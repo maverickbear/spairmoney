@@ -121,7 +121,7 @@ export async function updateAllSecurityPrices() {
 
   const now = formatTimestamp(new Date());
   const today = new Date();
-  today.setHours(0, 0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
   const todayTimestamp = formatTimestamp(today);
 
   let updated = 0;
@@ -199,7 +199,7 @@ export async function updateSecurityPrice(securityId: string, symbol: string) {
 
   const now = formatTimestamp(new Date());
   const today = new Date();
-  today.setHours(0, 0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
   const todayTimestamp = formatTimestamp(today);
 
   // Check if price already exists for today

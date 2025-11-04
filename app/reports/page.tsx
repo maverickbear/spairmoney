@@ -79,7 +79,7 @@ export default async function ReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Object.values(expensesByCategory).map((item) => {
+                {(Object.values(expensesByCategory) as Array<{ name: string; actual: number; budget: number }>).map((item) => {
                   const difference = item.actual - item.budget;
                   const percentage = item.budget > 0 ? (item.actual / item.budget) * 100 : 0;
 

@@ -426,7 +426,9 @@ export default function TransactionsPage() {
                       {tx.type}
                     </span>
                     {tx.recurring && (
-                      <Repeat className="h-3 w-3 text-muted-foreground" title="Recurring transaction" />
+                      <span title="Recurring transaction">
+                        <Repeat className="h-3 w-3 text-muted-foreground" />
+                      </span>
                     )}
                   </div>
                 </TableCell>

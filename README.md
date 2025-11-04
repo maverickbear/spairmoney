@@ -1,4 +1,4 @@
-# SmartCouple - Personal Finance Web App
+# Spare Finance - Personal Finance Web App
 
 A comprehensive personal finance web application built with Next.js 15, TypeScript, and Supabase (PostgreSQL). Track expenses, manage budgets, and monitor investments with granular category tracking.
 
@@ -163,5 +163,5 @@ The app uses Prisma with PostgreSQL (Supabase). Key models:
 
 MIT
 
-# smartcouple
-# smartcouple
+# spare-finance
+# spare-finance

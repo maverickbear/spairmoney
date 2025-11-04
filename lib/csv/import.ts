@@ -74,7 +74,7 @@ export function mapCSVToTransactions(
     const accountName = mapping.account ? row[mapping.account] : "";
     const categoryName = mapping.category ? row[mapping.category] : "";
     const subcategoryName = mapping.subcategory ? row[mapping.subcategory] : "";
-    const type = mapping.type ? row[mapping.type]?.toLowerCase() : "expense";
+    const type = (mapping.type ? row[mapping.type]?.toLowerCase() : "expense") || "expense";
     const tagsStr = mapping.tags ? row[mapping.tags] : "";
     const tags = tagsStr ? tagsStr.split(",").map((t) => t.trim()) : [];
 
@@ -82,14 +82,18 @@ export function mapCSVToTransactions(
     const category = categories.find((c) => c.name === categoryName);
     const subcategory = category?.subcategories?.find((s) => s.name === subcategoryName);
 
+    if (!account?.id) {
+      throw new Error(`Account not found: ${accountName}`);
+    }
+
     return {
       date,
       type,
       amount,
-      accountId: account?.id,
+      accountId: account.id,
       categoryId: category?.id,
       subcategoryId: subcategory?.id,
-      description,
+      description: description || "",
       tags,
     };
   });

@@ -9,15 +9,11 @@ export interface CheckboxProps
 }
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, onCheckedChange, onChange, ...props }, ref) => {
+  ({ className, onCheckedChange, ...props }, ref) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       // Call onCheckedChange if provided (for compatibility with shadcn/ui pattern)
       if (onCheckedChange) {
         onCheckedChange(e.target.checked);
-      }
-      // Call onChange if provided (for standard React pattern)
-      if (onChange) {
-        onChange(e);
       }
     };
 

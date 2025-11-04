@@ -35,7 +35,7 @@ export function Nav() {
       <div className="flex h-full flex-col">
         <div className="flex h-16 items-center border-b px-6">
           <Link href="/" className="text-xl font-bold">
-            SmartCouple
+            Spare Finance
           </Link>
         </div>
         

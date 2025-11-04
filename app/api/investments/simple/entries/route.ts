@@ -37,7 +37,11 @@ export async function POST(request: Request) {
       date: body.date instanceof Date ? body.date : new Date(body.date),
     };
     const validated = createEntrySchema.parse(data);
-    const entry = await createSimpleInvestmentEntry(validated);
+    // Ensure date is always a Date object
+    const entry = await createSimpleInvestmentEntry({
+      ...validated,
+      date: validated.date instanceof Date ? validated.date : new Date(validated.date),
+    });
     return NextResponse.json(entry, { status: 201 });
   } catch (error) {
     console.error("Error creating simple investment entry:", error);

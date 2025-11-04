@@ -130,7 +130,7 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   if (data.tags !== undefined) updateData.tags = JSON.stringify(data.tags || []);
   if (data.recurring !== undefined) updateData.recurring = data.recurring;
   if (data.transferToId !== undefined) updateData.transferToId = data.transferToId || null;
-  updateData.updatedAt = getCurrentTimestamp();
+  updateData.updatedAt = formatTimestamp(new Date());
 
   const { data: transaction, error } = await supabase
     .from("Transaction")

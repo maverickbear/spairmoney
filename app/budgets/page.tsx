@@ -160,7 +160,7 @@ export default function BudgetsPage() {
                 budget={budget.amount}
                 actual={budget.actualSpend || 0}
                 percentage={budget.percentage || 0}
-                status={budget.status}
+                status={budget.status || "ok"}
               />
             </CardContent>
           </Card>
