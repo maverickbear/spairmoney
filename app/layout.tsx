@@ -9,7 +9,7 @@ import { KBarWrapper } from "@/components/kbar-wrapper";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "SmartCouple - Personal Finance",
+  title: "Spare Finance - Personal Finance",
   description: "Track expenses, budgets, and investments",
 };
 

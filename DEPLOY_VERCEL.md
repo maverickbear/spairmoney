@@ -1,6 +1,6 @@
 # Guia de Deploy na Vercel
 
-Este guia explica como fazer o deploy gratuito do SmartCouple na Vercel.
+Este guia explica como fazer o deploy gratuito do Spare Finance na Vercel.
 
 ## Pré-requisitos
 
@@ -21,7 +21,7 @@ Este guia explica como fazer o deploy gratuito do SmartCouple na Vercel.
 
 2. Crie um novo repositório no GitHub e faça o push:
    ```bash
-   git remote add origin https://github.com/seu-usuario/smartcouple.git
+   git remote add origin https://github.com/seu-usuario/spare-finance.git
    git branch -M main
    git push -u origin main
    ```
@@ -36,7 +36,7 @@ Este guia explica como fazer o deploy gratuito do SmartCouple na Vercel.
 ## Passo 3: Fazer Deploy do Projeto
 
 1. No dashboard da Vercel, clique em **Add New Project**
-2. Selecione o repositório `smartcouple`
+2. Selecione o repositório `spare-finance`
 3. A Vercel detectará automaticamente que é um projeto Next.js
 
 ## Passo 4: Configurar Variáveis de Ambiente
@@ -59,7 +59,7 @@ Antes de fazer o deploy, configure as variáveis de ambiente:
 
 1. Clique em **Deploy**
 2. Aguarde o build completar (pode levar alguns minutos)
-3. Quando terminar, você verá um link do tipo: `https://smartcouple-xxxxx.vercel.app`
+3. Quando terminar, você verá um link do tipo: `https://spare-finance-xxxxx.vercel.app`
 
 ## Passo 6: Testar
 
