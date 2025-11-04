@@ -1,0 +1,48 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { LayoutDashboard, Receipt, Target, FolderTree, Wallet, TrendingUp, FileText, PiggyBank } from "lucide-react";
+
+const navItems = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/transactions", label: "Transactions", icon: Receipt },
+  { href: "/budgets", label: "Budgets", icon: Target },
+  { href: "/goals", label: "Goals", icon: PiggyBank },
+  { href: "/categories", label: "Categories", icon: FolderTree },
+  { href: "/accounts", label: "Accounts", icon: Wallet },
+  { href: "/investments", label: "Investments", icon: TrendingUp },
+  { href: "/reports", label: "Reports", icon: FileText },
+];
+
+export function BottomNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card md:hidden">
+      <div className="flex h-16 items-center justify-around">
+        {navItems.slice(0, 5).map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium transition-colors",
+                isActive
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
+              <span className={cn("text-[10px]", isActive && "text-primary")}>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+

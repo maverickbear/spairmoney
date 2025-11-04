@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id         String   @id @default(cuid())
+  name       String
+  type       String   // "cash" | "checking" | "savings" | "credit" | "investment" | "other"
+  creditLimit Float?  // Limit for credit cards (null for other types)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactions         Transaction[]
+  investmentAccounts  InvestmentAccount[]
+
+  @@index([type])
+}
+
+model Macro {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  categories Category[]
+  budgets    Budget[]
+
+  @@index([name])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  macroId   String
+  macro     Macro    @relation(fields: [macroId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subcategories    Subcategory[]
+  budgets          Budget[]
+  budgetCategories BudgetCategory[]
+  transactions     Transaction[]
+
+  @@index([macroId])
+  @@index([name])
+}
+
+model Subcategory {
+  id         String   @id @default(cuid())
+  name       String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  transactions Transaction[]
+
+  @@index([categoryId])
+  @@index([name])
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  date          DateTime
+  type          String   // "expense" | "income" | "transfer"
+  amount        Float
+  accountId     String
+  account       Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subcategoryId String?
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+  description   String?
+  tags          String   @default("") // JSON array as string
+  transferToId  String?  // For transfer transactions - points to destination account
+  transferFromId String? // For transfer transactions - points to origin transaction
+  recurring     Boolean  @default(false) // Indicates if transaction occurs every month
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([date])
+  @@index([categoryId, date])
+  @@index([accountId])
+  @@index([type])
+  @@index([date, type])
+  @@index([recurring])
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  period     DateTime // First day of month
+  categoryId String?  // Optional when macroId is present
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  macroId    String?  // Optional when grouping multiple categories
+  macro      Macro?    @relation(fields: [macroId], references: [id], onDelete: Cascade)
+  amount     Float
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  budgetCategories BudgetCategory[]
+
+  @@index([period])
+  @@index([categoryId, period])
+  @@index([macroId, period])
+}
+
+model InvestmentAccount {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // "Wealthsimple" | "TFSA" | "RRSP" | "Crypto Wallet" | etc.
+  accountId String?  // Link to Account if needed
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions InvestmentTransaction[]
+
+  @@index([type])
+}
+
+model Security {
+  id        String   @id @default(cuid())
+  symbol    String   @unique
+  name      String
+  class     String   // "stock" | "etf" | "crypto" | "bond" | "reit"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions InvestmentTransaction[]
+  prices       SecurityPrice[]
+
+  @@index([symbol])
+  @@index([class])
+}
+
+model InvestmentTransaction {
+  id              String   @id @default(cuid())
+  date            DateTime
+  accountId       String
+  account         InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  securityId      String?
+  security        Security? @relation(fields: [securityId], references: [id], onDelete: SetNull)
+  type            String   // "buy" | "sell" | "dividend" | "interest" | "transfer_in" | "transfer_out"
+  quantity        Float?
+  price           Float?
+  fees            Float    @default(0)
+  notes           String?
+  transferToId    String?  // For transfer_in/out
+  transferFromId  String?  // Points to other InvestmentTransaction for transfers
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([date])
+  @@index([accountId])
+  @@index([securityId])
+  @@index([type])
+}
+
+model SecurityPrice {
+  id        String   @id @default(cuid())
+  securityId String
+  security  Security @relation(fields: [securityId], references: [id], onDelete: Cascade)
+  date      DateTime
+  price     Float
+  createdAt DateTime @default(now())
+
+  @@unique([securityId, date])
+  @@index([securityId, date])
+}
+
+model BudgetCategory {
+  id         String   @id @default(cuid())
+  budgetId   String
+  budget     Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([budgetId, categoryId])
+  @@index([budgetId])
+  @@index([categoryId])
+}
+
