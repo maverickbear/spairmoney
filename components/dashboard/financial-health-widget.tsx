@@ -82,14 +82,14 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
 
   return (
     <>
-      <Card className="w-full">
+      <Card className="w-full group hover:shadow-md transition-shadow duration-300">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Heart className="h-5 w-5" />
             Financial Health
           </CardTitle>
           <CardDescription>
-            Complete analysis of your financial situation
+            Monthly Income vs Monthly Expenses comparison
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -146,29 +146,42 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
             </div>
           </div>
 
-          {/* Key Metrics */}
+          {/* Key Metrics - Income vs Expenses */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Months of Reserve</p>
-              <p className="text-lg font-semibold">
-                {data.monthsOfReserve.toFixed(1)}
-                <span className="text-sm text-muted-foreground ml-1">months</span>
+              <p className="text-xs text-muted-foreground">Monthly Income</p>
+              <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                {formatMoney(data.monthlyIncome)}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Savings Rate</p>
-              <p className={cn(
-                "text-lg font-semibold flex items-center gap-1",
-                data.savingsRate >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-              )}>
-                {data.savingsRate >= 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
-                )}
-                {data.savingsRate.toFixed(1)}%
+              <p className="text-xs text-muted-foreground">Monthly Expenses</p>
+              <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+                {formatMoney(data.monthlyExpenses)}
               </p>
             </div>
+          </div>
+
+          {/* Net Amount */}
+          <div className="space-y-1 p-3 rounded-lg border bg-card">
+            <p className="text-xs text-muted-foreground">Net Amount (Income - Expenses)</p>
+            <p className={cn(
+              "text-xl font-semibold flex items-center gap-2",
+              data.netAmount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            )}>
+              {data.netAmount >= 0 ? (
+                <TrendingUp className="h-5 w-5" />
+              ) : (
+                <TrendingDown className="h-5 w-5" />
+              )}
+              {formatMoney(data.netAmount)}
+              <span className={cn(
+                "text-sm ml-2",
+                data.savingsRate >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+              )}>
+                ({data.savingsRate >= 0 ? "+" : ""}{data.savingsRate.toFixed(1)}%)
+              </span>
+            </p>
           </div>
 
           {/* Alerts */}

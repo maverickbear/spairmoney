@@ -12,19 +12,32 @@ import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { UpcomingTransactions } from "@/components/dashboard/upcoming-transactions";
 import { FinancialHealthWidget } from "@/components/dashboard/financial-health-widget";
 import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
+import { MonthSelector } from "@/components/dashboard/month-selector";
 
-export default async function Dashboard() {
+interface DashboardProps {
+  searchParams: Promise<{ month?: string }> | { month?: string };
+}
+
+export default async function Dashboard({ searchParams }: DashboardProps) {
   try {
+    // Get selected month from URL or use current month
+    const params = await Promise.resolve(searchParams);
+    const selectedMonthParam = params?.month;
+    const selectedMonthDate = selectedMonthParam 
+      ? new Date(selectedMonthParam)
+      : new Date();
+    
     const now = new Date();
+    const selectedMonth = startOfMonth(selectedMonthDate);
     const currentMonth = startOfMonth(now);
-    const lastMonth = subMonths(currentMonth, 1);
+    const lastMonth = subMonths(selectedMonth, 1);
 
-    // Get transactions for current month
-    const currentMonthTransactions = await getTransactions({
-      startDate: currentMonth,
-      endDate: endOfMonth(now),
+    // Get transactions for selected month
+    const selectedMonthTransactions = await getTransactions({
+      startDate: selectedMonth,
+      endDate: endOfMonth(selectedMonthDate),
     }).catch((error) => {
-      console.error("Error fetching current month transactions:", error);
+      console.error("Error fetching selected month transactions:", error);
       return [];
     });
 
@@ -38,11 +51,11 @@ export default async function Dashboard() {
     });
 
   // Calculate metrics
-  const currentIncome = currentMonthTransactions
+  const currentIncome = selectedMonthTransactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const currentExpenses = currentMonthTransactions
+  const currentExpenses = selectedMonthTransactions
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
 
@@ -61,7 +74,7 @@ export default async function Dashboard() {
   });
 
   // Expenses by category
-  const expensesByCategory = currentMonthTransactions
+  const expensesByCategory = selectedMonthTransactions
     .filter((t) => t.type === "expense" && t.category && t.category.name)
     .reduce((acc, t) => {
       const catName = t.category?.name || "Uncategorized";
@@ -77,7 +90,7 @@ export default async function Dashboard() {
   );
 
   // Budget execution data
-  const budgets = await getBudgets(now).catch((error) => {
+  const budgets = await getBudgets(selectedMonthDate).catch((error) => {
     console.error("Error fetching budgets:", error);
     return [];
   });
@@ -95,8 +108,8 @@ export default async function Dashboard() {
     return [];
   });
 
-  // Get financial health data
-  const financialHealth = await calculateFinancialHealth().catch((error) => {
+  // Get financial health data for selected month
+  const financialHealth = await calculateFinancialHealth(selectedMonthDate).catch((error) => {
     console.error("Error calculating financial health:", error);
     return null;
   });
@@ -107,10 +120,10 @@ export default async function Dashboard() {
     return [];
   });
 
-  // Get transactions for the last 6 months for Income vs Expenses chart
-  const sixMonthsAgo = subMonths(now, 5); // 5 months ago + current month = 6 months
+  // Get transactions for the last 6 months for Income vs Expenses chart (ending at selected month)
+  const sixMonthsAgo = subMonths(selectedMonthDate, 5); // 5 months ago + selected month = 6 months
   const chartStart = startOfMonth(sixMonthsAgo);
-  const chartEnd = endOfMonth(now);
+  const chartEnd = endOfMonth(selectedMonthDate);
   const chartTransactions = await getTransactions({
     startDate: chartStart,
     endDate: chartEnd,
@@ -147,9 +160,12 @@ export default async function Dashboard() {
 
   return (
     <div className="space-y-4 md:space-y-8">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Overview of your finances</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Overview of your finances</p>
+        </div>
+        <MonthSelector />
       </div>
 
       {/* Summary Cards */}
