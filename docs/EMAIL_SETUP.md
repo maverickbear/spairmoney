@@ -49,7 +49,7 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxx
 RESEND_FROM_EMAIL=naor@maverickbear.co
 
 # URL da aplicação (para links nos emails)
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=https://sparefinance.vercel.app/
 ```
 
 ### Para Produção (Vercel)

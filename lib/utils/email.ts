@@ -26,7 +26,7 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
     return;
   }
 
-  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.vercel.app/";
   const invitationLink = `${appUrl}/members/accept?token=${data.invitationToken}`;
 
   // Always use naor@maverickbear.co as the default sender

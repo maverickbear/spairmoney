@@ -98,7 +98,7 @@ npm run db:seed
    ```bash
    npm run dev
    ```
-   - Acesse http://localhost:3000
+   - Acesse https://sparefinance.vercel.app/
    - Teste as funcionalidades principais
    - Verifique se os dados aparecem corretamente
 

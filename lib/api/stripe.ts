@@ -125,8 +125,8 @@ export async function createCheckoutSession(
           quantity: 1,
         },
       ],
-      success_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/welcome?plan=paid`,
-      cancel_url: returnUrl ? `${returnUrl}?canceled=true` : `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/select-plan?canceled=true`,
+      success_url: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.vercel.app/"}/welcome?plan=paid`,
+      cancel_url: returnUrl ? `${returnUrl}?canceled=true` : `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.vercel.app/"}/select-plan?canceled=true`,
       metadata: {
         userId: userId,
         planId: planId,
@@ -176,7 +176,7 @@ export async function createPortalSession(userId: string): Promise<{ url: string
     // Create portal session
     const session = await stripe.billingPortal.sessions.create({
       customer: subscription.stripeCustomerId,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/billing`,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.vercel.app/"}/billing`,
     });
 
     return { url: session.url, error: null };
