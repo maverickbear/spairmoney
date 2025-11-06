@@ -92,12 +92,14 @@ Análise detalhada das finanças:
 - Comparações históricas
 - Exportação para análise externa
 
-#### 8. Multi-tenancy
-Compartilhamento seguro com família:
+#### 8. Household Members (Multi-tenancy)
+Sistema para adicionar membros da família para acompanhamento financeiro separado:
 - Múltiplos membros por conta
-- Diferentes níveis de acesso
-- Compartilhamento de dados financeiros
+- Acompanhamento separado (cada membro tem suas próprias transações e dados)
+- Diferentes níveis de acesso (Admin e Member)
+- Compartilhamento seguro de dados financeiros
 - Gestão colaborativa
+- **Disponível apenas em planos pagos** (Basic e Premium)
 
 ---
 
@@ -115,31 +117,34 @@ Modelo de assinatura baseado em planos (SaaS - Software as a Service) com três 
 - Dívidas e metas básicas
 - Relatórios básicos
 - **Sem investimentos, sem CSV export**
+- **Sem Household Members** (apenas uso individual)
 
 **Estratégia**: Freemium para atrair usuários e demonstrar valor, com incentivo claro para upgrade.
 
 #### Plano BASIC - $7.99/mês ($79.90/ano)
-**Objetivo**: Plano principal para usuários individuais
+**Objetivo**: Plano principal para usuários individuais e famílias pequenas
 
 - 500 transações por mês
 - 10 contas bancárias
 - **Todas as features incluindo investimentos**
 - Relatórios avançados
 - Importação/Exportação CSV
+- **Household Members** (adicionar membros da família para acompanhamento separado)
 - Todas as funcionalidades do FREE
 
-**Estratégia**: Preço acessível que compete diretamente com PocketGuard e outros apps similares.
+**Estratégia**: Preço acessível que compete diretamente com PocketGuard e outros apps similares. Inclui household members como diferencial.
 
 #### Plano PREMIUM - $14.99/mês ($149.90/ano)
-**Objetivo**: Usuários avançados e famílias
+**Objetivo**: Usuários avançados e famílias maiores
 
 - **Transações ilimitadas**
 - **Contas ilimitadas**
 - Todas as features do BASIC
+- **Household Members** (adicionar membros da família para acompanhamento separado)
 - Prioridade de suporte (futuro)
 - Recursos avançados exclusivos
 
-**Estratégia**: Para usuários power users e famílias que precisam de recursos ilimitados.
+**Estratégia**: Para usuários power users e famílias que precisam de recursos ilimitados e household members.
 
 ### Análise de Receita
 

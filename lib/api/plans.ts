@@ -54,6 +54,8 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
   try {
     const supabase = await createServerClient();
     
+    // Use maybeSingle() instead of single() to handle case when no subscription exists
+    // This prevents 406 errors when there are 0 results
     const { data: subscription, error } = await supabase
       .from("Subscription")
       .select("*")
@@ -61,9 +63,15 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
       .eq("status", "active")
       .order("createdAt", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error || !subscription) {
+    // If error is PGRST116 (no rows returned), it's expected when no subscription exists
+    // Other errors should be logged
+    if (error && error.code !== "PGRST116") {
+      console.error("[PLANS] Error fetching subscription:", error);
+    }
+
+    if (!subscription) {
       // Return free subscription as default
       return {
         id: "free-default",
@@ -82,7 +90,7 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
 
     return mapSubscription(subscription);
   } catch (error) {
-    console.error("Error in getUserSubscription:", error);
+    console.error("[PLANS] Error in getUserSubscription:", error);
     // Return free subscription as default
     return {
       id: "free-default",

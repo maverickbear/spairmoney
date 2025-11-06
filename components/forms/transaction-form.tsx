@@ -38,7 +38,7 @@ interface Transaction {
   category?: {
     id: string;
     name: string;
-    macroId: string;
+    macroId?: string;
   };
 }
 
@@ -499,7 +499,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
               <Checkbox
                 id="recurring"
                 checked={form.watch("recurring")}
-                onChange={(e) => form.setValue("recurring", e.target.checked)}
+                onCheckedChange={(checked) => form.setValue("recurring", checked)}
               />
               <label
                 htmlFor="recurring"

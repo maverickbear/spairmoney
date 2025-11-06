@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/supabase-server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { planId, interval = "month" } = body;
+    const { planId, interval = "month", returnUrl } = body;
 
     if (!planId) {
       return NextResponse.json(
@@ -25,8 +25,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Build return URL with success parameter
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const finalReturnUrl = returnUrl 
+      ? `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}success=true`
+      : undefined;
+
     // Create checkout session
-    const { url, error } = await createCheckoutSession(authUser.id, planId, interval);
+    const { url, error } = await createCheckoutSession(authUser.id, planId, interval, finalReturnUrl);
 
     if (error || !url) {
       return NextResponse.json(

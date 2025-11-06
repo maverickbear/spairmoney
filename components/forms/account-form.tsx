@@ -56,7 +56,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
       if (account) {
         form.reset({
           name: account.name,
-          type: account.type,
+          type: account.type as "cash" | "checking" | "savings" | "credit" | "investment" | "other",
           creditLimit: account.creditLimit ?? undefined,
         });
       } else {

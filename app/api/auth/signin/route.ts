@@ -160,7 +160,9 @@ export async function POST(request: NextRequest) {
     // If session is not in authData, try to get it explicitly
     if (!activeSession) {
       const { data: { session } } = await supabase.auth.getSession();
-      activeSession = session;
+      if (session) {
+        activeSession = session;
+      }
     }
 
     // Create response with user data

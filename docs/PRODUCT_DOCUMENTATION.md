@@ -454,18 +454,25 @@ Sistema para importar e exportar dados financeiros.
 
 ---
 
-### 11. 👥 Multi-tenancy (Membros)
+### 11. 👥 Household Members (Multi-tenancy)
 
-Sistema para compartilhar acesso com membros da família.
+Sistema para adicionar membros da família para acompanhamento financeiro separado.
 
 #### Funcionalidades:
 
 - ✅ **Convidar membros**: Enviar convites por email
 - ✅ **Aceitar convites**: Membros podem aceitar convites
-- ✅ **Níveis de acesso**: Diferentes níveis de permissão (futuro)
+- ✅ **Acompanhamento separado**: Cada membro pode ter suas próprias transações, contas e dados
+- ✅ **Níveis de acesso**: Diferentes níveis de permissão (Admin e Member)
 - ✅ **Status de convite**: Rastreamento de status (pendente, aceito, expirado)
 - ✅ **Gerenciamento**: Listar, editar e remover membros
 - ✅ **Reenvio de convites**: Reenviar convites expirados
+
+#### Limites por Plano:
+
+- **FREE**: Não disponível (apenas uso individual)
+- **BASIC**: Disponível (adicionar membros da família)
+- **PREMIUM**: Disponível (adicionar membros da família)
 
 ---
 
@@ -497,6 +504,7 @@ Sistema completo de assinaturas e pagamentos via Stripe.
 - Relatórios básicos
 - Sem investimentos
 - Sem CSV export
+- **Sem Household Members** (apenas uso individual)
 
 ##### BASIC Plan - $7.99/mês ($79.90/ano)
 - 500 transações/mês
@@ -504,12 +512,14 @@ Sistema completo de assinaturas e pagamentos via Stripe.
 - Investimentos
 - Relatórios avançados
 - CSV export
+- **Household Members** (adicionar membros da família para acompanhamento separado)
 - Todas as features do FREE
 
 ##### PREMIUM Plan - $14.99/mês ($149.90/ano)
 - Transações ilimitadas
 - Contas ilimitadas
 - Todas as features do BASIC
+- **Household Members** (adicionar membros da família para acompanhamento separado)
 - Prioridade de suporte (futuro)
 
 #### Funcionalidades:
@@ -570,6 +580,7 @@ Sistema completo de assinaturas e pagamentos via Stripe.
 | CSV Export | ❌ |
 | Dívidas | ✅ |
 | Metas | ✅ |
+| Household Members | ❌ |
 
 ### BASIC Plan
 
@@ -582,6 +593,7 @@ Sistema completo de assinaturas e pagamentos via Stripe.
 | CSV Export | ✅ |
 | Dívidas | ✅ |
 | Metas | ✅ |
+| Household Members | ✅ |
 
 ### PREMIUM Plan
 
@@ -594,6 +606,7 @@ Sistema completo de assinaturas e pagamentos via Stripe.
 | CSV Export | ✅ |
 | Dívidas | ✅ |
 | Metas | ✅ |
+| Household Members | ✅ |
 
 ---
 

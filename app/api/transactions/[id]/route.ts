@@ -17,10 +17,10 @@ export async function PATCH(
     };
     const transaction = await updateTransaction(id, data);
     // Revalidate cache
-    revalidateTag('transactions');
-    revalidateTag('budgets');
-    revalidateTag('financial-health');
-    revalidateTag('goals');
+    revalidateTag('transactions', 'max');
+    revalidateTag('budgets', 'max');
+    revalidateTag('financial-health', 'max');
+    revalidateTag('goals', 'max');
     return NextResponse.json(transaction);
   } catch (error) {
     console.error("Error updating transaction:", error);
@@ -37,10 +37,10 @@ export async function DELETE(
     const { id } = await params;
     await deleteTransaction(id);
     // Revalidate cache
-    revalidateTag('transactions');
-    revalidateTag('budgets');
-    revalidateTag('financial-health');
-    revalidateTag('goals');
+    revalidateTag('transactions', 'max');
+    revalidateTag('budgets', 'max');
+    revalidateTag('financial-health', 'max');
+    revalidateTag('goals', 'max');
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete transaction" }, { status: 500 });

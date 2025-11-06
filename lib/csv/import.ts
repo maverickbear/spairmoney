@@ -50,10 +50,10 @@ interface TransactionInput {
   date: Date;
   type: string;
   amount: number;
-  accountId: string;
+  accountId?: string;
   categoryId?: string;
   subcategoryId?: string;
-  description: string;
+  description?: string;
   tags: string[];
 }
 
@@ -74,7 +74,7 @@ export function mapCSVToTransactions(
     const accountName = mapping.account ? row[mapping.account] : "";
     const categoryName = mapping.category ? row[mapping.category] : "";
     const subcategoryName = mapping.subcategory ? row[mapping.subcategory] : "";
-    const type = mapping.type ? row[mapping.type]?.toLowerCase() : "expense";
+    const type = (mapping.type ? row[mapping.type]?.toLowerCase() : "expense") || "expense";
     const tagsStr = mapping.tags ? row[mapping.tags] : "";
     const tags = tagsStr ? tagsStr.split(",").map((t) => t.trim()) : [];
 

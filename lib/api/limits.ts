@@ -4,6 +4,9 @@ import { createServerClient } from "@/lib/supabase-server";
 import { checkPlanLimits, getCurrentUserSubscription } from "@/lib/api/plans";
 import { PlanFeatures } from "@/lib/validations/plan";
 
+// Re-export PlanFeatures for convenience
+export type { PlanFeatures } from "@/lib/validations/plan";
+
 export interface LimitCheckResult {
   allowed: boolean;
   limit: number;

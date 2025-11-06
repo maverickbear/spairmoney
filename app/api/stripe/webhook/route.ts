@@ -8,17 +8,19 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-10-29.clover",
   typescript: true,
 });
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("[WEBHOOK:ROUTE] Webhook endpoint called");
     const body = await request.text();
     const headersList = await headers();
     const signature = headersList.get("stripe-signature");
 
     if (!signature) {
+      console.error("[WEBHOOK:ROUTE] Missing stripe-signature header");
       return NextResponse.json(
         { error: "Missing stripe-signature header" },
         { status: 400 }
@@ -26,6 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      console.error("[WEBHOOK:ROUTE] STRIPE_WEBHOOK_SECRET is not configured");
       return NextResponse.json(
         { error: "STRIPE_WEBHOOK_SECRET is not configured" },
         { status: 500 }
@@ -35,13 +38,15 @@ export async function POST(request: NextRequest) {
     // Verify webhook signature
     let event: Stripe.Event;
     try {
+      console.log("[WEBHOOK:ROUTE] Verifying webhook signature...");
       event = stripe.webhooks.constructEvent(
         body,
         signature,
         process.env.STRIPE_WEBHOOK_SECRET
       );
+      console.log("[WEBHOOK:ROUTE] Webhook signature verified successfully");
     } catch (err) {
-      console.error("Webhook signature verification failed:", err);
+      console.error("[WEBHOOK:ROUTE] Webhook signature verification failed:", err);
       return NextResponse.json(
         { error: "Webhook signature verification failed" },
         { status: 400 }
@@ -49,18 +54,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle the event
+    console.log("[WEBHOOK:ROUTE] Handling webhook event:", event.type);
     const result = await handleWebhookEvent(event);
 
     if (!result.success) {
+      console.error("[WEBHOOK:ROUTE] Webhook event handling failed:", result.error);
       return NextResponse.json(
         { error: result.error || "Failed to handle webhook event" },
         { status: 500 }
       );
     }
 
+    console.log("[WEBHOOK:ROUTE] Webhook event handled successfully");
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Error processing webhook:", error);
+    console.error("[WEBHOOK:ROUTE] Error processing webhook:", error);
     return NextResponse.json(
       { error: "Failed to process webhook" },
       { status: 500 }

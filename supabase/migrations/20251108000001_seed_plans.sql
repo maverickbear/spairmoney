@@ -13,8 +13,8 @@ VALUES
   (
     'basic',
     'basic',
-    9.99,
-    99.99,
+    7.99,
+    79.90,
     '{"maxTransactions": 500, "maxAccounts": 10, "hasInvestments": true, "hasAdvancedReports": true, "hasCsvExport": true, "hasDebts": true, "hasGoals": true}'::jsonb,
     NOW(),
     NOW()
@@ -22,8 +22,8 @@ VALUES
   (
     'premium',
     'premium',
-    19.99,
-    199.99,
+    14.99,
+    149.90,
     '{"maxTransactions": -1, "maxAccounts": -1, "hasInvestments": true, "hasAdvancedReports": true, "hasCsvExport": true, "hasDebts": true, "hasGoals": true}'::jsonb,
     NOW(),
     NOW()

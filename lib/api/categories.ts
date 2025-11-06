@@ -395,7 +395,7 @@ export async function updateSubcategory(id: string, data: { name?: string }) {
     throw new Error("Subcategory not found");
   }
 
-  const category = existingSubcategory.category as { id: string; userId: string | null };
+  const category = (existingSubcategory.category as unknown) as { id: string; userId: string | null };
   if (category.userId !== authUser.id) {
     throw new Error("Cannot update subcategories from system default categories");
   }
@@ -447,7 +447,7 @@ export async function deleteSubcategory(id: string) {
     throw new Error("Subcategory not found");
   }
 
-  const category = existingSubcategory.category as { id: string; userId: string | null };
+  const category = (existingSubcategory.category as unknown) as { id: string; userId: string | null };
   if (category.userId !== authUser.id) {
     throw new Error("Cannot delete subcategories from system default categories");
   }

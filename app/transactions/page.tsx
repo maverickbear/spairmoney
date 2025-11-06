@@ -41,7 +41,7 @@ interface Transaction {
   transferToId?: string;
   recurring?: boolean;
   account?: { id: string; name: string };
-  category?: { id: string; name: string };
+  category?: { id: string; name: string; macroId?: string };
   subcategory?: { id: string; name: string };
 }
 
@@ -205,7 +205,7 @@ export default function TransactionsPage() {
       
       // Add category from URL if present
       const categoryIdFromUrl = searchParams.get("categoryId");
-      const activeCategories = new Set(defaultCategories);
+      const activeCategories = new Set<string>(defaultCategories);
       if (categoryIdFromUrl) {
         activeCategories.add(categoryIdFromUrl);
       }
@@ -475,7 +475,7 @@ export default function TransactionsPage() {
                       {tx.type}
                     </span>
                     {tx.recurring && (
-                      <Repeat className="h-3 w-3 text-muted-foreground" title="Recurring transaction" />
+                      <Repeat className="h-3 w-3 text-muted-foreground" />
                     )}
                   </div>
                 </TableCell>

@@ -21,8 +21,8 @@ export async function POST(request: Request) {
       ...data,
       period: new Date(data.period),
     });
-    revalidateTag('budgets');
-    revalidateTag('financial-health');
+    revalidateTag('budgets', 'max');
+    revalidateTag('financial-health', 'max');
     return NextResponse.json(budget);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to create budget";

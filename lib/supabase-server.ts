@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
@@ -29,7 +30,6 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
     auth: {
       persistSession: false,
       autoRefreshToken: false,
-      detectSessionInCookie: false,
     },
   });
 
@@ -49,5 +49,27 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
   }
 
   return client;
+}
+
+// Server-side Supabase client with service role key
+// Use this for webhooks and admin operations that need to bypass RLS
+// WARNING: This client bypasses Row Level Security - use with caution!
+export function createServiceRoleClient() {
+  if (!supabaseServiceRoleKey) {
+    console.warn("⚠️  SUPABASE_SERVICE_ROLE_KEY not set. Falling back to anon key (may cause RLS issues).");
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+  }
+
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 }
 

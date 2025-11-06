@@ -29,7 +29,7 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
   const findSubcategory = async (name: string, categoryId: string) => {
     const category = allCategories.find((cat) => cat.id === categoryId);
     if (category && category.subcategories) {
-      const found = category.subcategories.find((sub) => sub.name === name);
+      const found = category.subcategories.find((sub: { id: string; name: string }) => sub.name === name);
       if (found) return found;
     }
     // If not found in loaded categories, try fetching directly

@@ -10,8 +10,8 @@ export async function PATCH(
     const { id } = await params;
     const data = await request.json();
     const goal = await updateGoal(id, data);
-    revalidateTag('goals');
-    revalidateTag('financial-health');
+    revalidateTag('goals', 'max');
+    revalidateTag('financial-health', 'max');
     return NextResponse.json(goal);
   } catch (error) {
     const errorMessage =
@@ -28,8 +28,8 @@ export async function DELETE(
   try {
     const { id } = await params;
     await deleteGoal(id);
-    revalidateTag('goals');
-    revalidateTag('financial-health');
+    revalidateTag('goals', 'max');
+    revalidateTag('financial-health', 'max');
     return NextResponse.json({ success: true });
   } catch (error) {
     const errorMessage =

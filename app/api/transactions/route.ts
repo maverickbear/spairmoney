@@ -64,10 +64,10 @@ export async function POST(request: Request) {
     };
     const transaction = await createTransaction(data);
     // Revalidate cache
-    revalidateTag('transactions');
-    revalidateTag('budgets');
-    revalidateTag('financial-health');
-    revalidateTag('goals');
+    revalidateTag('transactions', 'max');
+    revalidateTag('budgets', 'max');
+    revalidateTag('financial-health', 'max');
+    revalidateTag('goals', 'max');
     return NextResponse.json(transaction);
   } catch (error) {
     console.error("Error creating transaction:", error);

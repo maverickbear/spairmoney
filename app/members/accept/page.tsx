@@ -329,7 +329,7 @@ function AcceptInvitationForm() {
                       type="password"
                       {...form.register("password")}
                       placeholder="••••••••"
-                      disabled={status === "processing"}
+                      disabled={(status as string) === "processing"}
                       className="pl-10 h-11"
                     />
                   </div>
@@ -352,7 +352,7 @@ function AcceptInvitationForm() {
                       type="password"
                       {...form.register("confirmPassword")}
                       placeholder="••••••••"
-                      disabled={status === "processing"}
+                      disabled={(status as string) === "processing"}
                       className="pl-10 h-11"
                     />
                   </div>
@@ -364,12 +364,12 @@ function AcceptInvitationForm() {
                   )}
                 </div>
 
-                <Button 
+                <Button
                   type="submit" 
                   className="w-full h-11 text-base font-medium" 
-                  disabled={status === "processing"}
+                  disabled={(status as string) === "processing"}
                 >
-                  {status === "processing" ? (
+                  {(status as string) === "processing" ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Creating account...

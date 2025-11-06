@@ -1,31 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Zap, Crown, ArrowRight } from "lucide-react";
 
-export default function WelcomePage() {
+function WelcomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan") || "free";
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncSubscription = useCallback(async () => {
+    try {
+      setSyncing(true);
+      console.log("[WELCOME] Syncing subscription from Stripe...");
+      
+      const response = await fetch("/api/stripe/sync-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        console.log("[WELCOME] Subscription synced successfully:", data.subscription);
+      } else {
+        console.error("[WELCOME] Failed to sync subscription:", data.error);
+        // Don't fail the page, just log the error
+      }
+    } catch (error) {
+      console.error("[WELCOME] Error syncing subscription:", error);
+    } finally {
+      setSyncing(false);
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Small delay to ensure smooth transition
-    setTimeout(() => setLoading(false), 100);
-  }, []);
+    // If plan is "paid", try to sync subscription from Stripe
+    if (plan === "paid") {
+      syncSubscription();
+    } else {
+      setTimeout(() => setLoading(false), 100);
+    }
+  }, [plan, syncSubscription]);
 
   const handleGoToDashboard = () => {
     router.push("/");
   };
 
-  if (loading) {
+  if (loading || syncing) {
     return (
       <div className="container mx-auto py-8">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-pulse text-muted-foreground">Loading...</div>
+          <div className="animate-pulse text-muted-foreground">
+            {syncing ? "Activating your subscription..." : "Loading..."}
+          </div>
         </div>
       </div>
     );
@@ -169,6 +204,22 @@ export default function WelcomePage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function WelcomePage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-pulse text-muted-foreground">
+            Loading...
+          </div>
+        </div>
+      </div>
+    }>
+      <WelcomeContent />
+    </Suspense>
   );
 }
 

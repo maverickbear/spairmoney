@@ -74,10 +74,10 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
               <div className="relative flex-shrink-0">
-                {member.avatarUrl ? (
+                {(member as any).avatarUrl ? (
                   <>
                     <img
-                      src={member.avatarUrl}
+                      src={(member as any).avatarUrl}
                       alt={member.name || member.email}
                       className="h-12 w-12 rounded-full object-cover border-2"
                       onError={(e) => {

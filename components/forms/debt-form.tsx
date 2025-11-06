@@ -254,9 +254,11 @@ export function DebtForm({
           const parsedDate = new Date(debt.firstPaymentDate);
           firstPaymentDateValue = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
         } else {
-          firstPaymentDateValue = debt.firstPaymentDate instanceof Date 
-            ? debt.firstPaymentDate 
-            : new Date(debt.firstPaymentDate);
+          // Handle case where it might be a Date object from database
+          const dateValue = debt.firstPaymentDate as any;
+          firstPaymentDateValue = dateValue instanceof Date 
+            ? dateValue 
+            : new Date(dateValue);
         }
       } else {
         firstPaymentDateValue = new Date();
@@ -264,15 +266,15 @@ export function DebtForm({
 
       form.reset({
         name: debt.name ?? "",
-        loanType: debt.loanType ?? "other",
+        loanType: (debt.loanType ?? "other") as "other" | "car_loan" | "mortgage" | "personal_loan" | "credit_card" | "student_loan" | "business_loan",
         initialAmount: debt.initialAmount ?? 0,
         downPayment: debt.downPayment ?? 0,
         currentBalance: debt.currentBalance ?? 0,
         interestRate: debt.interestRate ?? 0,
         totalMonths: debt.totalMonths ?? 0,
         firstPaymentDate: firstPaymentDateValue,
-        paymentFrequency: debt.paymentFrequency ?? "monthly",
-        paymentAmount: debt.paymentAmount ?? 0,
+        paymentFrequency: (debt as any).paymentFrequency ?? "monthly",
+        paymentAmount: (debt as any).paymentAmount ?? 0,
         monthlyPayment: debt.monthlyPayment ?? 0,
         principalPaid: debt.principalPaid ?? 0,
         interestPaid: debt.interestPaid ?? 0,

@@ -43,9 +43,9 @@ For each plan (Basic and Premium), create a product and price in Stripe:
    - Name: "Basic Plan"
    - Description: "Basic subscription for Spare Finance"
 3. Create prices:
-   - Monthly: $9.99/month
-   - Yearly: $99.99/year
-4. Repeat for "Premium Plan" ($19.99/month, $199.99/year)
+   - Monthly: $7.99/month
+   - Yearly: $79.90/year
+4. Repeat for "Premium Plan" ($14.99/month, $149.90/year)
 5. Copy the **Price IDs** and **Product IDs**
 
 ### 3. Update Plan Prices in Database
@@ -127,9 +127,9 @@ npm install stripe
 
 ### Plans
 
-- **Free**: 50 transactions/month, 2 accounts, no investments, no advanced reports
-- **Basic**: 500 transactions/month, 10 accounts, basic investments, basic reports ($9.99/month)
-- **Premium**: Unlimited transactions, unlimited accounts, all features ($19.99/month)
+- **Free**: 50 transactions/month, 2 accounts, no investments, no advanced reports, no household members
+- **Basic**: 500 transactions/month, 10 accounts, investments, advanced reports, CSV export, household members ($7.99/month or $79.90/year)
+- **Premium**: Unlimited transactions, unlimited accounts, all features, household members ($14.99/month or $149.90/year)
 
 ### Authentication
 

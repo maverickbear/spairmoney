@@ -77,6 +77,7 @@ CREATE POLICY "Service role can delete plans" ON "Plan"
 DROP POLICY IF EXISTS "Service can insert subscriptions" ON "Subscription";
 DROP POLICY IF EXISTS "Service role can insert subscriptions" ON "Subscription";
 DROP POLICY IF EXISTS "Service role can delete subscriptions" ON "Subscription";
+DROP POLICY IF EXISTS "Service role can update subscriptions" ON "Subscription";
 
 -- Service role can insert subscriptions (for webhooks)
 -- More restrictive than the old "Service can insert subscriptions" which allowed all authenticated users
@@ -87,9 +88,16 @@ CREATE POLICY "Service role can insert subscriptions" ON "Subscription"
 CREATE POLICY "Service role can delete subscriptions" ON "Subscription"
   FOR DELETE USING (auth.role() = 'service_role');
 
+-- Service role can update subscriptions (for webhooks)
+-- Note: Service role bypasses RLS automatically, but this policy is good for safety
+CREATE POLICY "Service role can update subscriptions" ON "Subscription"
+  FOR UPDATE USING (auth.role() = 'service_role');
+
 -- Note: SELECT and UPDATE policies already exist:
 -- - "Users can read own subscriptions" (SELECT) - already exists
--- - "Users cannot update subscriptions" (UPDATE) - already exists
+-- - "Users cannot update subscriptions" (UPDATE) - already exists (blocks user updates)
+-- - "Users can insert own subscriptions" (INSERT) - created by 20241115000002_fix_subscription_insert_policy.sql
+--   This policy allows users to create their own subscriptions during signup/signin
 
 -- ============================================
 -- Step 5: Add DELETE policies for Security tables

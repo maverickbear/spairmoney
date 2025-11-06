@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface ListSkeletonProps {
   className?: string;
   itemCount?: number;
+  rowCount?: number;
 }
 
 export function ListSkeleton({ className, itemCount = 3 }: ListSkeletonProps) {

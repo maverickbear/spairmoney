@@ -187,6 +187,18 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                   ))}
                 </tr>
                 <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">Household Members</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.name !== "free" ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
                   <td className="px-6 py-4"></td>
                   {sortedPlans.map((plan) => {
                     const price = interval === "month" ? plan.priceMonthly : plan.priceYearly;
@@ -228,6 +240,7 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
               plan.features.hasCsvExport && "CSV export",
               plan.features.hasDebts && "Debts tracking",
               plan.features.hasGoals && "Goals tracking",
+              plan.name !== "free" && "Household members",
             ].filter(Boolean);
 
             const isPopular = plan.name === "basic";
@@ -255,8 +268,8 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                   </CardTitle>
                   <CardDescription className="text-base mt-2">
                     {plan.name === "free" && "Perfect for getting started with your financial management"}
-                    {plan.name === "basic" && "For personal use with essential features"}
-                    {plan.name === "premium" && "For power users who need advanced features"}
+                    {plan.name === "basic" && "For personal use and small families with essential features"}
+                    {plan.name === "premium" && "For power users and larger families with advanced features"}
                   </CardDescription>
                   <div className="mt-6">
                     {hasDiscount && originalYearlyPrice && (

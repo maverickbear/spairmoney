@@ -42,6 +42,7 @@ Este documento apresenta uma análise completa de pricing para os planos do Spar
 | CSV Export | ❌ | ✅ | ✅ |
 | Dívidas | ✅ | ✅ | ✅ |
 | Metas | ✅ | ✅ | ✅ |
+| Household Members | ❌ | ✅ | ✅ |
 
 ---
 
@@ -83,6 +84,7 @@ Este documento apresenta uma análise completa de pricing para os planos do Spar
 - **Custo**: ~$0.01-0.05/usuário/mês
 - **Função**: Acquisition funnel, test drive
 - **Limites**: 50 transações, 2 contas
+- **Sem Household Members**: Apenas uso individual
 - **Justificativa**: Plano freemium essencial para aquisição
 
 ---
@@ -124,6 +126,7 @@ Desconto: 17% (vs. mensal)
 - Relatórios avançados
 - CSV export
 - Dívidas e metas
+- **Household Members** (adicionar membros da família para acompanhamento separado)
 
 ---
 
@@ -161,6 +164,7 @@ Desconto: 17% (vs. mensal)
 - Transações ilimitadas
 - Contas ilimitadas
 - Todas as features do Basic
+- **Household Members** (adicionar membros da família para acompanhamento separado)
 - Prioridade de suporte (futuro)
 
 ---
