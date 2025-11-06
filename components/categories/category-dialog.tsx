@@ -324,7 +324,7 @@ export function CategoryDialog({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Group</label>
             <Select
               value={form.watch("macroId")}
@@ -348,7 +348,7 @@ export function CategoryDialog({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Category Name</label>
             <Input
               {...form.register("name")}
@@ -361,7 +361,7 @@ export function CategoryDialog({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Subcategories</label>
               <Button
@@ -417,7 +417,7 @@ export function CategoryDialog({
               </div>
             )}
 
-            <div className="space-y-1 max-h-48 overflow-y-auto rounded-md border p-2">
+            <div className="space-y-1 max-h-48 overflow-y-auto rounded-[12px] border p-2">
               {subcategories.length === 0 && pendingSubcategories.length === 0 && !isAddingSubcategory ? (
                 <p className="text-sm text-muted-foreground text-center py-2">
                   No subcategories yet
@@ -428,7 +428,7 @@ export function CategoryDialog({
                   {pendingSubcategories.map((pending) => (
                     <div
                       key={pending.tempId}
-                      className="flex items-center gap-2 p-2 hover:bg-muted rounded"
+                      className="flex items-center gap-2 p-2 hover:bg-muted rounded-[12px]"
                     >
                       {editingPendingSubcategoryTempId === pending.tempId ? (
                         <>
@@ -493,7 +493,7 @@ export function CategoryDialog({
                   {subcategories.map((subcategory) => (
                     <div
                       key={subcategory.id}
-                      className="flex items-center gap-2 p-2 hover:bg-muted rounded"
+                      className="flex items-center gap-2 p-2 hover:bg-muted rounded-[12px]"
                     >
                       {editingSubcategoryId === subcategory.id ? (
                         <>

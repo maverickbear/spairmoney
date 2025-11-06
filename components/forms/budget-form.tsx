@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { budgetSchema, BudgetFormData } from "@/lib/validations/budget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/common/money-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -295,7 +294,7 @@ export function BudgetForm({
               {budget.macroId && budget.macro ? (
                 // Grouped budget: show macro and related categories
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium">Group</label>
                     <Select value={budget.macroId} disabled={true}>
                       <SelectTrigger>
@@ -310,9 +309,9 @@ export function BudgetForm({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium">Categories</label>
-                    <div className="border rounded-md p-4 max-h-60 overflow-y-auto space-y-2">
+                    <div className="border rounded-[12px] p-4 max-h-60 overflow-y-auto space-y-2">
                       {budget.budgetCategories && budget.budgetCategories.length > 0 ? (
                         budget.budgetCategories.map((bc) => (
                           <div key={bc.category?.id} className="flex items-center space-x-2">
@@ -337,7 +336,7 @@ export function BudgetForm({
                 </>
               ) : (
                 // Single category budget: show category (read-only)
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Category</label>
                   <Select
                     value={form.watch("categoryId")}
@@ -386,9 +385,9 @@ export function BudgetForm({
               </div>
 
               {selectedMacroId && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Categories *</label>
-                  <div className="border rounded-md p-4 max-h-60 overflow-y-auto space-y-2">
+                  <div className="border rounded-[12px] p-4 max-h-60 overflow-y-auto space-y-2">
                     {availableCategories.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
                         No categories found for this group
@@ -426,9 +425,12 @@ export function BudgetForm({
             </>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Amount *</label>
-            <MoneyInput
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
               {...form.register("amount", { valueAsNumber: true })}
             />
             {form.formState.errors.amount && (
@@ -438,7 +440,7 @@ export function BudgetForm({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Note (optional)</label>
             <Input {...form.register("note")} />
           </div>

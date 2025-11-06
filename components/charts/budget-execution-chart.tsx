@@ -55,22 +55,18 @@ export function BudgetExecutionChart({ data }: BudgetExecutionChartProps) {
       description="Budget percentage by category"
       className="overflow-hidden"
     >
-      <div className="mb-6 border-b pb-4">
-        <div className="flex items-baseline gap-3">
-          <div className="text-3xl font-semibold tracking-tight">
-            {averagePercentage.toFixed(1)}%
-          </div>
-          <div className="text-sm font-medium text-muted-foreground">
-            Average Execution
-          </div>
+      {sortedData.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            No budgets found for this period
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Create budgets to track your spending
+          </p>
         </div>
-        <div className="mt-2 text-xs text-muted-foreground">
-          {data.length} {data.length === 1 ? "category" : "categories"} tracked
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {sortedData.map((item, index) => {
+      ) : (
+        <div className="space-y-4">
+          {sortedData.map((item, index) => {
           const colors = getStatusColor(item.percentage);
           const statusLabel = getStatusLabel(item.percentage);
           const clampedPercentage = Math.min(item.percentage, 100);
@@ -112,7 +108,8 @@ export function BudgetExecutionChart({ data }: BudgetExecutionChartProps) {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="mt-6 pt-4 border-t">

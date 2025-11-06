@@ -22,7 +22,7 @@ export interface AccountInvestmentValue {
 }
 
 export async function getSimpleInvestmentEntries(accountId?: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   let query = supabase
     .from("SimpleInvestmentEntry")
@@ -50,7 +50,7 @@ export async function createSimpleInvestmentEntry(data: {
   amount: number;
   description?: string;
 }) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const id = crypto.randomUUID();
   const date = data.date instanceof Date ? data.date : new Date(data.date);
@@ -83,7 +83,7 @@ export async function createSimpleInvestmentEntry(data: {
 }
 
 export async function getAccountInvestmentValue(accountId: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { data, error } = await supabase
     .from("AccountInvestmentValue")
@@ -107,7 +107,7 @@ export async function upsertAccountInvestmentValue(data: {
   accountId: string;
   totalValue: number;
 }) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const now = formatTimestamp(new Date());
 
@@ -161,7 +161,7 @@ export async function upsertAccountInvestmentValue(data: {
 }
 
 export async function getTotalInvestmentsValue() {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get all investment accounts (type = "investment")
   const { data: investmentAccounts, error: accountsError } = await supabase

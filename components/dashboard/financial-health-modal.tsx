@@ -39,7 +39,7 @@ export function FinancialHealthModal({
       case "Excellent":
         return "text-green-600 dark:text-green-400";
       case "Good":
-        return "text-blue-600 dark:text-blue-400";
+        return "text-green-600 dark:text-green-400";
       case "Fair":
         return "text-yellow-600 dark:text-yellow-400";
       case "Poor":
@@ -52,11 +52,11 @@ export function FinancialHealthModal({
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600 dark:text-green-400";
-    if (score >= 60) return "text-blue-600 dark:text-blue-400";
-    if (score >= 40) return "text-yellow-600 dark:text-yellow-400";
-    if (score >= 20) return "text-orange-600 dark:text-orange-400";
-    return "text-red-600 dark:text-red-400";
+    if (score >= 91) return "text-green-600 dark:text-green-400"; // Excellent
+    if (score >= 81) return "text-green-600 dark:text-green-400"; // Good
+    if (score >= 71) return "text-yellow-600 dark:text-yellow-400"; // Fair
+    if (score >= 61) return "text-orange-600 dark:text-orange-400"; // Poor
+    return "text-red-600 dark:text-red-400"; // Critical
   };
 
 
@@ -95,7 +95,7 @@ export function FinancialHealthModal({
 
         <div className="space-y-6 mt-4">
           {/* Score Overview */}
-          <div className="flex items-center justify-between p-6 rounded-lg border bg-card">
+          <div className="flex items-center justify-between p-6 rounded-[12px] border bg-card">
             <div className="flex flex-col gap-2">
               <div className="flex items-baseline gap-2">
                 <span className={cn("text-6xl font-bold", getScoreColor(data.score))}>
@@ -111,6 +111,11 @@ export function FinancialHealthModal({
                 {data.classification === "Critical" && <AlertTriangle className="h-5 w-5" />}
                 {data.classification}
               </div>
+              {data.message && (
+                <p className="text-base text-muted-foreground mt-2">
+                  {data.message}
+                </p>
+              )}
             </div>
             <div className="text-right space-y-1">
               <p className="text-sm text-muted-foreground">Net Amount</p>
@@ -130,7 +135,7 @@ export function FinancialHealthModal({
               Monthly Income vs Expenses
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg border bg-card">
+              <div className="p-4 rounded-[12px] border bg-card">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -142,7 +147,7 @@ export function FinancialHealthModal({
                 </p>
               </div>
 
-              <div className="p-4 rounded-lg border bg-card">
+              <div className="p-4 rounded-[12px] border bg-card">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
@@ -156,7 +161,7 @@ export function FinancialHealthModal({
             </div>
 
             {/* Net Amount and Savings Rate */}
-            <div className="p-4 rounded-lg border bg-card">
+            <div className="p-4 rounded-[12px] border bg-card">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {data.netAmount >= 0 ? (
@@ -213,7 +218,7 @@ export function FinancialHealthModal({
                   <div
                     key={alert.id}
                     className={cn(
-                      "p-4 rounded-lg border",
+                      "p-4 rounded-[12px] border",
                       alert.severity === "critical"
                         ? "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800"
                         : alert.severity === "warning"
@@ -253,7 +258,7 @@ export function FinancialHealthModal({
                   <div
                     key={suggestion.id}
                     className={cn(
-                      "p-4 rounded-lg border",
+                      "p-4 rounded-[12px] border",
                       getImpactColor(suggestion.impact)
                     )}
                   >

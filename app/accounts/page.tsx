@@ -13,6 +13,7 @@ import {
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { formatMoney } from "@/components/common/money";
 import { AccountForm } from "@/components/forms/account-form";
+import { TableSkeleton } from "@/components/ui/list-skeleton";
 
 interface Account {
   id: string;
@@ -26,6 +27,7 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadAccounts();
@@ -33,11 +35,14 @@ export default function AccountsPage() {
 
   async function loadAccounts() {
     try {
+      setLoading(true);
       const res = await fetch("/api/accounts");
       const data = await res.json();
       setAccounts(data);
     } catch (error) {
       console.error("Error loading accounts:", error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -71,24 +76,34 @@ export default function AccountsPage() {
         </Button>
       </div>
 
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs md:text-sm">Name</TableHead>
-              <TableHead className="text-xs md:text-sm">Type</TableHead>
-              <TableHead className="text-right text-xs md:text-sm">Balance</TableHead>
-              {accounts.some((acc) => acc.type === "credit" && acc.creditLimit) && (
-                <>
-                  <TableHead className="text-right text-xs md:text-sm hidden md:table-cell">Credit Limit</TableHead>
-                  <TableHead className="text-right text-xs md:text-sm hidden md:table-cell">Available</TableHead>
-                </>
-              )}
-              <TableHead className="text-xs md:text-sm">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {accounts.map((account) => {
+      {loading ? (
+        <TableSkeleton rowCount={5} />
+      ) : (
+        <div className="rounded-[12px] border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs md:text-sm">Name</TableHead>
+                <TableHead className="text-xs md:text-sm">Type</TableHead>
+                <TableHead className="text-right text-xs md:text-sm">Balance</TableHead>
+                {accounts.some((acc) => acc.type === "credit" && acc.creditLimit) && (
+                  <>
+                    <TableHead className="text-right text-xs md:text-sm hidden md:table-cell">Credit Limit</TableHead>
+                    <TableHead className="text-right text-xs md:text-sm hidden md:table-cell">Available</TableHead>
+                  </>
+                )}
+                <TableHead className="text-xs md:text-sm">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {accounts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No accounts found. Create one to get started.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                accounts.map((account) => {
               const isCreditCard = account.type === "credit" && account.creditLimit;
               const available = isCreditCard 
                 ? (account.creditLimit! + account.balance) 
@@ -98,7 +113,7 @@ export default function AccountsPage() {
                 <TableRow key={account.id}>
                   <TableCell className="font-medium text-xs md:text-sm">{account.name}</TableCell>
                   <TableCell>
-                    <span className="rounded bg-muted px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs capitalize">
+                    <span className="rounded-[12px] bg-muted px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs capitalize">
                       {account.type}
                     </span>
                   </TableCell>
@@ -149,11 +164,12 @@ export default function AccountsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+                );
+              }))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <AccountForm
         open={isFormOpen}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getBudgets, createBudget } from "@/lib/api/budgets";
 
 export async function GET(request: Request) {
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
       ...data,
       period: new Date(data.period),
     });
+    revalidateTag('budgets');
+    revalidateTag('financial-health');
     return NextResponse.json(budget);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to create budget";

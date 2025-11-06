@@ -1,6 +1,8 @@
 "use server";
 
-import { getTransactions } from "./transactions";
+import { unstable_cache } from "next/cache";
+import { cookies } from "next/headers";
+import { getTransactionsInternal } from "./transactions";
 import { startOfMonth, endOfMonth } from "date-fns";
 
 export interface FinancialHealthData {
@@ -10,6 +12,7 @@ export interface FinancialHealthData {
   monthlyExpenses: number;
   netAmount: number;
   savingsRate: number;
+  message: string;
   alerts: Array<{
     id: string;
     title: string;
@@ -25,16 +28,25 @@ export interface FinancialHealthData {
   }>;
 }
 
-export async function calculateFinancialHealth(selectedDate?: Date): Promise<FinancialHealthData> {
+async function calculateFinancialHealthInternal(
+  selectedDate?: Date,
+  accessToken?: string,
+  refreshToken?: string
+): Promise<FinancialHealthData> {
   const date = selectedDate || new Date();
   const selectedMonth = startOfMonth(date);
   const selectedMonthEnd = endOfMonth(date);
   
   // Get transactions for selected month only (to match the cards at the top)
-  const transactions = await getTransactions({
-    startDate: selectedMonth,
-    endDate: selectedMonthEnd,
-  });
+  // Call internal function directly to avoid reading cookies inside cached function
+  const transactions = await getTransactionsInternal(
+    {
+      startDate: selectedMonth,
+      endDate: selectedMonthEnd,
+    },
+    accessToken,
+    refreshToken
+  );
   
   // Filter out transfer transactions - only count income and expense
   const monthlyIncome = transactions
@@ -64,35 +76,67 @@ export async function calculateFinancialHealth(selectedDate?: Date): Promise<Fin
     ? -100 // If expenses but no income, savings rate is -100%
     : 0; // No income and no expenses
   
-  // Calculate score based on income vs expenses ratio
-  // Score ranges from 0-100 based on savings rate
-  // -50% or less (expenses > 150% of income) = 0
-  // 0% (expenses = income) = 50
-  // 50%+ savings rate = 100
+  // Calculate expense ratio (expenses as percentage of income)
+  // This is the key metric for the new classification system
+  const expenseRatio = monthlyIncome > 0 
+    ? (monthlyExpenses / monthlyIncome) * 100 
+    : monthlyExpenses > 0 
+    ? 100 // If expenses but no income, ratio is 100%+
+    : 0; // No income and no expenses
+  
+  // Calculate score based on expense ratio
+  // Score ranges from 0-100 based on expense ratio
+  // 0-60% expense ratio = 100-91 score (Excellent)
+  // 61-70% expense ratio = 90-81 score (Good)
+  // 71-80% expense ratio = 80-71 score (Fair)
+  // 81-90% expense ratio = 70-61 score (Poor)
+  // 91-100%+ expense ratio = 60-0 score (Critical)
   let score: number;
-  if (savingsRate >= 50) {
-    score = 100;
-  } else if (savingsRate >= 30) {
-    score = 80;
-  } else if (savingsRate >= 20) {
-    score = 60;
-  } else if (savingsRate >= 10) {
-    score = 40;
-  } else if (savingsRate >= 0) {
-    score = 20;
-  } else if (savingsRate >= -20) {
-    score = 10;
+  if (expenseRatio <= 60) {
+    // Excellent: 0-60% expenses, score 100-91
+    score = Math.max(91, 100 - (expenseRatio / 60) * 9);
+  } else if (expenseRatio <= 70) {
+    // Good: 61-70% expenses, score 90-81
+    score = Math.max(81, 90 - ((expenseRatio - 60) / 10) * 9);
+  } else if (expenseRatio <= 80) {
+    // Fair: 71-80% expenses, score 80-71
+    score = Math.max(71, 80 - ((expenseRatio - 70) / 10) * 9);
+  } else if (expenseRatio <= 90) {
+    // Poor: 81-90% expenses, score 70-61
+    score = Math.max(61, 70 - ((expenseRatio - 80) / 10) * 9);
   } else {
-    score = 0;
+    // Critical: 91-100%+ expenses, score 60-0
+    score = Math.max(0, 60 - ((expenseRatio - 90) / 10) * 60);
   }
   
-  // Determine classification
+  // Round score to nearest integer
+  score = Math.round(score);
+  
+  // Determine classification based on expense ratio
   let classification: "Excellent" | "Good" | "Fair" | "Poor" | "Critical";
-  if (score >= 80) classification = "Excellent";
-  else if (score >= 60) classification = "Good";
-  else if (score >= 40) classification = "Fair";
-  else if (score >= 20) classification = "Poor";
+  if (expenseRatio <= 60) classification = "Excellent";
+  else if (expenseRatio <= 70) classification = "Good";
+  else if (expenseRatio <= 80) classification = "Fair";
+  else if (expenseRatio <= 90) classification = "Poor";
   else classification = "Critical";
+  
+  // Generate personalized message based on classification
+  let message: string;
+  switch (classification) {
+    case "Excellent":
+      message = "You're living below your means — great job!";
+      break;
+    case "Good":
+    case "Fair":
+      message = "Your expenses are balanced but close to your limit.";
+      break;
+    case "Poor":
+    case "Critical":
+      message = "Warning: you're spending more than you earn!";
+      break;
+    default:
+      message = "";
+  }
   
   // Identify alerts
   const alerts = identifyAlerts({
@@ -119,9 +163,25 @@ export async function calculateFinancialHealth(selectedDate?: Date): Promise<Fin
     monthlyExpenses,
     netAmount,
     savingsRate,
+    message,
     alerts,
     suggestions,
   };
+}
+
+export async function calculateFinancialHealth(selectedDate?: Date): Promise<FinancialHealthData> {
+  // Get tokens from cookies outside of cached function
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("sb-access-token")?.value;
+  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  
+  const date = selectedDate || new Date();
+  const cacheKey = `financial-health-${date.getFullYear()}-${date.getMonth()}`;
+  return unstable_cache(
+    async () => calculateFinancialHealthInternal(selectedDate, accessToken, refreshToken),
+    [cacheKey],
+    { revalidate: 60, tags: ['financial-health', 'transactions'] }
+  )();
 }
 
 
@@ -153,10 +213,10 @@ function identifyAlerts(data: {
     const excessPercentage = ((data.monthlyExpenses / data.monthlyIncome - 1) * 100).toFixed(1);
     alerts.push({
       id: "expenses_exceeding_income",
-      title: "Despesas Excedem Renda",
-      description: `Suas despesas mensais (${formatMoney(data.monthlyExpenses)}) são ${excessPercentage}% maiores que sua renda mensal (${formatMoney(data.monthlyIncome)}).`,
+      title: "Expenses Exceeding Income",
+      description: `Your monthly expenses (${formatMoney(data.monthlyExpenses)}) are ${excessPercentage}% higher than your monthly income (${formatMoney(data.monthlyIncome)}).`,
       severity: "critical" as const,
-      action: "Revise suas despesas e identifique onde pode reduzir custos.",
+      action: "Review your expenses and identify where you can reduce costs.",
     });
   }
   
@@ -164,10 +224,10 @@ function identifyAlerts(data: {
   if (data.savingsRate < 0) {
     alerts.push({
       id: "negative_savings_rate",
-      title: "Taxa de Poupança Negativa",
-      description: `Você está gastando ${formatMoney(Math.abs(data.netAmount))} a mais do que ganha por mês.`,
+      title: "Negative Savings Rate",
+      description: `You are spending ${formatMoney(Math.abs(data.netAmount))} more than you earn per month.`,
       severity: "critical" as const,
-      action: "Crie um orçamento rigoroso e aumente sua renda ou reduza despesas.",
+      action: "Create a strict budget and increase your income or reduce expenses.",
     });
   }
   
@@ -175,10 +235,10 @@ function identifyAlerts(data: {
   if (data.savingsRate > 0 && data.savingsRate < 10) {
     alerts.push({
       id: "low_savings_rate",
-      title: "Taxa de Poupança Baixa",
-      description: `Você está poupando apenas ${data.savingsRate.toFixed(1)}% da sua renda (${formatMoney(data.netAmount)}/mês).`,
+      title: "Low Savings Rate",
+      description: `You are saving only ${data.savingsRate.toFixed(1)}% of your income (${formatMoney(data.netAmount)}/month).`,
       severity: "warning" as const,
-      action: "Tente aumentar sua taxa de poupança para pelo menos 20%.",
+      action: "Try to increase your savings rate to at least 20%.",
     });
   }
   
@@ -186,10 +246,10 @@ function identifyAlerts(data: {
   if (data.savingsRate > 0 && data.savingsRate < 5) {
     alerts.push({
       id: "very_low_savings_rate",
-      title: "Taxa de Poupança Muito Baixa",
-      description: `Sua taxa de poupança de ${data.savingsRate.toFixed(1)}% está abaixo do recomendado.`,
+      title: "Very Low Savings Rate",
+      description: `Your savings rate of ${data.savingsRate.toFixed(1)}% is below recommended.`,
       severity: "info" as const,
-      action: "Considere revisar suas despesas para aumentar sua capacidade de poupança.",
+      action: "Consider reviewing your expenses to increase your savings capacity.",
     });
   }
   
@@ -216,8 +276,8 @@ function generateSuggestions(data: {
     const reductionNeeded = data.monthlyExpenses - data.monthlyIncome;
     suggestions.push({
       id: "reduce_expenses",
-      title: "Reduzir Despesas Urgente",
-      description: `Você precisa reduzir ${formatMoney(reductionNeeded)} por mês para equilibrar sua renda e despesas.`,
+      title: "Urgently Reduce Expenses",
+      description: `You need to reduce ${formatMoney(reductionNeeded)} per month to balance your income and expenses.`,
       impact: "high" as const,
     });
   }
@@ -225,8 +285,8 @@ function generateSuggestions(data: {
   if (data.savingsRate < 0) {
     suggestions.push({
       id: "increase_income_or_reduce_expenses",
-      title: "Aumentar Renda ou Reduzir Despesas",
-      description: `Você está gastando ${formatMoney(Math.abs(data.netAmount))} a mais do que ganha. Priorize aumentar sua renda ou reduzir despesas.`,
+      title: "Increase Income or Reduce Expenses",
+      description: `You are spending ${formatMoney(Math.abs(data.netAmount))} more than you earn. Prioritize increasing your income or reducing expenses.`,
       impact: "high" as const,
     });
   }
@@ -235,8 +295,8 @@ function generateSuggestions(data: {
     const targetSavings = data.monthlyIncome * 0.2;
     suggestions.push({
       id: "increase_savings_rate",
-      title: "Aumentar Taxa de Poupança",
-      description: `Tente poupar pelo menos 20% da sua renda. Isso significa poupar ${formatMoney(targetSavings)} por mês.`,
+      title: "Increase Savings Rate",
+      description: `Try to save at least 20% of your income. This means saving ${formatMoney(targetSavings)} per month.`,
       impact: "high" as const,
     });
   }
@@ -245,8 +305,8 @@ function generateSuggestions(data: {
   if (data.savingsRate >= 10 && data.savingsRate < 20) {
     suggestions.push({
       id: "review_spending",
-      title: "Revisar Despesas",
-      description: "Analise suas categorias de despesas e identifique onde pode reduzir sem afetar sua qualidade de vida.",
+      title: "Review Expenses",
+      description: "Analyze your expense categories and identify where you can reduce without affecting your quality of life.",
       impact: "medium" as const,
     });
   }
@@ -254,8 +314,8 @@ function generateSuggestions(data: {
   if (data.monthlyExpenses > data.monthlyIncome * 0.9) {
     suggestions.push({
       id: "create_budget",
-      title: "Criar Orçamento",
-      description: "Crie um orçamento detalhado para controlar melhor suas despesas e garantir que você poupe regularmente.",
+      title: "Create Budget",
+      description: "Create a detailed budget to better control your expenses and ensure you save regularly.",
       impact: "medium" as const,
     });
   }
@@ -264,8 +324,8 @@ function generateSuggestions(data: {
   if (data.savingsRate >= 20 && data.savingsRate < 30) {
     suggestions.push({
       id: "optimize_savings",
-      title: "Otimizar Poupança",
-      description: "Você está no caminho certo! Considere automatizar suas poupanças e investir em aplicações de baixo risco.",
+      title: "Optimize Savings",
+      description: "You're on the right track! Consider automating your savings and investing in low-risk applications.",
       impact: "low" as const,
     });
   }
@@ -273,8 +333,8 @@ function generateSuggestions(data: {
   if (data.savingsRate >= 30) {
     suggestions.push({
       id: "maintain_good_habits",
-      title: "Manter Boas Práticas",
-      description: "Excelente! Você está mantendo uma taxa de poupança muito saudável. Continue assim!",
+      title: "Maintain Good Practices",
+      description: "Excellent! You're maintaining a very healthy savings rate. Keep it up!",
       impact: "low" as const,
     });
   }

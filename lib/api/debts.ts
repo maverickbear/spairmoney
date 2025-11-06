@@ -59,7 +59,7 @@ export interface DebtWithCalculations extends Debt {
  * Get all debts with calculated metrics
  */
 export async function getDebts(): Promise<DebtWithCalculations[]> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { data: debts, error } = await supabase
     .from("Debt")
@@ -68,7 +68,11 @@ export async function getDebts(): Promise<DebtWithCalculations[]> {
     .order("createdAt", { ascending: false });
 
   if (error) {
-    console.error("Supabase error fetching debts:", error);
+    // Only log non-connection errors to avoid spam
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (!errorMessage.includes("ENOTFOUND") && !errorMessage.includes("fetch failed")) {
+      console.error("Supabase error fetching debts:", error);
+    }
     return [];
   }
 
@@ -188,7 +192,13 @@ export async function createDebt(data: {
   accountId?: string;
   isPaused?: boolean;
 }): Promise<Debt> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("Unauthorized");
+  }
 
   const downPayment = data.downPayment ?? 0;
   const principalPaid = 0;
@@ -218,6 +228,8 @@ export async function createDebt(data: {
     additionalContributionAmount: data.additionalContributionAmount ?? 0,
     priority: data.priority ?? "Medium",
     description: data.description ?? null,
+    accountId: data.accountId || null,
+    userId: user.id,
     isPaidOff,
     isPaused: data.isPaused ?? false,
     paidOffAt: isPaidOff ? now : null,
@@ -266,7 +278,7 @@ export async function updateDebt(
     isPaused?: boolean;
   }
 ): Promise<Debt> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get current debt
   const { data: currentDebt, error: fetchError } = await supabase
@@ -347,7 +359,7 @@ export async function updateDebt(
  * Delete a debt
  */
 export async function deleteDebt(id: string): Promise<void> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { error } = await supabase.from("Debt").delete().eq("id", id);
 
@@ -366,7 +378,7 @@ export async function addPayment(id: string, paymentAmount: number): Promise<Deb
     throw new Error("Payment amount must be positive");
   }
 
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get current debt
   const { data: debt, error: fetchError } = await supabase
@@ -435,6 +447,7 @@ export async function addPayment(id: string, paymentAmount: number): Promise<Deb
           categoryId: categoryMapping.categoryId,
           subcategoryId: categoryMapping.subcategoryId,
           description: `Payment for ${debt.name}`,
+          tags: [],
           recurring: false,
         });
       } else {

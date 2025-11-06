@@ -14,7 +14,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/common/money-input";
 import { formatMoney } from "@/components/common/money";
 import {
   Select,
@@ -55,6 +54,7 @@ export default function GoalsPage() {
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [sortBy, setSortBy] = useState<"priority" | "progress" | "eta">("priority");
   const [filterBy, setFilterBy] = useState<"all" | "active" | "paused" | "completed">("all");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadGoals();
@@ -62,6 +62,7 @@ export default function GoalsPage() {
 
   async function loadGoals() {
     try {
+      setLoading(true);
       const res = await fetch("/api/goals");
       if (!res.ok) {
         throw new Error("Failed to fetch goals");
@@ -70,6 +71,8 @@ export default function GoalsPage() {
       setGoals(data);
     } catch (error) {
       console.error("Error loading goals:", error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -278,7 +281,18 @@ export default function GoalsPage() {
       </div>
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {sortedGoals.map((goal) => (
+        {loading ? (
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            Loading goals...
+          </div>
+        ) : sortedGoals.length === 0 ? (
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            {filterBy === "all"
+              ? "No goals created yet. Create one to get started."
+              : `No ${filterBy} goals found.`}
+          </div>
+        ) : (
+          sortedGoals.map((goal) => (
           <GoalCard
             key={goal.id}
             goal={goal}
@@ -292,14 +306,7 @@ export default function GoalsPage() {
             onTopUp={handleTopUp}
             onWithdraw={handleWithdraw}
           />
-        ))}
-
-        {sortedGoals.length === 0 && (
-          <div className="col-span-full text-center py-8 text-muted-foreground">
-            {filterBy === "all"
-              ? "No goals created yet. Create one to get started."
-              : `No ${filterBy} goals found.`}
-          </div>
+          ))
         )}
       </div>
 
@@ -329,10 +336,12 @@ export default function GoalsPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Amount</label>
-              <MoneyInput
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
                 value={topUpAmount}
                 onChange={(e) => setTopUpAmount(e.target.value)}
-                placeholder="0.00"
               />
             </div>
           </div>
@@ -356,10 +365,12 @@ export default function GoalsPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Amount</label>
-              <MoneyInput
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder="0.00"
               />
               {selectedGoal && (
                 <p className="text-xs text-muted-foreground">

@@ -1,0 +1,116 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { PlanSelector } from "@/components/billing/plan-selector";
+import { Plan } from "@/lib/validations/plan";
+import { useRouter, useSearchParams } from "next/navigation";
+
+export default function PricingPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [currentPlanId, setCurrentPlanId] = useState<string | undefined>();
+  const [selecting, setSelecting] = useState(false);
+
+  useEffect(() => {
+    loadPlans();
+
+    // Check for success/cancel from Stripe
+    const success = searchParams.get("success");
+    const canceled = searchParams.get("canceled");
+
+    if (success) {
+      // Redirect to billing page after successful payment
+      router.push("/billing?success=true");
+    } else if (canceled) {
+      // Show cancel message
+      console.log("Checkout was canceled");
+    }
+  }, [router, searchParams]);
+
+  async function loadPlans() {
+    try {
+      setLoading(true);
+
+      // Get plans
+      const plansResponse = await fetch("/api/billing/plans");
+      if (plansResponse.ok) {
+        const plansData = await plansResponse.json();
+        setPlans(plansData.plans);
+        setCurrentPlanId(plansData.currentPlanId);
+      }
+    } catch (error) {
+      console.error("Error loading plans:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSelectPlan(planId: string, interval: "month" | "year") {
+    try {
+      setSelecting(true);
+
+      // Create checkout session
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ planId, interval }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        console.error("Failed to create checkout session:", data.error);
+        alert("Failed to create checkout session. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error selecting plan:", error);
+      alert("An error occurred. Please try again.");
+    } finally {
+      setSelecting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Pricing</h1>
+            <p className="text-muted-foreground">Choose the plan that's right for you</p>
+          </div>
+          <div className="animate-pulse space-y-4">
+            <div className="h-64 bg-muted rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-8">
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Pricing</h1>
+          <p className="text-muted-foreground mt-2">
+            Choose the plan that's right for you
+          </p>
+        </div>
+
+        <PlanSelector
+          plans={plans}
+          currentPlanId={currentPlanId}
+          onSelectPlan={handleSelectPlan}
+          loading={selecting}
+        />
+      </div>
+    </div>
+  );
+}
+

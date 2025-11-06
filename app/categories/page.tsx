@@ -91,7 +91,7 @@ export default function CategoriesPage() {
         </Button>
       </div>
 
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-[12px] border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

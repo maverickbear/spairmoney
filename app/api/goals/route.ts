@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getGoals, createGoal } from "@/lib/api/goals";
 
 export async function GET() {
@@ -18,6 +19,8 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
     const goal = await createGoal(data);
+    revalidateTag('goals');
+    revalidateTag('financial-health');
     return NextResponse.json(goal);
   } catch (error) {
     const errorMessage =

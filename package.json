@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "check:supabase": "tsx scripts/check-supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -29,6 +30,8 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.50.1",
     "recharts": "^2.10.3",
+    "resend": "^6.4.1",
+    "stripe": "^19.2.1",
     "tailwind-merge": "^2.2.1",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.22.4"

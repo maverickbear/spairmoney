@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { goalSchema, GoalFormData } from "@/lib/validations/goal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/common/money-input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -296,7 +295,7 @@ export function GoalForm({
           onSubmit={form.handleSubmit(onSubmit)}
           className="space-y-4"
         >
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Goal Name *</label>
             <Input
               {...form.register("name")}
@@ -310,9 +309,12 @@ export function GoalForm({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-1">
               <label className="text-sm font-medium">Target Amount *</label>
-              <MoneyInput
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
                 {...form.register("targetAmount", { valueAsNumber: true })}
               />
               {form.formState.errors.targetAmount && (
@@ -322,11 +324,14 @@ export function GoalForm({
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <label className="text-sm font-medium">
                 Starting Balance *
               </label>
-              <MoneyInput
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
                 {...form.register("currentBalance", { valueAsNumber: true })}
               />
               {form.formState.errors.currentBalance && (
@@ -337,7 +342,7 @@ export function GoalForm({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Target Months *</label>
             <Select
               value={form.watch("targetMonths") ? form.watch("targetMonths")!.toString() : undefined}
@@ -371,7 +376,7 @@ export function GoalForm({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Priority *</label>
             <Select
               value={form.watch("priority")}
@@ -395,7 +400,7 @@ export function GoalForm({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Description (optional)</label>
             <Textarea
               {...form.register("description")}
@@ -405,7 +410,7 @@ export function GoalForm({
           </div>
 
           {forecast && (
-            <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+            <div className="rounded-[12px] border bg-muted/50 p-4 space-y-3">
               <h4 className="text-sm font-semibold">Forecast</h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>

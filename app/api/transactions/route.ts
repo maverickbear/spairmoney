@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getTransactions } from "@/lib/api/transactions";
 import { createTransaction } from "@/lib/api/transactions";
 import { TransactionFormData } from "@/lib/validations/transaction";
@@ -32,6 +33,29 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Check authentication and limits
+    const { createServerClient } = await import("@/lib/supabase-server");
+    const { checkTransactionLimit } = await import("@/lib/api/limits");
+    
+    const supabase = await createServerClient();
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Check transaction limit
+    const limitCheck = await checkTransactionLimit(authUser.id);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { error: limitCheck.message || "Transaction limit reached" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     // Convert date string to Date object if needed
     const data: TransactionFormData = {
@@ -39,6 +63,11 @@ export async function POST(request: Request) {
       date: body.date instanceof Date ? body.date : new Date(body.date),
     };
     const transaction = await createTransaction(data);
+    // Revalidate cache
+    revalidateTag('transactions');
+    revalidateTag('budgets');
+    revalidateTag('financial-health');
+    revalidateTag('goals');
     return NextResponse.json(transaction);
   } catch (error) {
     console.error("Error creating transaction:", error);

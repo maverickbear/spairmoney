@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -58,6 +59,7 @@ interface Category {
 }
 
 export default function TransactionsPage() {
+  const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -77,21 +79,51 @@ export default function TransactionsPage() {
   const [activeCategoryIds, setActiveCategoryIds] = useState<Set<string>>(new Set());
   const [selectValue, setSelectValue] = useState<string>("");
 
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     loadData();
     // Set default date range (this month)
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    // Read categoryId from URL if present
+    const categoryIdFromUrl = searchParams.get("categoryId");
+    
     setFilters(prev => ({
       ...prev,
       startDate: startOfMonth.toISOString().split('T')[0],
       endDate: endOfMonth.toISOString().split('T')[0],
+      categoryId: categoryIdFromUrl || "all",
     }));
-  }, []);
+  }, [searchParams]);
 
+  // Debounce search filter
   useEffect(() => {
-    loadTransactions();
+    const timer = setTimeout(async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams();
+        if (filters.startDate) params.append("startDate", filters.startDate);
+        if (filters.endDate) params.append("endDate", filters.endDate);
+        if (filters.accountId && filters.accountId !== "all") params.append("accountId", filters.accountId);
+        if (filters.categoryId && filters.categoryId !== "all") params.append("categoryId", filters.categoryId);
+        if (filters.type && filters.type !== "all") params.append("type", filters.type);
+        if (filters.search) params.append("search", filters.search);
+        if (filters.recurring && filters.recurring !== "all") params.append("recurring", filters.recurring);
+
+        const res = await fetch(`/api/transactions?${params}`);
+        const data = await res.json();
+        setTransactions(data);
+      } catch (error) {
+        console.error("Error loading transactions:", error);
+      } finally {
+        setLoading(false);
+      }
+    }, filters.search ? 300 : 0); // Only debounce if search is active
+
+    return () => clearTimeout(timer);
   }, [filters]);
 
   function getDateRangeDates(range: string): { startDate: string; endDate: string } {
@@ -170,7 +202,15 @@ export default function TransactionsPage() {
       const defaultCategories = categoriesData
         .filter((cat: Category) => defaultCategoryNames.includes(cat.name))
         .map((cat: Category) => cat.id);
-      setActiveCategoryIds(new Set(defaultCategories));
+      
+      // Add category from URL if present
+      const categoryIdFromUrl = searchParams.get("categoryId");
+      const activeCategories = new Set(defaultCategories);
+      if (categoryIdFromUrl) {
+        activeCategories.add(categoryIdFromUrl);
+      }
+      
+      setActiveCategoryIds(activeCategories);
     } catch (error) {
       console.error("Error loading data:", error);
     }
@@ -178,6 +218,7 @@ export default function TransactionsPage() {
 
   async function loadTransactions() {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (filters.startDate) params.append("startDate", filters.startDate);
       if (filters.endDate) params.append("endDate", filters.endDate);
@@ -192,6 +233,8 @@ export default function TransactionsPage() {
       setTransactions(data);
     } catch (error) {
       console.error("Error loading transactions:", error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -256,13 +299,13 @@ export default function TransactionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="grid gap-2 md:gap-4 grid-cols-2 md:grid-cols-5">
+      <div className="flex flex-wrap gap-2 items-center">
         <Select
           value={dateRange}
           onValueChange={handleDateRangeChange}
         >
-          <SelectTrigger className="text-xs md:text-sm">
-            <SelectValue placeholder="Date Range" />
+          <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="this-month">This month</SelectItem>
@@ -277,11 +320,11 @@ export default function TransactionsPage() {
           value={filters.accountId}
           onValueChange={(value) => setFilters({ ...filters, accountId: value })}
         >
-          <SelectTrigger className="text-xs md:text-sm">
+          <SelectTrigger className="h-9 w-auto min-w-[100px] text-xs">
             <SelectValue placeholder="Account" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Accounts</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {accounts.map((account) => (
               <SelectItem key={account.id} value={account.id}>
                 {account.name}
@@ -293,55 +336,48 @@ export default function TransactionsPage() {
           value={filters.type}
           onValueChange={(value) => setFilters({ ...filters, type: value })}
         >
-          <SelectTrigger className="text-xs md:text-sm">
+          <SelectTrigger className="h-9 w-auto min-w-[90px] text-xs">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="expense">Expense</SelectItem>
             <SelectItem value="income">Income</SelectItem>
             <SelectItem value="transfer">Transfer</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.recurring}
-          onValueChange={(value) => setFilters({ ...filters, recurring: value })}
-        >
-          <SelectTrigger className="text-xs md:text-sm">
-            <SelectValue placeholder="Recurring" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Transactions</SelectItem>
-            <SelectItem value="true">Recurring</SelectItem>
-            <SelectItem value="false">Non-Recurring</SelectItem>
           </SelectContent>
         </Select>
         <Input
           placeholder="Search..."
           value={filters.search}
           onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          className="text-xs md:text-sm col-span-2 md:col-span-1"
+          className="h-9 w-auto min-w-[120px] flex-1 max-w-[200px] text-xs"
         />
-        <Button variant="outline" size="sm" onClick={() => {
-          setDateRange("this-month");
-          const dates = getDateRangeDates("this-month");
-          setFilters({
-            startDate: dates.startDate,
-            endDate: dates.endDate,
-            accountId: "all",
-            categoryId: "all",
-            type: "all",
-            search: "",
-            recurring: "all",
-          });
-        }} className="col-span-2 md:col-span-1 text-xs md:text-sm">
-          Clear
-        </Button>
+        {(filters.accountId !== "all" || filters.type !== "all" || filters.search || filters.recurring !== "all" || dateRange !== "this-month") && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              setDateRange("this-month");
+              const dates = getDateRangeDates("this-month");
+              setFilters({
+                startDate: dates.startDate,
+                endDate: dates.endDate,
+                accountId: "all",
+                categoryId: "all",
+                type: "all",
+                search: "",
+                recurring: "all",
+              });
+            }} 
+            className="h-9 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </Button>
+        )}
       </div>
 
       {/* Category Pills Filters */}
       <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs md:text-sm font-medium text-muted-foreground">Filter by category:</span>
         <Button
           variant={filters.categoryId === "all" ? "default" : "outline"}
           size="sm"
@@ -399,7 +435,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* Transactions Table */}
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-[12px] border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -413,12 +449,25 @@ export default function TransactionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map((tx) => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Loading transactions...
+                </TableCell>
+              </TableRow>
+            ) : transactions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  No transactions found
+                </TableCell>
+              </TableRow>
+            ) : (
+              transactions.map((tx) => (
               <TableRow key={tx.id}>
                 <TableCell className="text-xs md:text-sm whitespace-nowrap">{format(new Date(tx.date), "MMM dd, yyyy")}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <span className={`rounded px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs ${
+                    <span className={`rounded-[12px] px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs ${
                       tx.type === "income" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" :
                       tx.type === "expense" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" :
                       "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
@@ -466,7 +515,8 @@ export default function TransactionsPage() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

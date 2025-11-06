@@ -1,5 +1,8 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
+import { cookies } from "next/headers";
+
 import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 import { startOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
@@ -39,12 +42,16 @@ export interface GoalWithCalculations extends Goal {
  * Calculate income basis from last 3 months of income transactions
  * or use expectedIncome if provided
  */
-export async function calculateIncomeBasis(expectedIncome?: number | null): Promise<number> {
+export async function calculateIncomeBasis(
+  expectedIncome?: number | null,
+  accessToken?: string,
+  refreshToken?: string
+): Promise<number> {
   if (expectedIncome && expectedIncome > 0) {
     return expectedIncome;
   }
 
-  const supabase = createServerClient();
+    const supabase = await createServerClient(accessToken, refreshToken);
   const now = new Date();
   const currentMonth = startOfMonth(now);
   
@@ -90,7 +97,7 @@ export async function validateAllocation(
   goalId: string | null,
   incomePercentage: number
 ): Promise<{ valid: boolean; total: number; message?: string }> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get all active goals (not completed, not paused)
   const { data: goals, error } = await supabase
@@ -135,8 +142,8 @@ export async function validateAllocation(
 /**
  * Get all goals with calculated progress, ETA, and monthly contribution
  */
-export async function getGoals(): Promise<GoalWithCalculations[]> {
-  const supabase = createServerClient();
+async function getGoalsInternal(accessToken?: string, refreshToken?: string): Promise<GoalWithCalculations[]> {
+    const supabase = await createServerClient(accessToken, refreshToken);
 
   const { data: goals, error } = await supabase
     .from("Goal")
@@ -155,7 +162,7 @@ export async function getGoals(): Promise<GoalWithCalculations[]> {
 
   // Calculate income basis (use expectedIncome from first goal if available, or calculate from transactions)
   // For now, we'll calculate from transactions. Expected income can be stored per goal or globally
-  const incomeBasis = await calculateIncomeBasis();
+  const incomeBasis = await calculateIncomeBasis(undefined, accessToken, refreshToken);
 
   // Calculate progress for each goal
   const goalsWithCalculations: GoalWithCalculations[] = goals.map((goal: any) => {
@@ -189,6 +196,19 @@ export async function getGoals(): Promise<GoalWithCalculations[]> {
   return goalsWithCalculations;
 }
 
+export async function getGoals(): Promise<GoalWithCalculations[]> {
+  // Get tokens from cookies outside of cached function
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("sb-access-token")?.value;
+  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  
+  return unstable_cache(
+    async () => getGoalsInternal(accessToken, refreshToken),
+    ['goals'],
+    { revalidate: 60, tags: ['goals', 'transactions'] }
+  )();
+}
+
 /**
  * Create a new goal
  */
@@ -203,7 +223,13 @@ export async function createGoal(data: {
   expectedIncome?: number;
   targetMonths?: number;
 }): Promise<Goal> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("Unauthorized");
+  }
 
   // If targetMonths is provided and incomePercentage is not, calculate incomePercentage
   let incomePercentage = data.incomePercentage || 0;
@@ -247,6 +273,7 @@ export async function createGoal(data: {
     completedAt: isCompleted ? now : null,
     expectedIncome: data.expectedIncome || null,
     targetMonths: data.targetMonths || null,
+    userId: user.id,
     createdAt: now,
     updatedAt: now,
   };
@@ -282,7 +309,7 @@ export async function updateGoal(
     targetMonths?: number;
   }
 ): Promise<Goal> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get current goal
   const { data: currentGoal, error: fetchError } = await supabase
@@ -368,7 +395,7 @@ export async function updateGoal(
  * Delete a goal
  */
 export async function deleteGoal(id: string): Promise<void> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { error } = await supabase.from("Goal").delete().eq("id", id);
 
@@ -386,7 +413,7 @@ export async function addTopUp(id: string, amount: number): Promise<Goal> {
     throw new Error("Top-up amount must be positive");
   }
 
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get current goal
   const { data: goal, error: fetchError } = await supabase
@@ -435,7 +462,7 @@ export async function withdraw(id: string, amount: number): Promise<Goal> {
     throw new Error("Withdrawal amount must be positive");
   }
 
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get current goal
   const { data: goal, error: fetchError } = await supabase

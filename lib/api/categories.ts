@@ -2,13 +2,50 @@
 
 import { createServerClient } from "@/lib/supabase-server";
 import { getCurrentTimestamp } from "@/lib/utils/timestamp";
+import { checkPlanLimits } from "@/lib/api/plans";
 
+/**
+ * Check if user has a paid plan (not free)
+ */
+async function hasPaidPlan(userId: string): Promise<boolean> {
+  try {
+    const { plan } = await checkPlanLimits(userId);
+    return plan !== null && plan.id !== "free";
+  } catch (error) {
+    console.error("Error checking plan:", error);
+    return false;
+  }
+}
+
+/**
+ * Get all macros (system defaults + user's custom macros)
+ */
 export async function getMacros() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    // If not authenticated, only return system defaults
+    const { data, error } = await supabase
+      .from("Macro")
+      .select("*")
+      .is("userId", null)
+      .order("name", { ascending: true });
+
+    if (error) {
+      return [];
+    }
+
+    return data || [];
+  }
+
+  // Return system defaults (userId IS NULL) OR user's own macros
   const { data, error } = await supabase
     .from("Macro")
     .select("*")
+    .or(`userId.is.null,userId.eq.${authUser.id}`)
     .order("name", { ascending: true });
 
   if (error) {
@@ -19,8 +56,31 @@ export async function getMacros() {
 }
 
 export async function getCategoriesByMacro(macroId: string) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    // If not authenticated, only return system defaults
+    const { data: categories, error } = await supabase
+      .from("Category")
+      .select(`
+        *,
+        subcategories:Subcategory(*)
+      `)
+      .eq("macroId", macroId)
+      .is("userId", null)
+      .order("name", { ascending: true });
+
+    if (error) {
+      return [];
+    }
+
+    return categories || [];
+  }
+
+  // Return system defaults (userId IS NULL) OR user's own categories
   const { data: categories, error } = await supabase
     .from("Category")
     .select(`
@@ -28,6 +88,7 @@ export async function getCategoriesByMacro(macroId: string) {
       subcategories:Subcategory(*)
     `)
     .eq("macroId", macroId)
+    .or(`userId.is.null,userId.eq.${authUser.id}`)
     .order("name", { ascending: true });
 
   if (error) {
@@ -38,8 +99,43 @@ export async function getCategoriesByMacro(macroId: string) {
 }
 
 export async function getSubcategoriesByCategory(categoryId: string) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  // Verify category exists and user has access
+  const { data: category, error: categoryError } = await supabase
+    .from("Category")
+    .select("id, userId")
+    .eq("id", categoryId)
+    .single();
+
+  if (categoryError || !category) {
+    return [];
+  }
+
+  // If not authenticated, only return subcategories from system categories
+  if (authError || !authUser) {
+    if (category.userId !== null) {
+      return []; // Can't access user's categories without auth
+    }
+
+    const { data, error } = await supabase
+      .from("Subcategory")
+      .select("*")
+      .eq("categoryId", categoryId)
+      .order("name", { ascending: true });
+
+    if (error) {
+      return [];
+    }
+
+    return data || [];
+  }
+
+  // Return subcategories from system categories OR user's own categories
+  // RLS will handle filtering automatically
   const { data, error } = await supabase
     .from("Subcategory")
     .select("*")
@@ -54,8 +150,31 @@ export async function getSubcategoriesByCategory(categoryId: string) {
 }
 
 export async function getAllCategories() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    // If not authenticated, only return system defaults
+    const { data, error } = await supabase
+      .from("Category")
+      .select(`
+        *,
+        macro:Macro(*),
+        subcategories:Subcategory(*)
+      `)
+      .is("userId", null)
+      .order("name", { ascending: true });
+
+    if (error) {
+      return [];
+    }
+
+    return data || [];
+  }
+
+  // Return system defaults (userId IS NULL) OR user's own categories
   const { data, error } = await supabase
     .from("Category")
     .select(`
@@ -63,6 +182,7 @@ export async function getAllCategories() {
       macro:Macro(*),
       subcategories:Subcategory(*)
     `)
+    .or(`userId.is.null,userId.eq.${authUser.id}`)
     .order("name", { ascending: true });
 
   if (error) {
@@ -73,8 +193,34 @@ export async function getAllCategories() {
 }
 
 export async function createCategory(data: { name: string; macroId: string }) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check if user has paid plan (required for custom categories)
+  const isPaidPlan = await hasPaidPlan(authUser.id);
+  if (!isPaidPlan) {
+    throw new Error("Creating custom categories requires a paid plan");
+  }
+
+  // Verify macro belongs to user or is system default
+  const { data: macro, error: macroError } = await supabase
+    .from("Macro")
+    .select("id, userId")
+    .eq("id", data.macroId)
+    .single();
+
+  if (macroError || !macro) {
+    throw new Error("Macro not found");
+  }
+
+  // If macro is system default (userId IS NULL), user can still create category under it
+  // But category will be personal (with userId)
   const id = crypto.randomUUID();
   const now = getCurrentTimestamp();
 
@@ -84,6 +230,7 @@ export async function createCategory(data: { name: string; macroId: string }) {
       id,
       name: data.name,
       macroId: data.macroId,
+      userId: authUser.id, // Personal category
       createdAt: now,
       updatedAt: now,
     })
@@ -103,7 +250,29 @@ export async function createCategory(data: { name: string; macroId: string }) {
 }
 
 export async function updateCategory(id: string, data: { name?: string; macroId?: string }) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify category belongs to user (can't update system defaults)
+  const { data: existingCategory, error: checkError } = await supabase
+    .from("Category")
+    .select("id, userId")
+    .eq("id", id)
+    .single();
+
+  if (checkError || !existingCategory) {
+    throw new Error("Category not found");
+  }
+
+  if (existingCategory.userId !== authUser.id) {
+    throw new Error("Cannot update system default categories");
+  }
 
   const updateData: Record<string, unknown> = {
     updatedAt: getCurrentTimestamp(),
@@ -114,6 +283,17 @@ export async function updateCategory(id: string, data: { name?: string; macroId?
   }
   
   if (data.macroId !== undefined) {
+    // Verify new macro belongs to user or is system default
+    const { data: macro, error: macroError } = await supabase
+      .from("Macro")
+      .select("id, userId")
+      .eq("id", data.macroId)
+      .single();
+
+    if (macroError || !macro) {
+      throw new Error("Macro not found");
+    }
+
     updateData.macroId = data.macroId;
   }
 
@@ -121,6 +301,7 @@ export async function updateCategory(id: string, data: { name?: string; macroId?
     .from("Category")
     .update(updateData)
     .eq("id", id)
+    .eq("userId", authUser.id) // Only update user's own categories
     .select(`
       *,
       macro:Macro(*),
@@ -137,7 +318,35 @@ export async function updateCategory(id: string, data: { name?: string; macroId?
 }
 
 export async function createSubcategory(data: { name: string; categoryId: string }) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify category belongs to user or is system default
+  const { data: category, error: categoryError } = await supabase
+    .from("Category")
+    .select("id, userId")
+    .eq("id", data.categoryId)
+    .single();
+
+  if (categoryError || !category) {
+    throw new Error("Category not found");
+  }
+
+  // If category is system default (userId IS NULL), user needs paid plan to create subcategory
+  if (category.userId === null) {
+    const isPaidPlan = await hasPaidPlan(authUser.id);
+    if (!isPaidPlan) {
+      throw new Error("Creating subcategories for system default categories requires a paid plan");
+    }
+  } else if (category.userId !== authUser.id) {
+    throw new Error("Category not found or access denied");
+  }
 
   const id = crypto.randomUUID();
   const now = getCurrentTimestamp();
@@ -163,7 +372,33 @@ export async function createSubcategory(data: { name: string; categoryId: string
 }
 
 export async function updateSubcategory(id: string, data: { name?: string }) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify subcategory belongs to user's category (can't update system defaults)
+  const { data: existingSubcategory, error: checkError } = await supabase
+    .from("Subcategory")
+    .select(`
+      id,
+      category:Category!inner(id, userId)
+    `)
+    .eq("id", id)
+    .single();
+
+  if (checkError || !existingSubcategory) {
+    throw new Error("Subcategory not found");
+  }
+
+  const category = existingSubcategory.category as { id: string; userId: string | null };
+  if (category.userId !== authUser.id) {
+    throw new Error("Cannot update subcategories from system default categories");
+  }
 
   const updateData: Record<string, unknown> = {
     updatedAt: getCurrentTimestamp(),
@@ -189,7 +424,33 @@ export async function updateSubcategory(id: string, data: { name?: string }) {
 }
 
 export async function deleteSubcategory(id: string) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify subcategory belongs to user's category (can't delete system defaults)
+  const { data: existingSubcategory, error: checkError } = await supabase
+    .from("Subcategory")
+    .select(`
+      id,
+      category:Category!inner(id, userId)
+    `)
+    .eq("id", id)
+    .single();
+
+  if (checkError || !existingSubcategory) {
+    throw new Error("Subcategory not found");
+  }
+
+  const category = existingSubcategory.category as { id: string; userId: string | null };
+  if (category.userId !== authUser.id) {
+    throw new Error("Cannot delete subcategories from system default categories");
+  }
 
   const { error } = await supabase
     .from("Subcategory")
@@ -205,7 +466,29 @@ export async function deleteSubcategory(id: string) {
 }
 
 export async function deleteCategory(id: string) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify category belongs to user (can't delete system defaults)
+  const { data: existingCategory, error: checkError } = await supabase
+    .from("Category")
+    .select("id, userId")
+    .eq("id", id)
+    .single();
+
+  if (checkError || !existingCategory) {
+    throw new Error("Category not found");
+  }
+
+  if (existingCategory.userId !== authUser.id) {
+    throw new Error("Cannot delete system default categories");
+  }
 
   // First delete all subcategories associated with this category
   const { error: subcategoryError } = await supabase
@@ -222,7 +505,8 @@ export async function deleteCategory(id: string) {
   const { error } = await supabase
     .from("Category")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("userId", authUser.id); // Only delete user's own categories
 
   if (error) {
     console.error("Supabase error deleting category:", error);
@@ -230,4 +514,59 @@ export async function deleteCategory(id: string) {
   }
 
   return true;
+}
+
+/**
+ * Create a custom macro (requires paid plan)
+ */
+export async function createMacro(data: { name: string }) {
+  const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !authUser) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check if user has paid plan (required for custom macros)
+  const isPaidPlan = await hasPaidPlan(authUser.id);
+  if (!isPaidPlan) {
+    throw new Error("Creating custom macros requires a paid plan");
+  }
+
+  // Check if user already has a macro with this name
+  // Note: Users can have macros with the same name as system defaults
+  const { data: existingMacro, error: checkError } = await supabase
+    .from("Macro")
+    .select("id, userId")
+    .eq("name", data.name)
+    .eq("userId", authUser.id)
+    .single();
+
+  if (existingMacro && !checkError) {
+    throw new Error("You already have a macro with this name");
+  }
+
+  const id = crypto.randomUUID();
+  const now = getCurrentTimestamp();
+
+  const { data: macro, error } = await supabase
+    .from("Macro")
+    .insert({
+      id,
+      name: data.name,
+      userId: authUser.id, // Personal macro
+      createdAt: now,
+      updatedAt: now,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("Supabase error creating macro:", error);
+    throw new Error(`Failed to create macro: ${error.message || JSON.stringify(error)}`);
+  }
+
+  return macro;
 }

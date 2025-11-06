@@ -67,7 +67,7 @@ export default async function ReportsPage() {
           <CardTitle className="text-lg md:text-xl">Monthly Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="rounded-[12px] border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -114,7 +114,7 @@ export default async function ReportsPage() {
           <CardTitle className="text-lg md:text-xl">Top 10 Expenses</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="rounded-[12px] border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
