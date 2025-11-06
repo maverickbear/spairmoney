@@ -10,12 +10,32 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [hasSubscription, setHasSubscription] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const subscriptionCheckedRef = useRef(false);
   const checkingRef = useRef(false);
   const isAuthPage = pathname?.startsWith("/auth");
   const isAcceptPage = pathname?.startsWith("/members/accept");
   const isSelectPlanPage = pathname === "/select-plan";
   const isWelcomePage = pathname === "/welcome";
+
+  // Listen for sidebar toggle events
+  useEffect(() => {
+    // Load initial state from localStorage
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved !== null) {
+      setIsSidebarCollapsed(saved === "true");
+    }
+
+    const handleSidebarToggle = (event: CustomEvent<{ isCollapsed: boolean }>) => {
+      setIsSidebarCollapsed(event.detail.isCollapsed);
+    };
+
+    window.addEventListener("sidebar-toggle", handleSidebarToggle as EventListener);
+
+    return () => {
+      window.removeEventListener("sidebar-toggle", handleSidebarToggle as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     // Check subscription for authenticated users
@@ -149,7 +169,11 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     <>
       <div className="flex min-h-screen">
         <Nav hasSubscription={hasSubscription} />
-        <main className="flex-1 md:ml-64 pb-16 md:pb-0">
+        <main
+          className={`flex-1 pb-16 md:pb-0 transition-all duration-300 ${
+            isSidebarCollapsed ? "md:ml-16" : "md:ml-64"
+          }`}
+        >
           <div className="container mx-auto px-4 py-4 md:py-8">{children}</div>
         </main>
       </div>

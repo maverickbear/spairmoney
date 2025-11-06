@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Target, FolderTree, Wallet, TrendingUp, FileText, Moon, Sun, User, Settings, LogOut, CreditCard, PiggyBank, Users } from "lucide-react";
+import { LayoutDashboard, Receipt, Target, FolderTree, Wallet, TrendingUp, FileText, Moon, Sun, User, Settings, LogOut, CreditCard, PiggyBank, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { ProfileModal } from "@/components/profile/profile-modal";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
@@ -16,6 +16,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PlanBadge } from "@/components/common/plan-badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const navSections = [
   {
@@ -65,6 +71,17 @@ function getInitials(name: string | undefined | null): string {
   return name[0].toUpperCase();
 }
 
+// Context for sidebar collapsed state
+const SidebarContext = createContext<{
+  isCollapsed: boolean;
+  setIsCollapsed: (collapsed: boolean) => void;
+}>({
+  isCollapsed: false,
+  setIsCollapsed: () => {},
+});
+
+export const useSidebar = () => useContext(SidebarContext);
+
 interface NavProps {
   hasSubscription?: boolean;
 }
@@ -76,6 +93,22 @@ export function Nav({ hasSubscription = true }: NavProps) {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Load collapsed state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved !== null) {
+      setIsCollapsed(saved === "true");
+    }
+  }, []);
+
+  // Save collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem("sidebar-collapsed", String(isCollapsed));
+    // Dispatch event for layout-wrapper to listen
+    window.dispatchEvent(new CustomEvent("sidebar-toggle", { detail: { isCollapsed } }));
+  }, [isCollapsed]);
 
   // Don't render Nav if user doesn't have subscription
   if (!hasSubscription) {
@@ -143,155 +176,239 @@ export function Nav({ hasSubscription = true }: NavProps) {
   const plan = userData?.plan;
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform hidden md:block">
-      <div className="flex h-full flex-col">
-        <div className="flex h-16 items-center border-b px-6">
-          <Link href="/" className="text-xl font-bold">
-            Spare Finance
-          </Link>
-        </div>
-        
-        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-          {navSections.map((section) => (
-            <div key={section.title} className="space-y-1">
-              <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {section.title}
-              </h3>
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={(e) => {
-                      if (!hasSubscription) {
-                        e.preventDefault();
-                        router.push("/select-plan");
-                      }
-                    }}
-                    className={cn(
-                      "flex items-center space-x-3 rounded-[12px] px-3 py-2 text-sm font-medium transition-all duration-200 ease-in-out",
-                      !hasSubscription && "opacity-50 cursor-not-allowed",
-                      isActive
-                        ? "bg-primary text-primary-foreground translate-x-0"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:translate-x-1 translate-x-0"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        <div className="border-t p-4">
-          {loading ? (
-            <div className="flex items-center space-x-3 px-3 py-2">
-              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-              <div className="flex-1 space-y-1">
-                <div className="h-3 w-20 bg-muted rounded-[12px] animate-pulse" />
-                <div className="h-2 w-16 bg-muted rounded-[12px] animate-pulse" />
-              </div>
-            </div>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start h-auto p-2"
-                >
-                  <div className="flex items-center space-x-3 w-full">
-                    <div className="relative flex-shrink-0">
-                      {user?.avatarUrl ? (
-                        <>
-                          <img
-                            src={user.avatarUrl}
-                            alt={user.name || "User"}
-                            className="h-8 w-8 rounded-full object-cover border"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                              const initialsContainer = e.currentTarget.nextElementSibling;
-                              if (initialsContainer) {
-                                (initialsContainer as HTMLElement).style.display = "flex";
-                              }
-                            }}
-                          />
-                          <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border">
-                            {getInitials(user?.name)}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border">
-                          {getInitials(user?.name)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="text-sm font-medium truncate">
-                        {user?.name || "User"}
-                      </div>
-                      {plan && (
-                        <div className="mt-0.5">
-                          <PlanBadge plan={plan.name} className="text-[10px] px-1.5 py-0" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => setProfileModalOpen(true)}
-                  className="cursor-pointer mb-1"
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild className="mb-1">
-                  <Link href="/members" className="cursor-pointer">
-                    <Users className="mr-2 h-4 w-4" />
-                    <span>Members</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild className="mb-1">
-                  <Link href="/settings" className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild className="mb-1">
-                  <Link href="/billing" className="cursor-pointer">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    <span>Billing</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="mb-1">
-                  <div className="relative mr-2 h-4 w-4">
-                    <Sun className="absolute h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  </div>
-                  <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="text-destructive focus:text-destructive cursor-pointer"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+    <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
+      <TooltipProvider>
+        <aside
+          className={cn(
+            "fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-300 hidden md:block",
+            isCollapsed ? "w-16" : "w-64"
           )}
-        </div>
-      </div>
-      <ProfileModal open={profileModalOpen} onOpenChange={setProfileModalOpen} />
-    </aside>
+        >
+          <div className="flex h-full flex-col">
+            <div
+              className={cn(
+                "flex h-16 items-center border-b px-4",
+                isCollapsed ? "justify-center" : "justify-between"
+              )}
+            >
+              {!isCollapsed && (
+                <Link href="/" className="text-xl font-bold">
+                  Spare Finance
+                </Link>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="h-4 w-4" />
+                    ) : (
+                      <ChevronLeft className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side={isCollapsed ? "right" : "bottom"}>
+                  {isCollapsed ? "Expand menu" : "Collapse menu"}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+              {navSections.map((section) => (
+                <div key={section.title} className="space-y-1">
+                  {!isCollapsed && (
+                    <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {section.title}
+                    </h3>
+                  )}
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive =
+                      pathname === item.href ||
+                      (item.href !== "/" && pathname.startsWith(item.href));
+                    const linkElement = (
+                      <Link
+                        href={item.href}
+                        onClick={(e) => {
+                          if (!hasSubscription) {
+                            e.preventDefault();
+                            router.push("/select-plan");
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center rounded-[12px] text-sm font-medium transition-all duration-200 ease-in-out",
+                          !hasSubscription && "opacity-50 cursor-not-allowed",
+                          isActive
+                            ? "bg-primary text-primary-foreground translate-x-0"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:translate-x-1 translate-x-0",
+                          isCollapsed
+                            ? "justify-center px-3 py-2"
+                            : "space-x-3 px-3 py-2"
+                        )}
+                      >
+                        <Icon className="h-5 w-5 flex-shrink-0" />
+                        {!isCollapsed && <span>{item.label}</span>}
+                      </Link>
+                    );
+
+                    if (isCollapsed) {
+                      return (
+                        <Tooltip key={item.href}>
+                          <TooltipTrigger asChild>{linkElement}</TooltipTrigger>
+                          <TooltipContent side="right">
+                            {item.label}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+
+                    return <div key={item.href}>{linkElement}</div>;
+                  })}
+                </div>
+              ))}
+            </nav>
+
+            <div className="border-t p-4">
+              {loading ? (
+                <div
+                  className={cn(
+                    "flex items-center",
+                    isCollapsed ? "justify-center" : "space-x-3 px-3 py-2"
+                  )}
+                >
+                  <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+                  {!isCollapsed && (
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3 w-20 bg-muted rounded-[12px] animate-pulse" />
+                      <div className="h-2 w-16 bg-muted rounded-[12px] animate-pulse" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "w-full h-auto p-2",
+                        isCollapsed ? "justify-center" : "justify-start"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "flex items-center w-full",
+                          isCollapsed ? "justify-center" : "space-x-3"
+                        )}
+                      >
+                        <div className="relative flex-shrink-0">
+                          {user?.avatarUrl ? (
+                            <>
+                              <img
+                                src={user.avatarUrl}
+                                alt={user.name || "User"}
+                                className="h-8 w-8 rounded-full object-cover border"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  const initialsContainer =
+                                    e.currentTarget.nextElementSibling;
+                                  if (initialsContainer) {
+                                    (initialsContainer as HTMLElement).style.display =
+                                      "flex";
+                                  }
+                                }}
+                              />
+                              <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border">
+                                {getInitials(user?.name)}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border">
+                              {getInitials(user?.name)}
+                            </div>
+                          )}
+                        </div>
+                        {!isCollapsed && (
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="text-sm font-medium truncate">
+                              {user?.name || "User"}
+                            </div>
+                            {plan && (
+                              <div className="mt-0.5">
+                                <PlanBadge
+                                  plan={plan.name}
+                                  className="text-[10px] px-1.5 py-0"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      onClick={() => setProfileModalOpen(true)}
+                      className="cursor-pointer mb-1"
+                    >
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="mb-1">
+                      <Link href="/members" className="cursor-pointer">
+                        <Users className="mr-2 h-4 w-4" />
+                        <span>Members</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="mb-1">
+                      <Link href="/settings" className="cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="mb-1">
+                      <Link href="/billing" className="cursor-pointer">
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        <span>Billing</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setTheme(theme === "dark" ? "light" : "dark")
+                      }
+                      className="mb-1"
+                    >
+                      <div className="relative mr-2 h-4 w-4">
+                        <Sun className="absolute h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                      </div>
+                      <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive cursor-pointer"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </div>
+          <ProfileModal
+            open={profileModalOpen}
+            onOpenChange={setProfileModalOpen}
+          />
+        </aside>
+      </TooltipProvider>
+    </SidebarContext.Provider>
   );
 }
 
