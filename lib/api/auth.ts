@@ -264,7 +264,7 @@ export async function updateProfile(data: { name?: string; avatarUrl?: string; p
       return { user: null, error: "Not authenticated" };
     }
 
-    const updateData: { name?: string; avatarUrl?: string; phoneNumber?: string } = {};
+    const updateData: { name?: string; avatarUrl?: string | null; phoneNumber?: string | null } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl || null;
     if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber || null;
