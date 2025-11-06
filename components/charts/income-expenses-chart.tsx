@@ -24,7 +24,7 @@ const EXPENSES_COLOR_LIGHT = "#fca5a5"; // Lighter coral
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-lg border bg-card p-3 shadow-lg backdrop-blur-sm">
+      <div className="rounded-[12px] border bg-card p-3 backdrop-blur-sm">
         <p className="mb-2 text-sm font-medium text-foreground">
           {payload[0].payload.month}
         </p>
@@ -80,17 +80,12 @@ export function IncomeExpensesChart({ data }: IncomeExpensesChartProps) {
     >
       <div className="mb-4 border-b pb-3">
         <div className="flex items-baseline gap-2">
-          <div className="text-2xl font-semibold tracking-tight">
+          <div className="text-xl font-semibold tracking-tight text-foreground">
             {formatMoney(netCashFlow)}
           </div>
           <div className="text-xs font-medium text-muted-foreground">
             Net Cash Flow
           </div>
-        </div>
-        <div className="mt-1.5 flex gap-3 text-xs text-muted-foreground">
-          <span>Income: {formatMoney(totalIncome)}</span>
-          <span>•</span>
-          <span>Expenses: {formatMoney(totalExpenses)}</span>
         </div>
       </div>
       <ResponsiveContainer width="100%" height={240}>

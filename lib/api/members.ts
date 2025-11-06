@@ -1,0 +1,675 @@
+"use server";
+
+import { createServerClient } from "@/lib/supabase-server";
+import { MemberInviteFormData, MemberUpdateFormData } from "@/lib/validations/member";
+import { formatTimestamp } from "@/lib/utils/timestamp";
+import { checkPlanLimits } from "./plans";
+import { sendInvitationEmail } from "@/lib/utils/email";
+
+export interface HouseholdMember {
+  id: string;
+  ownerId: string;
+  memberId: string | null;
+  email: string;
+  name: string | null;
+  role: "admin" | "member";
+  status: "pending" | "active" | "declined";
+  invitationToken: string;
+  invitedAt: Date;
+  acceptedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  isOwner?: boolean; // Flag to indicate if this is the account owner
+}
+
+// TODO: Restrict to paid plans in future
+export async function checkMemberAccess(userId: string): Promise<boolean> {
+  try {
+    // For now, allow all plans (including Free)
+    // In the future, check if user has a paid plan
+    // const { plan } = await checkPlanLimits(userId);
+    // return plan?.id !== "free";
+    return true;
+  } catch (error) {
+    console.error("Error checking member access:", error);
+    return false;
+  }
+}
+
+export async function getHouseholdMembers(ownerId: string): Promise<HouseholdMember[]> {
+  try {
+    const supabase = await createServerClient();
+
+    // Get owner information
+    const { data: ownerData, error: ownerError } = await supabase
+      .from("User")
+      .select("id, email, name, role, createdAt, updatedAt")
+      .eq("id", ownerId)
+      .single();
+
+    // Get household members
+    const { data: members, error } = await supabase
+      .from("HouseholdMember")
+      .select("*")
+      .eq("ownerId", ownerId)
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching household members:", error);
+      return [];
+    }
+
+    const householdMembers: HouseholdMember[] = members.map(member => {
+      const mappedMember = mapHouseholdMember(member);
+      // Mark owner (where ownerId = memberId) with isOwner flag
+      if (member.ownerId === member.memberId) {
+        mappedMember.isOwner = true;
+      }
+      return mappedMember;
+    });
+
+    // Sort to ensure owner (isOwner = true) appears first
+    householdMembers.sort((a, b) => {
+      if (a.isOwner && !b.isOwner) return -1;
+      if (!a.isOwner && b.isOwner) return 1;
+      return 0;
+    });
+
+    // If owner is not in the list (shouldn't happen with new system, but handle legacy cases)
+    const hasOwner = householdMembers.some(m => m.isOwner);
+    if (!hasOwner && ownerData && !ownerError) {
+      const ownerMember: HouseholdMember = {
+        id: ownerData.id,
+        ownerId: ownerData.id,
+        memberId: ownerData.id,
+        email: ownerData.email,
+        name: ownerData.name || null,
+        role: ownerData.role || "admin", // Use role from User table
+        status: "active",
+        invitationToken: "", // Not needed for owner
+        invitedAt: new Date(ownerData.createdAt),
+        acceptedAt: new Date(ownerData.createdAt),
+        createdAt: new Date(ownerData.createdAt),
+        updatedAt: new Date(ownerData.updatedAt),
+        isOwner: true,
+      };
+      
+      return [ownerMember, ...householdMembers];
+    }
+
+    return householdMembers;
+  } catch (error) {
+    console.error("Error in getHouseholdMembers:", error);
+    return [];
+  }
+}
+
+export async function inviteMember(ownerId: string, data: MemberInviteFormData): Promise<HouseholdMember> {
+  try {
+    const supabase = await createServerClient();
+
+    // Check if member access is allowed
+    const hasAccess = await checkMemberAccess(ownerId);
+    if (!hasAccess) {
+      throw new Error("Member invitations are only available on paid plans");
+    }
+
+    // Check if member with this email already exists for this owner
+    const { data: existing } = await supabase
+      .from("HouseholdMember")
+      .select("id")
+      .eq("ownerId", ownerId)
+      .eq("email", data.email.toLowerCase())
+      .single();
+
+    if (existing) {
+      throw new Error("Member with this email has already been invited");
+    }
+
+    // Generate invitation token
+    const invitationToken = crypto.randomUUID();
+
+    const now = formatTimestamp(new Date());
+
+    const { data: member, error } = await supabase
+      .from("HouseholdMember")
+      .insert({
+        ownerId,
+        email: data.email.toLowerCase(),
+        name: data.name || null,
+        role: data.role || "member", // Use provided role or default to 'member'
+        status: "pending",
+        invitationToken,
+        invitedAt: now,
+        acceptedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error inviting member:", error);
+      throw new Error(`Failed to invite member: ${error.message || JSON.stringify(error)}`);
+    }
+
+    // Get owner information for email
+    const { data: owner } = await supabase
+      .from("User")
+      .select("name, email")
+      .eq("id", ownerId)
+      .single();
+
+    if (owner) {
+      // Send invitation email
+      try {
+        await sendInvitationEmail({
+          to: data.email.toLowerCase(),
+          memberName: data.name || data.email,
+          ownerName: owner.name || owner.email || "Um usuário",
+          ownerEmail: owner.email,
+          invitationToken,
+          appUrl: process.env.NEXT_PUBLIC_APP_URL,
+        });
+      } catch (emailError) {
+        // Log error but don't fail the invitation
+        // The invitation is still created in the database
+        console.error("Error sending invitation email:", emailError);
+      }
+    }
+
+    return mapHouseholdMember(member);
+  } catch (error) {
+    console.error("Error in inviteMember:", error);
+    throw error;
+  }
+}
+
+export async function updateMember(memberId: string, data: MemberUpdateFormData): Promise<HouseholdMember> {
+  try {
+    const supabase = await createServerClient();
+
+    // Get current member data
+    const { data: currentMember, error: fetchError } = await supabase
+      .from("HouseholdMember")
+      .select("*")
+      .eq("id", memberId)
+      .single();
+
+    if (fetchError || !currentMember) {
+      throw new Error("Member not found");
+    }
+
+    const now = formatTimestamp(new Date());
+    const updateData: Record<string, unknown> = {
+      updatedAt: now,
+    };
+
+    // Update name if provided
+    if (data.name !== undefined) {
+      updateData.name = data.name || null;
+    }
+
+    // Update email if provided and different
+    let emailChanged = false;
+    if (data.email !== undefined && data.email.toLowerCase() !== currentMember.email.toLowerCase()) {
+      // Check if email is already used by another member for this owner
+      const { data: existing } = await supabase
+        .from("HouseholdMember")
+        .select("id")
+        .eq("ownerId", currentMember.ownerId)
+        .eq("email", data.email.toLowerCase())
+        .neq("id", memberId)
+        .single();
+
+      if (existing) {
+        throw new Error("Email is already used by another member");
+      }
+
+      updateData.email = data.email.toLowerCase();
+      emailChanged = true;
+    }
+
+    // Update role if provided
+    if (data.role !== undefined) {
+      updateData.role = data.role;
+    }
+
+    // If email changed and member is pending, generate new token and resend invitation
+    if (emailChanged && currentMember.status === "pending") {
+      const newToken = crypto.randomUUID();
+      updateData.invitationToken = newToken;
+      updateData.invitedAt = now;
+
+      // Update member
+      const { data: member, error } = await supabase
+        .from("HouseholdMember")
+        .update(updateData)
+        .eq("id", memberId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error updating member:", error);
+        throw new Error(`Failed to update member: ${error.message || JSON.stringify(error)}`);
+      }
+
+      // Resend invitation email with new token
+      try {
+        const { data: owner } = await supabase
+          .from("User")
+          .select("name, email")
+          .eq("id", currentMember.ownerId)
+          .single();
+
+        if (owner) {
+          await sendInvitationEmail({
+            to: updateData.email as string,
+            memberName: (updateData.name as string) || updateData.email as string,
+            ownerName: owner.name || owner.email || "A user",
+            ownerEmail: owner.email,
+            invitationToken: newToken,
+            appUrl: process.env.NEXT_PUBLIC_APP_URL,
+          });
+        }
+      } catch (emailError) {
+        console.error("Error sending invitation email after email update:", emailError);
+        // Don't fail the update if email sending fails
+      }
+
+      return mapHouseholdMember(member);
+    }
+
+    // If email or role changed and member is active, update User table
+    if ((emailChanged || data.role !== undefined) && currentMember.status === "active" && currentMember.memberId) {
+      const userUpdateData: Record<string, unknown> = {};
+      
+      if (emailChanged) {
+        userUpdateData.email = updateData.email;
+      }
+      
+      if (data.role !== undefined) {
+        userUpdateData.role = data.role;
+      }
+
+      if (Object.keys(userUpdateData).length > 0) {
+        userUpdateData.updatedAt = now;
+        
+        const { error: userUpdateError } = await supabase
+          .from("User")
+          .update(userUpdateData)
+          .eq("id", currentMember.memberId);
+
+        if (userUpdateError) {
+          console.error("Error updating user:", userUpdateError);
+          // Don't fail the member update if user update fails
+        }
+      }
+    }
+
+    // Update member
+    const { data: member, error } = await supabase
+      .from("HouseholdMember")
+      .update(updateData)
+      .eq("id", memberId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating member:", error);
+      throw new Error(`Failed to update member: ${error.message || JSON.stringify(error)}`);
+    }
+
+    return mapHouseholdMember(member);
+  } catch (error) {
+    console.error("Error in updateMember:", error);
+    throw error;
+  }
+}
+
+export async function removeMember(memberId: string): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+
+    const { error } = await supabase
+      .from("HouseholdMember")
+      .delete()
+      .eq("id", memberId);
+
+    if (error) {
+      console.error("Error removing member:", error);
+      throw new Error(`Failed to remove member: ${error.message || JSON.stringify(error)}`);
+    }
+  } catch (error) {
+    console.error("Error in removeMember:", error);
+    throw error;
+  }
+}
+
+export async function resendInvitationEmail(memberId: string): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+
+    // Get member data
+    const { data: member, error: fetchError } = await supabase
+      .from("HouseholdMember")
+      .select("*")
+      .eq("id", memberId)
+      .single();
+
+    if (fetchError || !member) {
+      throw new Error("Member not found");
+    }
+
+    // Only resend for pending invitations
+    if (member.status !== "pending") {
+      throw new Error("Can only resend invitation for pending members");
+    }
+
+    // Get owner information for email
+    const { data: owner } = await supabase
+      .from("User")
+      .select("name, email")
+      .eq("id", member.ownerId)
+      .single();
+
+    if (!owner) {
+      throw new Error("Owner not found");
+    }
+
+    // Send invitation email
+    await sendInvitationEmail({
+      to: member.email,
+      memberName: member.name || member.email,
+      ownerName: owner.name || owner.email || "Um usuário",
+      ownerEmail: owner.email,
+      invitationToken: member.invitationToken,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    });
+  } catch (error) {
+    console.error("Error resending invitation email:", error);
+    throw error;
+  }
+}
+
+export async function acceptInvitation(token: string, userId: string): Promise<HouseholdMember> {
+  try {
+    const supabase = await createServerClient();
+
+    // Find the invitation by token
+    const { data: invitation, error: findError } = await supabase
+      .from("HouseholdMember")
+      .select("*")
+      .eq("invitationToken", token)
+      .eq("status", "pending")
+      .single();
+
+    if (findError || !invitation) {
+      throw new Error("Invalid or expired invitation token");
+    }
+
+    // Get auth user info to verify email
+    const { data: { user: authUserData }, error: authUserError } = await supabase.auth.getUser();
+    
+    if (authUserError || !authUserData) {
+      throw new Error("User not authenticated");
+    }
+
+    // Verify email matches invitation
+    if (authUserData.email?.toLowerCase() !== invitation.email.toLowerCase()) {
+      throw new Error("Email does not match the invitation");
+    }
+
+    // Check if User exists, if not create it
+    const { data: existingUser } = await supabase
+      .from("User")
+      .select("id, email, role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const now = formatTimestamp(new Date());
+    
+    // Create User if it doesn't exist (becomes a user of the app when accepting invite)
+    if (!existingUser) {
+      const { error: createUserError } = await supabase
+        .from("User")
+        .insert({
+          id: userId,
+          email: authUserData.email!,
+          name: invitation.name || null,
+          role: invitation.role || "member",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+      if (createUserError) {
+        console.error("Error creating user:", createUserError);
+        throw new Error(`Failed to create user: ${createUserError.message || JSON.stringify(createUserError)}`);
+      }
+    } else {
+      // Update existing user's role based on invitation role
+      const { error: roleUpdateError } = await supabase
+        .from("User")
+        .update({
+          role: invitation.role || "member",
+          updatedAt: now,
+        })
+        .eq("id", userId);
+
+      if (roleUpdateError) {
+        console.error("Error updating user role:", roleUpdateError);
+        // Don't fail the invitation if role update fails
+      }
+    }
+
+    // Update the invitation to active status and link the member
+    const { data: member, error: updateError } = await supabase
+      .from("HouseholdMember")
+      .update({
+        memberId: userId,
+        status: "active",
+        acceptedAt: now,
+        updatedAt: now,
+      })
+      .eq("id", invitation.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error accepting invitation:", updateError);
+      throw new Error(`Failed to accept invitation: ${updateError.message || JSON.stringify(updateError)}`);
+    }
+
+    return mapHouseholdMember(member);
+  } catch (error) {
+    console.error("Error in acceptInvitation:", error);
+    throw error;
+  }
+}
+
+export async function acceptInvitationWithPassword(token: string, password: string): Promise<{ member: HouseholdMember; session: any }> {
+  try {
+    const supabase = await createServerClient();
+
+    // Find the invitation by token
+    const { data: invitation, error: findError } = await supabase
+      .from("HouseholdMember")
+      .select("*")
+      .eq("invitationToken", token)
+      .eq("status", "pending")
+      .single();
+
+    if (findError || !invitation) {
+      throw new Error("Invalid or expired invitation token");
+    }
+
+    // Create user in Supabase Auth
+    // Note: signUp will fail if email already exists, which is what we want
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: invitation.email,
+      password: password,
+      options: {
+        emailRedirectTo: undefined, // Don't require email confirmation
+        data: {
+          name: invitation.name || "",
+        },
+      },
+    });
+
+    if (authError) {
+      // Check if error is because user already exists
+      if (authError.message?.includes("already registered") || authError.message?.includes("already exists")) {
+        throw new Error("User with this email already exists. Please sign in instead.");
+      }
+      console.error("Error creating auth user:", authError);
+      throw new Error(`Failed to create account: ${authError.message || "Unknown error"}`);
+    }
+
+    if (!authData.user) {
+      throw new Error("Failed to create account. Please try again.");
+    }
+
+    const userId = authData.user.id;
+    const now = formatTimestamp(new Date());
+
+    // Sign in to get session before updating HouseholdMember (needed for RLS)
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: invitation.email,
+      password: password,
+    });
+
+    if (signInError || !signInData.session) {
+      console.error("Error signing in after account creation:", signInError);
+      throw new Error(`Failed to sign in after account creation: ${signInError?.message || "Unknown error"}`);
+    }
+
+    // Create a new client with the session to ensure RLS policies work
+    const supabaseWithSession = await createServerClient(
+      signInData.session.access_token,
+      signInData.session.refresh_token
+    );
+
+    // Create User in User table using the authenticated client
+    const { error: createUserError } = await supabaseWithSession
+      .from("User")
+      .insert({
+        id: userId,
+        email: invitation.email,
+        name: invitation.name || null,
+        role: invitation.role || "member",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+    if (createUserError) {
+      console.error("Error creating user:", createUserError);
+      throw new Error(`Failed to create user: ${createUserError.message || JSON.stringify(createUserError)}`);
+    }
+
+    // Create free subscription for new user
+    const { error: subscriptionError } = await supabaseWithSession
+      .from("Subscription")
+      .insert({
+        id: crypto.randomUUID(),
+        userId: userId,
+        planId: "free",
+        status: "active",
+      });
+
+    if (subscriptionError) {
+      console.error("Error creating subscription:", subscriptionError);
+      // Don't fail the invitation if subscription creation fails
+    }
+
+    // Update the invitation to active status and link the member
+    // Now using the authenticated client so RLS policies allow the update
+    const { data: member, error: updateError } = await supabaseWithSession
+      .from("HouseholdMember")
+      .update({
+        memberId: userId,
+        status: "active",
+        acceptedAt: now,
+        updatedAt: now,
+      })
+      .eq("id", invitation.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error accepting invitation:", updateError);
+      throw new Error(`Failed to accept invitation: ${updateError.message || JSON.stringify(updateError)}`);
+    }
+
+    return {
+      member: mapHouseholdMember(member),
+      session: signInData?.session || null,
+    };
+  } catch (error) {
+    console.error("Error in acceptInvitationWithPassword:", error);
+    throw error;
+  }
+}
+
+function mapHouseholdMember(data: any): HouseholdMember {
+  return {
+    id: data.id,
+    ownerId: data.ownerId,
+    memberId: data.memberId,
+    email: data.email,
+    name: data.name,
+    role: data.role || "member", // Default to 'member' if not set
+    status: data.status,
+    invitationToken: data.invitationToken,
+    invitedAt: new Date(data.invitedAt),
+    acceptedAt: data.acceptedAt ? new Date(data.acceptedAt) : null,
+    createdAt: new Date(data.createdAt),
+    updatedAt: new Date(data.updatedAt),
+  };
+}
+
+// Check if user has admin role (either owner or admin member)
+export async function isAdmin(userId: string, ownerId: string): Promise<boolean> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get user's role from User table
+    const { data: user } = await supabase
+      .from("User")
+      .select("role")
+      .eq("id", userId)
+      .single();
+
+    // Owner is always admin, or check role from User table
+    return userId === ownerId || user?.role === "admin";
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    return false;
+  }
+}
+
+// Get current user's role in household
+export async function getUserRole(userId: string, ownerId: string): Promise<"admin" | "member" | null> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get user's role from User table
+    const { data: user } = await supabase
+      .from("User")
+      .select("role")
+      .eq("id", userId)
+      .single();
+
+    // Owner is always admin, or use role from User table
+    if (userId === ownerId) {
+      return "admin";
+    }
+
+    return (user?.role as "admin" | "member") || null;
+  } catch (error) {
+    console.error("Error getting user role:", error);
+    return null;
+  }
+}
+
+
+

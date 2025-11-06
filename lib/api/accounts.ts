@@ -6,7 +6,7 @@ import { getCurrentTimestamp, formatTimestamp } from "@/lib/utils/timestamp";
 import { getAccountBalance } from "./transactions";
 
 export async function getAccounts() {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { data: accounts, error } = await supabase
     .from("Account")
@@ -59,7 +59,13 @@ export async function getAccounts() {
 }
 
 export async function createAccount(data: AccountFormData) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("Unauthorized");
+  }
 
   // Generate UUID for the account
   const id = crypto.randomUUID();
@@ -72,6 +78,7 @@ export async function createAccount(data: AccountFormData) {
       name: data.name,
       type: data.type,
       creditLimit: data.type === "credit" ? data.creditLimit : null,
+      userId: user.id,
       createdAt: now,
       updatedAt: now,
     })
@@ -92,7 +99,7 @@ export async function createAccount(data: AccountFormData) {
 }
 
 export async function updateAccount(id: string, data: Partial<AccountFormData>) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const updateData: Record<string, unknown> = { ...data };
   
@@ -126,7 +133,7 @@ export async function updateAccount(id: string, data: Partial<AccountFormData>) 
 }
 
 export async function deleteAccount(id: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { error } = await supabase.from("Account").delete().eq("id", id);
 

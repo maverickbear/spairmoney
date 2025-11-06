@@ -1,10 +1,12 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
+import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 
-export async function getBudgets(period: Date) {
-  const supabase = createServerClient();
+async function getBudgetsInternal(period: Date, accessToken?: string, refreshToken?: string) {
+    const supabase = await createServerClient(accessToken, refreshToken);
 
   const startOfMonth = new Date(period.getFullYear(), period.getMonth(), 1);
   const endOfMonth = new Date(period.getFullYear(), period.getMonth() + 1, 0, 23, 59, 59);
@@ -62,40 +64,42 @@ export async function getBudgets(period: Date) {
     };
   });
 
-  // Calculate actual spend for each budget
-  const budgetsWithActual = await Promise.all(
-    processedBudgets.map(async (budget) => {
-      let actualSpend = 0;
-      
-      if (budget.macroId && budget.budgetCategories && budget.budgetCategories.length > 0) {
-        // Budget grouped by macro: sum transactions from all related categories
-        const categoryIds = budget.budgetCategories
-          .map((bc: any) => bc.category?.id)
-          .filter((id: string) => id);
-        
-        if (categoryIds.length > 0) {
-          const { data: transactions } = await supabase
-            .from("Transaction")
-            .select("amount")
-            .in("categoryId", categoryIds)
-            .eq("type", "expense")
-            .gte("date", formatDateStart(startOfMonth))
-            .lte("date", formatDateEnd(endOfMonth));
+  // Fetch all transactions for the period once
+  const { data: allTransactions } = await supabase
+    .from("Transaction")
+    .select("categoryId, amount")
+    .eq("type", "expense")
+    .gte("date", formatDateStart(startOfMonth))
+    .lte("date", formatDateEnd(endOfMonth));
 
-          actualSpend = transactions?.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0) || 0;
-        }
-      } else if (budget.categoryId) {
-        // Single category budget: sum transactions from that category
-        const { data: transactions } = await supabase
-          .from("Transaction")
-          .select("amount")
-          .eq("categoryId", budget.categoryId)
-          .eq("type", "expense")
-          .gte("date", formatDateStart(startOfMonth))
-          .lte("date", formatDateEnd(endOfMonth));
-
-        actualSpend = transactions?.reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0) || 0;
+  // Create a map of categoryId -> total amount for quick lookup
+  const categorySpendMap = new Map<string, number>();
+  if (allTransactions) {
+    for (const tx of allTransactions) {
+      if (tx.categoryId) {
+        const current = categorySpendMap.get(tx.categoryId) || 0;
+        categorySpendMap.set(tx.categoryId, current + (tx.amount || 0));
       }
+    }
+  }
+
+  // Calculate actual spend for each budget using the pre-fetched data
+  const budgetsWithActual = processedBudgets.map((budget) => {
+    let actualSpend = 0;
+    
+    if (budget.macroId && budget.budgetCategories && budget.budgetCategories.length > 0) {
+      // Budget grouped by macro: sum transactions from all related categories
+      const categoryIds = budget.budgetCategories
+        .map((bc: any) => bc.category?.id)
+        .filter((id: string) => id);
+      
+      for (const categoryId of categoryIds) {
+        actualSpend += categorySpendMap.get(categoryId) || 0;
+      }
+    } else if (budget.categoryId) {
+      // Single category budget: sum transactions from that category
+      actualSpend = categorySpendMap.get(budget.categoryId) || 0;
+    }
 
       const percentage = budget.amount > 0 ? (actualSpend / budget.amount) * 100 : 0;
 
@@ -115,20 +119,33 @@ export async function getBudgets(period: Date) {
         macro: budget.macro,
       } : (budget.category || { id: budget.categoryId, name: "Unknown", macroId: "", macro: null });
 
-      return {
-        ...budget,
-        actualSpend,
-        percentage,
-        status,
-        category: displayCategory,
-        displayName,
-        macro: budget.macro || null,
-        budgetCategories: budget.budgetCategories || [],
-      };
-    })
-  );
+    return {
+      ...budget,
+      actualSpend,
+      percentage,
+      status,
+      category: displayCategory,
+      displayName,
+      macro: budget.macro || null,
+      budgetCategories: budget.budgetCategories || [],
+    };
+  });
 
   return budgetsWithActual;
+}
+
+export async function getBudgets(period: Date) {
+  // Get tokens from cookies outside of cached function
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("sb-access-token")?.value;
+  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  
+  const cacheKey = `budgets-${period.getFullYear()}-${period.getMonth()}`;
+  return unstable_cache(
+    async () => getBudgetsInternal(period, accessToken, refreshToken),
+    [cacheKey],
+    { revalidate: 60, tags: ['budgets', 'transactions'] }
+  )();
 }
 
 export async function createBudget(data: {
@@ -139,7 +156,13 @@ export async function createBudget(data: {
   amount: number;
   note?: string;
 }) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("Unauthorized");
+  }
 
   const id = crypto.randomUUID();
   const startOfMonth = new Date(data.period.getFullYear(), data.period.getMonth(), 1);
@@ -159,6 +182,7 @@ export async function createBudget(data: {
     period: periodDate,
     amount: data.amount,
     note: data.note || null,
+    userId: user.id,
     createdAt: now,
     updatedAt: now,
   };
@@ -214,7 +238,7 @@ export async function createBudget(data: {
 }
 
 export async function updateBudget(id: string, data: { amount: number; note?: string }) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const updateData: Record<string, unknown> = {
     amount: data.amount,
@@ -240,7 +264,7 @@ export async function updateBudget(id: string, data: { amount: number; note?: st
 }
 
 export async function deleteBudget(id: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { error } = await supabase.from("Budget").delete().eq("id", id);
 

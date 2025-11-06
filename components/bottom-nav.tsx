@@ -1,23 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Receipt, Target, FolderTree, Wallet, TrendingUp, FileText, PiggyBank } from "lucide-react";
+import { LayoutDashboard, Receipt, Target, FolderTree, Wallet, TrendingUp, FileText, PiggyBank, CreditCard } from "lucide-react";
 
+// Organized by: Overview, Money Management, Planning
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: Receipt },
   { href: "/budgets", label: "Budgets", icon: Target },
   { href: "/goals", label: "Goals", icon: PiggyBank },
-  { href: "/categories", label: "Categories", icon: FolderTree },
-  { href: "/accounts", label: "Accounts", icon: Wallet },
-  { href: "/investments", label: "Investments", icon: TrendingUp },
-  { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/debts", label: "Debts", icon: CreditCard },
 ];
 
-export function BottomNav() {
+interface BottomNavProps {
+  hasSubscription?: boolean;
+}
+
+export function BottomNav({ hasSubscription = true }: BottomNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Don't render BottomNav if user doesn't have subscription
+  if (!hasSubscription) {
+    return null;
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card md:hidden">
@@ -29,8 +37,15 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={(e) => {
+                if (!hasSubscription) {
+                  e.preventDefault();
+                  router.push("/select-plan");
+                }
+              }}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium transition-colors",
+                !hasSubscription && "opacity-50 cursor-not-allowed",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"

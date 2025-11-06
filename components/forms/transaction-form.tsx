@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { transactionSchema, TransactionFormData } from "@/lib/validations/transaction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/common/money-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -276,7 +275,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
+            <div className="space-y-1">
               <label className="text-sm font-medium">Date</label>
               <Input
                 type="date"
@@ -293,7 +292,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <label className="text-sm font-medium">Type</label>
               <Select
                 value={form.watch("type")}
@@ -326,7 +325,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <label className="text-sm font-medium">Account</label>
               <Select
                 value={form.watch("accountId")}
@@ -346,7 +345,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
             </div>
 
             {isTransfer && (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-sm font-medium">Transfer To</label>
                 <Select
                   value={form.watch("transferToId")}
@@ -370,7 +369,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
 
             {!isTransfer && (
               <>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Group</label>
                   <Select 
                     value={selectedMacroId || undefined} 
@@ -401,7 +400,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
                 </div>
 
                 {(categories.length > 0 || form.watch("categoryId")) && (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium">Category</label>
                     <Select
                       value={form.watch("categoryId") || undefined}
@@ -442,7 +441,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
                 )}
 
                 {(subcategories.length > 0 || form.watch("subcategoryId")) && (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <label className="text-sm font-medium">Subcategory</label>
                     <Select
                       value={form.watch("subcategoryId") || undefined}
@@ -481,19 +480,22 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
               </>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <label className="text-sm font-medium">Amount</label>
-              <MoneyInput
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
                 {...form.register("amount", { valueAsNumber: true })}
               />
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-1 md:col-span-2">
               <label className="text-sm font-medium">Description</label>
               <Input {...form.register("description")} />
             </div>
 
-            <div className="space-y-2 flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
               <Checkbox
                 id="recurring"
                 checked={form.watch("recurring")}
@@ -501,9 +503,9 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess }: 
               />
               <label
                 htmlFor="recurring"
-                className="text-sm font-medium cursor-pointer"
+                className="text-sm font-medium cursor-pointer flex items-center"
               >
-                Recurring (ocorre todos os meses)
+                Recurring (occurs every month)
               </label>
             </div>
           </div>

@@ -1,11 +1,16 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
+import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
 import { TransactionFormData } from "@/lib/validations/transaction";
-import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
+import { formatTimestamp, formatDateStart, formatDateEnd, getCurrentTimestamp } from "@/lib/utils/timestamp";
+import { getDebts } from "@/lib/api/debts";
+import { calculateNextPaymentDates, type DebtForCalculation } from "@/lib/utils/debts";
+import { getDebtCategoryMapping } from "@/lib/utils/debt-categories";
 
 export async function createTransaction(data: TransactionFormData) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   if (data.type === "transfer" && !data.transferToId) {
     throw new Error("Transfer destination is required");
@@ -111,7 +116,7 @@ export async function createTransaction(data: TransactionFormData) {
 }
 
 export async function updateTransaction(id: string, data: Partial<TransactionFormData>) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const updateData: Record<string, unknown> = {};
   if (data.date !== undefined) {
@@ -148,7 +153,7 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
 }
 
 export async function deleteTransaction(id: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get transaction first
   const { data: transaction, error: fetchError } = await supabase
@@ -184,16 +189,20 @@ export async function deleteTransaction(id: string) {
   }
 }
 
-export async function getTransactions(filters?: {
-  startDate?: Date;
-  endDate?: Date;
-  categoryId?: string;
-  accountId?: string;
-  type?: string;
-  search?: string;
-  recurring?: boolean;
-}) {
-  const supabase = createServerClient();
+export async function getTransactionsInternal(
+  filters?: {
+    startDate?: Date;
+    endDate?: Date;
+    categoryId?: string;
+    accountId?: string;
+    type?: string;
+    search?: string;
+    recurring?: boolean;
+  },
+  accessToken?: string,
+  refreshToken?: string
+) {
+    const supabase = await createServerClient(accessToken, refreshToken);
 
   let query = supabase
     .from("Transaction")
@@ -284,8 +293,35 @@ export async function getTransactions(filters?: {
   return transactions;
 }
 
+export async function getTransactions(filters?: {
+  startDate?: Date;
+  endDate?: Date;
+  categoryId?: string;
+  accountId?: string;
+  type?: string;
+  search?: string;
+  recurring?: boolean;
+}) {
+  // Get tokens from cookies outside of cached function
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("sb-access-token")?.value;
+  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  
+  // Cache for 30 seconds if no search filter (searches should be real-time)
+  if (!filters?.search) {
+    const cacheKey = `transactions-${filters?.startDate?.toISOString()}-${filters?.endDate?.toISOString()}-${filters?.categoryId || 'all'}-${filters?.accountId || 'all'}-${filters?.type || 'all'}-${filters?.recurring || 'all'}`;
+    return unstable_cache(
+      async () => getTransactionsInternal(filters, accessToken, refreshToken),
+      [cacheKey],
+      { revalidate: 30, tags: ['transactions'] }
+    )();
+  }
+  
+  return getTransactionsInternal(filters, accessToken, refreshToken);
+}
+
 export async function getUpcomingTransactions(limit: number = 5) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
   const now = new Date();
   const endDate = new Date(now);
   endDate.setMonth(endDate.getMonth() + 1); // Look ahead 1 month
@@ -304,15 +340,10 @@ export async function getUpcomingTransactions(limit: number = 5) {
 
   if (error) {
     console.error("Supabase error fetching recurring transactions:", error);
-    return [];
   }
 
-  if (!recurringTransactions || recurringTransactions.length === 0) {
-    return [];
-  }
-
-  // Handle relations
-  const transactions = recurringTransactions.map((tx: any) => {
+  // Handle relations for recurring transactions
+  const transactions = (recurringTransactions || []).map((tx: any) => {
     let account = null;
     if (tx.account) {
       account = Array.isArray(tx.account) ? (tx.account.length > 0 ? tx.account[0] : null) : tx.account;
@@ -336,7 +367,7 @@ export async function getUpcomingTransactions(limit: number = 5) {
     };
   });
 
-  // Calculate upcoming occurrences
+  // Calculate upcoming occurrences for recurring transactions
   const upcoming: Array<{
     id: string;
     date: Date;
@@ -347,6 +378,7 @@ export async function getUpcomingTransactions(limit: number = 5) {
     category?: { id: string; name: string } | null;
     subcategory?: { id: string; name: string } | null;
     originalDate: Date;
+    isDebtPayment?: boolean;
   }> = [];
 
   for (const tx of transactions) {
@@ -387,8 +419,125 @@ export async function getUpcomingTransactions(limit: number = 5) {
         category: tx.category,
         subcategory: tx.subcategory,
         originalDate: originalDate,
+        isDebtPayment: false,
       });
     }
+  }
+
+  // Get debts and calculate upcoming debt payments
+  try {
+    const debts = await getDebts();
+    
+    for (const debt of debts) {
+      // Skip if debt is paid off or paused
+      if (debt.isPaidOff || debt.isPaused || debt.currentBalance <= 0) {
+        continue;
+      }
+
+      // Convert debt to DebtForCalculation format
+      const debtForCalculation: DebtForCalculation = {
+        id: debt.id,
+        name: debt.name,
+        initialAmount: debt.initialAmount,
+        downPayment: debt.downPayment,
+        currentBalance: debt.currentBalance,
+        interestRate: debt.interestRate,
+        totalMonths: debt.totalMonths,
+        firstPaymentDate: debt.firstPaymentDate,
+        monthlyPayment: debt.monthlyPayment,
+        paymentFrequency: debt.paymentFrequency,
+        paymentAmount: debt.paymentAmount,
+        principalPaid: debt.principalPaid,
+        interestPaid: debt.interestPaid,
+        additionalContributions: debt.additionalContributions,
+        additionalContributionAmount: debt.additionalContributionAmount,
+        priority: debt.priority,
+        isPaused: debt.isPaused,
+        isPaidOff: debt.isPaidOff,
+        description: debt.description,
+      };
+
+      // Calculate next payment dates for this debt
+      const debtPayments = calculateNextPaymentDates(
+        debtForCalculation,
+        now,
+        endDate
+      );
+
+      // Get account information if accountId is set
+      let account = null;
+      if (debt.accountId) {
+        const { data: accountData } = await supabase
+          .from("Account")
+          .select("id, name")
+          .eq("id", debt.accountId)
+          .single();
+        
+        if (accountData) {
+          account = {
+            id: accountData.id,
+            name: accountData.name,
+          };
+        }
+      }
+
+      // Get category mapping for the debt
+      let category = null;
+      let subcategory = null;
+      try {
+        const categoryMapping = await getDebtCategoryMapping(debt.loanType);
+        if (categoryMapping) {
+          const { data: categoryData } = await supabase
+            .from("Category")
+            .select("id, name")
+            .eq("id", categoryMapping.categoryId)
+            .single();
+          
+          if (categoryData) {
+            category = {
+              id: categoryData.id,
+              name: categoryData.name,
+            };
+          }
+
+          if (categoryMapping.subcategoryId) {
+            const { data: subcategoryData } = await supabase
+              .from("Subcategory")
+              .select("id, name")
+              .eq("id", categoryMapping.subcategoryId)
+              .single();
+            
+            if (subcategoryData) {
+              subcategory = {
+                id: subcategoryData.id,
+                name: subcategoryData.name,
+              };
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching category mapping for debt ${debt.id}:`, error);
+      }
+
+      // Add debt payments to upcoming list
+      for (const payment of debtPayments) {
+        upcoming.push({
+          id: `debt-${debt.id}-${payment.date.toISOString()}`,
+          date: payment.date,
+          type: "expense",
+          amount: payment.amount,
+          description: `Payment for ${debt.name}`,
+          account: account,
+          category: category,
+          subcategory: subcategory,
+          originalDate: payment.date,
+          isDebtPayment: true,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching debt payments:", error);
+    // Continue even if debt payments fail
   }
 
   // Sort by date and limit
@@ -397,7 +546,7 @@ export async function getUpcomingTransactions(limit: number = 5) {
 }
 
 export async function getAccountBalance(accountId: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { data: transactions, error } = await supabase
     .from("Transaction")

@@ -104,7 +104,7 @@ export async function fetchMultiplePrices(symbols: string[]): Promise<Map<string
  * Update prices for all securities in the database
  */
 export async function updateAllSecurityPrices() {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   // Get all securities
   const { data: securities, error: securitiesError } = await supabase
@@ -189,7 +189,7 @@ export async function updateAllSecurityPrices() {
  * Update price for a specific security
  */
 export async function updateSecurityPrice(securityId: string, symbol: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const price = await fetchYahooFinancePrice(symbol);
   

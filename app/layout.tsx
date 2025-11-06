@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Nav } from "@/components/nav";
-import { BottomNav } from "@/components/bottom-nav";
+import { LayoutWrapper } from "@/components/layout-wrapper";
 import { KBarWrapper } from "@/components/kbar-wrapper";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ 
+  subsets: ["latin"],
+  display: "swap",
+  fallback: ["system-ui", "arial"],
+  adjustFontFallback: true,
+  preload: false, // Disable preloading to avoid network issues
+});
 
 export const metadata: Metadata = {
   title: "Spare Finance - Personal Finance",
@@ -20,20 +25,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.className} bg-slate-50 dark:bg-gray-900`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <div className="flex">
-            <Nav />
-            <main className="flex-1 md:ml-64 pb-16 md:pb-0">
-              <div className="container mx-auto px-4 py-4 md:py-8">{children}</div>
-            </main>
-          </div>
-          <BottomNav />
+          <LayoutWrapper>{children}</LayoutWrapper>
           <KBarWrapper />
         </ThemeProvider>
       </body>

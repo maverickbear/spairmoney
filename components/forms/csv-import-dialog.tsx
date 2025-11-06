@@ -129,7 +129,7 @@ export function CsvImportDialog({
               <h3 className="text-sm font-medium">Column Mapping</h3>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Date</label>
                   <Select
                     value={mapping.date || ""}
@@ -148,7 +148,7 @@ export function CsvImportDialog({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Amount</label>
                   <Select
                     value={mapping.amount || ""}
@@ -167,7 +167,7 @@ export function CsvImportDialog({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Description</label>
                   <Select
                     value={mapping.description || ""}
@@ -186,7 +186,7 @@ export function CsvImportDialog({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Account</label>
                   <Select
                     value={mapping.account || ""}
@@ -205,7 +205,7 @@ export function CsvImportDialog({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Category</label>
                   <Select
                     value={mapping.category || ""}
@@ -224,7 +224,7 @@ export function CsvImportDialog({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">Type</label>
                   <Select
                     value={mapping.type || ""}

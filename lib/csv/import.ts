@@ -50,10 +50,10 @@ interface TransactionInput {
   date: Date;
   type: string;
   amount: number;
-  accountId: string;
+  accountId?: string;
   categoryId?: string;
   subcategoryId?: string;
-  description: string;
+  description?: string;
   tags: string[];
 }
 

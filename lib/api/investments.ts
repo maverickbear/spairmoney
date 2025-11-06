@@ -17,7 +17,7 @@ export interface Holding {
 }
 
 export async function getHoldings(accountId?: string): Promise<Holding[]> {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   let query = supabase
     .from("InvestmentTransaction")
@@ -165,7 +165,7 @@ export async function getInvestmentTransactions(filters?: {
   startDate?: Date;
   endDate?: Date;
 }) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   let query = supabase
     .from("InvestmentTransaction")
@@ -204,7 +204,7 @@ export async function getInvestmentTransactions(filters?: {
 }
 
 export async function createInvestmentTransaction(data: InvestmentTransactionFormData) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const id = crypto.randomUUID();
   const date = data.date instanceof Date ? data.date : new Date(data.date);
@@ -238,7 +238,7 @@ export async function createInvestmentTransaction(data: InvestmentTransactionFor
 }
 
 export async function updateInvestmentTransaction(id: string, data: Partial<InvestmentTransactionFormData>) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const updateData: Record<string, unknown> = {};
   if (data.date) {
@@ -270,7 +270,7 @@ export async function updateInvestmentTransaction(id: string, data: Partial<Inve
 }
 
 export async function deleteInvestmentTransaction(id: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { error } = await supabase.from("InvestmentTransaction").delete().eq("id", id);
 
@@ -281,7 +281,7 @@ export async function deleteInvestmentTransaction(id: string) {
 }
 
 export async function getSecurities() {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { data, error } = await supabase
     .from("Security")
@@ -297,7 +297,7 @@ export async function getSecurities() {
 }
 
 export async function createSecurity(data: { symbol: string; name: string; class: string }) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const id = crypto.randomUUID();
   const now = formatTimestamp(new Date());
@@ -324,7 +324,7 @@ export async function createSecurity(data: { symbol: string; name: string; class
 }
 
 export async function getSecurityPrices(securityId?: string) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   let query = supabase
     .from("SecurityPrice")
@@ -348,7 +348,7 @@ export async function getSecurityPrices(securityId?: string) {
 }
 
 export async function createSecurityPrice(data: SecurityPriceFormData) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const id = crypto.randomUUID();
   const date = data.date instanceof Date ? data.date : new Date(data.date);
@@ -376,7 +376,7 @@ export async function createSecurityPrice(data: SecurityPriceFormData) {
 }
 
 export async function getInvestmentAccounts() {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
 
   const { data, error } = await supabase
     .from("InvestmentAccount")
@@ -391,7 +391,13 @@ export async function getInvestmentAccounts() {
 }
 
 export async function createInvestmentAccount(data: InvestmentAccountFormData) {
-  const supabase = createServerClient();
+    const supabase = await createServerClient();
+
+  // Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("Unauthorized");
+  }
 
   const id = crypto.randomUUID();
   const now = formatTimestamp(new Date());
@@ -403,6 +409,7 @@ export async function createInvestmentAccount(data: InvestmentAccountFormData) {
       name: data.name,
       type: data.type,
       accountId: data.accountId || null,
+      userId: user.id,
       createdAt: now,
       updatedAt: now,
     })

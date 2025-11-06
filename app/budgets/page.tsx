@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { BudgetForm } from "@/components/forms/budget-form";
+import { CardSkeleton } from "@/components/ui/card-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Budget {
   id: string;
@@ -58,6 +60,7 @@ export default function BudgetsPage() {
   const [macros, setMacros] = useState<Macro[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
+  const [loading, setLoading] = useState(true);
   const now = new Date();
 
   useEffect(() => {
@@ -66,6 +69,7 @@ export default function BudgetsPage() {
 
   async function loadData() {
     try {
+      setLoading(true);
       const [budgetsData, categoriesData, macrosData] = await Promise.all([
         getBudgets(now),
         getAllCategories(),
@@ -76,6 +80,8 @@ export default function BudgetsPage() {
       setMacros(macrosData as Macro[]);
     } catch (error) {
       console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -118,60 +124,83 @@ export default function BudgetsPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {budgets.map((budget) => (
-          <Card key={budget.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                {budget.displayName || budget.category.name}
-              </CardTitle>
-                <div className="flex items-center space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setSelectedBudget(budget);
-                      setIsFormOpen(true);
-                    }}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(budget.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+      {loading ? (
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-6 w-32" />
+                  <div className="flex items-center space-x-1">
+                    <Skeleton className="h-8 w-8 rounded" />
+                    <Skeleton className="h-8 w-8 rounded" />
+                  </div>
                 </div>
-              </div>
-              {budget.budgetCategories && budget.budgetCategories.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {budget.budgetCategories.map(bc => bc.category.name).join(", ")}
-                </p>
-              )}
-              {budget.note && (
-                <p className="text-sm text-muted-foreground">{budget.note}</p>
-              )}
-            </CardHeader>
-            <CardContent>
-              <BudgetProgress
-                budget={budget.amount}
-                actual={budget.actualSpend || 0}
-                percentage={budget.percentage || 0}
-                status={budget.status || "ok"}
-              />
-            </CardContent>
-          </Card>
-        ))}
+                <Skeleton className="h-3 w-24 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-2 w-full rounded-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {budgets.map((budget) => (
+            <Card key={budget.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {budget.displayName || budget.category.name}
+                </CardTitle>
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedBudget(budget);
+                        setIsFormOpen(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(budget.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                {budget.budgetCategories && budget.budgetCategories.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {budget.budgetCategories.map(bc => bc.category.name).join(", ")}
+                  </p>
+                )}
+                {budget.note && (
+                  <p className="text-sm text-muted-foreground">{budget.note}</p>
+                )}
+              </CardHeader>
+              <CardContent>
+                <BudgetProgress
+                  budget={budget.amount}
+                  actual={budget.actualSpend || 0}
+                  percentage={budget.percentage || 0}
+                  status={budget.status || "ok"}
+                />
+              </CardContent>
+            </Card>
+          ))}
 
-        {budgets.length === 0 && (
-          <div className="col-span-full text-center py-8 text-muted-foreground">
-            No budgets set for this month. Create one to get started.
-          </div>
-        )}
-      </div>
+          {budgets.length === 0 && (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              No budgets set for this month. Create one to get started.
+            </div>
+          )}
+        </div>
+      )}
 
       <BudgetForm 
         macros={macros}

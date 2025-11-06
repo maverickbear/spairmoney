@@ -12,7 +12,9 @@ import {
   CheckCircle2, 
   Info,
   Heart,
-  ArrowRight
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/common/money";
@@ -29,7 +31,7 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
       case "Excellent":
         return "text-green-600 dark:text-green-400";
       case "Good":
-        return "text-blue-600 dark:text-blue-400";
+        return "text-green-600 dark:text-green-400";
       case "Fair":
         return "text-yellow-600 dark:text-yellow-400";
       case "Poor":
@@ -46,7 +48,7 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
       case "Excellent":
         return "bg-green-100 dark:bg-green-900/20";
       case "Good":
-        return "bg-blue-100 dark:bg-blue-900/20";
+        return "bg-green-100 dark:bg-green-900/20";
       case "Fair":
         return "bg-yellow-100 dark:bg-yellow-900/20";
       case "Poor":
@@ -59,11 +61,11 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600 dark:text-green-400";
-    if (score >= 60) return "text-blue-600 dark:text-blue-400";
-    if (score >= 40) return "text-yellow-600 dark:text-yellow-400";
-    if (score >= 20) return "text-orange-600 dark:text-orange-400";
-    return "text-red-600 dark:text-red-400";
+    if (score >= 91) return "text-green-600 dark:text-green-400"; // Excellent
+    if (score >= 81) return "text-green-600 dark:text-green-400"; // Good
+    if (score >= 71) return "text-yellow-600 dark:text-yellow-400"; // Fair
+    if (score >= 61) return "text-orange-600 dark:text-orange-400"; // Poor
+    return "text-red-600 dark:text-red-400"; // Critical
   };
 
   const getAlertIcon = (severity: string) => {
@@ -82,93 +84,50 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
 
   return (
     <>
-      <Card className="w-full">
+      <Card className="w-full group">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Heart className="h-5 w-5" />
+          <CardTitle>
             Financial Health
           </CardTitle>
           <CardDescription>
-            Complete analysis of your financial situation
+            Monthly Income vs Monthly Expenses comparison
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Score Display */}
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-baseline gap-2">
-                <span className={cn("text-5xl font-bold", getScoreColor(data.score))}>
-                  {data.score}
-                </span>
-                <span className="text-sm text-muted-foreground">/100</span>
-              </div>
-              <div className={cn(
-                "inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold w-fit",
-                getClassificationBgColor(data.classification),
-                getClassificationColor(data.classification)
-              )}>
-                {data.classification === "Excellent" && <CheckCircle2 className="h-4 w-4" />}
-                {data.classification === "Critical" && <AlertTriangle className="h-4 w-4" />}
-                {data.classification}
-              </div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-baseline gap-2">
+              <span className={cn("text-4xl font-semibold", getScoreColor(data.score))}>
+                {data.score}
+              </span>
+              <span className="text-sm text-muted-foreground">/100</span>
             </div>
-            
-            {/* Progress Indicator */}
-            <div className="relative w-24 h-24">
-              <svg className="w-24 h-24 transform -rotate-90">
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="none"
-                  className="text-muted"
-                />
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={`${2 * Math.PI * 40}`}
-                  strokeDashoffset={`${2 * Math.PI * 40 * (1 - data.score / 100)}`}
-                  className={getScoreColor(data.score)}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className={cn("text-lg font-semibold", getScoreColor(data.score))}>
-                  {data.score}%
-                </span>
-              </div>
+            <div className={cn(
+              "inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold w-fit",
+              getClassificationBgColor(data.classification),
+              getClassificationColor(data.classification)
+            )}>
+              {data.classification === "Excellent" && <CheckCircle2 className="h-4 w-4" />}
+              {data.classification === "Critical" && <AlertTriangle className="h-4 w-4" />}
+              {data.classification}
             </div>
+            {data.message && (
+              <p className="text-sm text-muted-foreground mt-1">
+                {data.message}
+              </p>
+            )}
           </div>
 
-          {/* Key Metrics */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Months of Reserve</p>
-              <p className="text-lg font-semibold">
-                {data.monthsOfReserve.toFixed(1)}
-                <span className="text-sm text-muted-foreground ml-1">months</span>
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Savings Rate</p>
-              <p className={cn(
-                "text-lg font-semibold flex items-center gap-1",
-                data.savingsRate >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-              )}>
-                {data.savingsRate >= 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
-                )}
-                {data.savingsRate.toFixed(1)}%
-              </p>
-            </div>
+
+          {/* Cost of Living */}
+          <div className="space-y-1 p-3 rounded-[12px] border bg-card">
+            <p className="text-xs text-muted-foreground">Cost of Living</p>
+            <p className="text-lg font-semibold flex items-center gap-2 text-foreground">
+              {formatMoney(data.monthlyExpenses)}
+              <span className="text-sm text-muted-foreground">
+                ({data.monthlyIncome > 0 ? ((data.monthlyExpenses / data.monthlyIncome) * 100).toFixed(1) : "0.0"}%)
+              </span>
+            </p>
           </div>
 
           {/* Alerts */}
@@ -180,7 +139,7 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
                   <div
                     key={alert.id}
                     className={cn(
-                      "flex items-start gap-2 p-3 rounded-lg border",
+                      "flex items-start gap-2 p-3 rounded-[12px] border",
                       alert.severity === "critical" 
                         ? "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800"
                         : alert.severity === "warning"

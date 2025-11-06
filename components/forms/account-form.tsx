@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { accountSchema, AccountFormData } from "@/lib/validations/account";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/common/money-input";
 import {
   Select,
   SelectContent,
@@ -115,12 +114,12 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Name</label>
             <Input {...form.register("name")} />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <label className="text-sm font-medium">Type</label>
             <Select
               value={form.watch("type")}
@@ -147,9 +146,12 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
           </div>
 
           {accountType === "credit" && (
-            <div className="space-y-2">
+            <div className="space-y-1">
               <label className="text-sm font-medium">Credit Limit</label>
-              <MoneyInput
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
                 min="0"
                 {...form.register("creditLimit", { 
                   valueAsNumber: true,

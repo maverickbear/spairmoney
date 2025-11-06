@@ -81,8 +81,7 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+          <CardTitle>
             Upcoming Transactions
           </CardTitle>
           <CardDescription>Recurring transactions scheduled for the next month</CardDescription>
@@ -139,7 +138,7 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
               <div
                 key={getTransactionKey(tx)}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-lg border bg-card transition-all",
+                  "flex items-center justify-between p-3 rounded-[12px] border bg-card transition-all",
                   paid
                     ? "opacity-60 border-muted"
                     : "hover:bg-accent/50"
