@@ -2,6 +2,7 @@
 
 import { createServerClient } from "@/lib/supabase-server";
 import { Plan, PlanFeatures, Subscription } from "@/lib/validations/plan";
+import { getOwnerIdForMember, isHouseholdMember } from "./members";
 
 export interface PlanWithSubscription extends Plan {
   subscription?: Subscription;
@@ -54,8 +55,54 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
   try {
     const supabase = await createServerClient();
     
-    // Use maybeSingle() instead of single() to handle case when no subscription exists
-    // This prevents 406 errors when there are 0 results
+    // Check if user is an active household member
+    const isMember = await isHouseholdMember(userId);
+    
+    if (isMember) {
+      // User is a household member, inherit plan from owner
+      const ownerId = await getOwnerIdForMember(userId);
+      
+      if (ownerId) {
+        // Get owner's subscription
+        const { data: ownerSubscription, error: ownerError } = await supabase
+          .from("Subscription")
+          .select("*")
+          .eq("userId", ownerId)
+          .eq("status", "active")
+          .order("createdAt", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (ownerError && ownerError.code !== "PGRST116") {
+          console.error("[PLANS] Error fetching owner subscription:", ownerError);
+        }
+
+        if (ownerSubscription) {
+          // Owner has a subscription, return it as shadow subscription for the member
+          // Only inherit if owner has Basic or Premium plan
+          const ownerPlanId = ownerSubscription.planId;
+          if (ownerPlanId === "basic" || ownerPlanId === "premium") {
+            return {
+              id: ownerSubscription.id,
+              userId, // Use member's userId, but owner's subscription data
+              planId: ownerPlanId,
+              status: ownerSubscription.status,
+              stripeSubscriptionId: ownerSubscription.stripeSubscriptionId,
+              stripeCustomerId: ownerSubscription.stripeCustomerId,
+              currentPeriodStart: ownerSubscription.currentPeriodStart ? new Date(ownerSubscription.currentPeriodStart) : null,
+              currentPeriodEnd: ownerSubscription.currentPeriodEnd ? new Date(ownerSubscription.currentPeriodEnd) : null,
+              cancelAtPeriodEnd: ownerSubscription.cancelAtPeriodEnd || false,
+              createdAt: ownerSubscription.createdAt ? new Date(ownerSubscription.createdAt) : new Date(),
+              updatedAt: ownerSubscription.updatedAt ? new Date(ownerSubscription.updatedAt) : new Date(),
+            };
+          }
+          // If owner has Free plan, fall through to return Free for member
+        }
+        // If owner has no subscription or has Free, return Free for member
+      }
+    }
+    
+    // User is not a member, or owner has Free/no subscription - check user's own subscription
     const { data: subscription, error } = await supabase
       .from("Subscription")
       .select("*")

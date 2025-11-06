@@ -499,6 +499,10 @@ export async function acceptInvitation(token: string, userId: string): Promise<H
       throw new Error(`Failed to accept invitation: ${updateError.message || JSON.stringify(updateError)}`);
     }
 
+    // Note: We don't create a Free subscription for members
+    // Members inherit the plan from the owner (shadow subscription)
+    // This is handled dynamically in getUserSubscription()
+
     return mapHouseholdMember(member);
   } catch (error) {
     console.error("Error in acceptInvitation:", error);
@@ -590,20 +594,9 @@ export async function acceptInvitationWithPassword(token: string, password: stri
       throw new Error(`Failed to create user: ${createUserError.message || JSON.stringify(createUserError)}`);
     }
 
-    // Create free subscription for new user
-    const { error: subscriptionError } = await supabaseWithSession
-      .from("Subscription")
-      .insert({
-        id: crypto.randomUUID(),
-        userId: userId,
-        planId: "free",
-        status: "active",
-      });
-
-    if (subscriptionError) {
-      console.error("Error creating subscription:", subscriptionError);
-      // Don't fail the invitation if subscription creation fails
-    }
+    // Note: We don't create a Free subscription for members
+    // Members inherit the plan from the owner (shadow subscription)
+    // This is handled dynamically in getUserSubscription()
 
     // Update the invitation to active status and link the member
     // Now using the authenticated client so RLS policies allow the update
@@ -700,6 +693,54 @@ export async function getUserRole(userId: string, ownerId: string): Promise<"adm
     return (user?.role as "admin" | "member") || null;
   } catch (error) {
     console.error("Error getting user role:", error);
+    return null;
+  }
+}
+
+// Check if user is an active household member
+export async function isHouseholdMember(userId: string): Promise<boolean> {
+  try {
+    const supabase = await createServerClient();
+    
+    const { data: member, error } = await supabase
+      .from("HouseholdMember")
+      .select("id")
+      .eq("memberId", userId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (error && error.code !== "PGRST116") {
+      console.error("Error checking household membership:", error);
+      return false;
+    }
+
+    return member !== null;
+  } catch (error) {
+    console.error("Error in isHouseholdMember:", error);
+    return false;
+  }
+}
+
+// Get ownerId for a household member
+export async function getOwnerIdForMember(userId: string): Promise<string | null> {
+  try {
+    const supabase = await createServerClient();
+    
+    const { data: member, error } = await supabase
+      .from("HouseholdMember")
+      .select("ownerId")
+      .eq("memberId", userId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (error && error.code !== "PGRST116") {
+      console.error("Error getting ownerId for member:", error);
+      return null;
+    }
+
+    return member?.ownerId || null;
+  } catch (error) {
+    console.error("Error in getOwnerIdForMember:", error);
     return null;
   }
 }
