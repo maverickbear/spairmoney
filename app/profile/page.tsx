@@ -13,13 +13,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Edit, Save, X, User } from "lucide-react";
+import { Edit, Save, X, User, CreditCard, Users, ExternalLink } from "lucide-react";
+import { PlanBadge } from "@/components/common/plan-badge";
+import Link from "next/link";
 
 interface Profile {
   name: string;
   email: string;
   avatarUrl?: string;
   phoneNumber?: string;
+  plan?: {
+    name: "free" | "basic" | "premium";
+    isShadow: boolean;
+    ownerId?: string;
+    ownerName?: string;
+  } | null;
+  household?: {
+    isOwner: boolean;
+    isMember: boolean;
+    ownerId?: string;
+    ownerName?: string;
+  } | null;
 }
 
 
@@ -335,6 +349,92 @@ export default function ProfilePage() {
               </div>
             )}
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Plan & Subscription Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan & Subscription</CardTitle>
+          <CardDescription>
+            Your current plan and household information
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Current Plan */}
+          {profile?.plan && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Current Plan</span>
+                </div>
+                <PlanBadge plan={profile.plan.name} />
+              </div>
+              
+              {profile.plan.isShadow && (
+                <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 text-sm">
+                  <p className="text-blue-800 dark:text-blue-200">
+                    <strong>Shadow Subscription:</strong> You're inheriting the{" "}
+                    <span className="font-semibold capitalize">{profile.plan.name}</span> plan from{" "}
+                    <span className="font-semibold">{profile.plan.ownerName || "the owner"}</span>.
+                  </p>
+                </div>
+              )}
+              
+              {!profile.plan.isShadow && profile.plan.name !== "free" && (
+                <div className="text-sm text-muted-foreground">
+                  You have an active subscription to the {profile.plan.name} plan.
+                </div>
+              )}
+              
+              {!profile.plan.isShadow && profile.plan.name === "free" && (
+                <div className="text-sm text-muted-foreground">
+                  You're currently on the free plan.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Household Information */}
+          {profile?.household && (profile.household.isOwner || profile.household.isMember) && (
+            <div className="space-y-2 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Household</span>
+              </div>
+              
+              {profile.household.isOwner && (
+                <div className="text-sm text-muted-foreground">
+                  You are the owner of this household.
+                </div>
+              )}
+              
+              {profile.household.isMember && profile.household.ownerName && (
+                <div className="text-sm text-muted-foreground">
+                  You are a member of <span className="font-semibold">{profile.household.ownerName}</span>'s household.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            {profile?.household?.isOwner && (
+              <Link href="/billing">
+                <Button variant="outline" size="sm" className="w-full">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Manage Subscription
+                </Button>
+              </Link>
+            )}
+            <Link href="/members">
+              <Button variant="outline" size="sm" className="w-full">
+                <Users className="mr-2 h-4 w-4" />
+                Manage Household
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

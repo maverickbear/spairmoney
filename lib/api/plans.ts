@@ -285,3 +285,85 @@ function getDefaultFeatures(): PlanFeatures {
   };
 }
 
+export interface UserPlanInfo {
+  name: "free" | "basic" | "premium";
+  isShadow: boolean; // true se herdado do owner
+  ownerId?: string; // se for shadow subscription
+  ownerName?: string; // nome do owner (se for shadow)
+}
+
+export async function getUserPlanInfo(userId: string): Promise<UserPlanInfo | null> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Check if user is an active household member
+    const isMember = await isHouseholdMember(userId);
+    
+    if (isMember) {
+      // User is a household member, inherit plan from owner
+      const ownerId = await getOwnerIdForMember(userId);
+      
+      if (ownerId) {
+        // Get owner's subscription
+        const { data: ownerSubscription, error: ownerError } = await supabase
+          .from("Subscription")
+          .select("*")
+          .eq("userId", ownerId)
+          .eq("status", "active")
+          .order("createdAt", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (ownerError && ownerError.code !== "PGRST116") {
+          console.error("[PLANS] Error fetching owner subscription:", ownerError);
+        }
+
+        if (ownerSubscription) {
+          // Owner has a subscription, check if it's Basic or Premium
+          const ownerPlanId = ownerSubscription.planId;
+          
+          if (ownerPlanId === "basic" || ownerPlanId === "premium") {
+            // Get owner's name
+            const { data: owner } = await supabase
+              .from("User")
+              .select("name, email")
+              .eq("id", ownerId)
+              .maybeSingle();
+
+            return {
+              name: ownerPlanId as "basic" | "premium",
+              isShadow: true,
+              ownerId,
+              ownerName: owner?.name || owner?.email || undefined,
+            };
+          }
+          // If owner has Free plan, fall through to return Free
+        }
+        // If owner has no subscription or has Free, return Free for member
+      }
+    }
+    
+    // User is not a member, or owner has Free/no subscription - check user's own subscription
+    const subscription = await getUserSubscription(userId);
+    
+    if (subscription) {
+      return {
+        name: subscription.planId as "free" | "basic" | "premium",
+        isShadow: false,
+      };
+    }
+
+    // Default to free
+    return {
+      name: "free",
+      isShadow: false,
+    };
+  } catch (error) {
+    console.error("[PLANS] Error in getUserPlanInfo:", error);
+    return {
+      name: "free",
+      isShadow: false,
+    };
+  }
+}
+

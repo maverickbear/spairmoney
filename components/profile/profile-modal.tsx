@@ -13,14 +13,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Save, X, Upload, Camera } from "lucide-react";
+import { Save, X, Upload, Camera, CreditCard, Users } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { PlanBadge } from "@/components/common/plan-badge";
+import Link from "next/link";
 
 interface Profile {
   name: string;
   email: string;
   avatarUrl?: string;
   phoneNumber?: string;
+  plan?: {
+    name: "free" | "basic" | "premium";
+    isShadow: boolean;
+    ownerId?: string;
+    ownerName?: string;
+  } | null;
+  household?: {
+    isOwner: boolean;
+    isMember: boolean;
+    ownerId?: string;
+    ownerName?: string;
+  } | null;
 }
 
 interface ProfileModalProps {
@@ -363,6 +377,70 @@ export function ProfileModal({ open, onOpenChange }: ProfileModalProps) {
                   )}
                 </div>
               </div>
+              </div>
+            )}
+
+            {/* Plan & Subscription Section */}
+            {!loading && profile && (
+              <div className="space-y-4 pt-6 border-t">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Plan & Subscription</span>
+                  </div>
+                  
+                  {profile.plan && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Current Plan</span>
+                        <PlanBadge plan={profile.plan.name} />
+                      </div>
+                      
+                      {profile.plan.isShadow && (
+                        <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 text-sm">
+                          <p className="text-blue-800 dark:text-blue-200">
+                            <strong>Shadow Subscription:</strong> You're inheriting the{" "}
+                            <span className="font-semibold capitalize">{profile.plan.name}</span> plan from{" "}
+                            <span className="font-semibold">{profile.plan.ownerName || "the owner"}</span>.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {!profile.plan.isShadow && profile.plan.name !== "free" && (
+                        <div className="text-sm text-muted-foreground">
+                          You have an active subscription to the {profile.plan.name} plan.
+                        </div>
+                      )}
+                      
+                      {!profile.plan.isShadow && profile.plan.name === "free" && (
+                        <div className="text-sm text-muted-foreground">
+                          You're currently on the free plan.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {profile.household && (profile.household.isOwner || profile.household.isMember) && (
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Household</span>
+                      </div>
+                      
+                      {profile.household.isOwner && (
+                        <div className="text-sm text-muted-foreground">
+                          You are the owner of this household.
+                        </div>
+                      )}
+                      
+                      {profile.household.isMember && profile.household.ownerName && (
+                        <div className="text-sm text-muted-foreground">
+                          You are a member of <span className="font-semibold">{profile.household.ownerName}</span>'s household.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -1,13 +1,64 @@
 import { NextResponse } from "next/server";
 import { updateProfile, getProfile } from "@/lib/api/profile";
 import { profileSchema, ProfileFormData } from "@/lib/validations/profile";
+import { createServerClient } from "@/lib/supabase-server";
+import { getUserPlanInfo } from "@/lib/api/plans";
+import { getUserHouseholdInfo } from "@/lib/api/members";
+
+export interface ProfileWithPlan {
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  phoneNumber?: string;
+  plan: {
+    name: "free" | "basic" | "premium";
+    isShadow: boolean;
+    ownerId?: string;
+    ownerName?: string;
+  } | null;
+  household: {
+    isOwner: boolean;
+    isMember: boolean;
+    ownerId?: string;
+    ownerName?: string;
+  } | null;
+}
 
 export async function GET() {
   try {
-    // TODO: When authentication is implemented, get profile from database
-    // For now, return null to indicate client should check localStorage
+    const supabase = await createServerClient();
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Get profile information
     const profile = await getProfile();
-    return NextResponse.json(profile);
+    
+    if (!profile) {
+      return NextResponse.json(
+        { error: "Profile not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get plan information
+    const planInfo = await getUserPlanInfo(authUser.id);
+    
+    // Get household information
+    const householdInfo = await getUserHouseholdInfo(authUser.id);
+
+    const profileWithPlan: ProfileWithPlan = {
+      ...profile,
+      plan: planInfo,
+      household: householdInfo,
+    };
+
+    return NextResponse.json(profileWithPlan);
   } catch (error) {
     console.error("Error fetching profile:", error);
     return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });

@@ -763,5 +763,85 @@ export async function getOwnerIdForMember(userId: string): Promise<string | null
   }
 }
 
+export interface UserHouseholdInfo {
+  isOwner: boolean;
+  isMember: boolean;
+  ownerId?: string;
+  ownerName?: string;
+}
+
+export async function getUserHouseholdInfo(userId: string): Promise<UserHouseholdInfo | null> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Check if user is an owner (has household members)
+    const { data: ownedHousehold, error: ownerError } = await supabase
+      .from("HouseholdMember")
+      .select("ownerId")
+      .eq("ownerId", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (ownerError && ownerError.code !== "PGRST116") {
+      console.error("[MEMBERS] Error checking if user is owner:", ownerError);
+    }
+
+    const isOwner = ownedHousehold !== null;
+
+    // Check if user is a member
+    const isMember = await isHouseholdMember(userId);
+    
+    if (!isOwner && !isMember) {
+      // User is neither owner nor member
+      return {
+        isOwner: false,
+        isMember: false,
+      };
+    }
+
+    if (isOwner) {
+      // User is an owner
+      return {
+        isOwner: true,
+        isMember: false,
+      };
+    }
+
+    // User is a member, get owner info
+    const ownerId = await getOwnerIdForMember(userId);
+    
+    if (ownerId) {
+      // Get owner's name
+      const { data: owner, error: ownerDataError } = await supabase
+        .from("User")
+        .select("name, email")
+        .eq("id", ownerId)
+        .maybeSingle();
+
+      if (ownerDataError && ownerDataError.code !== "PGRST116") {
+        console.error("[MEMBERS] Error fetching owner data:", ownerDataError);
+      }
+
+      return {
+        isOwner: false,
+        isMember: true,
+        ownerId,
+        ownerName: owner?.name || owner?.email || undefined,
+      };
+    }
+
+    return {
+      isOwner: false,
+      isMember: true,
+    };
+  } catch (error) {
+    console.error("[MEMBERS] Error in getUserHouseholdInfo:", error);
+    return {
+      isOwner: false,
+      isMember: false,
+    };
+  }
+}
+
 
 
