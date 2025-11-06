@@ -81,7 +81,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
       if (res.ok) {
         const data = await res.json();
         // Remove duplicates by id to ensure unique households
-        const uniqueHouseholds = Array.from(
+        const uniqueHouseholds: Household[] = Array.from(
           new Map(data.map((h: Household) => [h.id, h])).values()
         );
         setHouseholds(uniqueHouseholds);
