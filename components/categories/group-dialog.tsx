@@ -304,7 +304,7 @@ export function GroupDialog({
         onOpenChange(open);
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>Create Group</DialogTitle>
           <DialogDescription>
@@ -312,7 +312,8 @@ export function GroupDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium">Group Name</label>
             <Input
@@ -334,7 +335,6 @@ export function GroupDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={() => {
                     setIsAddingCategory(true);
                     setSelectedCategoryTempId(null);
@@ -597,7 +597,6 @@ export function GroupDialog({
                             <Button
                               type="button"
                               variant="outline"
-                              size="sm"
                               onClick={() => {
                                 setIsAddingSubcategory(true);
                                 setNewSubcategoryName("");
@@ -637,6 +636,8 @@ export function GroupDialog({
                 ))
               )}
             </div>
+          </div>
+
           </div>
 
           <DialogFooter>

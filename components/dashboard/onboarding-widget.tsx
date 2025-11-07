@@ -119,7 +119,7 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
 
   if (loading || !status) {
     return (
-      <Card className="border-border/50">
+      <Card>
         <CardContent className="p-6">
           <div className="animate-pulse space-y-4">
             <div className="h-4 bg-muted rounded w-1/3"></div>
@@ -153,7 +153,7 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
 
   return (
     <>
-      <Card className="border-border/50 bg-gradient-to-br from-background to-muted/20">
+      <Card className="bg-gradient-to-br from-background to-muted/20">
         <CardHeader className="pb-4">
           <div className="flex items-start justify-between">
             <div className="flex-1 space-y-2">
@@ -242,7 +242,6 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
                 </div>
                 {!action.completed && (
                   <Button
-                    size="sm"
                     variant="default"
                     onClick={action.action}
                     className="shrink-0 h-7 text-xs"

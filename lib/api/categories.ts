@@ -4,6 +4,14 @@ import { createServerClient } from "@/lib/supabase-server";
 import { getCurrentTimestamp } from "@/lib/utils/timestamp";
 import { checkPlanLimits } from "@/lib/api/plans";
 
+// Cache for categories (they don't change frequently)
+const categoriesCache = new Map<string, { data: any[]; timestamp: number; userId: string | null }>();
+const CATEGORIES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache for macros
+const macrosCache = new Map<string, { data: any[]; timestamp: number; userId: string | null }>();
+const MACROS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Check if user has a paid plan (not free)
  */
@@ -18,13 +26,32 @@ async function hasPaidPlan(userId: string): Promise<boolean> {
 }
 
 /**
+ * Invalidate categories cache for a user
+ */
+export async function invalidateCategoriesCache(userId: string | null): Promise<void> {
+  categoriesCache.delete(userId || 'null');
+  macrosCache.delete(userId || 'null');
+  console.log("[CATEGORIES] Invalidated cache for user:", userId || 'null');
+}
+
+/**
  * Get all macros (system defaults + user's custom macros)
  */
 export async function getMacros() {
   const supabase = await createServerClient();
 
-  // Get current user
+  // Get current user for cache key
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  const userId = authUser?.id || null;
+  const cacheKey = userId || 'null';
+  
+  // Check cache
+  const now = Date.now();
+  const cached = macrosCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < MACROS_CACHE_TTL) {
+    console.log("[CATEGORIES] getMacros - Using cache for user:", userId || 'null');
+    return cached.data;
+  }
   
   if (authError || !authUser) {
     // If not authenticated, only return system defaults
@@ -38,7 +65,16 @@ export async function getMacros() {
       return [];
     }
 
-    return data || [];
+    const result = data || [];
+    
+    // Update cache
+    macrosCache.set(cacheKey, {
+      data: result,
+      timestamp: now,
+      userId: null,
+    });
+    
+    return result;
   }
 
   // Return system defaults (userId IS NULL) OR user's own macros
@@ -52,7 +88,16 @@ export async function getMacros() {
     return [];
   }
 
-  return data || [];
+  const result = data || [];
+  
+  // Update cache
+  macrosCache.set(cacheKey, {
+    data: result,
+    timestamp: now,
+    userId,
+  });
+  
+  return result;
 }
 
 export async function getCategoriesByMacro(macroId: string) {
@@ -155,6 +200,17 @@ export async function getAllCategories() {
   // Get current user
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
   
+  const userId = authUser?.id || null;
+  const cacheKey = userId || 'null';
+  
+  // Check cache
+  const now = Date.now();
+  const cached = categoriesCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < CATEGORIES_CACHE_TTL) {
+    console.log("[CATEGORIES] getAllCategories - Using cache for user:", userId || 'null');
+    return cached.data;
+  }
+  
   if (authError || !authUser) {
     // If not authenticated, only return system defaults
     const { data, error } = await supabase
@@ -180,6 +236,13 @@ export async function getAllCategories() {
     const uniqueData = Array.from(
       new Map((data || []).map((cat: any) => [cat.id, cat])).values()
     );
+
+    // Update cache
+    categoriesCache.set(cacheKey, {
+      data: uniqueData,
+      timestamp: now,
+      userId: null,
+    });
 
     return uniqueData;
   }
@@ -209,6 +272,13 @@ export async function getAllCategories() {
   const uniqueData = Array.from(
     new Map((data || []).map((cat: any) => [cat.id, cat])).values()
   );
+
+  // Update cache
+  categoriesCache.set(cacheKey, {
+    data: uniqueData,
+    timestamp: now,
+    userId,
+  });
 
   return uniqueData;
 }
@@ -266,6 +336,9 @@ export async function createCategory(data: { name: string; macroId: string }) {
     console.error("Supabase error creating category:", error);
     throw new Error(`Failed to create category: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
 
   return category;
 }
@@ -335,6 +408,9 @@ export async function updateCategory(id: string, data: { name?: string; macroId?
     throw new Error(`Failed to update category: ${error.message || JSON.stringify(error)}`);
   }
 
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
+
   return category;
 }
 
@@ -394,6 +470,9 @@ export async function createSubcategory(data: { name: string; categoryId: string
     throw new Error(`Failed to create subcategory: ${error.message || JSON.stringify(error)}`);
   }
 
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
+
   return subcategory;
 }
 
@@ -449,6 +528,9 @@ export async function updateSubcategory(id: string, data: { name?: string }) {
     throw new Error(`Failed to update subcategory: ${error.message || JSON.stringify(error)}`);
   }
 
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
+
   return subcategory;
 }
 
@@ -494,6 +576,9 @@ export async function deleteSubcategory(id: string) {
     console.error("Supabase error deleting subcategory:", error);
     throw new Error(`Failed to delete subcategory: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
 
   return true;
 }
@@ -545,6 +630,9 @@ export async function deleteCategory(id: string) {
     console.error("Supabase error deleting category:", error);
     throw new Error(`Failed to delete category: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
 
   return true;
 }
@@ -601,6 +689,9 @@ export async function createMacro(data: { name: string }) {
     throw new Error(`Failed to create macro: ${error.message || JSON.stringify(error)}`);
   }
 
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
+
   return macro;
 }
 
@@ -643,6 +734,9 @@ export async function deleteMacro(id: string) {
     console.error("Supabase error deleting macro:", error);
     throw new Error(`Failed to delete macro: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache
+  await invalidateCategoriesCache(authUser.id);
 
   return true;
 }

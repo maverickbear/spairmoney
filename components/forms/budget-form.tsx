@@ -313,7 +313,7 @@ export function BudgetForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{budget ? "Edit" : "Add"} Budget</DialogTitle>
           <DialogDescription>
@@ -326,7 +326,8 @@ export function BudgetForm({
         <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
           console.error("Form validation errors:", errors);
           alert("Please fix the form errors before submitting");
-        })} className="space-y-4">
+        })} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           {budget ? (
             // Editing mode: show group and categories (read-only for grouped, editable for single)
             <>
@@ -482,6 +483,8 @@ export function BudgetForm({
           <div className="space-y-1">
             <label className="text-sm font-medium">Note (optional)</label>
             <Input {...form.register("note")} />
+          </div>
+
           </div>
 
           <DialogFooter>

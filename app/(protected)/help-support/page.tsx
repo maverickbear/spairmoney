@@ -176,7 +176,7 @@ export default function HelpSupportPage() {
               <p className="text-sm text-muted-foreground mb-2">
                 Send us an email and we'll respond within 24 hours
               </p>
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" asChild>
                 <a href="mailto:support@sparefinance.com">support@sparefinance.com</a>
               </Button>
             </div>
@@ -189,7 +189,7 @@ export default function HelpSupportPage() {
               <p className="text-sm text-muted-foreground mb-2">
                 Chat with our support team Monday-Friday, 9 AM - 5 PM EST
               </p>
-              <Button variant="outline" size="sm">
+              <Button variant="outline">
                 Start Chat
               </Button>
             </div>
@@ -202,7 +202,7 @@ export default function HelpSupportPage() {
               <p className="text-sm text-muted-foreground mb-2">
                 Browse our comprehensive knowledge base and tutorials
               </p>
-              <Button variant="outline" size="sm">
+              <Button variant="outline">
                 Visit Help Center
               </Button>
             </div>
@@ -212,13 +212,13 @@ export default function HelpSupportPage() {
 
       {/* Related Links */}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" asChild>
           <Link href="/settings">Account Settings</Link>
         </Button>
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" asChild>
           <Link href="/privacy-policy">Privacy Policy</Link>
         </Button>
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" asChild>
           <Link href="/terms-of-use">Terms of Use</Link>
         </Button>
       </div>

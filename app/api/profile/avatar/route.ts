@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { validateImageFile, sanitizeFilename, getFileExtension } from "@/lib/utils/file-validation";
+import { SecurityLogger } from "@/lib/utils/security-logging";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +11,14 @@ export async function POST(request: NextRequest) {
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !authUser) {
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || 
+                 request.headers.get("x-real-ip") || 
+                 "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+      SecurityLogger.unauthorizedAccess(
+        "Unauthorized avatar upload attempt",
+        { ip, userAgent }
+      );
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -26,29 +36,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json(
-        { error: "File must be an image" },
-        { status: 400 }
-      );
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File size must be less than 5MB" },
-        { status: 400 }
-      );
-    }
-
-    // Generate unique filename
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${authUser.id}/${Date.now()}.${fileExt}`;
-    
-    // Convert File to ArrayBuffer
+    // Convert File to ArrayBuffer for validation
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // Comprehensive file validation
+    const validation = await validateImageFile(file, buffer);
+    if (!validation.valid) {
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || 
+                 request.headers.get("x-real-ip") || 
+                 "unknown";
+      const userAgent = request.headers.get("user-agent") || "unknown";
+      SecurityLogger.invalidFileUpload(
+        `Invalid file upload attempt by user ${authUser.id}`,
+        {
+          userId: authUser.id,
+          ip,
+          userAgent,
+          details: {
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            error: validation.error,
+          },
+        }
+      );
+      return NextResponse.json(
+        { error: validation.error || "Invalid file" },
+        { status: 400 }
+      );
+    }
+
+    // Sanitize filename
+    const sanitizedOriginalName = sanitizeFilename(file.name);
+    const fileExt = getFileExtension(sanitizedOriginalName) || getFileExtension(file.name) || "jpg";
+    
+    // Generate unique filename with sanitized extension
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const fileName = `${authUser.id}/${timestamp}-${randomSuffix}.${fileExt}`;
 
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage

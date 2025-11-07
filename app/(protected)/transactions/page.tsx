@@ -14,8 +14,7 @@ import {
 import { TransactionForm } from "@/components/forms/transaction-form";
 import { CsvImportDialog } from "@/components/forms/csv-import-dialog";
 import { formatMoney } from "@/components/common/money";
-import { EmptyState } from "@/components/common/empty-state";
-import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Receipt } from "lucide-react";
+import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -310,38 +309,6 @@ export default function TransactionsPage() {
     }
   }
 
-  // Show empty state when no transactions and not loading
-  if (!loading && transactions.length === 0) {
-    return (
-      <div>
-        <EmptyState
-          image={<Receipt className="w-full h-full text-muted-foreground opacity-50" />}
-          title="No transactions found"
-          description="Start tracking your income and expenses by adding your first transaction."
-          action={{
-            label: "Add Transaction",
-            onClick: () => {
-              setSelectedTransaction(null);
-              setIsFormOpen(true);
-            },
-          }}
-        />
-        <TransactionForm
-          open={isFormOpen}
-          onOpenChange={setIsFormOpen}
-          transaction={selectedTransaction}
-          onSuccess={loadTransactions}
-        />
-        <CsvImportDialog
-          open={isImportOpen}
-          onOpenChange={setIsImportOpen}
-          onSuccess={loadTransactions}
-          accounts={accounts}
-          categories={categories}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -351,17 +318,17 @@ export default function TransactionsPage() {
           <p className="text-sm md:text-base text-muted-foreground">Manage your income and expenses</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => setIsImportOpen(true)} className="text-xs md:text-sm">
+          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="text-xs md:text-sm">
             <Upload className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
             <span className="hidden sm:inline">Import CSV</span>
             <span className="sm:hidden">Import</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport} className="text-xs md:text-sm">
+          <Button variant="outline" onClick={handleExport} className="text-xs md:text-sm">
             <Download className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
             <span className="hidden sm:inline">Export CSV</span>
             <span className="sm:hidden">Export</span>
           </Button>
-          <Button size="sm" onClick={() => {
+          <Button onClick={() => {
             setSelectedTransaction(null);
             setIsFormOpen(true);
           }} className="text-xs md:text-sm">
@@ -428,7 +395,6 @@ export default function TransactionsPage() {
         {(filters.accountId !== "all" || filters.type !== "all" || filters.search || filters.recurring !== "all" || dateRange !== "this-month") && (
           <Button 
             variant="ghost" 
-            size="sm" 
             onClick={() => {
               setDateRange("this-month");
               const dates = getDateRangeDates("this-month");
@@ -453,7 +419,6 @@ export default function TransactionsPage() {
       <div className="flex flex-wrap gap-2 items-center">
         <Button
           variant={filters.categoryId === "all" ? "default" : "outline"}
-          size="sm"
           onClick={() => setFilters({ ...filters, categoryId: "all" })}
           className="rounded-full"
         >
@@ -465,7 +430,6 @@ export default function TransactionsPage() {
             <Button
               key={category.id}
               variant={filters.categoryId === category.id ? "default" : "outline"}
-              size="sm"
               onClick={() => setFilters({ ...filters, categoryId: category.id })}
               className="rounded-full"
             >
@@ -531,7 +495,7 @@ export default function TransactionsPage() {
             ) : (
               transactions.map((tx) => (
               <TableRow key={tx.id}>
-                <TableCell className="text-xs md:text-sm whitespace-nowrap">{format(new Date(tx.date), "MMM dd, yyyy")}</TableCell>
+                <TableCell className="font-medium text-xs md:text-sm whitespace-nowrap">{format(new Date(tx.date), "MMM dd, yyyy")}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <span className={`rounded-[12px] px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs ${

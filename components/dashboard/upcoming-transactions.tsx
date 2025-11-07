@@ -138,9 +138,9 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
               <div
                 key={getTransactionKey(tx)}
                 className={cn(
-                  "flex items-center justify-between p-3 rounded-[12px] border bg-card transition-all",
+                  "flex items-center justify-between p-3 rounded-[12px] bg-card transition-all",
                   paid
-                    ? "opacity-60 border-muted"
+                    ? "opacity-60"
                     : "hover:bg-accent/50"
                 )}
               >
@@ -192,7 +192,6 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
                   </p>
                   <Button
                     variant={paid ? "secondary" : "outline"}
-                    size="sm"
                     onClick={() => togglePaid(tx)}
                     className={cn(
                       "h-8 px-3 text-xs",

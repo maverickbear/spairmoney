@@ -1,19 +1,23 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { format, startOfMonth, addMonths, subMonths } from "date-fns";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export function MonthSelector() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   
   // Get selected month from URL or use current month
   const monthParam = searchParams.get("month");
   const selectedMonth = monthParam 
-    ? startOfMonth(new Date(monthParam))
+    ? (() => {
+        // Parse YYYY-MM-DD format and create date in local timezone (same as dashboard)
+        const [year, month, day] = monthParam.split('-').map(Number);
+        return startOfMonth(new Date(year, month - 1, day));
+      })()
     : startOfMonth(new Date());
   
   const currentMonth = startOfMonth(new Date());
@@ -28,39 +32,32 @@ export function MonthSelector() {
     const monthString = format(newMonth, "yyyy-MM-dd");
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", monthString);
-    router.push(`/?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`);
   };
   
   const goToCurrentMonth = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("month");
-    router.push(`/?${params.toString()}`);
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
   };
   
   return (
     <div className="flex items-center gap-2">
       <Button
         variant="outline"
-        size="sm"
         onClick={() => navigateMonth("prev")}
         className="h-8 w-8 p-0"
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
       
-      <div className="text-right min-w-[140px]">
-        <p className="text-sm font-medium text-muted-foreground">Current Month</p>
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <p className="text-lg md:text-xl font-semibold">
-            {format(selectedMonth, "MMMM yyyy")}
-          </p>
-        </div>
-      </div>
+      <p className="text-base font-medium min-w-[140px] text-center">
+        {format(selectedMonth, "MMMM yyyy")}
+      </p>
       
       <Button
         variant="outline"
-        size="sm"
         onClick={() => navigateMonth("next")}
         className="h-8 w-8 p-0"
       >
@@ -70,7 +67,6 @@ export function MonthSelector() {
       {!isCurrentMonth && (
         <Button
           variant="ghost"
-          size="sm"
           onClick={goToCurrentMonth}
           className="h-8 text-xs"
         >

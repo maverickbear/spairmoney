@@ -61,14 +61,14 @@ export async function getAccountsClient(): Promise<Account[]> {
     const currentBalance = balances.get(tx.accountId) || 0;
     
     if (tx.type === "income") {
-      balances.set(tx.accountId, currentBalance + tx.amount);
+      balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
     } else if (tx.type === "expense") {
-      balances.set(tx.accountId, currentBalance - tx.amount);
+      balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
     } else if (tx.type === "transfer") {
       if (tx.transferToId) {
-        balances.set(tx.accountId, currentBalance - tx.amount);
+        balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
       } else {
-        balances.set(tx.accountId, currentBalance + tx.amount);
+        balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
       }
     }
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { PlanFeatures } from "@/lib/validations/plan";
 
 interface PlanLimitsContextValue {
@@ -23,12 +24,28 @@ const defaultLimits: PlanFeatures = {
 };
 
 export function PlanLimitsProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [limits, setLimits] = useState<PlanFeatures>(defaultLimits);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fetchingRef = useRef(false);
 
+  // Check if we're on a public page that doesn't require authentication
+  const isPublicPage = pathname?.startsWith("/auth") || 
+                       pathname?.startsWith("/members/accept") ||
+                       pathname === "/" ||
+                       pathname === "/pricing" ||
+                       pathname?.startsWith("/api");
+
   const fetchLimits = useCallback(async () => {
+    // Skip fetching on public pages
+    if (isPublicPage) {
+      console.log("[PLAN-LIMITS] Skipping fetch on public page:", pathname);
+      setLoading(false);
+      setLimits(defaultLimits);
+      return;
+    }
+
     // Prevent concurrent calls
     if (fetchingRef.current) {
       console.log("[PLAN-LIMITS] Already fetching, skipping duplicate call");
@@ -41,6 +58,14 @@ export function PlanLimitsProvider({ children }: { children: ReactNode }) {
 
       const response = await fetch("/api/billing/subscription");
       if (!response.ok) {
+        // If 401, user is not authenticated - use default limits
+        if (response.status === 401) {
+          console.log("[PLAN-LIMITS] User not authenticated, using default limits");
+          setLimits(defaultLimits);
+          setLoading(false);
+          fetchingRef.current = false;
+          return;
+        }
         throw new Error("Failed to fetch subscription");
       }
 
@@ -60,7 +85,7 @@ export function PlanLimitsProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, []);
+  }, [isPublicPage, pathname]);
 
   useEffect(() => {
     fetchLimits();

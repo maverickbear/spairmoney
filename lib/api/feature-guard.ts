@@ -53,16 +53,45 @@ export async function guardTransactionLimit(
   month?: Date
 ): Promise<GuardResult> {
   try {
-    const limitCheck = await checkTransactionLimit(userId, month);
+    // Get plan limits once and reuse for both checks
+    const { limits, plan } = await checkPlanLimits(userId);
     
-    if (!limitCheck.allowed) {
-      const { plan } = await checkPlanLimits(userId);
-      
+    // Check if unlimited plan
+    if (limits.maxTransactions === -1) {
+      return { allowed: true };
+    }
+
+    const supabase = await createServerClient();
+    
+    // Get start and end of month
+    const checkMonth = month || new Date();
+    const startOfMonth = new Date(checkMonth.getFullYear(), checkMonth.getMonth(), 1);
+    const endOfMonth = new Date(checkMonth.getFullYear(), checkMonth.getMonth() + 1, 0, 23, 59, 59);
+
+    // Count transactions for the month
+    const { count, error } = await supabase
+      .from("Transaction")
+      .select("*", { count: "exact", head: true })
+      .gte("date", startOfMonth.toISOString())
+      .lte("date", endOfMonth.toISOString());
+
+    if (error) {
+      console.error("Error checking transaction limit:", error);
+      return {
+        allowed: false,
+        error: createPlanError(PlanErrorCode.TRANSACTION_LIMIT_REACHED),
+      };
+    }
+
+    const current = count || 0;
+    const allowed = current < limits.maxTransactions;
+    
+    if (!allowed) {
       return {
         allowed: false,
         error: createPlanError(PlanErrorCode.TRANSACTION_LIMIT_REACHED, {
-          limit: limitCheck.limit,
-          current: limitCheck.current,
+          limit: limits.maxTransactions,
+          current,
           currentPlan: plan?.name,
         }),
       };
@@ -83,16 +112,38 @@ export async function guardTransactionLimit(
  */
 export async function guardAccountLimit(userId: string): Promise<GuardResult> {
   try {
-    const limitCheck = await checkAccountLimit(userId);
+    // Get plan limits once and reuse for both checks
+    const { limits, plan } = await checkPlanLimits(userId);
     
-    if (!limitCheck.allowed) {
-      const { plan } = await checkPlanLimits(userId);
-      
+    // Check if unlimited plan
+    if (limits.maxAccounts === -1) {
+      return { allowed: true };
+    }
+
+    const supabase = await createServerClient();
+    
+    // Count current accounts
+    const { count, error } = await supabase
+      .from("Account")
+      .select("*", { count: "exact", head: true });
+
+    if (error) {
+      console.error("Error checking account limit:", error);
+      return {
+        allowed: false,
+        error: createPlanError(PlanErrorCode.ACCOUNT_LIMIT_REACHED),
+      };
+    }
+
+    const current = count || 0;
+    const allowed = current < limits.maxAccounts;
+    
+    if (!allowed) {
       return {
         allowed: false,
         error: createPlanError(PlanErrorCode.ACCOUNT_LIMIT_REACHED, {
-          limit: limitCheck.limit,
-          current: limitCheck.current,
+          limit: limits.maxAccounts,
+          current,
           currentPlan: plan?.name,
         }),
       };

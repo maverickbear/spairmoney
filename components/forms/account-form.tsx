@@ -2,6 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { accountSchema, AccountFormData } from "@/lib/validations/account";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,9 +51,10 @@ interface AccountFormProps {
   onOpenChange: (open: boolean) => void;
   account?: Account;
   onSuccess?: () => void;
+  initialAccountLimit?: { current: number; limit: number } | null;
 }
 
-export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountFormProps) {
+export function AccountForm({ open, onOpenChange, account, onSuccess, initialAccountLimit }: AccountFormProps) {
   const { toast } = useToast();
   const [households, setHouseholds] = useState<Household[]>([]);
   const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
@@ -60,6 +62,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
   const [userRole, setUserRole] = useState<"admin" | "member" | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [accountLimit, setAccountLimit] = useState<{ current: number; limit: number } | null>(null);
+  const [loadingLimit, setLoadingLimit] = useState(false);
 
   const form = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -74,15 +77,30 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
   
   const accountType = form.watch("type");
 
+  // Use initialAccountLimit if available, otherwise use accountLimit state
+  const currentAccountLimit = initialAccountLimit !== undefined ? initialAccountLimit : accountLimit;
+  
+  // Check if limit is reached
+  const isLimitReached = currentAccountLimit && currentAccountLimit.limit !== -1 && currentAccountLimit.current >= currentAccountLimit.limit;
+
   // Load current user ID, households and user role when form opens
   useEffect(() => {
     if (open) {
       loadCurrentUserId();
       loadHouseholds();
       loadUserRole();
-      loadAccountLimit();
+      // Use initial limit if provided, otherwise load it
+      if (initialAccountLimit !== undefined) {
+        setAccountLimit(initialAccountLimit);
+      } else {
+        // Load limit immediately when modal opens
+        loadAccountLimit();
+      }
+    } else {
+      // Reset limit when modal closes
+      setAccountLimit(null);
     }
-  }, [open]);
+  }, [open, initialAccountLimit]);
 
   async function loadCurrentUserId() {
     try {
@@ -99,10 +117,13 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
 
   async function loadUserRole() {
     try {
-      const res = await fetch("/api/members/role");
-      if (res.ok) {
-        const data = await res.json() as { role: "admin" | "member" };
-        setUserRole(data.role);
+      const { getUserRoleClient } = await import("@/lib/api/members-client");
+      const role = await getUserRoleClient();
+      if (role) {
+        setUserRole(role);
+      } else {
+        // Default to admin if no role found (user is owner)
+        setUserRole("admin");
       }
     } catch (error) {
       console.error("Error loading user role:", error);
@@ -114,15 +135,24 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
   async function loadHouseholds() {
     try {
       setLoadingHouseholds(true);
-      const res = await fetch("/api/households");
-      if (res.ok) {
-        const data = await res.json() as Household[];
-        // Remove duplicates by id to ensure unique households
-        const uniqueHouseholds: Household[] = Array.from(
-          new Map(data.map((h: Household) => [h.id, h])).values()
-        );
-        setHouseholds(uniqueHouseholds);
-      }
+      const { getHouseholdMembersClient } = await import("@/lib/api/members-client");
+      const members = await getHouseholdMembersClient();
+      
+      // Transform household members into households format
+      const householdsList: Household[] = members
+        .filter(member => member.status === "active" && member.memberId) // Only include active members with memberId
+        .map(member => ({
+          id: member.memberId!, // memberId is guaranteed to exist due to filter
+          name: member.name || member.email,
+          email: member.email,
+          isOwner: member.isOwner || false,
+        }));
+      
+      // Remove duplicates by id to ensure unique households
+      const uniqueHouseholds: Household[] = Array.from(
+        new Map(householdsList.map((h: Household) => [h.id, h])).values()
+      );
+      setHouseholds(uniqueHouseholds);
     } catch (error) {
       console.error("Error loading households:", error);
     } finally {
@@ -132,18 +162,19 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
 
   async function loadAccountLimit() {
     try {
-      const response = await fetch("/api/billing/limits");
-      if (response.ok) {
-        const data = await response.json();
-        if (data.accountLimit) {
-          setAccountLimit({
-            current: data.accountLimit.current,
-            limit: data.accountLimit.limit,
-          });
-        }
+      setLoadingLimit(true);
+      const { getBillingLimitsAction } = await import("@/lib/actions/billing");
+      const limits = await getBillingLimitsAction();
+      if (limits?.accountLimit) {
+        setAccountLimit({
+          current: limits.accountLimit.current,
+          limit: limits.accountLimit.limit,
+        });
       }
     } catch (error) {
       console.error("Error loading account limit:", error);
+    } finally {
+      setLoadingLimit(false);
     }
   }
 
@@ -197,11 +228,11 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
       }
 
       // Check limit before creating (only for new accounts)
-      if (!account && accountLimit) {
-        if (accountLimit.limit !== -1 && accountLimit.current >= accountLimit.limit) {
+      if (!account && currentAccountLimit) {
+        if (currentAccountLimit.limit !== -1 && currentAccountLimit.current >= currentAccountLimit.limit) {
           toast({
             title: "Limit Reached",
-            description: `You've reached your account limit (${accountLimit.limit}). Upgrade your plan to add more accounts.`,
+            description: `You've reached your account limit (${currentAccountLimit.limit}). Upgrade your plan to add more accounts.`,
             variant: "destructive",
           });
           return;
@@ -293,7 +324,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{account ? "Edit" : "Add"} Account</DialogTitle>
           <DialogDescription>
@@ -301,143 +332,165 @@ export function AccountForm({ open, onOpenChange, account, onSuccess }: AccountF
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {/* Show limit warning for new accounts */}
-          {!account && accountLimit && accountLimit.limit !== -1 && (
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          {/* Show limit warning for new accounts - show immediately if limit reached */}
+          {!account && currentAccountLimit && currentAccountLimit.limit !== -1 && (
             <LimitWarning
-              current={accountLimit.current}
-              limit={accountLimit.limit}
+              current={currentAccountLimit.current}
+              limit={currentAccountLimit.limit}
               type="accounts"
             />
           )}
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Name</label>
-            <Input {...form.register("name")} />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Type</label>
-            <Select
-              value={form.watch("type")}
-              onValueChange={(value) => {
-                form.setValue("type", value as "checking" | "savings" | "credit" | "cash" | "investment" | "other");
-                // Clear credit limit when changing away from credit type
-                if (value !== "credit") {
-                  form.setValue("creditLimit", undefined);
-                }
-                // Clear initial balance when changing away from checking/savings
-                if (value !== "checking" && value !== "savings") {
-                  form.setValue("initialBalance", undefined);
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="checking">Checking</SelectItem>
-                <SelectItem value="savings">Savings</SelectItem>
-                <SelectItem value="credit">Credit Card</SelectItem>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="investment">Investment</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {accountType === "credit" && (
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Credit Limit</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                min="0"
-                {...form.register("creditLimit", { 
-                  valueAsNumber: true,
-                  setValueAs: (value) => {
-                    if (value === "" || value === null || value === undefined) {
-                      return undefined;
-                    }
-                    const num = Number(value);
-                    return isNaN(num) ? undefined : num;
-                  }
-                })}
-              />
-              {form.formState.errors.creditLimit && (
-                <p className="text-sm text-destructive">{form.formState.errors.creditLimit.message}</p>
-              )}
-            </div>
+          
+          {/* Show loading state only if limit is not yet loaded and not provided */}
+          {!account && !currentAccountLimit && loadingLimit && (
+            <div className="text-sm text-muted-foreground">Checking limit...</div>
           )}
+          
+          {/* Hide form fields if limit is reached for new accounts */}
+          {(!account && isLimitReached) ? null : (
+            <>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Name</label>
+                <Input {...form.register("name")} />
+              </div>
 
-          {(accountType === "checking" || accountType === "savings") && (
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Initial Balance</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                {...form.register("initialBalance", { 
-                  valueAsNumber: true,
-                  setValueAs: (value) => {
-                    if (value === "" || value === null || value === undefined) {
-                      return undefined;
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Type</label>
+                <Select
+                  value={form.watch("type")}
+                  onValueChange={(value) => {
+                    form.setValue("type", value as "checking" | "savings" | "credit" | "cash" | "investment" | "other");
+                    // Clear credit limit when changing away from credit type
+                    if (value !== "credit") {
+                      form.setValue("creditLimit", undefined);
                     }
-                    const num = Number(value);
-                    return isNaN(num) ? undefined : num;
-                  }
-                })}
-              />
-              {form.formState.errors.initialBalance && (
-                <p className="text-sm text-destructive">{form.formState.errors.initialBalance.message}</p>
-              )}
-            </div>
-          )}
+                    // Clear initial balance when changing away from checking/savings
+                    if (value !== "checking" && value !== "savings") {
+                      form.setValue("initialBalance", undefined);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="checking">Checking</SelectItem>
+                    <SelectItem value="savings">Savings</SelectItem>
+                    <SelectItem value="credit">Credit Card</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="investment">Investment</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {(userRole === "member" || userRole === "admin") && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Additional Account Owners</label>
-              <p className="text-xs text-muted-foreground">
-                You are automatically included as an owner. Select additional households to share this account with.
-              </p>
-              {loadingHouseholds ? (
-                <p className="text-sm text-muted-foreground">Loading households...</p>
-              ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
-                  {households.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No additional households available</p>
-                  ) : (
-                    households
-                      .filter((household) => household.id !== currentUserId) // Filter out current user
-                      .map((household) => (
-                        <div key={household.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`owner-${household.id}`}
-                            checked={selectedOwnerIds.includes(household.id)}
-                            onCheckedChange={(checked) => handleOwnerToggle(household.id, checked as boolean)}
-                          />
-                          <label
-                            htmlFor={`owner-${household.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
-                          >
-                            {household.name}
-                          </label>
-                        </div>
-                      ))
+              {accountType === "credit" && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Credit Limit</label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    min="0"
+                    {...form.register("creditLimit", { 
+                      valueAsNumber: true,
+                      setValueAs: (value) => {
+                        if (value === "" || value === null || value === undefined) {
+                          return undefined;
+                        }
+                        const num = Number(value);
+                        return isNaN(num) ? undefined : num;
+                      }
+                    })}
+                  />
+                  {form.formState.errors.creditLimit && (
+                    <p className="text-sm text-destructive">{form.formState.errors.creditLimit.message}</p>
                   )}
                 </div>
               )}
-              {form.formState.errors.ownerIds && (
-                <p className="text-sm text-destructive">{form.formState.errors.ownerIds.message}</p>
+
+              {(accountType === "checking" || accountType === "savings") && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Initial Balance</label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    {...form.register("initialBalance", { 
+                      valueAsNumber: true,
+                      setValueAs: (value) => {
+                        if (value === "" || value === null || value === undefined) {
+                          return undefined;
+                        }
+                        const num = Number(value);
+                        return isNaN(num) ? undefined : num;
+                      }
+                    })}
+                  />
+                  {form.formState.errors.initialBalance && (
+                    <p className="text-sm text-destructive">{form.formState.errors.initialBalance.message}</p>
+                  )}
+                </div>
               )}
-            </div>
+
+              {(userRole === "member" || userRole === "admin") && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Additional Account Owners</label>
+                  <p className="text-xs text-muted-foreground">
+                    You are automatically included as an owner. Select additional households to share this account with.
+                  </p>
+                  {loadingHouseholds ? (
+                    <p className="text-sm text-muted-foreground">Loading households...</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                      {households.filter((household) => household.id !== currentUserId).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          You haven't invited any member yet.{" "}
+                          <Link href="/members" className="text-primary hover:underline font-medium">
+                            Invite
+                          </Link>{" "}
+                          now
+                        </p>
+                      ) : (
+                        households
+                          .filter((household) => household.id !== currentUserId) // Filter out current user
+                          .map((household) => (
+                            <div key={household.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`owner-${household.id}`}
+                                checked={selectedOwnerIds.includes(household.id)}
+                                onCheckedChange={(checked) => handleOwnerToggle(household.id, checked as boolean)}
+                              />
+                              <label
+                                htmlFor={`owner-${household.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                              >
+                                {household.name}
+                              </label>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  )}
+                  {form.formState.errors.ownerIds && (
+                    <p className="text-sm text-destructive">{form.formState.errors.ownerIds.message}</p>
+                  )}
+                </div>
+              )}
+            </>
           )}
+
+          </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            {(!account && isLimitReached) ? null : (
+              <Button type="submit">Save</Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

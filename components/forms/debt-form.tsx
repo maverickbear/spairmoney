@@ -420,7 +420,7 @@ export function DebtForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{debt ? "Edit" : "Create"} Debt</DialogTitle>
           <DialogDescription>
@@ -432,8 +432,9 @@ export function DebtForm({
 
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-4"
+          className="flex flex-col flex-1 overflow-hidden"
         >
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium">Debt Name *</label>
             <Input
@@ -699,6 +700,8 @@ export function DebtForm({
               )}
             </div>
           )}
+
+          </div>
 
           <DialogFooter>
             <Button

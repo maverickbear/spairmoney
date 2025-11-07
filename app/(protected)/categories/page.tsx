@@ -311,7 +311,7 @@ export default function CategoriesPage() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" className="cursor-pointer">
+            <Button className="cursor-pointer">
               Create New
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
@@ -451,14 +451,6 @@ export default function CategoriesPage() {
                             </React.Fragment>
                           ))}
                         
-                        {/* Empty state for group */}
-                        {isExpanded && !hasCategories && (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
-                              No categories in this group
-                            </TableCell>
-                          </TableRow>
-                        )}
                       </React.Fragment>
                     );
                   })}
@@ -607,14 +599,6 @@ export default function CategoriesPage() {
                             </React.Fragment>
                           ))}
                         
-                        {/* Empty state for group */}
-                        {isExpanded && !hasCategories && (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
-                              No categories in this group
-                            </TableCell>
-                          </TableRow>
-                        )}
                       </React.Fragment>
                     );
                   })}
@@ -624,12 +608,6 @@ export default function CategoriesPage() {
           </div>
         )}
 
-        {/* Empty state when no categories */}
-        {systemGroups.length === 0 && userGroups.length === 0 && (
-          <div className="rounded-[12px] border p-8 text-center">
-            <p className="text-sm text-muted-foreground">No categories found</p>
-          </div>
-        )}
       </div>
 
       <CategoryDialog

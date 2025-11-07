@@ -124,6 +124,13 @@ export async function createTransactionClient(data: TransactionFormData): Promis
     throw new Error("Transfer destination is required");
   }
 
+  // Get current user
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("Unauthorized");
+  }
+  const userId = user.id;
+
   const date = data.date instanceof Date ? data.date : new Date(data.date);
   const now = formatTimestamp(new Date());
   const formatDate = formatTimestamp;
@@ -142,6 +149,7 @@ export async function createTransactionClient(data: TransactionFormData): Promis
         type: "transfer",
         amount: data.amount,
         accountId: data.accountId,
+        userId: userId, // Add userId directly to transaction
         description: data.description || null,
         transferToId: data.transferToId!,
         recurring: data.recurring ?? false,
@@ -156,6 +164,15 @@ export async function createTransactionClient(data: TransactionFormData): Promis
       throw new Error(`Failed to create outgoing transaction: ${outgoingError?.message || JSON.stringify(outgoingError)}`);
     }
 
+    // Get userId for the destination account (same user for now, could be different for shared accounts)
+    const { data: destAccount } = await supabase
+      .from("Account")
+      .select("userId")
+      .eq("id", data.transferToId!)
+      .single();
+    
+    const destUserId = destAccount?.userId || userId;
+
     // Create incoming transaction
     const { data: incoming, error: incomingError } = await supabase
       .from("Transaction")
@@ -165,6 +182,7 @@ export async function createTransactionClient(data: TransactionFormData): Promis
         type: "transfer",
         amount: data.amount,
         accountId: data.transferToId!,
+        userId: destUserId, // Add userId directly to transaction
         description: data.description || null,
         transferFromId: outgoing.id,
         transferToId: null,
@@ -194,6 +212,7 @@ export async function createTransactionClient(data: TransactionFormData): Promis
       type: data.type,
       amount: data.amount,
       accountId: data.accountId,
+      userId: userId, // Add userId directly to transaction
       categoryId: data.categoryId || null,
       subcategoryId: data.subcategoryId || null,
       description: data.description || null,

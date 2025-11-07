@@ -125,8 +125,9 @@ export function GoalForm({
           }
         }
 
-         // Always calculate incomePercentage from targetMonths when targetMonths is provided
-         let effectiveIncomePercentage = 0;
+         // Calculate incomePercentage from targetMonths when targetMonths is provided
+         // Otherwise use the incomePercentage from the form
+         let effectiveIncomePercentage = baseIncomePercentage || 0;
          if (effectiveTargetMonths && effectiveTargetMonths > 0 && incomeBasis > 0) {
            effectiveIncomePercentage = calculateIncomePercentageFromTargetMonths(
              effectiveTargetAmount,
@@ -230,13 +231,6 @@ export function GoalForm({
         return;
       }
 
-      // Optimistic update: call onSuccess immediately
-      if (onSuccess) {
-        onSuccess();
-      }
-      onOpenChange(false);
-      form.reset();
-
       if (goal) {
         // Update existing goal
         const res = await fetch(`/api/goals/${goal.id}`, {
@@ -283,6 +277,15 @@ export function GoalForm({
         }
       }
 
+      // Close modal and reset form
+      onOpenChange(false);
+      form.reset();
+
+      // Call onSuccess after successful request to refresh the list
+      if (onSuccess) {
+        onSuccess();
+      }
+
       toast({
         title: goal ? "Goal updated" : "Goal created",
         description: goal ? "Your goal has been updated successfully." : "Your goal has been created successfully.",
@@ -295,16 +298,12 @@ export function GoalForm({
         description: error instanceof Error ? error.message : "Failed to save goal",
         variant: "destructive",
       });
-      // Reload on error to revert optimistic update
-      if (onSuccess) {
-        onSuccess();
-      }
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{goal ? "Edit" : "Create"} Goal</DialogTitle>
           <DialogDescription>
@@ -316,8 +315,11 @@ export function GoalForm({
 
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-4"
+          className="flex flex-col flex-1 overflow-hidden"
         >
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
+              <div className="space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium">Goal Name *</label>
             <Input
@@ -432,43 +434,59 @@ export function GoalForm({
             />
           </div>
 
-          {forecast && (
-            <div className="rounded-[12px] border bg-muted/50 p-4 space-y-3">
+              </div>
+
+              {/* Forecast Panel - Right Side */}
+              <div className="lg:sticky lg:top-0 w-full lg:w-[280px]">
+          {forecast ? (
+            <div className="rounded-[12px] border bg-muted/50 p-6 space-y-3 h-fit">
               <h4 className="text-sm font-semibold">Forecast</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-muted-foreground">Monthly Contribution</p>
-                  <p className="font-semibold">
+                  <p className="text-xs text-muted-foreground mb-1">Monthly Contribution</p>
+                  <p className="text-base font-semibold">
                     {formatMoney(forecast.monthlyContribution)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Progress</p>
-                  <p className="font-semibold">
+                  <p className="text-xs text-muted-foreground mb-1">Progress</p>
+                  <p className="text-base font-semibold">
                     {forecast.progressPct.toFixed(1)}%
                   </p>
                 </div>
-              </div>
-              {forecast.monthsToGoal !== null && (
-                <div className="text-sm">
-                  <p className="text-muted-foreground">ETA</p>
-                  <p className="font-semibold">
-                    {forecast.monthsToGoal === 0
-                      ? "Goal reached!"
-                      : forecast.monthsToGoal < 12
-                      ? `${Math.round(forecast.monthsToGoal)} month${Math.round(forecast.monthsToGoal) !== 1 ? "s" : ""}`
-                      : `${Math.floor(forecast.monthsToGoal / 12)} year${Math.floor(forecast.monthsToGoal / 12) !== 1 ? "s" : ""}, ${Math.round(forecast.monthsToGoal % 12)} month${Math.round(forecast.monthsToGoal % 12) !== 1 ? "s" : ""}`}
-                  </p>
+                {forecast.monthsToGoal !== null && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">ETA</p>
+                    <p className="text-base font-semibold">
+                      {forecast.monthsToGoal === 0
+                        ? "Goal reached!"
+                        : forecast.monthsToGoal < 12
+                        ? `${Math.round(forecast.monthsToGoal)} month${Math.round(forecast.monthsToGoal) !== 1 ? "s" : ""}`
+                        : `${Math.floor(forecast.monthsToGoal / 12)} year${Math.floor(forecast.monthsToGoal / 12) !== 1 ? "s" : ""}, ${Math.round(forecast.monthsToGoal % 12)} month${Math.round(forecast.monthsToGoal % 12) !== 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                )}
+                <div className="pt-2 border-t space-y-1.5">
+                  <div className="text-xs text-muted-foreground leading-tight">
+                    Based on income basis: {formatMoney(forecast.incomeBasis)}/month
+                  </div>
+                  <div className="text-xs text-muted-foreground leading-tight">
+                    Total allocation: {forecast.totalAllocation.toFixed(2)}%
+                  </div>
                 </div>
-              )}
-              <div className="text-xs text-muted-foreground">
-                Based on income basis: {formatMoney(forecast.incomeBasis)}/month
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Total allocation: {forecast.totalAllocation.toFixed(2)}%
               </div>
             </div>
+          ) : (
+            <div className="rounded-[12px] border bg-muted/50 p-6 space-y-3 h-fit">
+              <h4 className="text-sm font-semibold">Forecast</h4>
+              <p className="text-xs text-muted-foreground">
+                Enter goal details to see forecast calculations
+              </p>
+            </div>
           )}
+              </div>
+            </div>
+          </div>
 
           <DialogFooter>
             <Button

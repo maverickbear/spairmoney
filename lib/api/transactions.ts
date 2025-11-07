@@ -1,6 +1,6 @@
 "use server";
 
-import { unstable_cache } from "next/cache";
+import { unstable_cache, revalidateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
 import { TransactionFormData } from "@/lib/validations/transaction";
@@ -9,15 +9,18 @@ import { getDebts } from "@/lib/api/debts";
 import { calculateNextPaymentDates, type DebtForCalculation } from "@/lib/utils/debts";
 import { getDebtCategoryMapping } from "@/lib/utils/debt-categories";
 import { guardTransactionLimit, getCurrentUserId, throwIfNotAllowed } from "@/lib/api/feature-guard";
+import { requireTransactionOwnership } from "@/lib/utils/security";
 
 export async function createTransaction(data: TransactionFormData) {
     const supabase = await createServerClient();
 
   // Get current user and validate transaction limit
-  const userId = await getCurrentUserId();
-  if (!userId) {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
     throw new Error("Unauthorized");
   }
+  
+  const userId = user.id;
 
   // Check transaction limit before creating
   const limitGuard = await guardTransactionLimit(userId, data.date instanceof Date ? data.date : new Date(data.date));
@@ -49,6 +52,7 @@ export async function createTransaction(data: TransactionFormData) {
         type: "transfer",
         amount: data.amount,
         accountId: data.accountId,
+        userId: userId, // Add userId directly to transaction
         description: data.description || null,
         transferToId: data.transferToId!,
         recurring: data.recurring ?? false,
@@ -63,6 +67,16 @@ export async function createTransaction(data: TransactionFormData) {
       throw new Error(`Failed to create outgoing transaction: ${outgoingError?.message || JSON.stringify(outgoingError)}`);
     }
 
+    // Get userId for the destination account (same user for now, could be different for shared accounts)
+    // For now, use the same userId for both transactions
+    const { data: destAccount } = await supabase
+      .from("Account")
+      .select("userId")
+      .eq("id", data.transferToId!)
+      .single();
+    
+    const destUserId = destAccount?.userId || userId;
+
     // Create incoming transaction
     const { data: incoming, error: incomingError } = await supabase
       .from("Transaction")
@@ -72,6 +86,7 @@ export async function createTransaction(data: TransactionFormData) {
         type: "transfer",
         amount: data.amount,
         accountId: data.transferToId!,
+        userId: destUserId, // Add userId directly to transaction
         description: data.description || null,
         transferFromId: outgoing.id,
         transferToId: null,
@@ -86,6 +101,9 @@ export async function createTransaction(data: TransactionFormData) {
       console.error("Supabase error creating incoming transaction:", incomingError);
       throw new Error(`Failed to create incoming transaction: ${incomingError?.message || JSON.stringify(incomingError)}`);
     }
+
+    // Invalidate cache to ensure dashboard shows updated data
+    revalidateTag('transactions');
 
     return { outgoing, incoming };
   }
@@ -102,6 +120,7 @@ export async function createTransaction(data: TransactionFormData) {
         type: data.type,
         amount: data.amount,
         accountId: data.accountId,
+        userId: user.id, // Add userId directly to transaction
         categoryId: data.categoryId || null,
         subcategoryId: data.subcategoryId || null,
         description: data.description || null,
@@ -123,11 +142,17 @@ export async function createTransaction(data: TransactionFormData) {
     throw new Error(`Failed to create transaction: ${error.message || JSON.stringify(error)}`);
   }
 
+  // Invalidate cache to ensure dashboard shows updated data
+  revalidateTag('transactions');
+
   return transaction;
 }
 
 export async function updateTransaction(id: string, data: Partial<TransactionFormData>) {
     const supabase = await createServerClient();
+
+  // Verify ownership before updating
+  await requireTransactionOwnership(id);
 
   const updateData: Record<string, unknown> = {};
   if (data.date !== undefined) {
@@ -166,6 +191,9 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
 export async function deleteTransaction(id: string) {
     const supabase = await createServerClient();
 
+  // Verify ownership before deleting
+  await requireTransactionOwnership(id);
+
   // Get transaction first
   const { data: transaction, error: fetchError } = await supabase
     .from("Transaction")
@@ -198,6 +226,9 @@ export async function deleteTransaction(id: string) {
     console.error("Error deleting transaction:", error);
     throw error;
   }
+
+  // Invalidate cache to ensure dashboard shows updated data
+  revalidateTag('transactions');
 }
 
 export async function getTransactionsInternal(
@@ -215,15 +246,28 @@ export async function getTransactionsInternal(
 ) {
     const supabase = await createServerClient(accessToken, refreshToken);
 
+  // IMPORTANT: Buscar transações SEM joins primeiro para evitar problemas de RLS
+  // Quando fazemos select('*, account:Account(*)'), o Supabase aplica RLS em Account também
+  // Se Account RLS bloquear, a transação não aparece mesmo que Transaction RLS permita
+  // Solução: Buscar transações primeiro, depois buscar relacionamentos separadamente
   let query = supabase
     .from("Transaction")
-    .select(`
-      *,
-      account:Account(*),
-      category:Category(*),
-      subcategory:Subcategory(*)
-    `)
+    .select("*")
     .order("date", { ascending: false });
+
+  // Log the date filters being applied
+  if (filters?.startDate || filters?.endDate) {
+    console.log("🔍 [getTransactionsInternal] Applying date filters:", {
+      startDate: filters.startDate ? {
+        original: filters.startDate.toISOString(),
+        formatted: formatDateStart(filters.startDate),
+      } : undefined,
+      endDate: filters.endDate ? {
+        original: filters.endDate.toISOString(),
+        formatted: formatDateEnd(filters.endDate),
+      } : undefined,
+    });
+  }
 
   if (filters?.startDate) {
     query = query.gte("date", formatDateStart(filters.startDate));
@@ -242,6 +286,9 @@ export async function getTransactionsInternal(
   }
 
   if (filters?.type) {
+    console.log("🔍 [getTransactionsInternal] Applying type filter:", {
+      type: filters.type,
+    });
     query = query.eq("type", filters.type);
   }
 
@@ -253,6 +300,33 @@ export async function getTransactionsInternal(
     query = query.eq("recurring", filters.recurring);
   }
 
+  // Log the final query being executed
+  console.log("🔍 [getTransactionsInternal] Executing query with filters:", {
+    hasStartDate: !!filters?.startDate,
+    hasEndDate: !!filters?.endDate,
+    type: filters?.type,
+    categoryId: filters?.categoryId,
+    accountId: filters?.accountId,
+  });
+
+  // Verificar se o usuário está autenticado antes de executar a query
+  const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+  
+  // Se não estiver autenticado, retornar array vazio (não lançar erro)
+  if (authError || !currentUser) {
+    console.log("🔍 [getTransactionsInternal] User not authenticated:", {
+      authError: authError?.message,
+      hasUser: !!currentUser,
+    });
+    return [];
+  }
+
+  console.log("🔍 [getTransactionsInternal] Authentication check:", {
+    hasUser: !!currentUser,
+    userId: currentUser?.id,
+    authError: authError?.message,
+  });
+
   const { data, error } = await query;
 
   if (error) {
@@ -261,51 +335,217 @@ export async function getTransactionsInternal(
       details: error.details,
       hint: error.hint,
       code: error.code,
+      userId: currentUser?.id,
     });
     throw new Error(`Failed to fetch transactions: ${error.message || JSON.stringify(error)}`);
+  }
+
+  // Log detalhado sobre o resultado
+  if (data && data.length > 0) {
+    console.log("🔍 [getTransactionsInternal] Transactions found:", {
+      count: data.length,
+      sampleTransaction: data[0] ? {
+        id: data[0].id,
+        userId: data[0].userId,
+        accountId: data[0].accountId,
+        type: data[0].type,
+        amount: data[0].amount,
+        date: data[0].date,
+      } : null,
+      currentUserId: currentUser?.id,
+      userIdMatch: data[0]?.userId === currentUser?.id,
+    });
   }
 
   if (!data || data.length === 0) {
     // Only log in development to reduce noise in production
     if (process.env.NODE_ENV === "development") {
-      console.log("No transactions found with filters:", filters);
+      // Log the actual formatted dates being used in the query
+      const logFilters = filters ? {
+        ...filters,
+        startDate: filters.startDate ? formatDateStart(filters.startDate) : undefined,
+        endDate: filters.endDate ? formatDateEnd(filters.endDate) : undefined,
+      } : filters;
+      console.log("🔍 [getTransactionsInternal] No transactions found with filters:", logFilters);
+      
+      // Check if there are ANY transactions in the database (without date filters)
+      // This helps us understand if the problem is with date filtering or if there are no transactions at all
+      // Also check if userId column exists
+        // IMPORTANT: Test RLS by checking auth.uid() directly
+        const { data: { user: testUser } } = await supabase.auth.getUser();
+        console.log("🔍 [getTransactionsInternal] RLS Test - auth.uid() check:", {
+          currentUserId: currentUser?.id,
+          testUserId: testUser?.id,
+          userIdsMatch: currentUser?.id === testUser?.id,
+        });
+
+      const { data: allTransactions, error: allError } = await supabase
+        .from("Transaction")
+        .select("id, date, type, amount, accountId, userId")
+        .limit(10)
+        .order("date", { ascending: false });
+      
+      if (allError) {
+        console.error("❌ [getTransactionsInternal] Error checking for any transactions:", allError);
+      } else {
+        console.log("🔍 [getTransactionsInternal] Sample of ALL transactions in DB (first 10):", {
+          totalFound: allTransactions?.length || 0,
+          transactions: allTransactions?.map((t: any) => ({
+            id: t.id,
+            date: t.date,
+            dateType: typeof t.date,
+            type: t.type,
+            amount: t.amount,
+            accountId: t.accountId,
+            userId: t.userId, // Check if userId column exists and is populated
+            hasUserId: t.userId !== null && t.userId !== undefined,
+          })) || [],
+          dateRange: allTransactions && allTransactions.length > 0 ? {
+            oldest: allTransactions[allTransactions.length - 1]?.date,
+            newest: allTransactions[0]?.date,
+          } : null,
+          error: allError,
+          errorMessage: allError?.message,
+          errorCode: allError?.code,
+        });
+
+        // Check if user has accounts and if transactions belong to those accounts
+        if (allTransactions && allTransactions.length > 0) {
+          const { data: userAccounts, error: accountsError } = await supabase
+            .from("Account")
+            .select("id, userId, name")
+            .limit(10);
+          
+          // Get current user ID
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          
+          // Check AccountOwner for transaction accounts
+          const transactionAccountIds = [...new Set(allTransactions.map((t: any) => t.accountId))];
+          const { data: accountOwners, error: ownersError } = await supabase
+            .from("AccountOwner")
+            .select("accountId, ownerId")
+            .in("accountId", transactionAccountIds);
+          
+          console.log("🔍 [getTransactionsInternal] User accounts check:", {
+            currentUserId: currentUser?.id,
+            accountsFound: userAccounts?.length || 0,
+            accounts: userAccounts || [],
+            accountsError: accountsError,
+            transactionAccountIds: transactionAccountIds,
+            transactionAccounts: allTransactions.map((t: any) => ({
+              transactionId: t.id,
+              accountId: t.accountId,
+              type: t.type,
+              amount: t.amount,
+            })),
+            matchingAccounts: userAccounts?.filter((acc: any) => 
+              allTransactions.some((t: any) => t.accountId === acc.id)
+            ) || [],
+            accountOwners: accountOwners || [],
+            ownersError: ownersError,
+            accountsBelongingToUser: userAccounts?.filter((acc: any) => 
+              acc.userId === currentUser?.id
+            ) || [],
+            accountsWithAccountOwner: accountOwners?.filter((ao: any) => 
+              ao.ownerId === currentUser?.id
+            ) || [],
+          });
+        }
+      }
     }
     return [];
   }
 
-  // Only log in development to reduce noise in production
-  if (process.env.NODE_ENV === "development") {
-    console.log(`Found ${data.length} transactions from Supabase`);
+  // Log detailed transaction information for debugging Monthly Income issue
+  console.log("🔍 [getTransactionsInternal] Found transactions:", {
+    totalCount: data.length,
+    filters: filters ? {
+      startDate: filters.startDate ? formatDateStart(filters.startDate) : undefined,
+      endDate: filters.endDate ? formatDateEnd(filters.endDate) : undefined,
+      type: filters.type,
+    } : "no filters",
+    transactionTypes: [...new Set(data.map((t: any) => t.type))],
+    incomeCount: data.filter((t: any) => t.type === "income").length,
+    expenseCount: data.filter((t: any) => t.type === "expense").length,
+    incomeTransactions: data.filter((t: any) => t.type === "income").map((t: any) => ({
+      id: t.id,
+      type: t.type,
+      amount: t.amount,
+      amountType: typeof t.amount,
+      date: t.date,
+      description: t.description,
+    })),
+    incomeTotal: data.filter((t: any) => t.type === "income").reduce((sum: number, t: any) => {
+      const amount = Number(t.amount) || 0;
+      return sum + amount;
+    }, 0),
+    sampleTransaction: data[0] ? {
+      id: data[0].id,
+      type: data[0].type,
+      amount: data[0].amount,
+      amountType: typeof data[0].amount,
+      date: data[0].date,
+    } : null,
+  });
+
+  // Buscar relacionamentos separadamente para evitar problemas de RLS com joins
+  // Coletar IDs únicos de relacionamentos
+  const accountIds = [...new Set(data.map((t: any) => t.accountId).filter(Boolean))];
+  const categoryIds = [...new Set(data.map((t: any) => t.categoryId).filter(Boolean))];
+  const subcategoryIds = [...new Set(data.map((t: any) => t.subcategoryId).filter(Boolean))];
+
+  // Buscar contas separadamente
+  const accountsMap = new Map();
+  if (accountIds.length > 0) {
+    const { data: accounts } = await supabase
+      .from("Account")
+      .select("*")
+      .in("id", accountIds);
+    
+    if (accounts) {
+      accounts.forEach((acc: any) => {
+        accountsMap.set(acc.id, acc);
+      });
+    }
+    }
+
+  // Buscar categorias separadamente
+  const categoriesMap = new Map();
+  if (categoryIds.length > 0) {
+    const { data: categories } = await supabase
+      .from("Category")
+      .select("*")
+      .in("id", categoryIds);
+    
+    if (categories) {
+      categories.forEach((cat: any) => {
+        categoriesMap.set(cat.id, cat);
+      });
+    }
+    }
+
+  // Buscar subcategorias separadamente
+  const subcategoriesMap = new Map();
+  if (subcategoryIds.length > 0) {
+    const { data: subcategories } = await supabase
+      .from("Subcategory")
+      .select("*")
+      .in("id", subcategoryIds);
+    
+    if (subcategories) {
+      subcategories.forEach((sub: any) => {
+        subcategoriesMap.set(sub.id, sub);
+      });
+    }
   }
 
-  // Supabase returns relations differently depending on the relationship type
-  // For one-to-many or many-to-one, it can return as object or array
-  const transactions = (data || []).map((tx: any) => {
-    // Handle account relation
-    let account = null;
-    if (tx.account) {
-      account = Array.isArray(tx.account) ? (tx.account.length > 0 ? tx.account[0] : null) : tx.account;
-    }
-
-    // Handle category relation
-    let category = null;
-    if (tx.category) {
-      category = Array.isArray(tx.category) ? (tx.category.length > 0 ? tx.category[0] : null) : tx.category;
-    }
-
-    // Handle subcategory relation
-    let subcategory = null;
-    if (tx.subcategory) {
-      subcategory = Array.isArray(tx.subcategory) ? (tx.subcategory.length > 0 ? tx.subcategory[0] : null) : tx.subcategory;
-    }
-    
-    return {
+  // Combinar transações com relacionamentos
+  const transactions = (data || []).map((tx: any) => ({
       ...tx,
-      account: account || null,
-      category: category || null,
-      subcategory: subcategory || null,
-    };
-  });
+    account: accountsMap.get(tx.accountId) || null,
+    category: categoriesMap.get(tx.categoryId) || null,
+    subcategory: subcategoriesMap.get(tx.subcategoryId) || null,
+  }));
 
   return transactions;
 }
@@ -319,10 +559,34 @@ export async function getTransactions(filters?: {
   search?: string;
   recurring?: boolean;
 }) {
-  // Get tokens from cookies outside of cached function
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get("sb-access-token")?.value;
-  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  // Get tokens from Supabase client directly (not from cookies)
+  // This is more reliable because Supabase SSR manages cookies automatically
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  
+  try {
+    const supabase = await createServerClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      accessToken = session.access_token;
+      refreshToken = session.refresh_token;
+    }
+    
+    // Log token availability (only in development)
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔍 [getTransactions] Token check:", {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        accessTokenLength: accessToken?.length,
+        refreshTokenLength: refreshToken?.length,
+        hasSession: !!session,
+      });
+    }
+  } catch (error: any) {
+    // If we can't get tokens (e.g., inside unstable_cache), continue without them
+    console.warn("⚠️ [getTransactions] Could not get tokens:", error?.message);
+  }
   
   // Cache for 30 seconds if no search filter (searches should be real-time)
   if (!filters?.search) {
@@ -602,14 +866,14 @@ export async function getAccountBalance(accountId: string) {
     }
     
     if (tx.type === "income") {
-      balance += tx.amount;
+      balance += (Number(tx.amount) || 0);
     } else if (tx.type === "expense") {
-      balance -= tx.amount;
+      balance -= (Number(tx.amount) || 0);
     } else if (tx.type === "transfer") {
       if (tx.transferToId) {
-        balance -= tx.amount; // Outgoing
+        balance -= (Number(tx.amount) || 0); // Outgoing
       } else {
-        balance += tx.amount; // Incoming
+        balance += (Number(tx.amount) || 0); // Incoming
       }
     }
   }

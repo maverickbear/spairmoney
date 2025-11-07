@@ -141,7 +141,7 @@ export function CategoryDialog({
       // For system categories, skip the category update and just refresh subcategories
       if (isSystemCategory && category) {
         // Refresh the subcategories list and close dialog
-        const res = await fetch(`/api/categories/all`);
+        const res = await fetch(`/api/categories?all=true`);
         if (res.ok) {
           const allCategories = await res.json();
           const updatedCategory = allCategories.find((cat: any) => cat.id === category.id);
@@ -406,7 +406,7 @@ export function CategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{category ? "Edit" : "Add"} Category</DialogTitle>
           <DialogDescription>
@@ -416,7 +416,8 @@ export function CategoryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           {!isSystemCategory && (
             <>
               <div className="space-y-1">
@@ -685,6 +686,8 @@ export function CategoryDialog({
                 </button>
               )}
             </div>
+          </div>
+
           </div>
 
           <DialogFooter>

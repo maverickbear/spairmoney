@@ -4,7 +4,7 @@ export interface FeaturePromotion {
   benefits: {
     title: string;
     description: string;
-    icon: string;
+    icon: string; // Icon name from lucide-react
   }[];
   preview?: {
     title: string;
@@ -20,17 +20,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "Track all investments",
         description: "Monitor stocks, bonds, funds, and more in a unified dashboard.",
-        icon: "📊",
+        icon: "BarChart3",
       },
       {
         title: "Real-time portfolio value",
         description: "See your total investment value and performance at a glance.",
-        icon: "💰",
+        icon: "Wallet",
       },
       {
         title: "Investment history",
         description: "Keep track of contributions, dividends, and interest over time.",
-        icon: "📈",
+        icon: "TrendingUp",
       },
     ],
     preview: {
@@ -45,17 +45,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "Detailed analytics",
         description: "Understand where your money goes with comprehensive reports.",
-        icon: "📊",
+        icon: "BarChart3",
       },
       {
         title: "Trend analysis",
         description: "Track your financial progress over time with visual charts.",
-        icon: "📈",
+        icon: "TrendingUp",
       },
       {
         title: "Custom date ranges",
         description: "Analyze any period to understand your financial patterns.",
-        icon: "📅",
+        icon: "Calendar",
       },
     ],
     preview: {
@@ -70,17 +70,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "Full data export",
         description: "Export all your transactions, accounts, and financial data.",
-        icon: "📥",
+        icon: "Download",
       },
       {
         title: "Tax preparation",
         description: "Easily prepare your data for tax filing or accounting software.",
-        icon: "📋",
+        icon: "FileText",
       },
       {
         title: "Data backup",
         description: "Keep a local copy of all your financial information.",
-        icon: "💾",
+        icon: "HardDrive",
       },
     ],
     preview: {
@@ -95,17 +95,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "No transaction limits",
         description: "Record unlimited transactions every month.",
-        icon: "♾️",
+        icon: "Infinity",
       },
       {
         title: "Complete financial picture",
         description: "Track every expense and income without worrying about limits.",
-        icon: "📊",
+        icon: "BarChart3",
       },
       {
         title: "Full history",
         description: "Keep your complete financial history without restrictions.",
-        icon: "📚",
+        icon: "BookOpen",
       },
     ],
     preview: {
@@ -120,17 +120,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "No account limits",
         description: "Add as many accounts as you need for complete financial tracking.",
-        icon: "🏦",
+        icon: "Building2",
       },
       {
         title: "All account types",
         description: "Track checking, savings, credit cards, investments, and more.",
-        icon: "💳",
+        icon: "CreditCard",
       },
       {
         title: "Unified view",
         description: "See all your accounts in one place with a complete overview.",
-        icon: "👁️",
+        icon: "Eye",
       },
     ],
     preview: {
@@ -145,17 +145,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "Debt tracking",
         description: "Monitor all your debts in one place with balances and interest rates.",
-        icon: "📊",
+        icon: "BarChart3",
       },
       {
         title: "Payment prioritization",
         description: "See which debts to pay first to save on interest.",
-        icon: "🎯",
+        icon: "Target",
       },
       {
         title: "Payoff timeline",
         description: "Visualize when you'll be debt-free with different payment strategies.",
-        icon: "📅",
+        icon: "Calendar",
       },
     ],
     preview: {
@@ -170,17 +170,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "Goal setting",
         description: "Create and track multiple savings goals with target dates.",
-        icon: "🎯",
+        icon: "Target",
       },
       {
         title: "Progress tracking",
         description: "See how close you are to each goal with visual progress indicators.",
-        icon: "📈",
+        icon: "TrendingUp",
       },
       {
         title: "ETA calculation",
         description: "Know exactly when you'll reach your goals based on your savings rate.",
-        icon: "⏰",
+        icon: "Clock",
       },
     ],
     preview: {
@@ -195,17 +195,17 @@ export const featurePromotions: Record<string, FeaturePromotion> = {
       {
         title: "Family accounts",
         description: "Add multiple family members with separate financial tracking.",
-        icon: "👨‍👩‍👧‍👦",
+        icon: "Users",
       },
       {
         title: "Individual tracking",
         description: "Each member has their own transactions, accounts, and budgets.",
-        icon: "👤",
+        icon: "User",
       },
       {
         title: "Unified overview",
         description: "See the complete household financial picture in one place.",
-        icon: "🏠",
+        icon: "Home",
       },
     ],
     preview: {
@@ -224,17 +224,17 @@ export function getFeaturePromotion(featureName: string): FeaturePromotion {
         {
           title: `Access ${featureName}`,
           description: `Get full access to ${featureName} and all its features.`,
-          icon: "✨",
+          icon: "Sparkles",
         },
         {
           title: "More features",
           description: "Unlock additional features and capabilities with your upgrade.",
-          icon: "🚀",
+          icon: "Rocket",
         },
         {
           title: "Priority support",
           description: "Get priority support and faster response times.",
-          icon: "💬",
+          icon: "MessageCircle",
         },
       ],
     }

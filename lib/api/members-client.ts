@@ -16,6 +16,7 @@ export interface HouseholdMember {
   createdAt: string;
   updatedAt: string;
   isOwner?: boolean;
+  avatarUrl?: string | null;
 }
 
 /**
@@ -63,11 +64,40 @@ export async function getHouseholdMembersClient(): Promise<HouseholdMember[]> {
     return [];
   }
 
-  // Map and mark owner
+  // Get avatar URLs from User table for active members
+  const memberIds = (members || [])
+    .filter((m: any) => m.memberId)
+    .map((m: any) => m.memberId);
+  
+  const ownerMemberId = ownerId;
+  const allUserIds = [...new Set([ownerMemberId, ...memberIds])];
+
+  const { data: users, error: usersError } = await supabase
+    .from("User")
+    .select("id, avatarUrl")
+    .in("id", allUserIds);
+
+  if (usersError) {
+    console.error("Error fetching user avatars:", usersError);
+  }
+
+  // Create a map of userId -> avatarUrl
+  const avatarMap = new Map<string, string | null>();
+  if (users) {
+    users.forEach((user: any) => {
+      avatarMap.set(user.id, user.avatarUrl);
+    });
+  }
+
+  // Map and mark owner, and add avatarUrl
   const householdMembers: HouseholdMember[] = (members || []).map((member: any) => {
+    const userId = member.memberId || member.ownerId;
+    const avatarUrl = avatarMap.get(userId) || null;
+    
     const mapped: HouseholdMember = {
       ...member,
       isOwner: member.ownerId === member.memberId,
+      avatarUrl: avatarUrl,
     };
     return mapped;
   });

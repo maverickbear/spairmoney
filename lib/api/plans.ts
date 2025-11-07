@@ -8,7 +8,38 @@ export interface PlanWithSubscription extends Plan {
   subscription?: Subscription;
 }
 
-export async function getPlans(): Promise<Plan[]> {
+// Simple in-memory cache for plans (they rarely change)
+const plansCache = new Map<string, Plan>();
+let cacheTimestamp = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache for subscriptions (shorter TTL since they can change)
+// Stores both completed results and in-flight promises to prevent duplicate fetches
+const subscriptionCache = new Map<string, 
+  | { subscription: Subscription | null; timestamp: number; type: 'result' }
+  | { promise: Promise<Subscription | null>; timestamp: number; type: 'promise' }
+>();
+const SUBSCRIPTION_CACHE_TTL = 30 * 1000; // 30 seconds
+
+// Request-level memoization to prevent duplicate calls in the same request
+const requestCache = new Map<string, Promise<Subscription | null>>();
+
+/**
+ * Invalidate subscription cache for a user
+ * Call this when subscriptions are created, updated, or deleted
+ */
+export async function invalidateSubscriptionCache(userId: string): Promise<void> {
+  subscriptionCache.delete(userId);
+  // Also invalidate request cache
+  requestCache.delete(`subscription:${userId}`);
+  // Also invalidate for any members of this user's household
+  // (since members inherit the owner's subscription)
+  // Note: This is a simple implementation - in production you might want
+  // to track household relationships in the cache
+  console.log("[PLANS] Invalidated subscription cache for user:", userId);
+}
+
+async function refreshPlansCache(): Promise<void> {
   try {
     const supabase = await createServerClient();
     
@@ -18,11 +49,35 @@ export async function getPlans(): Promise<Plan[]> {
       .order("priceMonthly", { ascending: true });
 
     if (error || !plans) {
-      console.error("Error fetching plans:", error);
-      return [];
+      console.error("Error fetching plans for cache:", error);
+      return;
     }
 
-    return plans.map(mapPlan);
+    // Clear existing cache
+    plansCache.clear();
+    
+    // Populate cache
+    plans.forEach(plan => {
+      const mappedPlan = mapPlan(plan);
+      plansCache.set(mappedPlan.id, mappedPlan);
+    });
+    
+    cacheTimestamp = Date.now();
+  } catch (error) {
+    console.error("Error refreshing plans cache:", error);
+  }
+}
+
+export async function getPlans(): Promise<Plan[]> {
+  try {
+    // Check if cache is valid
+    const now = Date.now();
+    if (plansCache.size === 0 || (now - cacheTimestamp) > CACHE_TTL) {
+      await refreshPlansCache();
+    }
+
+    // Return cached plans
+    return Array.from(plansCache.values()).sort((a, b) => a.priceMonthly - b.priceMonthly);
   } catch (error) {
     console.error("Error in getPlans:", error);
     return [];
@@ -31,6 +86,19 @@ export async function getPlans(): Promise<Plan[]> {
 
 export async function getPlanById(planId: string): Promise<Plan | null> {
   try {
+    // Check if cache is valid
+    const now = Date.now();
+    if (!plansCache.has(planId) || (now - cacheTimestamp) > CACHE_TTL) {
+      await refreshPlansCache();
+    }
+
+    // Return from cache
+    const cachedPlan = plansCache.get(planId);
+    if (cachedPlan) {
+      return cachedPlan;
+    }
+
+    // If not in cache, fetch directly (fallback)
     const supabase = await createServerClient();
     
     const { data: plan, error } = await supabase
@@ -44,7 +112,11 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
       return null;
     }
 
-    return mapPlan(plan);
+    const mappedPlan = mapPlan(plan);
+    // Update cache
+    plansCache.set(planId, mappedPlan);
+    
+    return mappedPlan;
   } catch (error) {
     console.error("Error in getPlanById:", error);
     return null;
@@ -53,66 +125,186 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
 
 export async function getUserSubscription(userId: string): Promise<Subscription | null> {
   try {
+    // Check request-level cache first (prevents duplicate calls in same request)
+    // Use get() instead of has() + get() to avoid race conditions
+    const requestKey = `subscription:${userId}`;
+    const cachedPromise = requestCache.get(requestKey);
+    if (cachedPromise) {
+      console.log("[PLANS] getUserSubscription - Using request-level cache for:", userId);
+      return await cachedPromise;
+    }
+
+    // Check persistent cache (both results and in-flight promises)
+    const now = Date.now();
+    const cached = subscriptionCache.get(userId);
+    
+    if (cached) {
+      // Check if cache entry is still valid
+      const isExpired = (now - cached.timestamp) >= SUBSCRIPTION_CACHE_TTL;
+      
+      if (!isExpired) {
+        if (cached.type === 'result') {
+          // We have a cached result
+          console.log("[PLANS] getUserSubscription - Using persistent cache result for:", userId);
+          const result = Promise.resolve(cached.subscription);
+          requestCache.set(requestKey, result);
+          setTimeout(() => requestCache.delete(requestKey), 100);
+          return cached.subscription;
+        } else if (cached.type === 'promise') {
+          // There's an in-flight promise - reuse it
+          console.log("[PLANS] getUserSubscription - Reusing in-flight promise for:", userId);
+          requestCache.set(requestKey, cached.promise);
+          setTimeout(() => requestCache.delete(requestKey), 1000);
+          return await cached.promise;
+        }
+      } else {
+        // Cache expired, remove it
+        subscriptionCache.delete(userId);
+      }
+    }
+
+    // No valid cache - create new fetch promise
+    // Double-check cache after we decide to create a new promise (prevents race conditions)
+    // This ensures that if another call set the cache between our check and now, we reuse it
+    const doubleCheckCache = subscriptionCache.get(userId);
+    if (doubleCheckCache && (now - doubleCheckCache.timestamp) < SUBSCRIPTION_CACHE_TTL) {
+      if (doubleCheckCache.type === 'result') {
+        console.log("[PLANS] getUserSubscription - Using persistent cache result (double-check) for:", userId);
+        const result = Promise.resolve(doubleCheckCache.subscription);
+        requestCache.set(requestKey, result);
+        setTimeout(() => requestCache.delete(requestKey), 100);
+        return doubleCheckCache.subscription;
+      } else if (doubleCheckCache.type === 'promise') {
+        console.log("[PLANS] getUserSubscription - Reusing in-flight promise (double-check) for:", userId);
+        requestCache.set(requestKey, doubleCheckCache.promise);
+        setTimeout(() => requestCache.delete(requestKey), 1000);
+        return await doubleCheckCache.promise;
+      }
+    }
+    
+    console.log("[PLANS] getUserSubscription - Fetching new subscription for:", userId);
+    
+    // Create promise and cache it IMMEDIATELY (before awaiting) to prevent concurrent calls
+    // This ensures all concurrent calls get the same promise
+    const subscriptionPromise = fetchUserSubscription(userId)
+      .then((subscription) => {
+        // Update persistent cache with result after fetch completes
+        subscriptionCache.set(userId, {
+          subscription,
+          timestamp: Date.now(),
+          type: 'result',
+        });
+        return subscription;
+      })
+      .catch((error) => {
+        // Remove from caches on error so it can be retried
+        subscriptionCache.delete(userId);
+        requestCache.delete(requestKey);
+        throw error;
+      });
+
+    // Store the in-flight promise in persistent cache IMMEDIATELY
+    // This allows other concurrent calls to reuse the same promise
+    subscriptionCache.set(userId, {
+      promise: subscriptionPromise,
+      timestamp: now,
+      type: 'promise',
+    });
+
+    // Set in request cache BEFORE awaiting - this is critical for preventing race conditions
+    requestCache.set(requestKey, subscriptionPromise);
+
+    // Clean up request cache after a short delay (request should complete quickly)
+    setTimeout(() => {
+      requestCache.delete(requestKey);
+    }, 1000);
+
+    return await subscriptionPromise;
+  } catch (error) {
+    console.error("[PLANS] Error in getUserSubscription:", error);
+    // Return free subscription as default
+    return {
+      id: "free-default",
+      userId,
+      planId: "free",
+      status: "active",
+      stripeSubscriptionId: null,
+      stripeCustomerId: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+}
+
+async function fetchUserSubscription(userId: string): Promise<Subscription | null> {
     const supabase = await createServerClient();
     
-    // Check if user is an active household member
-    const isMember = await isHouseholdMember(userId);
-    console.log("[PLANS] getUserSubscription - userId:", userId, "isMember:", isMember);
+    // Optimize: Check household membership and get ownerId in a single query
+    const { data: member, error: memberError } = await supabase
+      .from("HouseholdMember")
+      .select("ownerId, status")
+      .eq("memberId", userId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (memberError && memberError.code !== "PGRST116") {
+      console.error("[PLANS] Error checking household membership:", memberError);
+    }
+
+    const isMember = member !== null;
+    const ownerId = member?.ownerId || null;
+    console.log("[PLANS] getUserSubscription - userId:", userId, "isMember:", isMember, "ownerId:", ownerId);
     
-    if (isMember) {
+    if (isMember && ownerId) {
       // User is a household member, inherit plan from owner
-      const ownerId = await getOwnerIdForMember(userId);
-      console.log("[PLANS] getUserSubscription - ownerId:", ownerId);
-      
-      if (ownerId) {
-        // Get owner's subscription
-        const { data: ownerSubscription, error: ownerError } = await supabase
-          .from("Subscription")
-          .select("*")
-          .eq("userId", ownerId)
-          .eq("status", "active")
-          .order("createdAt", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      // Get owner's subscription
+      const { data: ownerSubscription, error: ownerError } = await supabase
+        .from("Subscription")
+        .select("*")
+        .eq("userId", ownerId)
+        .eq("status", "active")
+        .order("createdAt", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-        if (ownerError && ownerError.code !== "PGRST116") {
-          console.error("[PLANS] Error fetching owner subscription:", ownerError);
-        }
-
-        console.log("[PLANS] getUserSubscription - ownerSubscription:", ownerSubscription ? { planId: ownerSubscription.planId, status: ownerSubscription.status } : null);
-
-        if (ownerSubscription) {
-          // Owner has a subscription, return it as shadow subscription for the member
-          // Only inherit if owner has Basic or Premium plan
-          const ownerPlanId = ownerSubscription.planId;
-          console.log("[PLANS] getUserSubscription - ownerPlanId:", ownerPlanId);
-          
-          if (ownerPlanId === "basic" || ownerPlanId === "premium") {
-            console.log("[PLANS] getUserSubscription - Returning shadow subscription for member:", userId, "with plan:", ownerPlanId);
-            return {
-              id: ownerSubscription.id,
-              userId, // Use member's userId, but owner's subscription data
-              planId: ownerPlanId,
-              status: ownerSubscription.status,
-              stripeSubscriptionId: ownerSubscription.stripeSubscriptionId,
-              stripeCustomerId: ownerSubscription.stripeCustomerId,
-              currentPeriodStart: ownerSubscription.currentPeriodStart ? new Date(ownerSubscription.currentPeriodStart) : null,
-              currentPeriodEnd: ownerSubscription.currentPeriodEnd ? new Date(ownerSubscription.currentPeriodEnd) : null,
-              cancelAtPeriodEnd: ownerSubscription.cancelAtPeriodEnd || false,
-              createdAt: ownerSubscription.createdAt ? new Date(ownerSubscription.createdAt) : new Date(),
-              updatedAt: ownerSubscription.updatedAt ? new Date(ownerSubscription.updatedAt) : new Date(),
-            };
-          } else {
-            console.log("[PLANS] getUserSubscription - Owner has Free plan, member will get Free");
-          }
-          // If owner has Free plan, fall through to return Free for member
-        } else {
-          console.log("[PLANS] getUserSubscription - Owner has no active subscription");
-        }
-        // If owner has no subscription or has Free, return Free for member
-      } else {
-        console.log("[PLANS] getUserSubscription - Could not find ownerId for member");
+      if (ownerError && ownerError.code !== "PGRST116") {
+        console.error("[PLANS] Error fetching owner subscription:", ownerError);
       }
+
+      console.log("[PLANS] getUserSubscription - ownerSubscription:", ownerSubscription ? { planId: ownerSubscription.planId, status: ownerSubscription.status } : null);
+
+      if (ownerSubscription) {
+        // Owner has a subscription, return it as shadow subscription for the member
+        // Only inherit if owner has Basic or Premium plan
+        const ownerPlanId = ownerSubscription.planId;
+        console.log("[PLANS] getUserSubscription - ownerPlanId:", ownerPlanId);
+        
+        if (ownerPlanId === "basic" || ownerPlanId === "premium") {
+          console.log("[PLANS] getUserSubscription - Returning shadow subscription for member:", userId, "with plan:", ownerPlanId);
+          return {
+            id: ownerSubscription.id,
+            userId, // Use member's userId, but owner's subscription data
+            planId: ownerPlanId,
+            status: ownerSubscription.status,
+            stripeSubscriptionId: ownerSubscription.stripeSubscriptionId,
+            stripeCustomerId: ownerSubscription.stripeCustomerId,
+            currentPeriodStart: ownerSubscription.currentPeriodStart ? new Date(ownerSubscription.currentPeriodStart) : null,
+            currentPeriodEnd: ownerSubscription.currentPeriodEnd ? new Date(ownerSubscription.currentPeriodEnd) : null,
+            cancelAtPeriodEnd: ownerSubscription.cancelAtPeriodEnd || false,
+            createdAt: ownerSubscription.createdAt ? new Date(ownerSubscription.createdAt) : new Date(),
+            updatedAt: ownerSubscription.updatedAt ? new Date(ownerSubscription.updatedAt) : new Date(),
+          };
+        } else {
+          console.log("[PLANS] getUserSubscription - Owner has Free plan, member will get Free");
+        }
+        // If owner has Free plan, fall through to return Free for member
+      } else {
+        console.log("[PLANS] getUserSubscription - Owner has no active subscription");
+      }
+      // If owner has no subscription or has Free, return Free for member
     } else {
       console.log("[PLANS] getUserSubscription - User is not a household member");
     }
@@ -151,23 +343,6 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
     }
 
     return mapSubscription(subscription);
-  } catch (error) {
-    console.error("[PLANS] Error in getUserSubscription:", error);
-    // Return free subscription as default
-    return {
-      id: "free-default",
-      userId,
-      planId: "free",
-      status: "active",
-      stripeSubscriptionId: null,
-      stripeCustomerId: null,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-  }
 }
 
 export async function getCurrentUserSubscription(): Promise<Subscription | null> {
@@ -192,14 +367,19 @@ export async function getCurrentUserSubscription(): Promise<Subscription | null>
   }
 }
 
-export async function checkPlanLimits(userId: string): Promise<{
+export async function checkPlanLimits(
+  userId: string,
+  subscription?: Subscription | null
+): Promise<{
   plan: Plan | null;
   subscription: Subscription | null;
   limits: PlanFeatures;
 }> {
   try {
-    const subscription = await getUserSubscription(userId);
-    if (!subscription) {
+    // Use provided subscription or fetch it
+    const userSubscription = subscription ?? await getUserSubscription(userId);
+    
+    if (!userSubscription) {
       // Default to free plan
       const freePlan = await getPlanById("free");
       return {
@@ -209,18 +389,18 @@ export async function checkPlanLimits(userId: string): Promise<{
       };
     }
 
-    const plan = await getPlanById(subscription.planId);
+    const plan = await getPlanById(userSubscription.planId);
     if (!plan) {
       return {
         plan: null,
-        subscription,
+        subscription: userSubscription,
         limits: getDefaultFeatures(),
       };
     }
 
     return {
       plan,
-      subscription,
+      subscription: userSubscription,
       limits: plan.features,
     };
   } catch (error) {

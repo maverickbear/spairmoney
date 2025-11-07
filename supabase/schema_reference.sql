@@ -432,7 +432,8 @@ CREATE TABLE IF NOT EXISTS "public"."Transaction" (
     "transferFromId" "text",
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
-    "recurring" boolean DEFAULT false NOT NULL
+    "recurring" boolean DEFAULT false NOT NULL,
+    "userId" "uuid" NOT NULL
 );
 
 
@@ -851,6 +852,10 @@ CREATE INDEX "Transaction_type_idx" ON "public"."Transaction" USING "btree" ("ty
 
 
 
+CREATE INDEX "Transaction_userId_idx" ON "public"."Transaction" USING "btree" ("userId");
+
+
+
 CREATE INDEX "User_email_idx" ON "public"."User" USING "btree" ("email");
 
 
@@ -1022,6 +1027,11 @@ ALTER TABLE ONLY "public"."Transaction"
 
 ALTER TABLE ONLY "public"."Transaction"
     ADD CONSTRAINT "Transaction_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "public"."Subcategory"("id") ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."Transaction"
+    ADD CONSTRAINT "Transaction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE;
 
 
 
@@ -1262,9 +1272,14 @@ CREATE POLICY "Users can delete own subcategories" ON "public"."Subcategory" FOR
 
 
 
-CREATE POLICY "Users can delete own transactions" ON "public"."Transaction" FOR DELETE USING ((EXISTS ( SELECT 1
+CREATE POLICY "Users can delete own transactions" ON "public"."Transaction" FOR DELETE USING ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
+  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM "public"."AccountOwner"
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."AccountOwner"
+     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
 
 
 
@@ -1346,9 +1361,14 @@ CREATE POLICY "Users can insert own subscriptions" ON "public"."Subscription" FO
 
 
 
-CREATE POLICY "Users can insert own transactions" ON "public"."Transaction" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+CREATE POLICY "Users can insert own transactions" ON "public"."Transaction" FOR INSERT WITH CHECK ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
+  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM "public"."AccountOwner"
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."AccountOwner"
+     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
 
 
 
@@ -1424,9 +1444,14 @@ CREATE POLICY "Users can update own subcategories" ON "public"."Subcategory" FOR
 
 
 
-CREATE POLICY "Users can update own transactions" ON "public"."Transaction" FOR UPDATE USING ((EXISTS ( SELECT 1
+CREATE POLICY "Users can update own transactions" ON "public"."Transaction" FOR UPDATE USING ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
+  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM "public"."AccountOwner"
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."AccountOwner"
+     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
 
 
 
@@ -1485,9 +1510,14 @@ CREATE POLICY "Users can view own simple investment entries" ON "public"."Simple
 
 
 
-CREATE POLICY "Users can view own transactions" ON "public"."Transaction" FOR SELECT USING ((EXISTS ( SELECT 1
+CREATE POLICY "Users can view own transactions" ON "public"."Transaction" FOR SELECT USING ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
+  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM "public"."AccountOwner"
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+   FROM ("public"."AccountOwner"
+     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
+  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
 
 
 

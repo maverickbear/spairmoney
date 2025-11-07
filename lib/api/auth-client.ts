@@ -31,12 +31,18 @@ async function validatePasswordAgainstHIBPClient(
     const prefix = hash.substring(0, 5);
     const suffix = hash.substring(5);
     
+    // Create abort controller for timeout (5 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    try {
     // Query HIBP API with only the prefix (k-anonymity)
     const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
       headers: {
         "User-Agent": "SpareFinance-PasswordCheck/1.0",
         "Add-Padding": "true", // Add padding to prevent timing attacks
       },
+        signal: controller.signal,
     });
     
     if (!response.ok) {
@@ -67,9 +73,20 @@ async function validatePasswordAgainstHIBPClient(
     }
     
     return { isValid: true };
+    } finally {
+      // Always clear the timeout
+      clearTimeout(timeoutId);
+    }
   } catch (error) {
     // Fail open - if there's an error, don't block the user
-    console.error("Error checking password against HIBP:", error);
+    // Only log warnings for network errors (expected when offline or API is down)
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      console.warn("HIBP API check failed (network error), allowing password");
+    } else if (error instanceof Error && error.name === "AbortError") {
+      console.warn("HIBP API check timed out, allowing password");
+    } else {
+      console.warn("HIBP API check failed, allowing password:", error);
+    }
     return { isValid: true };
   }
 }

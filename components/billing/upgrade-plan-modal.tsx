@@ -185,7 +185,7 @@ export function UpgradePlanModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle className="text-2xl">Choose Your Plan</DialogTitle>
           <DialogDescription className="text-base">
@@ -193,12 +193,12 @@ export function UpgradePlanModal({
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
             <PlanSelector
               plans={plans}
               currentPlanId={currentPlanId}
@@ -206,8 +206,8 @@ export function UpgradePlanModal({
               loading={selecting}
               showComparison={false}
             />
-          </div>
-        )}
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

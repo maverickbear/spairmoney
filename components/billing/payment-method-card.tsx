@@ -84,7 +84,6 @@ export function PaymentMethodCard({ paymentMethod, onManage }: PaymentMethodCard
             </div>
             <Button
               variant="ghost"
-              size="sm"
               onClick={handleManage}
               disabled={loading}
               className="h-8 w-8 p-0"
@@ -100,7 +99,6 @@ export function PaymentMethodCard({ paymentMethod, onManage }: PaymentMethodCard
             </div>
             <Button
               variant="ghost"
-              size="sm"
               onClick={handleManage}
               disabled={loading}
               className="h-8 w-8 p-0"

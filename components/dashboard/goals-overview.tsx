@@ -87,7 +87,7 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
             <CardDescription>Track your financial progress</CardDescription>
           </div>
           <Link href="/goals">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost">
               View All
             </Button>
           </Link>

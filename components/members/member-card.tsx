@@ -137,7 +137,6 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                   {member.status === "pending" && (
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={handleResend}
                     >
                       <Mail className="mr-2 h-4 w-4" />
@@ -146,7 +145,6 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                   )}
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => setIsEditOpen(true)}
                   >
                     <Edit className="mr-2 h-4 w-4" />
@@ -154,7 +152,6 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={handleDelete}
                     className="text-destructive hover:text-destructive"
                   >

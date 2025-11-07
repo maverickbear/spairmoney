@@ -22,7 +22,7 @@ export function EmptyState({ image, title, description, action }: EmptyStateProp
       <h2 className="text-2xl font-bold mb-2 text-center">{title}</h2>
       <p className="text-muted-foreground mb-6 text-center max-w-md">{description}</p>
       {action && (
-        <Button onClick={action.onClick} size="lg">
+        <Button onClick={action.onClick}>
           {action.label}
         </Button>
       )}

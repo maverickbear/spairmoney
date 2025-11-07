@@ -149,7 +149,7 @@ function WelcomeContent() {
           </p>
         </div>
 
-        <Card className="border-primary">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Crown className="w-5 h-5 text-primary" />
@@ -194,7 +194,6 @@ function WelcomeContent() {
               <Button
                 onClick={handleGoToDashboard}
                 className="w-full"
-                size="lg"
               >
                 Start Using Premium Features
                 <ArrowRight className="w-4 h-4 ml-2" />

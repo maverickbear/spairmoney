@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -295,8 +296,7 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
-        {/* Fixed Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
+        <DialogHeader>
           <DialogTitle>Profile</DialogTitle>
           <DialogDescription>
             Manage your profile information
@@ -435,8 +435,7 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
             )}
           </div>
 
-          {/* Fixed Footer */}
-          <div className="px-6 py-4 border-t flex justify-end gap-2 flex-shrink-0">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
@@ -453,7 +452,7 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
               <Save className="mr-2 h-4 w-4" />
               {saving ? "Saving..." : "Save Changes"}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

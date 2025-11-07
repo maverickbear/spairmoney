@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { DebtCard } from "@/components/debts/debt-card";
 import { DebtForm } from "@/components/forms/debt-form";
-import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, CreditCard } from "lucide-react";
@@ -162,88 +161,6 @@ export default function DebtsPage() {
     return 0;
   });
 
-  // Show empty state when no debts and has loaded (or not loading on first render)
-  if ((hasLoaded || !loading) && filterBy === "all" && debts.length === 0) {
-    return (
-      <div>
-        <EmptyState
-          image={<CreditCard className="w-full h-full text-muted-foreground opacity-50" />}
-          title="No debts found"
-          description="Start tracking your loans and debt payments by creating your first debt entry."
-          action={{
-            label: "Create Debt",
-            onClick: () => {
-              setSelectedDebt(null);
-              setIsFormOpen(true);
-            },
-          }}
-        />
-        <DebtForm
-          debt={selectedDebt || undefined}
-          open={isFormOpen}
-          onOpenChange={(open) => {
-            setIsFormOpen(open);
-            if (!open) {
-              setSelectedDebt(null);
-            }
-          }}
-          onSuccess={() => {
-            loadDebts();
-            setSelectedDebt(null);
-          }}
-        />
-        <Dialog 
-          open={isPaymentOpen} 
-          onOpenChange={(open) => {
-            setIsPaymentOpen(open);
-            if (!open) {
-              setPaymentAmount("");
-              setSelectedDebt(null);
-            }
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Record Payment</DialogTitle>
-              <DialogDescription>
-                Record a payment for {selectedDebt?.name || "this debt"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Payment Amount</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={paymentAmount || ""}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                />
-                {selectedDebt && (
-                  <p className="text-xs text-muted-foreground">
-                    Current balance: {formatMoney(selectedDebt.currentBalance)}
-                  </p>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setIsPaymentOpen(false);
-                  setPaymentAmount("");
-                  setSelectedDebt(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={submitPayment}>Record Payment</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -255,7 +172,6 @@ export default function DebtsPage() {
           </p>
         </div>
         <Button
-          size="sm"
           onClick={() => {
             setSelectedDebt(null);
             setIsFormOpen(true);
@@ -268,34 +184,28 @@ export default function DebtsPage() {
 
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Filter:</label>
-            <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Debts</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-                <SelectItem value="paid_off">Paid Off</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
+            <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Debts</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="paid_off">Paid Off</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Sort:</label>
-            <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="priority">Priority</SelectItem>
-                <SelectItem value="progress">Progress</SelectItem>
-                <SelectItem value="months_remaining">Months Remaining</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
+            <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="priority">Priority</SelectItem>
+              <SelectItem value="progress">Progress</SelectItem>
+              <SelectItem value="months_remaining">Months Remaining</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

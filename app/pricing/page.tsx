@@ -27,7 +27,8 @@ export default function PricingPage() {
       // Show cancel message
       console.log("Checkout was canceled");
     }
-  }, [router, searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadPlans() {
     try {

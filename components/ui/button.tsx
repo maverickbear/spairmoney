@@ -3,9 +3,10 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { componentSizes, DEFAULT_SIZE, type ButtonSize } from "@/lib/design-system/sizes";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-[12px] text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -20,15 +21,38 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-[12px] px-3",
-        lg: "h-11 rounded-[12px] px-8",
-        icon: "h-10 w-10",
+        small: cn(
+          componentSizes.button.small.height,
+          componentSizes.button.small.paddingX,
+          componentSizes.button.small.paddingY,
+          componentSizes.button.small.text,
+          componentSizes.button.small.rounded
+        ),
+        medium: cn(
+          componentSizes.button.medium.height,
+          componentSizes.button.medium.paddingX,
+          componentSizes.button.medium.paddingY,
+          componentSizes.button.medium.text,
+          componentSizes.button.medium.rounded
+        ),
+        large: cn(
+          componentSizes.button.large.height,
+          componentSizes.button.large.paddingX,
+          componentSizes.button.large.paddingY,
+          componentSizes.button.large.text,
+          componentSizes.button.large.rounded
+        ),
+        icon: cn(
+          componentSizes.button.icon.height,
+          componentSizes.button.icon.width,
+          componentSizes.button.icon.text,
+          componentSizes.button.icon.rounded
+        ),
       },
     },
     defaultVariants: {
       variant: "default",
-      size: "default",
+      size: DEFAULT_SIZE,
     },
   }
 );

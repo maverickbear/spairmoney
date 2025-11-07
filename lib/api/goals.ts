@@ -8,6 +8,7 @@ import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/tim
 import { startOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
 import { getTransactions } from "./transactions";
 import { calculateProgress as calculateGoalProgress } from "@/lib/utils/goals";
+import { requireGoalOwnership } from "@/lib/utils/security";
 
 export interface Goal {
   id: string;
@@ -78,7 +79,7 @@ export async function calculateIncomeBasis(
         return 0;
       }
 
-      return (transactions || []).reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+      return (transactions || []).reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
     })
   );
 
@@ -145,6 +146,14 @@ export async function validateAllocation(
 async function getGoalsInternal(accessToken?: string, refreshToken?: string): Promise<GoalWithCalculations[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
 
+  // Get current user to verify authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    console.error("[GOALS] Authentication error:", authError);
+    return [];
+  }
+  console.log("[GOALS] Fetching goals for user:", user.id);
+
   const { data: goals, error } = await supabase
     .from("Goal")
     .select("*")
@@ -152,9 +161,11 @@ async function getGoalsInternal(accessToken?: string, refreshToken?: string): Pr
     .order("createdAt", { ascending: false });
 
   if (error) {
-    console.error("Supabase error fetching goals:", error);
+    console.error("[GOALS] Supabase error fetching goals:", error);
     return [];
   }
+
+  console.log("[GOALS] Raw goals from database:", goals?.length || 0);
 
   if (!goals || goals.length === 0) {
     return [];
@@ -311,6 +322,9 @@ export async function updateGoal(
 ): Promise<Goal> {
     const supabase = await createServerClient();
 
+  // Verify ownership before updating
+  await requireGoalOwnership(id);
+
   // Get current goal
   const { data: currentGoal, error: fetchError } = await supabase
     .from("Goal")
@@ -396,6 +410,9 @@ export async function updateGoal(
  */
 export async function deleteGoal(id: string): Promise<void> {
     const supabase = await createServerClient();
+
+  // Verify ownership before deleting
+  await requireGoalOwnership(id);
 
   const { error } = await supabase.from("Goal").delete().eq("id", id);
 

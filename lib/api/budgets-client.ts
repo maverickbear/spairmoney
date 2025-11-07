@@ -84,7 +84,7 @@ export async function getBudgetsClient(period: Date): Promise<Budget[]> {
     for (const tx of allTransactions) {
       if (tx.categoryId) {
         const current = categorySpendMap.get(tx.categoryId) || 0;
-        categorySpendMap.set(tx.categoryId, current + (tx.amount || 0));
+        categorySpendMap.set(tx.categoryId, current + (Number(tx.amount) || 0));
       }
     }
   }

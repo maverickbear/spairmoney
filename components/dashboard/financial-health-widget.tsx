@@ -26,6 +26,19 @@ interface FinancialHealthWidgetProps {
 export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Log data for debugging
+  console.log("🔍 [FinancialHealthWidget] Received data:", {
+    hasData: !!data,
+    score: data?.score,
+    classification: data?.classification,
+    monthlyIncome: data?.monthlyIncome,
+    monthlyExpenses: data?.monthlyExpenses,
+    netAmount: data?.netAmount,
+    savingsRate: data?.savingsRate,
+    alertsCount: data?.alerts?.length || 0,
+    suggestionsCount: data?.suggestions?.length || 0,
+  });
+
   const getClassificationColor = (classification: string) => {
     switch (classification) {
       case "Excellent":
@@ -120,7 +133,7 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
 
 
           {/* Cost of Living */}
-          <div className="space-y-1 p-3 rounded-[12px] border bg-card">
+          <div className="space-y-1 p-3 rounded-[12px] bg-card">
             <p className="text-xs text-muted-foreground">Cost of Living</p>
             <p className="text-lg font-semibold flex items-center gap-2 text-foreground">
               {formatMoney(data.monthlyExpenses)}
@@ -162,7 +175,6 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
 
           {/* View Details Button */}
           <Button
-            variant="outline"
             className="w-full"
             onClick={() => setIsModalOpen(true)}
           >

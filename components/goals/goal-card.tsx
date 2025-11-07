@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ProgressRing } from "./progress-ring";
+import { Progress } from "@/components/ui/progress";
 import { ETAIndicator } from "./eta-indicator";
 import { formatMoney } from "@/components/common/money";
 import {
@@ -139,41 +139,44 @@ export function GoalCard({
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-center">
-          <ProgressRing
-            percentage={goal.progressPct || 0}
-            size={120}
-            strokeWidth={10}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Current</p>
-            <p className="font-semibold">{formatMoney(goal.currentBalance)}</p>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground">Current</p>
+              <p className="font-semibold text-base">{formatMoney(goal.currentBalance)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Target</p>
+              <p className="font-semibold text-base">{formatMoney(goal.targetAmount)}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-muted-foreground">Target</p>
-            <p className="font-semibold">{formatMoney(goal.targetAmount)}</p>
-          </div>
-        </div>
 
-        {goal.monthlyContribution !== undefined && goal.monthlyContribution > 0 && (
+          {/* Progress bar after the numbers */}
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Monthly Contribution</p>
-            <p className="text-sm font-medium">
-              {formatMoney(goal.monthlyContribution)}
-            </p>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{goal.progressPct?.toFixed(1) || 0}%</span>
+            </div>
+            <Progress value={goal.progressPct || 0} className="h-2" />
           </div>
-        )}
 
-        {goal.incomeBasis !== undefined && (
-          <ETAIndicator
-            monthsToGoal={goal.monthsToGoal ?? null}
-            incomeBasis={goal.incomeBasis}
-          />
-        )}
+            {goal.monthlyContribution !== undefined && goal.monthlyContribution > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Monthly Contribution</p>
+                <p className="text-sm font-medium">
+                  {formatMoney(goal.monthlyContribution)}
+                </p>
+              </div>
+            )}
+
+            {goal.incomeBasis !== undefined && (
+              <ETAIndicator
+                monthsToGoal={goal.monthsToGoal ?? null}
+                incomeBasis={goal.incomeBasis}
+              />
+            )}
+        </div>
       </CardContent>
     </Card>
   );

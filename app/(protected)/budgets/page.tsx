@@ -1,18 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getBudgets } from "@/lib/api/budgets";
-import { getAllCategories, getMacros } from "@/lib/api/categories";
-import { BudgetProgress } from "@/components/budgets/budget-progress";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/common/empty-state";
 import { Plus, Edit, Trash2, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { BudgetForm } from "@/components/forms/budget-form";
-import { CardSkeleton } from "@/components/ui/card-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/toast-provider";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { formatMoney } from "@/components/common/money";
+import { cn } from "@/lib/utils";
 
 interface Budget {
   id: string;
@@ -133,44 +138,6 @@ export default function BudgetsPage() {
     }
   }
 
-  // Show empty state when no budgets and has loaded (or not loading on first render)
-  if ((hasLoaded || !loading) && budgets.length === 0) {
-    return (
-      <div>
-        <EmptyState
-          image={<Wallet className="w-full h-full text-muted-foreground opacity-50" />}
-          title="No budgets found"
-          description="Create a budget to track your spending and stay on top of your finances."
-          action={{
-            label: "Add Budget",
-            onClick: () => {
-              setSelectedBudget(null);
-              setIsFormOpen(true);
-            },
-          }}
-        />
-        <BudgetForm 
-          macros={macros}
-          categories={categories} 
-          period={now}
-          budget={selectedBudget || undefined}
-          open={isFormOpen}
-          onOpenChange={(open) => {
-            setIsFormOpen(open);
-            if (!open) {
-              setSelectedBudget(null);
-            }
-          }}
-          onSuccess={async () => {
-            setSelectedBudget(null);
-            // Small delay to ensure database is updated
-            await new Promise(resolve => setTimeout(resolve, 100));
-            loadData();
-          }}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -182,7 +149,6 @@ export default function BudgetsPage() {
           </p>
         </div>
         <Button
-          size="sm"
           onClick={() => {
             setSelectedBudget(null);
             setIsFormOpen(true);
@@ -194,75 +160,162 @@ export default function BudgetsPage() {
       </div>
 
       {loading && budgets.length > 0 ? (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-6 w-32" />
-                  <div className="flex items-center space-x-1">
-                    <Skeleton className="h-8 w-8 rounded" />
-                    <Skeleton className="h-8 w-8 rounded" />
-                  </div>
-                </div>
-                <Skeleton className="h-3 w-24 mt-2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-2 w-full rounded-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Spent / Budget</TableHead>
+                  <TableHead>Percentage</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-2 w-full rounded-full" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Skeleton className="h-8 w-8 rounded" />
+                        <Skeleton className="h-8 w-8 rounded" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : budgets.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Wallet className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No budgets yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create your first budget to start tracking your spending.
+            </p>
+            <Button
+              onClick={() => {
+                setSelectedBudget(null);
+                setIsFormOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Budget
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {budgets.map((budget) => (
-            <Card key={budget.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  {budget.displayName || budget.category.name}
-                </CardTitle>
-                  <div className="flex items-center space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedBudget(budget);
-                        setIsFormOpen(true);
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(budget.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                {budget.budgetCategories && budget.budgetCategories.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {budget.budgetCategories.map(bc => bc.category.name).join(", ")}
-                  </p>
-                )}
-                {budget.note && (
-                  <p className="text-sm text-muted-foreground">{budget.note}</p>
-                )}
-              </CardHeader>
-              <CardContent>
-                <BudgetProgress
-                  budget={budget.amount}
-                  actual={budget.actualSpend || 0}
-                  percentage={budget.percentage || 0}
-                  status={budget.status || "ok"}
-                />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Spent / Budget</TableHead>
+                  <TableHead>Percentage</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {budgets.map((budget) => {
+                  const getStatusColor = () => {
+                    if (budget.status === "over") return "bg-destructive";
+                    if (budget.status === "warning") return "bg-yellow-500 dark:bg-yellow-600";
+                    return "bg-green-500 dark:bg-green-600";
+                  };
+
+                  const clampedPercentage = Math.min(budget.percentage || 0, 100);
+
+                  return (
+                    <TableRow key={budget.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">
+                            {budget.displayName || budget.category.name}
+                          </div>
+                          {budget.budgetCategories && budget.budgetCategories.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {budget.budgetCategories.map(bc => bc.category.name).join(", ")}
+                            </p>
+                          )}
+                          {budget.note && (
+                            <p className="text-xs text-muted-foreground mt-1">{budget.note}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">
+                          {formatMoney(budget.actualSpend || 0)} / {formatMoney(budget.amount)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={cn(
+                            "text-sm font-semibold",
+                            budget.status === "over" && "text-destructive",
+                            budget.status === "warning" && "text-yellow-600 dark:text-yellow-400",
+                            budget.status === "ok" && "text-green-600 dark:text-green-400"
+                          )}
+                        >
+                          {(budget.percentage || 0).toFixed(1)}%
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="w-full max-w-[200px]">
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={cn(
+                                "h-full transition-all",
+                                getStatusColor()
+                              )}
+                              style={{ width: `${clampedPercentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedBudget(budget);
+                              setIsFormOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(budget.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       <BudgetForm 

@@ -1,18 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import Link from "next/link";
+import { UpgradePlanModal } from "@/components/billing/upgrade-plan-modal";
 
 interface LimitWarningProps {
   current: number;
   limit: number;
   type: "transactions" | "accounts";
   className?: string;
+  onUpgradeSuccess?: () => void;
 }
 
-export function LimitWarning({ current, limit, type, className = "" }: LimitWarningProps) {
+export function LimitWarning({ current, limit, type, className = "", onUpgradeSuccess }: LimitWarningProps) {
+  const [modalOpen, setModalOpen] = useState(false);
   // Show warning when at 80% or more
   const percentage = (current / limit) * 100;
   const showWarning = percentage >= 80;
@@ -30,13 +33,15 @@ export function LimitWarning({ current, limit, type, className = "" }: LimitWarn
     <Alert className={`border-yellow-500/50 bg-yellow-500/10 ${className}`}>
       <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
       <AlertTitle className="text-yellow-900 dark:text-yellow-100">
-        {isAtLimit ? `Limit Reached` : `Approaching Limit`}
+        {isAtLimit ? `You've reached your limit! 🎯` : `Approaching Limit`}
       </AlertTitle>
       <AlertDescription className="mt-2 space-y-3">
         <div>
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
             {isAtLimit
-              ? `You've reached your ${typeName} limit (${limit}/${limit}). Upgrade to continue adding ${typeNameSingular}s.`
+              ? type === "accounts"
+                ? `You're using all ${limit} of your ${typeName} on the free plan. Upgrade to unlock unlimited ${typeName} and more powerful features!`
+                : `You've used all ${limit} ${typeName} this month. Upgrade to unlock unlimited ${typeName} and keep tracking your finances without limits!`
               : `You've used ${current} of ${limit} ${typeName} this month. ${remaining} ${typeNameSingular}${remaining !== 1 ? "s" : ""} remaining.`}
           </p>
         </div>
@@ -54,14 +59,24 @@ export function LimitWarning({ current, limit, type, className = "" }: LimitWarn
             <span>{percentage.toFixed(0)}%</span>
           </div>
         </div>
-        <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-          <Link href="/pricing">
-            Upgrade Plan
-            <ArrowRight className="ml-2 w-4 h-4" />
-          </Link>
+        <Button 
+          variant="outline" 
+          className="w-full sm:w-auto"
+          onClick={() => setModalOpen(true)}
+        >
+          {isAtLimit ? "Unlock Unlimited Access" : "Upgrade Plan"}
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </AlertDescription>
+      
+      <UpgradePlanModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onSuccess={() => {
+          setModalOpen(false);
+          onUpgradeSuccess?.();
+        }}
+      />
     </Alert>
   );
 }
-

@@ -70,7 +70,7 @@ export function AccountsBreakdownModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">
             <Wallet className="h-6 w-6" />
@@ -81,9 +81,10 @@ export function AccountsBreakdownModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="space-y-6">
           {/* Total Balance Summary */}
-          <div className="p-6 rounded-[12px] border bg-card">
+          <div className="p-6 rounded-[12px] bg-card">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
@@ -104,7 +105,7 @@ export function AccountsBreakdownModal({
           {/* Accounts by Household */}
           {householdTotals.map(({ household, accounts, total }) => (
             <div key={household} className="space-y-3">
-              <div className="flex items-center justify-between p-4 rounded-[12px] border bg-card">
+              <div className="flex items-center justify-between p-4 rounded-[12px] bg-card">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-muted-foreground" />
                   <h3 className="text-lg font-semibold">{household}</h3>
@@ -169,6 +170,7 @@ export function AccountsBreakdownModal({
               <p>No accounts found</p>
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

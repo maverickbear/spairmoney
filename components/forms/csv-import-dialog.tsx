@@ -117,7 +117,7 @@ export function CsvImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>Import Transactions from CSV</DialogTitle>
           <DialogDescription>
@@ -125,18 +125,18 @@ export function CsvImportDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {!hasCsvAccess && !limitsLoading && (
-          <div className="mb-4">
-            <UpgradePrompt
-              feature="CSV Import/Export"
-              currentPlan="free"
-              requiredPlan="basic"
-              message="CSV import and export are not available in the Free plan. Upgrade to Basic or Premium to import and export your transactions."
-            />
-          </div>
-        )}
-
-        <div className="space-y-4">
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+            {!hasCsvAccess && !limitsLoading && (
+              <div>
+                <UpgradePrompt
+                  feature="CSV Import/Export"
+                  currentPlan="free"
+                  requiredPlan="basic"
+                  message="CSV import and export are not available in the Free plan. Upgrade to Basic or Premium to import and export your transactions."
+                />
+              </div>
+            )}
           <div>
             <label className="text-sm font-medium">CSV File</label>
             <Input type="file" accept=".csv" onChange={handleFileChange} />
@@ -269,18 +269,19 @@ export function CsvImportDialog({
               )}
             </div>
           )}
-        </div>
+          </div>
 
-        <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleImport} 
-            disabled={isImporting || !mapping.date || !mapping.amount || (!hasCsvAccess && !limitsLoading)}
-          >
-            {isImporting ? "Importing..." : "Import"}
-          </Button>
+          <div className="px-6 py-4 border-t flex justify-end gap-2 flex-shrink-0">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleImport} 
+              disabled={isImporting || !mapping.date || !mapping.amount || (!hasCsvAccess && !limitsLoading)}
+            >
+              {isImporting ? "Importing..." : "Import"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

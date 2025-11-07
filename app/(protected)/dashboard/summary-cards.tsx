@@ -29,30 +29,136 @@ export function SummaryCards({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Helper function to parse date from Supabase format
+  // Supabase returns dates as "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SS"
+  const parseTransactionDate = (dateStr: string | Date): Date => {
+    if (dateStr instanceof Date) {
+      return dateStr;
+    }
+    // Handle both "YYYY-MM-DD HH:MM:SS" and "YYYY-MM-DDTHH:MM:SS" formats
+    const normalized = dateStr.replace(' ', 'T').split('.')[0]; // Remove milliseconds if present
+    return new Date(normalized);
+  };
+
   // Filter transactions to only include those with date <= today
+  // Temporarily include ALL transactions from the selected month to debug
   const pastTransactions = selectedMonthTransactions.filter((t) => {
-    const txDate = new Date(t.date);
-    txDate.setHours(0, 0, 0, 0);
-    return txDate <= today;
+    if (!t.date) return false;
+    // For now, include all transactions to see if date filtering is the issue
+    // TODO: Re-enable date filtering once we confirm transactions are being returned
+    return true;
+    
+    // Original date filtering code (commented out for debugging):
+    // try {
+    //   const txDate = parseTransactionDate(t.date);
+    //   txDate.setHours(0, 0, 0, 0);
+    //   return txDate <= today;
+    // } catch (error) {
+    //   console.error("Error parsing transaction date:", t.date, error);
+    //   return true;
+    // }
   });
 
   const pastLastMonthTransactions = lastMonthTransactions.filter((t) => {
-    const txDate = new Date(t.date);
-    txDate.setHours(0, 0, 0, 0);
-    return txDate <= today;
+    if (!t.date) return false;
+    try {
+      const txDate = parseTransactionDate(t.date);
+      txDate.setHours(0, 0, 0, 0);
+      return txDate <= today;
+    } catch (error) {
+      console.error("Error parsing transaction date:", t.date, error);
+      return true; // Include if date parsing fails
+    }
   });
 
+  // Debug: Log transactions to understand the issue
+  // IMPORTANT: Monthly Income should show transactions from the SELECTED MONTH (from MonthSelector)
+  // selectedMonthTransactions already contains transactions from the selected month
+  console.log("🔍 [summary-cards] Processing transactions for Monthly Income (SELECTED MONTH):", {
+    note: "Monthly Income shows transactions from the month selected in MonthSelector at the top",
+      totalTransactions: selectedMonthTransactions.length,
+      pastTransactions: pastTransactions.length,
+      today: today.toISOString(),
+      allTransactionTypes: [...new Set(selectedMonthTransactions.map(t => t?.type).filter(Boolean))],
+    incomeTransactions: pastTransactions.filter((t) => t && t.type === "income"),
+    incomeTransactionsCount: pastTransactions.filter((t) => t && t.type === "income").length,
+    expenseTransactionsCount: pastTransactions.filter((t) => t && t.type === "expense").length,
+    incomeTransactionsDetails: pastTransactions
+      .filter((t) => t && t.type === "income")
+      .map(t => ({
+        id: t.id,
+        type: t.type,
+        amount: t.amount,
+        amountType: typeof t.amount,
+        parsedAmount: t.amount != null ? (typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount)) : null,
+        date: t.date,
+        description: t.description,
+      })),
+    sampleTransactions: selectedMonthTransactions.slice(0, 5).map(t => ({ 
+        id: t?.id,
+        type: t?.type, 
+        amount: t?.amount, 
+        amountType: typeof t?.amount,
+        parsed: t?.amount != null ? (typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount)) : null,
+        date: t?.date,
+      })),
+    });
+
   const currentIncome = pastTransactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t && t.type === "income")
+    .reduce((sum, t) => {
+      // Handle various amount formats: number, string, null, undefined
+      let amount = 0;
+      if (t.amount != null) {
+        const parsed = typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount);
+        amount = isNaN(parsed) ? 0 : parsed;
+      }
+      const newSum = sum + amount;
+      console.log("🔍 [summary-cards] Calculating income - transaction:", {
+        id: t.id,
+        type: t.type,
+        amount: t.amount,
+        parsedAmount: amount,
+        currentSum: sum,
+        newSum: newSum,
+      });
+      return newSum;
+    }, 0);
+
+  console.log("🔍 [summary-cards] Final Monthly Income calculation:", {
+    currentIncome,
+    incomeTransactionsCount: pastTransactions.filter((t) => t && t.type === "income").length,
+    totalPastTransactions: pastTransactions.length,
+  });
 
   const currentExpenses = pastTransactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t && t.type === "expense")
+    .reduce((sum, t) => {
+      // Handle various amount formats: number, string, null, undefined
+      let amount = 0;
+      if (t.amount != null) {
+        const parsed = typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount);
+        amount = isNaN(parsed) ? 0 : parsed;
+      }
+      return sum + amount;
+    }, 0);
+
+  console.log("🔍 [summary-cards] Final Monthly Expenses calculation:", {
+    currentExpenses,
+    expenseTransactionsCount: pastTransactions.filter((t) => t && t.type === "expense").length,
+  });
 
   const lastMonthExpenses = pastLastMonthTransactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t && t.type === "expense")
+    .reduce((sum, t) => {
+      // Handle various amount formats: number, string, null, undefined
+      let amount = 0;
+      if (t.amount != null) {
+        const parsed = typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount);
+        amount = isNaN(parsed) ? 0 : parsed;
+      }
+      return sum + amount;
+    }, 0);
 
   const momChange = lastMonthExpenses > 0
     ? ((currentExpenses - lastMonthExpenses) / lastMonthExpenses) * 100

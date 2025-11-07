@@ -1,17 +1,327 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Plus, Edit as EditIcon, Trash2, Crown, Mail, Users } from "lucide-react";
+import { MemberForm } from "@/components/members/member-form";
+import type { HouseholdMember } from "@/lib/api/members-client";
+import { usePlanLimits } from "@/hooks/use-plan-limits";
+import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { InvitationStatus } from "@/components/members/invitation-status";
 
-export default function MembersPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/settings?tab=members");
-  }, [router]);
-
-  return null;
+// Members helper
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "M";
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return name[0].toUpperCase();
 }
 
+export default function MembersPage() {
+  const [members, setMembers] = useState<HouseholdMember[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<HouseholdMember | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "member" | null>(null);
+  const { limits, loading: limitsLoading } = usePlanLimits();
 
+  const hasHouseholdMembersAccess = limits.hasInvestments;
 
+  useEffect(() => {
+    if (!limitsLoading) {
+      loadMembers();
+      loadCurrentUserRole();
+    }
+  }, [limitsLoading]);
+
+  async function loadCurrentUserRole() {
+    try {
+      const { getUserRoleClient } = await import("@/lib/api/members-client");
+      const role = await getUserRoleClient();
+      if (role) {
+        setCurrentUserRole(role);
+      }
+    } catch (error) {
+      console.error("Error loading user role:", error);
+    }
+  }
+
+  async function loadMembers() {
+    try {
+      setLoading(true);
+      const { getHouseholdMembersClient } = await import("@/lib/api/members-client");
+      const data = await getHouseholdMembersClient();
+      setMembers(data);
+    } catch (error) {
+      console.error("Error loading members:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete(member: HouseholdMember) {
+    if (!confirm(`Are you sure you want to remove ${member.name || member.email} from your household?`)) {
+      return;
+    }
+
+    try {
+      const { deleteMemberClient } = await import("@/lib/api/members-client");
+      await deleteMemberClient(member.id);
+      loadMembers();
+    } catch (error) {
+      console.error("Error removing member:", error);
+      alert(error instanceof Error ? error.message : "Failed to remove member");
+    }
+  }
+
+  async function handleResend(member: HouseholdMember) {
+    try {
+      const res = await fetch(`/api/members/${member.id}/resend`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || "Failed to resend invitation");
+      }
+
+      alert("Invitation email resent successfully!");
+    } catch (error) {
+      console.error("Error resending invitation:", error);
+      alert(error instanceof Error ? error.message : "Failed to resend invitation");
+    }
+  }
+
+  function handleEdit(member: HouseholdMember) {
+    setEditingMember(member);
+    setIsFormOpen(true);
+  }
+
+  function handleFormClose() {
+    setIsFormOpen(false);
+    setEditingMember(undefined);
+  }
+
+  function handleFormSuccess() {
+    loadMembers();
+    handleFormClose();
+  }
+
+  if (!limitsLoading && !hasHouseholdMembersAccess) {
+    return (
+      <div className="space-y-4 md:space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Household Members</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Manage household members and invitations
+          </p>
+        </div>
+        <UpgradePrompt
+          feature="Household Members"
+          currentPlan="free"
+          requiredPlan="basic"
+          message="Household members are not available in the Free plan. Upgrade to Basic or Premium to add family members."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Household Members</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Manage household members and invitations
+          </p>
+        </div>
+        {(currentUserRole === "admin" || currentUserRole === null) && (
+          <Button
+            onClick={() => setIsFormOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Invite Member
+          </Button>
+        )}
+      </div>
+
+      {loading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 bg-muted rounded animate-pulse" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : members.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Users className="h-12 w-12 text-muted-foreground mb-4" />
+            <CardTitle className="mb-2">No members yet</CardTitle>
+            <CardDescription className="text-center mb-4">
+              Invite household members to share access to your financial data.
+            </CardDescription>
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Invite Your First Member
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="rounded-[12px] border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs md:text-sm">Member</TableHead>
+                <TableHead className="text-xs md:text-sm">Email</TableHead>
+                <TableHead className="text-xs md:text-sm">Role</TableHead>
+                <TableHead className="text-xs md:text-sm">Status</TableHead>
+                <TableHead className="text-xs md:text-sm">Date</TableHead>
+                <TableHead className="text-right text-xs md:text-sm">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {members.map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell className="font-medium text-xs md:text-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-shrink-0">
+                        {member.avatarUrl ? (
+                          <>
+                            <img
+                              src={member.avatarUrl}
+                              alt={member.name || member.email}
+                              className="h-10 w-10 rounded-full object-cover border-2"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                                const initialsContainer = e.currentTarget.nextElementSibling;
+                                if (initialsContainer) {
+                                  (initialsContainer as HTMLElement).style.display = "flex";
+                                }
+                              }}
+                            />
+                            <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border-2">
+                              {getInitials(member.name)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border-2">
+                            {getInitials(member.name)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span>{member.name || member.email}</span>
+                          {member.isOwner && (
+                            <Badge variant="default" className="flex items-center gap-1">
+                              <Crown className="h-3 w-3" />
+                              Owner
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs md:text-sm text-muted-foreground">
+                    {member.email}
+                  </TableCell>
+                  <TableCell className="text-xs md:text-sm">
+                    {member.isOwner ? (
+                      <Badge variant="default" className="flex items-center gap-1">
+                        <Crown className="h-3 w-3" />
+                        Admin
+                      </Badge>
+                    ) : (
+                      <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                        {member.role === "admin" ? "Admin" : "Member"}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs md:text-sm">
+                    {member.isOwner ? (
+                      <Badge variant="secondary">Active</Badge>
+                    ) : (
+                      <InvitationStatus status={member.status} />
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs md:text-sm text-muted-foreground">
+                    {member.isOwner ? (
+                      <span>Since {new Date(member.createdAt).toLocaleDateString()}</span>
+                    ) : member.status === "pending" ? (
+                      <span>Invited {new Date(member.invitedAt).toLocaleDateString()}</span>
+                    ) : member.acceptedAt ? (
+                      <span>Joined {new Date(member.acceptedAt).toLocaleDateString()}</span>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {!member.isOwner && (currentUserRole === "admin" || currentUserRole === null) && (
+                      <div className="flex space-x-1 md:space-x-2">
+                        {member.status === "pending" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 md:h-10 md:w-10"
+                            onClick={() => handleResend(member)}
+                            title="Resend invitation email"
+                          >
+                            <Mail className="h-3 w-3 md:h-4 md:w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 md:h-10 md:w-10"
+                          onClick={() => handleEdit(member)}
+                        >
+                          <EditIcon className="h-3 w-3 md:h-4 md:w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 md:h-10 md:w-10"
+                          onClick={() => handleDelete(member)}
+                        >
+                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <MemberForm
+        open={isFormOpen}
+        onOpenChange={handleFormClose}
+        member={editingMember}
+        onSuccess={handleFormSuccess}
+      />
+    </div>
+  );
+}

@@ -8,6 +8,7 @@ import { CashFlowSection } from "./cash-flow-section";
 import { TransactionsBudgetSection } from "./transactions-budget-section";
 import { ChartsSection } from "./charts-section";
 import { OnboardingWidget } from "@/components/dashboard/onboarding-widget";
+import { TotalIncomeWidget } from "@/components/dashboard/total-income-widget";
 import { loadDashboardData } from "./data-loader";
 
 interface DashboardProps {
@@ -23,6 +24,9 @@ async function DashboardContent({ selectedMonthDate }: { selectedMonthDate: Date
       {data.onboardingStatus && (
         <OnboardingWidget initialStatus={data.onboardingStatus} />
       )}
+
+      {/* Total Income Widget */}
+      <TotalIncomeWidget transactions={data.allIncomeTransactions} />
 
       {/* Summary Cards */}
       <SummaryCards 
@@ -61,8 +65,22 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   const params = await Promise.resolve(searchParams);
   const selectedMonthParam = params?.month;
   const selectedMonthDate = selectedMonthParam 
-    ? new Date(selectedMonthParam)
+    ? (() => {
+        // Parse YYYY-MM-DD format and create date in local timezone
+        const [year, month, day] = selectedMonthParam.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      })()
     : new Date();
+
+  // Ensure we're using the start of the month for consistency
+  const selectedMonth = new Date(selectedMonthDate.getFullYear(), selectedMonthDate.getMonth(), 1);
+  
+  console.log("🔍 [dashboard] Selected month from URL:", {
+    monthParam: selectedMonthParam,
+    selectedMonthDate: selectedMonthDate.toISOString(),
+    selectedMonth: selectedMonth.toISOString(),
+    monthName: selectedMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }),
+  });
 
   return (
     <div className="space-y-6 md:space-y-10">
@@ -103,7 +121,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
           </div>
         </>
       }>
-        <DashboardContent selectedMonthDate={selectedMonthDate} />
+        <DashboardContent selectedMonthDate={selectedMonth} />
       </Suspense>
     </div>
   );

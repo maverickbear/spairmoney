@@ -55,7 +55,7 @@ export function FeaturesSection() {
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
-              <Card key={index} className="border-2 hover:border-primary/50 transition-colors">
+              <Card key={index} className="transition-colors">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="p-3 bg-primary/10 rounded-[12px]">

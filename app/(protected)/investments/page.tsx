@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
-import { EmptyState } from "@/components/common/empty-state";
-import { Plus, Edit, TrendingUp } from "lucide-react";
+import { Plus, Edit } from "lucide-react";
 import { FeatureGuard } from "@/components/common/feature-guard";
 import {
   Dialog,
@@ -229,188 +228,7 @@ export default function InvestmentsPage() {
 
   return (
     <FeatureGuard feature="hasInvestments" featureName="Investments">
-      {/* Show empty state when no investment accounts and has loaded (or not loading on first render) */}
-      {(hasLoaded || !loading) && accounts.length === 0 ? (
-        <div>
-          <EmptyState
-            image={<TrendingUp className="w-full h-full text-muted-foreground opacity-50" />}
-            title="No investment accounts found"
-            description="Create an investment account in the Accounts page to start tracking your investments."
-            action={{
-              label: "Go to Accounts",
-              onClick: () => {
-                window.location.href = "/accounts";
-              },
-            }}
-          />
-          <Dialog
-          open={openEntryDialog}
-          onOpenChange={(isOpen) => {
-            setOpenEntryDialog(isOpen);
-            if (!isOpen) {
-              entryForm.reset();
-            }
-          }}
-        >
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add Investment Entry</DialogTitle>
-              <DialogDescription>
-                Add a monthly contribution, dividend, or interest payment
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={entryForm.handleSubmit(handleSubmitEntry)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Account</label>
-                  <select
-                    {...entryForm.register("accountId")}
-                    className="flex h-10 w-full rounded-[12px] border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="">Select account</option>
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
-                  </select>
-                  {entryForm.formState.errors.accountId && (
-                    <p className="text-xs text-destructive mt-1">
-                      {entryForm.formState.errors.accountId.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Date</label>
-                  <Input
-                    type="date"
-                    {...entryForm.register("date", {
-                      valueAsDate: true,
-                    })}
-                    value={
-                      entryForm.watch("date")
-                        ? format(entryForm.watch("date") as Date, "yyyy-MM-dd")
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const newDate = new Date(e.target.value);
-                      if (!isNaN(newDate.getTime())) {
-                        entryForm.setValue("date", newDate);
-                      }
-                    }}
-                  />
-                  {entryForm.formState.errors.date && (
-                    <p className="text-xs text-destructive mt-1">
-                      {entryForm.formState.errors.date.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Type</label>
-                  <select
-                    {...entryForm.register("type")}
-                    className="flex h-10 w-full rounded-[12px] border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="initial">Initial Balance</option>
-                    <option value="contribution">Monthly Contribution</option>
-                    <option value="dividend">Dividend</option>
-                    <option value="interest">Interest</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Amount</label>
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    {...entryForm.register("amount", { valueAsNumber: true })}
-                  />
-                  {entryForm.formState.errors.amount && (
-                    <p className="text-xs text-destructive mt-1">
-                      {entryForm.formState.errors.amount.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium mb-2 block">Description (optional)</label>
-                  <Input {...entryForm.register("description")} />
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setOpenEntryDialog(false);
-                    entryForm.reset();
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">Save</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={openValueDialog}
-          onOpenChange={(isOpen) => {
-            setOpenValueDialog(isOpen);
-            if (!isOpen) {
-              valueForm.reset();
-              setEditingAccount(null);
-            }
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Update Total Value</DialogTitle>
-              <DialogDescription>
-                Update the total investment value for {editingAccount?.name}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={valueForm.handleSubmit(handleSubmitValue)} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Total Value</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  {...valueForm.register("totalValue", { valueAsNumber: true })}
-                />
-                {valueForm.formState.errors.totalValue && (
-                  <p className="text-xs text-destructive mt-1">
-                    {valueForm.formState.errors.totalValue.message}
-                  </p>
-                )}
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setOpenValueDialog(false);
-                    valueForm.reset();
-                    setEditingAccount(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">Update</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-        </div>
-      ) : (
-        <div className="space-y-4 md:space-y-6">
+      <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Investments</h1>
@@ -418,7 +236,7 @@ export default function InvestmentsPage() {
             Manage your investments by account
           </p>
         </div>
-        <Button size="sm" onClick={() => setOpenEntryDialog(true)}>
+        <Button onClick={() => setOpenEntryDialog(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Entry
         </Button>
@@ -671,8 +489,7 @@ export default function InvestmentsPage() {
           </form>
         </DialogContent>
       </Dialog>
-        </div>
-      )}
+      </div>
     </FeatureGuard>
   );
 }

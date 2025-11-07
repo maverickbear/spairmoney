@@ -24,7 +24,7 @@ const EXPENSES_COLOR_LIGHT = "#fca5a5"; // Lighter coral
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-[12px] border bg-card p-3 backdrop-blur-sm">
+      <div className="rounded-[12px] bg-card p-3 backdrop-blur-sm">
         <p className="mb-2 text-sm font-medium text-foreground">
           {payload[0].payload.month}
         </p>

@@ -27,19 +27,51 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
         persistSession: false,
         autoRefreshToken: false,
       },
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
     });
 
     try {
-      await client.auth.setSession({
+      // Set session with tokens - this is critical for RLS to work
+      const { data: sessionData, error: sessionError } = await client.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
       });
+
+      // Verify the session was set correctly
+      if (sessionError) {
+        console.warn("⚠️ [createServerClient] setSession error:", sessionError.message);
+      }
+
+      // Verify user is authenticated
+      const { data: { user }, error: userError } = await client.auth.getUser();
+      if (userError || !user) {
+        console.warn("⚠️ [createServerClient] getUser error after setSession:", {
+          userError: userError?.message,
+          hasUser: !!user,
+          sessionHasUser: !!sessionData?.user,
+        });
+      } else {
+        // Log success in development
+        if (process.env.NODE_ENV === "development") {
+          console.log("✅ [createServerClient] Successfully authenticated with tokens:", {
+            userId: user.id,
+            hasSession: !!sessionData,
+          });
+        }
+      }
     } catch (error: any) {
       // Handle refresh token errors gracefully
       if (error?.message?.includes("refresh_token_not_found") || 
           error?.message?.includes("Invalid refresh token") ||
           error?.message?.includes("JWT expired")) {
+        console.warn("⚠️ [createServerClient] Token error:", error?.message);
         // Session will be invalid, but continue with unauthenticated client
+      } else {
+        console.warn("⚠️ [createServerClient] Unexpected error:", error?.message);
       }
     }
 

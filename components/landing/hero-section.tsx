@@ -32,7 +32,6 @@ export function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Button
               asChild
-              size="lg"
               className="bg-[#a78bfa] text-white hover:bg-[#a78bfa]/90 text-base font-semibold px-8 py-6 h-auto rounded-[12px]"
             >
               <Link href="#pricing">Start a free trial</Link>
@@ -40,7 +39,6 @@ export function HeroSection() {
             <Button
               asChild
               variant="outline"
-              size="lg"
               className="bg-white/10 border-white/20 text-white hover:bg-white/20 text-base font-semibold px-8 py-6 h-auto rounded-[12px] backdrop-blur-sm"
             >
               <Link href="#features">

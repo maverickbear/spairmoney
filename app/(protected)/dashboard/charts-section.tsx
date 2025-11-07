@@ -13,7 +13,7 @@ export function ChartsSection({
 
   const currentIncome = selectedMonthTransactions
     .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
   const expensesByCategory = selectedMonthTransactions
     .filter((t) => t.type === "expense" && t.category && t.category.name)
@@ -23,7 +23,7 @@ export function ChartsSection({
       if (!acc[catName]) {
         acc[catName] = { value: 0, id: catId };
       }
-      acc[catName].value += t.amount;
+      acc[catName].value += (Number(t.amount) || 0);
       return acc;
     }, {} as Record<string, { value: number; id: string | null }>);
 

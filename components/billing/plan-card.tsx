@@ -56,7 +56,6 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
             </div>
             <Button
               variant="ghost"
-              size="sm"
               onClick={handleManage}
               disabled={loading}
               className="h-8 w-8 p-0"
@@ -97,7 +96,6 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
           {!isFree && (
             <Button
               variant="ghost"
-              size="sm"
               onClick={handleManage}
               disabled={loading}
               className="h-8 w-8 p-0"

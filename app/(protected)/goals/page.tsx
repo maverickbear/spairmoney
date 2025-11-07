@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { GoalCard } from "@/components/goals/goal-card";
 import { GoalForm } from "@/components/forms/goal-form";
-import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
-import { Plus, Target } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -67,9 +66,13 @@ export default function GoalsPage() {
   async function loadGoals() {
     try {
       setLoading(true);
-      const { getGoalsClient } = await import("@/lib/api/goals-client");
-      const data = await getGoalsClient();
-      setGoals(data);
+      const res = await fetch("/api/goals");
+      if (!res.ok) {
+        throw new Error("Failed to fetch goals");
+      }
+      const data = await res.json();
+      console.log("Goals loaded:", data);
+      setGoals(data || []);
       setHasLoaded(true);
     } catch (error) {
       console.error("Error loading goals:", error);
@@ -280,100 +283,6 @@ export default function GoalsPage() {
   const activeGoals = goals.filter((g) => !g.isCompleted && !g.isPaused);
   const totalAllocation = activeGoals.reduce((sum, g) => sum + (g.incomePercentage || 0), 0);
 
-  // Show empty state when no goals and has loaded (or not loading on first render)
-  if ((hasLoaded || !loading) && filterBy === "all" && goals.length === 0) {
-    return (
-      <div>
-        <EmptyState
-          image={<Target className="w-full h-full text-muted-foreground opacity-50" />}
-          title="No goals found"
-          description="Create your first savings goal to start tracking your progress toward your financial objectives."
-          action={{
-            label: "Create Goal",
-            onClick: () => {
-              setSelectedGoal(null);
-              setIsFormOpen(true);
-            },
-          }}
-        />
-        <GoalForm
-          goal={selectedGoal || undefined}
-          open={isFormOpen}
-          onOpenChange={(open) => {
-            setIsFormOpen(open);
-            if (!open) {
-              setSelectedGoal(null);
-            }
-          }}
-          onSuccess={() => {
-            loadGoals();
-            setSelectedGoal(null);
-          }}
-        />
-        <Dialog open={isTopUpOpen} onOpenChange={setIsTopUpOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Top-up</DialogTitle>
-              <DialogDescription>
-                Add money to {selectedGoal?.name || "this goal"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={topUpAmount}
-                  onChange={(e) => setTopUpAmount(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsTopUpOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={submitTopUp}>Add Top-up</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Withdraw from Goal</DialogTitle>
-              <DialogDescription>
-                Withdraw money from {selectedGoal?.name || "this goal"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                />
-                {selectedGoal && (
-                  <p className="text-xs text-muted-foreground">
-                    Current balance: {formatMoney(selectedGoal.currentBalance)}
-                  </p>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsWithdrawOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={submitWithdraw}>Withdraw</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -385,7 +294,6 @@ export default function GoalsPage() {
           </p>
         </div>
         <Button
-          size="sm"
           onClick={() => {
             setSelectedGoal(null);
             setIsFormOpen(true);
@@ -398,34 +306,28 @@ export default function GoalsPage() {
 
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Filter:</label>
-            <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Goals</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
+            <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Goals</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Sort:</label>
-            <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="priority">Priority</SelectItem>
-                <SelectItem value="progress">Progress</SelectItem>
-                <SelectItem value="eta">ETA</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
+            <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="priority">Priority</SelectItem>
+              <SelectItem value="progress">Progress</SelectItem>
+              <SelectItem value="eta">ETA</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="text-sm">
@@ -436,8 +338,8 @@ export default function GoalsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {loading && goals.length > 0 ? (
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        {loading && !hasLoaded ? (
           <div className="col-span-full text-center py-8 text-muted-foreground">
             Loading goals...
           </div>

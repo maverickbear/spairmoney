@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, CreditCard } from "lucide-react";
 import { formatMoney } from "@/components/common/money";
-import { EmptyState } from "@/components/common/empty-state";
 import { AccountForm } from "@/components/forms/account-form";
 import { TableSkeleton } from "@/components/ui/list-skeleton";
 import { useToast } from "@/components/toast-provider";
@@ -34,6 +33,7 @@ export default function AccountsPage() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [accountLimit, setAccountLimit] = useState<{ current: number; limit: number } | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -52,6 +52,28 @@ export default function AccountsPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadAccountLimit() {
+    try {
+      const { getBillingLimitsAction } = await import("@/lib/actions/billing");
+      const limits = await getBillingLimitsAction();
+      if (limits?.accountLimit) {
+        setAccountLimit({
+          current: limits.accountLimit.current,
+          limit: limits.accountLimit.limit,
+        });
+      }
+    } catch (error) {
+      console.error("Error loading account limit:", error);
+    }
+  }
+
+  async function handleAddAccount() {
+    setSelectedAccount(null);
+    // Load limit before opening modal for immediate display
+    await loadAccountLimit();
+    setIsFormOpen(true);
   }
 
   async function handleDelete(id: string) {
@@ -73,6 +95,8 @@ export default function AccountsPage() {
       });
       
       loadAccounts();
+      // Reload limit after deletion
+      loadAccountLimit();
     } catch (error) {
       console.error("Error deleting account:", error);
       // Revert optimistic update on error
@@ -87,31 +111,6 @@ export default function AccountsPage() {
     }
   }
 
-  // Show empty state when no accounts and has loaded (or not loading on first render)
-  if ((hasLoaded || !loading) && accounts.length === 0) {
-    return (
-      <div>
-        <EmptyState
-          image={<CreditCard className="w-full h-full text-muted-foreground opacity-50" />}
-          title="No accounts found"
-          description="Create your first account to start tracking your finances and transactions."
-          action={{
-            label: "Add Account",
-            onClick: () => {
-              setSelectedAccount(null);
-              setIsFormOpen(true);
-            },
-          }}
-        />
-        <AccountForm
-          open={isFormOpen}
-          onOpenChange={setIsFormOpen}
-          account={selectedAccount || undefined}
-          onSuccess={loadAccounts}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -121,11 +120,7 @@ export default function AccountsPage() {
           <p className="text-sm md:text-base text-muted-foreground">Manage your accounts and view balances</p>
         </div>
         <Button
-          size="sm"
-          onClick={() => {
-            setSelectedAccount(null);
-            setIsFormOpen(true);
-          }}
+          onClick={handleAddAccount}
         >
           <Plus className="mr-2 h-4 w-4" />
           Add Account
@@ -226,9 +221,18 @@ export default function AccountsPage() {
 
       <AccountForm
         open={isFormOpen}
-        onOpenChange={setIsFormOpen}
+        onOpenChange={(open) => {
+          setIsFormOpen(open);
+          if (!open) {
+            setAccountLimit(null);
+          }
+        }}
         account={selectedAccount || undefined}
-        onSuccess={loadAccounts}
+        onSuccess={() => {
+          loadAccounts();
+          loadAccountLimit();
+        }}
+        initialAccountLimit={accountLimit}
       />
     </div>
   );

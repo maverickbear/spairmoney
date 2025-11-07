@@ -11,6 +11,7 @@ import {
 } from "@/lib/utils/debts";
 import { createTransaction } from "@/lib/api/transactions";
 import { getDebtCategoryMapping } from "@/lib/utils/debt-categories";
+import { requireDebtOwnership } from "@/lib/utils/security";
 
 export interface Debt {
   id: string;
@@ -280,6 +281,9 @@ export async function updateDebt(
 ): Promise<Debt> {
     const supabase = await createServerClient();
 
+  // Verify ownership before updating
+  await requireDebtOwnership(id);
+
   // Get current debt
   const { data: currentDebt, error: fetchError } = await supabase
     .from("Debt")
@@ -360,6 +364,9 @@ export async function updateDebt(
  */
 export async function deleteDebt(id: string): Promise<void> {
     const supabase = await createServerClient();
+
+  // Verify ownership before deleting
+  await requireDebtOwnership(id);
 
   const { error } = await supabase.from("Debt").delete().eq("id", id);
 

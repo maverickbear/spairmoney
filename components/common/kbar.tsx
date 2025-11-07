@@ -14,6 +14,7 @@ import {
   FileText,
   PiggyBank,
   CreditCard,
+  Users,
 } from "lucide-react";
 
 interface KBarProps {
@@ -36,6 +37,7 @@ const commandGroups = [
       { id: "budgets", label: "Budgets", icon: Target, href: "/budgets" },
       { id: "categories", label: "Categories", icon: FolderTree, href: "/categories" },
       { id: "accounts", label: "Accounts", icon: Wallet, href: "/accounts" },
+      { id: "households", label: "Households", icon: Users, href: "/members" },
     ],
   },
   {

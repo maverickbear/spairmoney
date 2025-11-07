@@ -1,19 +1,56 @@
 import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { componentSizes, DEFAULT_SIZE, type ComponentSize } from "@/lib/design-system/sizes";
+
+const inputVariants = cva(
+  "flex w-full border border-input bg-background ring-offset-background file:border-0 file:bg-transparent file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+  {
+    variants: {
+      size: {
+        small: cn(
+          componentSizes.input.small.height,
+          componentSizes.input.small.paddingX,
+          componentSizes.input.small.paddingY,
+          componentSizes.input.small.text,
+          componentSizes.input.small.rounded,
+          "file:text-sm"
+        ),
+        medium: cn(
+          componentSizes.input.medium.height,
+          componentSizes.input.medium.paddingX,
+          componentSizes.input.medium.paddingY,
+          componentSizes.input.medium.text,
+          componentSizes.input.medium.rounded,
+          "file:text-base"
+        ),
+        large: cn(
+          componentSizes.input.large.height,
+          componentSizes.input.large.paddingX,
+          componentSizes.input.large.paddingY,
+          componentSizes.input.large.text,
+          componentSizes.input.large.rounded,
+          "file:text-lg"
+        ),
+      },
+    },
+    defaultVariants: {
+      size: DEFAULT_SIZE,
+    },
+  }
+);
 
 export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+  extends React.InputHTMLAttributes<HTMLInputElement>,
+    VariantProps<typeof inputVariants> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, size, type, ...props }, ref) => {
     return (
       <input
         type={type}
-        className={cn(
-          "flex h-12 w-full rounded-[12px] border border-input bg-background px-4 py-3 text-base ring-offset-background file:border-0 file:bg-transparent file:text-base file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-          className
-        )}
+        className={cn(inputVariants({ size, className }))}
         ref={ref}
         {...props}
       />
@@ -22,5 +59,5 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 );
 Input.displayName = "Input";
 
-export { Input };
+export { Input, inputVariants };
 

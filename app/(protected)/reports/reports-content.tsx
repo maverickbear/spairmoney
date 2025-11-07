@@ -90,8 +90,8 @@ export function ReportsContent({ limits, budgets, transactions, now }: ReportsCo
                   return (
                     <TableRow key={item.name}>
                       <TableCell className="font-medium text-xs md:text-sm">{item.name}</TableCell>
-                      <TableCell className="text-right text-xs md:text-sm">{formatMoney(item.budget)}</TableCell>
-                      <TableCell className="text-right text-xs md:text-sm">{formatMoney(item.actual)}</TableCell>
+                      <TableCell className="text-right font-medium text-xs md:text-sm">{formatMoney(item.budget)}</TableCell>
+                      <TableCell className="text-right font-medium text-xs md:text-sm">{formatMoney(item.actual)}</TableCell>
                       <TableCell className={`text-right font-medium text-xs md:text-sm hidden md:table-cell ${
                         difference >= 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
                       }`}>
@@ -133,7 +133,7 @@ export function ReportsContent({ limits, budgets, transactions, now }: ReportsCo
                 <TableBody>
                   {topExpenses.map((tx) => (
                     <TableRow key={tx.id}>
-                      <TableCell className="text-xs md:text-sm whitespace-nowrap">{format(new Date(tx.date), "MMM dd, yyyy")}</TableCell>
+                      <TableCell className="font-medium text-xs md:text-sm whitespace-nowrap">{format(new Date(tx.date), "MMM dd, yyyy")}</TableCell>
                       <TableCell className="text-xs md:text-sm hidden md:table-cell max-w-[150px] truncate">{tx.description || "-"}</TableCell>
                       <TableCell className="text-xs md:text-sm">
                         {tx.category?.name}

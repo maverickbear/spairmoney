@@ -100,7 +100,7 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit" : "Invite"} Member</DialogTitle>
           <DialogDescription>
@@ -110,7 +110,8 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="space-y-1">
             <label className="text-sm font-medium">Email</label>
             <Input
@@ -162,6 +163,8 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
                 {form.formState.errors.role?.message}
               </p>
             )}
+          </div>
+
           </div>
 
           <DialogFooter>

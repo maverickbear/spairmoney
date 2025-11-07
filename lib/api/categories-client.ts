@@ -19,65 +19,45 @@ export interface Macro {
 
 /**
  * Get all categories (system defaults + user's custom)
+ * Uses API route which has server-side caching
  */
 export async function getAllCategoriesClient(): Promise<Category[]> {
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  
-  let query = supabase
-    .from("Category")
-    .select(`
-      *,
-      macro:Macro(*),
-      subcategories:Subcategory(*)
-    `)
-    .order("name", { ascending: true });
-
-  if (authUser) {
-    query = query.or(`userId.is.null,userId.eq.${authUser.id}`);
-  } else {
-    query = query.is("userId", null);
-  }
-
-  const { data: categories, error } = await query;
-
-  if (error) {
-    console.error("Supabase error fetching categories:", error);
+  try {
+    const response = await fetch("/api/categories?all=true");
+    if (!response.ok) {
+      console.error("Error fetching categories:", response.statusText);
     return [];
   }
+    const categories = await response.json();
 
-  // Handle relations
+    // Handle relations (ensure consistent format)
   return (categories || []).map((cat: any) => ({
     ...cat,
     macro: Array.isArray(cat.macro) ? (cat.macro.length > 0 ? cat.macro[0] : null) : cat.macro,
     subcategories: Array.isArray(cat.subcategories) ? cat.subcategories : [],
   }));
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    return [];
+  }
 }
 
 /**
  * Get all macros (system defaults + user's custom)
+ * Uses API route which has server-side caching
  */
 export async function getMacrosClient(): Promise<Macro[]> {
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  
-  let query = supabase
-    .from("Macro")
-    .select("*")
-    .order("name", { ascending: true });
-
-  if (authUser) {
-    query = query.or(`userId.is.null,userId.eq.${authUser.id}`);
-  } else {
-    query = query.is("userId", null);
+  try {
+    const response = await fetch("/api/categories");
+    if (!response.ok) {
+      console.error("Error fetching macros:", response.statusText);
+      return [];
   }
-
-  const { data: macros, error } = await query;
-
-  if (error) {
-    console.error("Supabase error fetching macros:", error);
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching macros:", error);
     return [];
   }
-
-  return macros || [];
 }
 
 /**

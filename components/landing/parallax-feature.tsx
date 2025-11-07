@@ -92,7 +92,7 @@ export function ParallaxFeature({
           transition: "transform 0.1s ease-out",
         }}
       >
-        <Card className="border-2 hover:border-primary/50 transition-colors">
+        <Card className="transition-colors">
           <CardHeader>
             <CardTitle className="text-2xl md:text-3xl">{title}</CardTitle>
           </CardHeader>

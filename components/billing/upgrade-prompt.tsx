@@ -1,9 +1,61 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Lock, TrendingUp, BarChart3, FileText, Download, Users, Wallet, Target, Check } from "lucide-react";
+import {
+  ArrowRight,
+  Lock,
+  TrendingUp,
+  BarChart3,
+  FileText,
+  Download,
+  Users,
+  Wallet,
+  Target,
+  Calendar,
+  HardDrive,
+  Infinity,
+  Building2,
+  CreditCard,
+  Eye,
+  BookOpen,
+  Clock,
+  User,
+  Home,
+  Sparkles,
+  Rocket,
+  MessageCircle,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { getFeaturePromotion } from "@/lib/utils/feature-promotions";
+
+// Icon mapping
+const iconMap: Record<string, LucideIcon> = {
+  BarChart3,
+  Wallet,
+  TrendingUp,
+  Calendar,
+  Download,
+  FileText,
+  HardDrive,
+  Infinity,
+  Building2,
+  CreditCard,
+  Eye,
+  BookOpen,
+  Target,
+  Clock,
+  Users,
+  User,
+  Home,
+  Sparkles,
+  Rocket,
+  MessageCircle,
+};
+
+function getIconComponent(iconName: string): LucideIcon {
+  return iconMap[iconName] || Sparkles;
+}
 
 function FeaturePreview({ feature, planName }: { feature: string; planName: string }) {
   if (feature === "Investments") {
@@ -221,19 +273,24 @@ export function UpgradePrompt({
 
         {/* Benefits Section */}
         <div className="grid gap-6 md:grid-cols-3">
-          {promotion.benefits.map((benefit, index) => (
-            <div key={index} className="space-y-2">
-              <div className="flex items-start gap-3">
-                <span className="text-xl leading-none">{benefit.icon}</span>
-                <div className="flex-1 space-y-1">
-                  <h3 className="font-medium text-sm text-foreground">{benefit.title}</h3>
-                  <p className="text-sm text-muted-foreground/70 leading-relaxed">
-                    {benefit.description}
-                  </p>
+          {promotion.benefits.map((benefit, index) => {
+            const IconComponent = getIconComponent(benefit.icon);
+            return (
+              <div key={index} className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    <IconComponent className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <h3 className="font-medium text-sm text-foreground">{benefit.title}</h3>
+                    <p className="text-sm text-muted-foreground/70 leading-relaxed">
+                      {benefit.description}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Call to Action */}
@@ -245,13 +302,13 @@ export function UpgradePrompt({
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-            <Button asChild size="lg" className="w-full sm:w-auto">
+            <Button asChild className="w-full sm:w-auto">
               <Link href={`/pricing?upgrade=${requiredPlan}`}>
                 Upgrade to {planName}
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Link>
             </Button>
-            <Button asChild variant="ghost" size="lg" className="w-full sm:w-auto">
+            <Button asChild variant="ghost" className="w-full sm:w-auto">
               <Link href="/pricing">
                 See pricing
               </Link>

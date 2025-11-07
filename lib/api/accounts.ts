@@ -5,6 +5,7 @@ import { AccountFormData } from "@/lib/validations/account";
 import { getCurrentTimestamp, formatTimestamp } from "@/lib/utils/timestamp";
 import { getAccountBalance } from "./transactions";
 import { guardAccountLimit, throwIfNotAllowed } from "@/lib/api/feature-guard";
+import { requireAccountOwnership } from "@/lib/utils/security";
 
 export async function getAccounts() {
     const supabase = await createServerClient();
@@ -52,16 +53,16 @@ export async function getAccounts() {
     const currentBalance = balances.get(tx.accountId) || 0;
     
     if (tx.type === "income") {
-      balances.set(tx.accountId, currentBalance + tx.amount);
+      balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
     } else if (tx.type === "expense") {
-      balances.set(tx.accountId, currentBalance - tx.amount);
+      balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
     } else if (tx.type === "transfer") {
       if (tx.transferToId) {
         // Outgoing transfer - reduce balance
-        balances.set(tx.accountId, currentBalance - tx.amount);
+        balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
       } else {
         // Ingoing transfer - increase balance
-        balances.set(tx.accountId, currentBalance + tx.amount);
+        balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
       }
     }
   }
@@ -191,17 +192,10 @@ export async function createAccount(data: AccountFormData) {
       updatedAt: now,
     }));
 
-    console.log("Creating account owners:", {
-      accountId: id,
-      ownerIds,
-      accountOwners,
-      currentUserId: user.id,
-    });
-
-    const { data: insertedOwners, error: ownersError } = await supabase
+    // Don't select the inserted data to reduce overhead
+    const { error: ownersError } = await supabase
       .from("AccountOwner")
-      .insert(accountOwners)
-      .select();
+      .insert(accountOwners);
 
     if (ownersError) {
       console.error("Supabase error creating account owners:", {
@@ -216,8 +210,6 @@ export async function createAccount(data: AccountFormData) {
       // Fail the account creation if owners can't be created
       throw new Error(`Failed to create account owners: ${ownersError.message || JSON.stringify(ownersError)}`);
     }
-
-    console.log("Account owners created successfully:", insertedOwners);
   }
 
   return account;
@@ -225,6 +217,9 @@ export async function createAccount(data: AccountFormData) {
 
 export async function updateAccount(id: string, data: Partial<AccountFormData>) {
     const supabase = await createServerClient();
+
+  // Verify ownership before updating
+  await requireAccountOwnership(id);
 
   const updateData: Record<string, unknown> = { ...data };
   
@@ -314,6 +309,9 @@ export async function updateAccount(id: string, data: Partial<AccountFormData>) 
 
 export async function deleteAccount(id: string) {
     const supabase = await createServerClient();
+
+  // Verify ownership before deleting
+  await requireAccountOwnership(id);
 
   const { error } = await supabase.from("Account").delete().eq("id", id);
 

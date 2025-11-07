@@ -15,8 +15,10 @@ export async function GET() {
       );
     }
 
+    // Fetch subscription once and reuse it
     const subscription = await getCurrentUserSubscription();
-    const { plan, limits } = await checkPlanLimits(authUser.id);
+    // Pass subscription to checkPlanLimits to avoid duplicate fetch
+    const { plan, limits } = await checkPlanLimits(authUser.id, subscription);
 
     return NextResponse.json({
       subscription,

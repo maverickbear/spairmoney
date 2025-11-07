@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
+import { requireBudgetOwnership } from "@/lib/utils/security";
 
 async function getBudgetsInternal(period: Date, accessToken?: string, refreshToken?: string) {
     const supabase = await createServerClient(accessToken, refreshToken);
@@ -78,7 +79,7 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
     for (const tx of allTransactions) {
       if (tx.categoryId) {
         const current = categorySpendMap.get(tx.categoryId) || 0;
-        categorySpendMap.set(tx.categoryId, current + (tx.amount || 0));
+        categorySpendMap.set(tx.categoryId, current + (Number(tx.amount) || 0));
       }
     }
   }
@@ -240,6 +241,9 @@ export async function createBudget(data: {
 export async function updateBudget(id: string, data: { amount: number; note?: string }) {
     const supabase = await createServerClient();
 
+  // Verify ownership before updating
+  await requireBudgetOwnership(id);
+
   const updateData: Record<string, unknown> = {
     amount: data.amount,
     updatedAt: formatTimestamp(new Date()),
@@ -265,6 +269,9 @@ export async function updateBudget(id: string, data: { amount: number; note?: st
 
 export async function deleteBudget(id: string) {
     const supabase = await createServerClient();
+
+  // Verify ownership before deleting
+  await requireBudgetOwnership(id);
 
   const { error } = await supabase.from("Budget").delete().eq("id", id);
 

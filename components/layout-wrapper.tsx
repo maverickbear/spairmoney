@@ -13,6 +13,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const subscriptionCheckedRef = useRef(false);
   const checkingRef = useRef(false);
+  const lastCheckedPathnameRef = useRef<string | null>(null);
   const isApiRoute = pathname?.startsWith("/api");
   const isAuthPage = pathname?.startsWith("/auth");
   const isAcceptPage = pathname?.startsWith("/members/accept");
@@ -59,6 +60,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       isSelectPlanPage,
       isWelcomePage,
       subscriptionChecked: subscriptionCheckedRef.current,
+      lastCheckedPathname: lastCheckedPathnameRef.current,
     });
 
     // Skip subscription check for public pages (auth, accept, landing, pricing) and API routes
@@ -66,6 +68,14 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       console.log("[LAYOUT-WRAPPER] Skipping subscription check for public page or API route");
       setChecking(false);
       setHasSubscription(false);
+      lastCheckedPathnameRef.current = pathname;
+      return;
+    }
+
+    // If we already checked for this pathname, skip
+    if (lastCheckedPathnameRef.current === pathname && subscriptionCheckedRef.current) {
+      console.log("[LAYOUT-WRAPPER] Already checked for this pathname, skipping");
+      setChecking(false);
       return;
     }
 
@@ -83,17 +93,23 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       }
       
       // Check subscription immediately (no delay for better UX)
-      if (!subscriptionCheckedRef.current) {
+      if (!subscriptionCheckedRef.current && !checkingRef.current) {
         console.log("[LAYOUT-WRAPPER] Checking subscription immediately");
         checkSubscription();
       } else {
-        console.log("[LAYOUT-WRAPPER] Already checked subscription, skipping");
+        console.log("[LAYOUT-WRAPPER] Already checking or checked subscription, skipping");
         setChecking(false);
       }
     } else {
       // For select-plan and welcome pages, we still check subscription but don't block
-      console.log("[LAYOUT-WRAPPER] Checking subscription for select-plan/welcome page");
-      checkSubscription();
+      // Only check if we haven't checked for this pathname yet
+      if (lastCheckedPathnameRef.current !== pathname && !checkingRef.current) {
+        console.log("[LAYOUT-WRAPPER] Checking subscription for select-plan/welcome page");
+        checkSubscription();
+      } else {
+        console.log("[LAYOUT-WRAPPER] Already checking or checked for this pathname, skipping");
+        setChecking(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
@@ -107,6 +123,9 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     
     console.log("[LAYOUT-WRAPPER] checkSubscription: Starting check");
     checkingRef.current = true;
+    const currentPathname = pathname;
+    lastCheckedPathnameRef.current = currentPathname;
+    
     try {
       console.log("[LAYOUT-WRAPPER] checkSubscription: Fetching /api/billing/plans");
       const response = await fetch("/api/billing/plans");
@@ -122,7 +141,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
           setHasSubscription(true);
           subscriptionCheckedRef.current = true;
           // If user is on select-plan page and already has a plan, redirect to dashboard
-          if (isSelectPlanPage) {
+          // Only redirect if we're still on the same pathname (avoid redirect loops)
+          if (isSelectPlanPage && pathname === currentPathname) {
             console.log("[LAYOUT-WRAPPER] checkSubscription: User has plan, redirecting from select-plan to dashboard");
             router.push("/dashboard");
             return;
@@ -130,7 +150,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         } else {
           // User is authenticated but has no plan, redirect to select-plan
           console.log("[LAYOUT-WRAPPER] checkSubscription: No subscription found, currentPlanId:", data.currentPlanId);
-          if (!isSelectPlanPage && !isWelcomePage) {
+          // Only redirect if we're still on the same pathname and not already on select-plan/welcome
+          if (!isSelectPlanPage && !isWelcomePage && pathname === currentPathname) {
             console.log("[LAYOUT-WRAPPER] checkSubscription: Redirecting to /select-plan");
             router.push("/select-plan");
             return;
@@ -144,7 +165,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         setHasSubscription(false);
         subscriptionCheckedRef.current = true;
         // Only redirect to login if we're on a protected page (not public pages)
-        if (!isApiRoute && !isAuthPage && !isAcceptPage && !isSelectPlanPage && !isWelcomePage && !isLandingPage && !isPricingPage) {
+        // Only redirect if we're still on the same pathname
+        if (!isApiRoute && !isAuthPage && !isAcceptPage && !isSelectPlanPage && !isWelcomePage && !isLandingPage && !isPricingPage && pathname === currentPathname) {
           const currentPath = pathname || "/";
           console.log("[LAYOUT-WRAPPER] checkSubscription: Redirecting to login, path:", currentPath);
           router.push(`/auth/login?redirect=${encodeURIComponent(currentPath)}`);
@@ -163,7 +185,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         
         // Only redirect if we're not already on select-plan or welcome page
         // and if it's not a temporary error (5xx)
-        if (!isSelectPlanPage && !isWelcomePage && response.status >= 400 && response.status < 500) {
+        // Only redirect if we're still on the same pathname
+        if (!isSelectPlanPage && !isWelcomePage && response.status >= 400 && response.status < 500 && pathname === currentPathname) {
           console.log("[LAYOUT-WRAPPER] checkSubscription: Client error, redirecting to /select-plan");
           router.push("/select-plan");
           return;
@@ -176,7 +199,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       subscriptionCheckedRef.current = true;
       
       // Only redirect on network errors if we're not already on select-plan or welcome page
-      if (!isSelectPlanPage && !isWelcomePage) {
+      // Only redirect if we're still on the same pathname
+      if (!isSelectPlanPage && !isWelcomePage && pathname === currentPathname) {
         // Check if it's a network error
         if (error instanceof TypeError && error.message.includes("fetch")) {
           console.log("[LAYOUT-WRAPPER] checkSubscription: Network error, redirecting to /select-plan");

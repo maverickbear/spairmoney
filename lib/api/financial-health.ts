@@ -39,6 +39,13 @@ async function calculateFinancialHealthInternal(
   
   // Get transactions for selected month only (to match the cards at the top)
   // Call internal function directly to avoid reading cookies inside cached function
+  console.log("🔍 [calculateFinancialHealthInternal] Fetching transactions:", {
+    selectedMonth: selectedMonth.toISOString(),
+    selectedMonthEnd: selectedMonthEnd.toISOString(),
+    hasAccessToken: !!accessToken,
+    hasRefreshToken: !!refreshToken,
+  });
+
   const transactions = await getTransactionsInternal(
     {
       startDate: selectedMonth,
@@ -48,21 +55,34 @@ async function calculateFinancialHealthInternal(
     refreshToken
   );
   
+  console.log("🔍 [calculateFinancialHealthInternal] Transactions received:", {
+    count: transactions.length,
+    transactionTypes: [...new Set(transactions.map(t => t?.type).filter(Boolean))],
+    sampleTransactions: transactions.slice(0, 3).map(t => ({
+      id: t?.id,
+      type: t?.type,
+      amount: t?.amount,
+      date: t?.date,
+    })),
+  });
+  
   // Filter out transfer transactions - only count income and expense
   const monthlyIncome = transactions
     .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   
   const monthlyExpenses = transactions
     .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + (t.amount || 0), 0);
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   
   const netAmount = monthlyIncome - monthlyExpenses;
   
   // Log for debugging
-  console.log("Financial Health Calculation (Selected Month):", {
+  console.log("🔍 [calculateFinancialHealthInternal] Financial Health Calculation (Selected Month):", {
     month: selectedMonth.toISOString().split('T')[0],
     transactionsCount: transactions.length,
+    incomeTransactions: transactions.filter(t => t.type === "income").length,
+    expenseTransactions: transactions.filter(t => t.type === "expense").length,
     monthlyIncome,
     monthlyExpenses,
     netAmount,
@@ -170,10 +190,33 @@ async function calculateFinancialHealthInternal(
 }
 
 export async function calculateFinancialHealth(selectedDate?: Date): Promise<FinancialHealthData> {
-  // Get tokens from cookies outside of cached function
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get("sb-access-token")?.value;
-  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  // Get tokens from Supabase client directly (not from cookies)
+  // This is more reliable because Supabase SSR manages cookies automatically
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  
+  try {
+    const { createServerClient } = await import("@/lib/supabase-server");
+    const supabase = await createServerClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      accessToken = session.access_token;
+      refreshToken = session.refresh_token;
+    }
+    
+    // Log token availability (only in development)
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔍 [calculateFinancialHealth] Token check:", {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        hasSession: !!session,
+      });
+    }
+  } catch (error: any) {
+    // If we can't get tokens (e.g., inside unstable_cache), continue without them
+    console.warn("⚠️ [calculateFinancialHealth] Could not get tokens:", error?.message);
+  }
   
   const date = selectedDate || new Date();
   const cacheKey = `financial-health-${date.getFullYear()}-${date.getMonth()}`;

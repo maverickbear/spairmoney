@@ -80,7 +80,7 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{transactionLimit.message}</p>
               {isAtLimit(transactionLimit) && (
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="outline">
                   <Link href="/pricing">
                     Upgrade
                     <ArrowRight className="ml-1 w-3 h-3" />
@@ -129,7 +129,7 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{accountLimit.message}</p>
               {isAtLimit(accountLimit) && (
-                <Button asChild variant="outline" size="sm">
+                <Button asChild variant="outline">
                   <Link href="/pricing">
                     Upgrade
                     <ArrowRight className="ml-1 w-3 h-3" />
@@ -149,7 +149,7 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
               ) : (
                 <>
                   <Badge variant="secondary" className="text-xs">Disabled</Badge>
-                  <Button asChild variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                  <Button asChild variant="ghost" className="h-6 px-2 text-xs">
                     <Link href="/pricing">
                       Upgrade
                     </Link>
@@ -166,7 +166,7 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
               ) : (
                 <>
                   <Badge variant="secondary" className="text-xs">Disabled</Badge>
-                  <Button asChild variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                  <Button asChild variant="ghost" className="h-6 px-2 text-xs">
                     <Link href="/pricing">
                       Upgrade
                     </Link>
@@ -183,7 +183,7 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
               ) : (
                 <>
                   <Badge variant="secondary" className="text-xs">Disabled</Badge>
-                  <Button asChild variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                  <Button asChild variant="ghost" className="h-6 px-2 text-xs">
                     <Link href="/pricing">
                       Upgrade
                     </Link>

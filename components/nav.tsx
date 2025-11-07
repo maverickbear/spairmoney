@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PlanBadge } from "@/components/common/plan-badge";
 import {
   Tooltip,
   TooltipContent,
@@ -37,6 +36,7 @@ const navSections = [
       { href: "/budgets", label: "Budgets", icon: Target },
       { href: "/categories", label: "Categories", icon: FolderTree },
       { href: "/accounts", label: "Accounts", icon: Wallet },
+      { href: "/members", label: "Households", icon: Users },
     ],
   },
   {
@@ -179,7 +179,6 @@ export function Nav({ hasSubscription = true }: NavProps) {
   };
 
   const user = userData?.user;
-  const plan = userData?.plan;
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
@@ -286,7 +285,7 @@ export function Nav({ hasSubscription = true }: NavProps) {
                     isCollapsed ? "justify-center" : "space-x-3 px-3 py-2"
                   )}
                 >
-                  <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+                  <div className="h-12 w-12 rounded-full bg-muted animate-pulse" />
                   {!isCollapsed && (
                     <div className="flex-1 space-y-1">
                       <div className="h-3 w-20 bg-muted rounded-[12px] animate-pulse" />
@@ -299,7 +298,6 @@ export function Nav({ hasSubscription = true }: NavProps) {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="sm"
                       className={cn(
                         "w-full h-auto p-2",
                         isCollapsed ? "justify-center" : "justify-start"
@@ -317,7 +315,7 @@ export function Nav({ hasSubscription = true }: NavProps) {
                               <img
                                 src={user.avatarUrl}
                                 alt={user.name || "User"}
-                                className="h-8 w-8 rounded-full object-cover border"
+                                className="h-12 w-12 rounded-full object-cover border"
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                   const initialsContainer =
@@ -328,12 +326,12 @@ export function Nav({ hasSubscription = true }: NavProps) {
                                   }
                                 }}
                               />
-                              <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border">
+                              <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border">
                                 {getInitials(user?.name)}
                               </div>
                             </>
                           ) : (
-                            <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border">
+                            <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border">
                               {getInitials(user?.name)}
                             </div>
                           )}
@@ -343,12 +341,9 @@ export function Nav({ hasSubscription = true }: NavProps) {
                             <div className="text-sm font-medium truncate">
                               {user?.name || "User"}
                             </div>
-                            {plan && (
-                              <div className="mt-0.5">
-                                <PlanBadge
-                                  plan={plan.name}
-                                  className="text-[10px] px-1.5 py-0"
-                                />
+                            {user?.email && (
+                              <div className="mt-0.5 text-xs text-muted-foreground truncate">
+                                {user.email}
                               </div>
                             )}
                           </div>

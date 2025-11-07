@@ -85,17 +85,18 @@ export function FinancialHealthModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col !p-0 !gap-0">
+        <DialogHeader>
           <DialogTitle className="text-2xl">Financial Health Analysis</DialogTitle>
           <DialogDescription>
             Monthly Income vs Monthly Expenses comparison and recommendations
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="space-y-6">
           {/* Score Overview */}
-          <div className="flex items-center justify-between p-6 rounded-[12px] border bg-card">
+          <div className="flex items-center justify-between p-6 rounded-[12px] bg-card">
             <div className="flex flex-col gap-2">
               <div className="flex items-baseline gap-2">
                 <span className={cn("text-6xl font-bold", getScoreColor(data.score))}>
@@ -135,7 +136,7 @@ export function FinancialHealthModal({
               Monthly Income vs Expenses
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-[12px] border bg-card">
+              <div className="p-4 rounded-[12px] bg-card">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -147,7 +148,7 @@ export function FinancialHealthModal({
                 </p>
               </div>
 
-              <div className="p-4 rounded-[12px] border bg-card">
+              <div className="p-4 rounded-[12px] bg-card">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
@@ -161,7 +162,7 @@ export function FinancialHealthModal({
             </div>
 
             {/* Net Amount and Savings Rate */}
-            <div className="p-4 rounded-[12px] border bg-card">
+            <div className="p-4 rounded-[12px] bg-card">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {data.netAmount >= 0 ? (
@@ -300,6 +301,7 @@ export function FinancialHealthModal({
               </div>
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -150,15 +150,13 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
   async function loadTransactionLimit() {
     try {
-      const response = await fetch("/api/billing/limits");
-      if (response.ok) {
-        const data = await response.json();
-        if (data.transactionLimit) {
-          setTransactionLimit({
-            current: data.transactionLimit.current,
-            limit: data.transactionLimit.limit,
-          });
-        }
+      const { getBillingLimitsAction } = await import("@/lib/actions/billing");
+      const limits = await getBillingLimitsAction();
+      if (limits?.transactionLimit) {
+        setTransactionLimit({
+          current: limits.transactionLimit.current,
+          limit: limits.transactionLimit.limit,
+        });
       }
     } catch (error) {
       console.error("Error loading transaction limit:", error);
@@ -175,7 +173,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
     // We'll need to fetch it from the categories list if needed
     // If macro not available, fetch from API
       try {
-        const categoryRes = await fetch(`/api/categories/all`);
+        const categoryRes = await fetch(`/api/categories?all=true`);
         if (!categoryRes.ok) {
           console.error("Error fetching categories:", categoryRes.status, categoryRes.statusText);
           return;
@@ -288,11 +286,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         ...data,
         date: data.date instanceof Date ? data.date.toISOString() : data.date,
       };
-      
-      // Optimistic update: call onSuccess immediately
-      onSuccess?.();
-      onOpenChange(false);
-      form.reset();
 
       const res = await fetch(url, {
         method,
@@ -319,11 +312,18 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         throw new Error(errorMessage);
       }
 
+      // Close form and reset only after successful save
+      onOpenChange(false);
+      form.reset();
+
       toast({
         title: transaction ? "Transaction updated" : "Transaction created",
         description: transaction ? "Your transaction has been updated successfully." : "Your transaction has been created successfully.",
         variant: "success",
       });
+
+      // Reload transactions after successful save
+      onSuccess?.();
     } catch (error) {
       console.error("Error saving transaction:", error);
       toast({
@@ -331,8 +331,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         description: error instanceof Error ? error.message : "Failed to save transaction",
         variant: "destructive",
       });
-      // Reload on error to revert optimistic update
-      onSuccess?.();
       // Reload limit after error
       loadTransactionLimit();
     }
@@ -342,7 +340,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{transaction ? "Edit" : "Add"} Transaction</DialogTitle>
           <DialogDescription>
@@ -350,7 +348,8 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           {/* Show limit warning for new transactions */}
           {!transaction && transactionLimit && transactionLimit.limit !== -1 && (
             <LimitWarning
@@ -475,7 +474,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
                       className="h-6 text-xs"
                       onClick={() => handleMacroChange("")}
                     >
@@ -510,7 +508,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
                         className="h-6 text-xs"
                         onClick={() => {
                           form.setValue("categoryId", undefined);
@@ -551,7 +548,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
                         className="h-6 text-xs"
                         onClick={() => {
                           form.setValue("subcategoryId", undefined);
@@ -593,6 +589,8 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                 Recurring (occurs every month)
               </label>
             </div>
+          </div>
+
           </div>
 
           <DialogFooter>

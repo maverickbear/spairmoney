@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { profileSchema, ProfileFormData } from "@/lib/validations/profile";
@@ -15,7 +15,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Edit, Save, X, User, CreditCard, Users } from "lucide-react";
+import { Edit, Save, X, User, CreditCard, Upload } from "lucide-react";
+import { useToast } from "@/components/toast-provider";
 import { PlanBadge } from "@/components/common/plan-badge";
 import Link from "next/link";
 import { UsageChart } from "@/components/billing/usage-chart";
@@ -25,21 +26,6 @@ import { UpgradePlanCard } from "@/components/billing/upgrade-plan-card";
 import { PaymentHistory } from "@/components/billing/payment-history";
 import { Subscription, Plan } from "@/lib/validations/plan";
 import { PlanFeatures, LimitCheckResult } from "@/lib/api/limits";
-import { Plus, Edit as EditIcon, Trash2, Crown, Mail } from "lucide-react";
-import { MemberForm } from "@/components/members/member-form";
-import type { HouseholdMember } from "@/lib/api/members-client";
-import { usePlanLimits } from "@/hooks/use-plan-limits";
-import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { InvitationStatus } from "@/components/members/invitation-status";
 
 // Profile interfaces
 interface Profile {
@@ -73,22 +59,15 @@ interface PaymentMethod {
   } | null;
 }
 
-// Members helper
-function getInitials(name: string | null | undefined): string {
-  if (!name) return "M";
-  const parts = name.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return name[0].toUpperCase();
-}
-
 // Profile Tab Component
 function ProfileTab() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { toast } = useToast();
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -188,6 +167,97 @@ function ProfileTab() {
     return name[0].toUpperCase();
   }
 
+  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Error", description: "Please upload an image file", variant: "destructive" });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Error", description: "Please upload an image smaller than 5MB", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      // Create FormData
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Upload to Supabase Storage
+      const res = await fetch("/api/profile/avatar", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        let errorMessage = "Failed to upload avatar";
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          try {
+            const text = await res.text();
+            errorMessage = text || errorMessage;
+          } catch (textError) {
+            // If all else fails, use status text
+            errorMessage = res.statusText || errorMessage;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const { url } = await res.json().catch(() => {
+        throw new Error("Failed to parse response from server");
+      });
+
+      // Update form with new avatar URL
+      form.setValue("avatarUrl", url);
+      
+      // Save avatar URL to profile automatically
+      try {
+        const { updateProfileClient } = await import("@/lib/api/profile-client");
+        const updatedProfile = await updateProfileClient({ avatarUrl: url });
+        setProfile(updatedProfile);
+        
+        // Dispatch event to notify other components
+        const successEvent = new CustomEvent("profile-saved", { detail: updatedProfile });
+        window.dispatchEvent(successEvent);
+      } catch (error) {
+        console.error("Error saving avatar URL:", error);
+        // Still show success for upload, but warn about save
+        toast({ 
+          title: "Uploaded", 
+          description: "Avatar uploaded but failed to save. Please save your profile.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      toast({ title: "Success", description: "Avatar uploaded and saved successfully", variant: "success" });
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload avatar",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4 md:space-y-6">
@@ -213,7 +283,6 @@ function ProfileTab() {
         </div>
         {!isEditing && (
           <Button
-            size="sm"
             onClick={() => setIsEditing(true)}
           >
             <Edit className="mr-2 h-4 w-4" />
@@ -223,13 +292,7 @@ function ProfileTab() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>
-            Your profile information is stored securely in your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="flex flex-col items-center space-y-4">
               <div className="relative">
@@ -255,22 +318,30 @@ function ProfileTab() {
                   {getInitials(form.watch("name") || profile?.name || "User")}
                 </div>
               </div>
-
+              
               {isEditing && (
-                <div className="w-full max-w-md space-y-2">
-                  <label className="text-sm font-medium">Avatar URL</label>
-                  <Input
-                    {...form.register("avatarUrl")}
-                    placeholder="https://example.com/avatar.jpg"
-                    type="url"
+                <div className="flex flex-col items-center space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    ref={fileInputRef}
+                    disabled={uploading}
                   />
-                  {form.formState.errors.avatarUrl && (
-                    <p className="text-sm text-destructive">
-                      {form.formState.errors.avatarUrl.message}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Enter a URL to your profile image
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={uploading}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {uploading ? "Uploading..." : "Upload Avatar"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    JPG, PNG or GIF. Max size 5MB
                   </p>
                 </div>
               )}
@@ -404,7 +475,6 @@ function ProfileTab() {
           {profile?.household && (profile.household.isOwner || profile.household.isMember) && (
             <div className="space-y-2 pt-4 border-t">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Household</span>
               </div>
               
@@ -425,300 +495,20 @@ function ProfileTab() {
           <div className="flex gap-2 pt-4 border-t">
             {profile?.household?.isOwner && (
               <Link href="/settings?tab=billing">
-                <Button variant="outline" size="sm" className="w-full">
+                <Button variant="outline" className="w-full">
                   <CreditCard className="mr-2 h-4 w-4" />
                   Manage Subscription
                 </Button>
               </Link>
             )}
-            <Link href="/settings?tab=members">
-              <Button variant="outline" size="sm" className="w-full">
-                <Users className="mr-2 h-4 w-4" />
+            <Link href="/members">
+              <Button variant="outline" className="w-full">
                 Manage Household
               </Button>
             </Link>
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-// Members Tab Component
-function MembersTab() {
-  const [members, setMembers] = useState<HouseholdMember[]>([]);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<HouseholdMember | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
-  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "member" | null>(null);
-  const { limits, loading: limitsLoading } = usePlanLimits();
-
-  const hasHouseholdMembersAccess = limits.hasInvestments;
-
-  useEffect(() => {
-    if (!limitsLoading) {
-      loadMembers();
-      loadCurrentUserRole();
-    }
-  }, [limitsLoading]);
-
-  async function loadCurrentUserRole() {
-    try {
-      const { getUserRoleClient } = await import("@/lib/api/members-client");
-      const role = await getUserRoleClient();
-      if (role) {
-        setCurrentUserRole(role);
-      }
-    } catch (error) {
-      console.error("Error loading user role:", error);
-    }
-  }
-
-  async function loadMembers() {
-    try {
-      setLoading(true);
-      const { getHouseholdMembersClient } = await import("@/lib/api/members-client");
-      const data = await getHouseholdMembersClient();
-      setMembers(data);
-    } catch (error) {
-      console.error("Error loading members:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDelete(member: HouseholdMember) {
-    if (!confirm(`Are you sure you want to remove ${member.name || member.email} from your household?`)) {
-      return;
-    }
-
-    try {
-      const { deleteMemberClient } = await import("@/lib/api/members-client");
-      await deleteMemberClient(member.id);
-      loadMembers();
-    } catch (error) {
-      console.error("Error removing member:", error);
-      alert(error instanceof Error ? error.message : "Failed to remove member");
-    }
-  }
-
-  async function handleResend(member: HouseholdMember) {
-    try {
-      const res = await fetch(`/api/members/${member.id}/resend`, {
-        method: "POST",
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(errorData.error || "Failed to resend invitation");
-      }
-
-      alert("Invitation email resent successfully!");
-    } catch (error) {
-      console.error("Error resending invitation:", error);
-      alert(error instanceof Error ? error.message : "Failed to resend invitation");
-    }
-  }
-
-  function handleEdit(member: HouseholdMember) {
-    setEditingMember(member);
-    setIsFormOpen(true);
-  }
-
-  function handleFormClose() {
-    setIsFormOpen(false);
-    setEditingMember(undefined);
-  }
-
-  function handleFormSuccess() {
-    loadMembers();
-    handleFormClose();
-  }
-
-  if (!limitsLoading && !hasHouseholdMembersAccess) {
-    return (
-      <div className="space-y-4 md:space-y-6">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold">Household Members</h2>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Manage household members and invitations
-          </p>
-        </div>
-        <UpgradePrompt
-          feature="Household Members"
-          currentPlan="free"
-          requiredPlan="basic"
-          message="Household members are not available in the Free plan. Upgrade to Basic or Premium to add family members."
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold">Household Members</h2>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Manage household members and invitations
-          </p>
-        </div>
-        {(currentUserRole === "admin" || currentUserRole === null) && (
-          <Button
-            size="sm"
-            onClick={() => setIsFormOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Invite Member
-          </Button>
-        )}
-      </div>
-
-      {loading ? (
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 bg-muted rounded animate-pulse" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : members.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <CardTitle className="mb-2">No members yet</CardTitle>
-            <CardDescription className="text-center mb-4">
-              Invite household members to share access to your financial data.
-            </CardDescription>
-            <Button onClick={() => setIsFormOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Invite Your First Member
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {members.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border-2">
-                            {getInitials(member.name)}
-                          </div>
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{member.name || member.email}</span>
-                            {member.isOwner && (
-                              <Badge variant="default" className="flex items-center gap-1">
-                                <Crown className="h-3 w-3" />
-                                Owner
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">{member.email}</span>
-                    </TableCell>
-                    <TableCell>
-                      {member.isOwner ? (
-                        <Badge variant="default" className="flex items-center gap-1">
-                          <Crown className="h-3 w-3" />
-                          Admin
-                        </Badge>
-                      ) : (
-                        <Badge variant={member.role === "admin" ? "default" : "secondary"}>
-                          {member.role === "admin" ? "Admin" : "Member"}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {member.isOwner ? (
-                        <Badge variant="secondary">Active</Badge>
-                      ) : (
-                        <InvitationStatus status={member.status} />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {member.isOwner ? (
-                        <span className="text-sm text-muted-foreground">
-                          Since {new Date(member.createdAt).toLocaleDateString()}
-                        </span>
-                      ) : member.status === "pending" ? (
-                        <span className="text-sm text-muted-foreground">
-                          Invited {new Date(member.invitedAt).toLocaleDateString()}
-                        </span>
-                      ) : member.acceptedAt ? (
-                        <span className="text-sm text-muted-foreground">
-                          Joined {new Date(member.acceptedAt).toLocaleDateString()}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {!member.isOwner && (currentUserRole === "admin" || currentUserRole === null) && (
-                        <div className="flex justify-end gap-2">
-                          {member.status === "pending" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleResend(member)}
-                              title="Resend invitation email"
-                            >
-                              <Mail className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(member)}
-                          >
-                            <EditIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(member)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      <MemberForm
-        open={isFormOpen}
-        onOpenChange={handleFormClose}
-        member={editingMember}
-        onSuccess={handleFormSuccess}
-      />
     </div>
   );
 }
@@ -773,9 +563,9 @@ function BillingTab() {
 
   async function loadBillingData() {
     try {
-      const [subResponse, limitsResponse, paymentMethodResponse] = await Promise.all([
+      const [subResponse, limitsAction, paymentMethodResponse] = await Promise.all([
         fetch("/api/billing/subscription"),
-        fetch("/api/billing/limits"),
+        import("@/lib/actions/billing").then(m => m.getBillingLimitsAction()),
         fetch("/api/billing/payment-method"),
       ]);
 
@@ -786,10 +576,9 @@ function BillingTab() {
         setLimits(subData.limits);
       }
 
-      if (limitsResponse.ok) {
-        const limitsData = await limitsResponse.json();
-        setTransactionLimit(limitsData.transactionLimit);
-        setAccountLimit(limitsData.accountLimit);
+      if (limitsAction) {
+        setTransactionLimit(limitsAction.transactionLimit);
+        setAccountLimit(limitsAction.accountLimit);
       }
 
       if (paymentMethodResponse.ok) {
@@ -849,7 +638,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["profile", "members", "billing"].includes(tab)) {
+    if (tab && ["profile", "billing"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -867,14 +656,10 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="profile">
             <User className="mr-2 h-4 w-4" />
             Profile
-          </TabsTrigger>
-          <TabsTrigger value="members">
-            <Users className="mr-2 h-4 w-4" />
-            Members
           </TabsTrigger>
           <TabsTrigger value="billing">
             <CreditCard className="mr-2 h-4 w-4" />
@@ -884,10 +669,6 @@ export default function SettingsPage() {
 
         <TabsContent value="profile" className="mt-6">
           <ProfileTab />
-        </TabsContent>
-
-        <TabsContent value="members" className="mt-6">
-          <MembersTab />
         </TabsContent>
 
         <TabsContent value="billing" className="mt-6">
