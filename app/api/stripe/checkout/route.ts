@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build return URL with success parameter
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.vercel.app/";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
     const finalReturnUrl = returnUrl 
       ? `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}success=true`
       : undefined;

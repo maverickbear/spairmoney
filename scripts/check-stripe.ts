@@ -84,7 +84,7 @@ async function checkStripeConfig(): Promise<CheckResult> {
   }
 
   if (!process.env.NEXT_PUBLIC_APP_URL) {
-    details.push("⚠️  NEXT_PUBLIC_APP_URL is not set (defaults to https://sparefinance.vercel.app/)");
+    details.push("⚠️  NEXT_PUBLIC_APP_URL is not set (defaults to https://sparefinance.com/)");
   } else {
     details.push(`✅ NEXT_PUBLIC_APP_URL: ${process.env.NEXT_PUBLIC_APP_URL}`);
   }

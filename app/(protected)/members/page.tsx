@@ -201,7 +201,6 @@ export default function MembersPage() {
                 <TableHead className="text-xs md:text-sm">Role</TableHead>
                 <TableHead className="text-xs md:text-sm">Status</TableHead>
                 <TableHead className="text-xs md:text-sm">Date</TableHead>
-                <TableHead className="text-right text-xs md:text-sm">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -252,19 +251,18 @@ export default function MembersPage() {
                   </TableCell>
                   <TableCell className="text-xs md:text-sm">
                     {member.isOwner ? (
-                      <Badge variant="default" className="flex items-center gap-1">
-                        <Crown className="h-3 w-3" />
+                      <Badge variant="default" className="rounded-full border-gray-300 bg-white text-foreground hover:bg-white">
                         Admin
                       </Badge>
                     ) : (
-                      <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                      <Badge variant={member.role === "admin" ? "default" : "secondary"} className={member.role === "admin" ? "rounded-full border-gray-300 bg-white text-foreground hover:bg-white" : ""}>
                         {member.role === "admin" ? "Admin" : "Member"}
                       </Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-xs md:text-sm">
                     {member.isOwner ? (
-                      <Badge variant="secondary">Active</Badge>
+                      <Badge variant="secondary" className="rounded-full bg-green-600 text-white border-transparent hover:bg-green-600">Active</Badge>
                     ) : (
                       <InvitationStatus status={member.status} />
                     )}

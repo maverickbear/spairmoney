@@ -75,7 +75,7 @@ await supabase.from("Account").insert({
 npm run dev
 ```
 
-Acesse https://sparefinance.vercel.app/ e teste:
+Acesse https://sparefinance.com/ e teste:
 - ✅ Dashboard
 - ✅ Transactions
 - ✅ Categories

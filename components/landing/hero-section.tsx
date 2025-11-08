@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { DashboardPreviewDemo } from "./demo/dashboard-preview-demo";
 
 export function HeroSection() {
   return (
@@ -49,12 +50,10 @@ export function HeroSection() {
           </div>
         </div>
 
-        {/* Dashboard preview - placeholder for now */}
-        <div className="mt-16 max-w-5xl mx-auto">
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10 backdrop-blur-sm bg-white/5">
-            <div className="aspect-video bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center">
-              <p className="text-white/50 text-sm">Dashboard Preview</p>
-            </div>
+        {/* Dashboard preview */}
+        <div className="mt-16 max-w-7xl mx-auto">
+          <div className="relative rounded-t-2xl rounded-bl-none rounded-br-none overflow-hidden shadow-2xl border-t border-l border-r border-white/10 backdrop-blur-sm bg-white/5">
+            <DashboardPreviewDemo />
           </div>
         </div>
       </div>

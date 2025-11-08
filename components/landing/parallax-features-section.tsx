@@ -2,6 +2,11 @@
 
 import { ParallaxFeature } from "./parallax-feature";
 import { BarChart3, Wallet, TrendingUp, Shield, PieChart, Target } from "lucide-react";
+import { SpendLimitDemo } from "./demo/spend-limit-demo";
+import { BudgetDemo } from "./demo/budget-demo";
+import { DashboardPreviewDemo } from "./demo/dashboard-preview-demo";
+import { GoalsDemo } from "./demo/goals-demo";
+import { ChartDemo } from "./demo/chart-demo";
 
 export function ParallaxFeaturesSection() {
   const features = [
@@ -9,24 +14,28 @@ export function ParallaxFeaturesSection() {
       title: "Advanced Analytics",
       description: "Gain instant insights into your spending patterns and make smarter financial decisions. Track your expenses, income, and savings with detailed analytics and visualizations.",
       icon: <BarChart3 className="w-16 h-16 text-primary" />,
+      demoComponent: <DashboardPreviewDemo />,
       reverse: false,
     },
     {
-      title: "Real-time Expense Tracking",
-      description: "Monitor your finances in real-time with automatic transaction categorization. Never miss a payment or overspend with instant notifications and budget alerts.",
+      title: "Take Control with Spend Limits",
+      description: "You can set a spend limit on any Privacy Card so you won't be charged for more than you authorize. Perfect for managing recurring bill payments or subscription fees.",
       icon: <Wallet className="w-16 h-16 text-primary" />,
+      demoComponent: <SpendLimitDemo />,
       reverse: true,
     },
     {
       title: "Smart Budget Management",
       description: "Create and manage budgets effortlessly with intelligent recommendations. Set spending limits, track progress, and achieve your financial goals with ease.",
       icon: <PieChart className="w-16 h-16 text-primary" />,
+      demoComponent: <BudgetDemo />,
       reverse: false,
     },
     {
-      title: "Investment Portfolio Tracking",
-      description: "Keep track of all your investments in one place. Monitor stocks, bonds, and other assets with real-time prices and performance metrics.",
+      title: "Cash Flow Tracking",
+      description: "Monitor your income and expenses with detailed cash flow analysis. Visualize your financial trends and make informed decisions about your money.",
       icon: <TrendingUp className="w-16 h-16 text-primary" />,
+      demoComponent: <ChartDemo />,
       reverse: true,
     },
     {
@@ -39,6 +48,7 @@ export function ParallaxFeaturesSection() {
       title: "Goal Setting & Tracking",
       description: "Set financial goals and track your progress. Whether it's saving for a vacation, paying off debt, or building an emergency fund, we help you stay on track.",
       icon: <Target className="w-16 h-16 text-primary" />,
+      demoComponent: <GoalsDemo />,
       reverse: true,
     },
   ];
@@ -64,6 +74,7 @@ export function ParallaxFeaturesSection() {
               title={feature.title}
               description={feature.description}
               icon={feature.icon}
+              demoComponent={feature.demoComponent}
               reverse={feature.reverse}
             />
           ))}

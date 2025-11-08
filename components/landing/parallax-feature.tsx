@@ -8,6 +8,7 @@ interface ParallaxFeatureProps {
   description: string;
   imageUrl?: string;
   icon?: React.ReactNode;
+  demoComponent?: React.ReactNode;
   reverse?: boolean;
 }
 
@@ -16,6 +17,7 @@ export function ParallaxFeature({
   description,
   imageUrl,
   icon,
+  demoComponent,
   reverse = false,
 }: ParallaxFeatureProps) {
   const [scrollY, setScrollY] = useState(0);
@@ -68,8 +70,12 @@ export function ParallaxFeature({
           transition: "transform 0.1s ease-out",
         }}
       >
-        <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 aspect-video flex items-center justify-center">
-          {imageUrl ? (
+        <div className="relative rounded-2xl overflow-hidden shadow-2xl h-[500px] flex items-center justify-center p-4 bg-primary">
+          {demoComponent ? (
+            <div className="w-full h-full flex items-center justify-center">
+              {demoComponent}
+            </div>
+          ) : imageUrl ? (
             <img
               src={imageUrl}
               alt={title}

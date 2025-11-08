@@ -209,7 +209,7 @@ export function Nav({ hasSubscription = true }: NavProps) {
               {navSections.map((section) => (
                 <div key={section.title} className="space-y-1">
                   {!isCollapsed && (
-                    <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <h3 className="px-3 pb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       {section.title}
                     </h3>
                   )}
