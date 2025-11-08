@@ -137,7 +137,7 @@ const fakeGoals = [
 
 const fakeFinancialHealth = {
   score: 85,
-  classification: "Good",
+  classification: "Good" as "Excellent" | "Good" | "Fair" | "Poor" | "Critical",
   message: "Your financial health is in good shape. Keep up the good work!",
   monthlyIncome: 5200,
   monthlyExpenses: 3750,
@@ -146,9 +146,10 @@ const fakeFinancialHealth = {
   alerts: [
     {
       id: "1",
-      severity: "warning",
+      severity: "warning" as "critical" | "warning" | "info",
       title: "Transportation budget exceeded",
       description: "You've spent 105% of your transportation budget this month.",
+      action: "Review your transportation expenses",
     },
   ],
   suggestions: [
@@ -156,6 +157,7 @@ const fakeFinancialHealth = {
       id: "1",
       title: "Increase emergency fund contribution",
       description: "Consider increasing your emergency fund savings rate.",
+      impact: "high" as "high" | "medium" | "low",
     },
   ],
 };
