@@ -162,6 +162,7 @@ export function GoalForm({
           currentBalance: effectiveCurrentBalance,
           incomePercentage: effectiveIncomePercentage,
           priority: effectivePriority,
+          isPaused: goal?.isPaused ?? false,
           isCompleted: effectiveCurrentBalance >= effectiveTargetAmount,
           completedAt: null,
           description: null,

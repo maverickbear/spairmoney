@@ -318,7 +318,7 @@ export function DebtForm({
         const currentPaymentAmount = form.getValues("paymentAmount");
         
         // If the calculated value is significantly different, reset manual edit flag and recalculate
-        if (Math.abs(calculatedPaymentAmount - currentPaymentAmount) > 0.01) {
+        if (currentPaymentAmount !== undefined && Math.abs(calculatedPaymentAmount - currentPaymentAmount) > 0.01) {
           // If user manually edited, but the base values changed, allow recalculation
           if (isPaymentAmountManuallyEdited.current) {
             // Check if this is due to base value changes (not just initial load)
@@ -376,7 +376,7 @@ export function DebtForm({
       );
       // Only update if the calculated value is different from current
       const currentMonthly = form.getValues("monthlyPayment");
-      if (Math.abs(calculatedMonthly - currentMonthly) > 0.01) {
+      if (currentMonthly !== undefined && Math.abs(calculatedMonthly - currentMonthly) > 0.01) {
         form.setValue("monthlyPayment", calculatedMonthly, { shouldValidate: false });
       }
     }
@@ -675,9 +675,9 @@ export function DebtForm({
     try {
       setIsSubmitting(true);
       // Calculate initial balance
-      const calculatedBalance = data.currentBalance > 0
+      const calculatedBalance = (data.currentBalance !== undefined && data.currentBalance > 0)
         ? data.currentBalance
-        : data.initialAmount - data.downPayment - data.principalPaid;
+        : data.initialAmount - (data.downPayment ?? 0) - (data.principalPaid ?? 0);
 
       // Convert firstPaymentDate to ISO string for API
       const firstPaymentDateValue = data.firstPaymentDate instanceof Date
@@ -1027,7 +1027,7 @@ export function DebtForm({
                 </label>
                 <Select
                   value={form.watch("accountId") || ""}
-                  onValueChange={(value) => form.setValue("accountId", value || undefined)}
+                  onValueChange={(value) => form.setValue("accountId", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select account" />
@@ -1055,7 +1055,7 @@ export function DebtForm({
                   type="date"
                   value={
                     form.watch("startDate")
-                      ? new Date(form.watch("startDate")).toISOString().split("T")[0]
+                      ? new Date(form.watch("startDate")!).toISOString().split("T")[0]
                       : ""
                   }
                   onChange={(e) => {
@@ -1078,7 +1078,7 @@ export function DebtForm({
                   type="date"
                   value={
                     form.watch("firstPaymentDate")
-                      ? new Date(form.watch("firstPaymentDate")).toISOString().split("T")[0]
+                      ? new Date(form.watch("firstPaymentDate")!).toISOString().split("T")[0]
                       : ""
                   }
                   onChange={(e) => {

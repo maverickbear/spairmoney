@@ -5,6 +5,45 @@ import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 import { requireBudgetOwnership } from "@/lib/utils/security";
 
+export interface Budget {
+  id: string;
+  period: string;
+  amount: number;
+  categoryId?: string | null;
+  subcategoryId?: string | null;
+  macroId?: string | null;
+  userId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  note?: string | null;
+  actualSpend?: number;
+  percentage?: number;
+  status?: "ok" | "warning" | "over";
+  displayName?: string;
+  category?: {
+    id: string;
+    name: string;
+    macroId?: string;
+    macro?: { id: string; name: string } | null;
+  } | null;
+  subcategory?: { id: string; name: string } | null;
+  macro?: { id: string; name: string } | null;
+  budgetCategories?: Array<{
+    id: string;
+    budgetId: string;
+    categoryId: string;
+    createdAt?: string;
+    category?: { id: string; name: string } | null;
+  }>;
+  budgetSubcategories?: Array<{
+    id: string;
+    budgetId: string;
+    subcategoryId: string;
+    createdAt?: string;
+    subcategory?: { id: string; name: string } | null;
+  }>;
+}
+
 async function getBudgetsInternal(period: Date, accessToken?: string, refreshToken?: string) {
     const supabase = await createServerClient(accessToken, refreshToken);
 

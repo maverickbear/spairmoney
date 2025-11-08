@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Edit, Save, X, User, CreditCard, Upload } from "lucide-react";
+import { Edit, Save, X, User, CreditCard, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import { PlanBadge } from "@/components/common/plan-badge";
 import Link from "next/link";

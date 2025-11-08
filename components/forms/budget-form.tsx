@@ -49,6 +49,7 @@ interface Budget {
   id: string;
   period: string;
   categoryId?: string | null;
+  subcategoryId?: string | null;
   macroId?: string | null;
   amount: number;
   note?: string | null;

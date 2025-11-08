@@ -45,7 +45,7 @@ export function ReportsContent({ limits, budgets, transactions, now }: ReportsCo
 
   // Merge with budgets
   budgets.forEach((budget) => {
-    if (expensesByCategory[budget.categoryId]) {
+    if (budget.categoryId && expensesByCategory[budget.categoryId]) {
       expensesByCategory[budget.categoryId].budget = budget.amount;
     }
   });
