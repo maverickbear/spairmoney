@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { usePricingModal } from "@/contexts/pricing-modal-context";
 import { getFeaturePromotion } from "@/lib/utils/feature-promotions";
 
 // Icon mapping
@@ -230,6 +231,7 @@ export function UpgradePrompt({
   message,
   className = "",
 }: UpgradePromptProps) {
+  const { openModal } = usePricingModal();
   const planName = requiredPlan === "premium" ? "Premium" : "Basic";
   const promotion = getFeaturePromotion(feature);
 
@@ -302,16 +304,12 @@ export function UpgradePrompt({
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-            <Button asChild className="w-full sm:w-auto">
-              <Link href={`/pricing?upgrade=${requiredPlan}`}>
+            <Button onClick={openModal} className="w-full sm:w-auto">
                 Upgrade to {planName}
                 <ArrowRight className="ml-2 w-4 h-4" />
-              </Link>
             </Button>
-            <Button asChild variant="ghost" className="w-full sm:w-auto">
-              <Link href="/pricing">
+            <Button onClick={openModal} variant="ghost" className="w-full sm:w-auto">
                 See pricing
-              </Link>
             </Button>
           </div>
           <p className="text-xs text-muted-foreground/60">

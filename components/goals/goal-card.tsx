@@ -17,8 +17,6 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  Pause,
-  Play,
   Plus,
   Minus,
 } from "lucide-react";
@@ -31,7 +29,6 @@ export interface GoalCardProps {
     currentBalance: number;
     incomePercentage: number;
     priority: "High" | "Medium" | "Low";
-    isPaused: boolean;
     isCompleted: boolean;
     description?: string | null;
     expectedIncome?: number | null;
@@ -43,7 +40,6 @@ export interface GoalCardProps {
   };
   onEdit: (goal: GoalCardProps["goal"]) => void;
   onDelete: (id: string) => void;
-  onPause: (id: string, isPaused: boolean) => void;
   onTopUp: (id: string) => void;
   onWithdraw: (id: string) => void;
 }
@@ -52,7 +48,6 @@ export function GoalCard({
   goal,
   onEdit,
   onDelete,
-  onPause,
   onTopUp,
   onWithdraw,
 }: GoalCardProps) {
@@ -72,11 +67,6 @@ export function GoalCard({
               {goal.isCompleted && (
                 <Badge variant="default" className="bg-green-600 dark:bg-green-500">
                   Completed
-                </Badge>
-              )}
-              {goal.isPaused && (
-                <Badge variant="outline" className="border-yellow-500 dark:border-yellow-400 text-yellow-600 dark:text-yellow-400">
-                  Paused
                 </Badge>
               )}
             </div>
@@ -104,21 +94,6 @@ export function GoalCard({
               <DropdownMenuItem onClick={() => onEdit(goal)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onPause(goal.id, !goal.isPaused)}
-              >
-                {goal.isPaused ? (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Resume
-                  </>
-                ) : (
-                  <>
-                    <Pause className="mr-2 h-4 w-4" />
-                    Pause
-                  </>
-                )}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onTopUp(goal.id)}>
                 <Plus className="mr-2 h-4 w-4" />

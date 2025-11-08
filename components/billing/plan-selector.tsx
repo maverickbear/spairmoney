@@ -223,7 +223,7 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
         </div>
       ) : (
         // Card view
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {sortedPlans.map((plan) => {
             const monthlyPrice = plan.priceMonthly;
             const yearlyPrice = plan.priceYearly;
@@ -233,47 +233,72 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
             const originalYearlyPrice = interval === "year" && yearlyPrice > 0 ? yearlyPrice : null;
             const isCurrent = plan.id === currentPlanId;
             
-            // Simplified key features only
-            const keyFeatures = [];
+            // All features
+            const allFeatures = [];
+            
+            // Transactions
             if (plan.features.maxTransactions === -1) {
-              keyFeatures.push("Unlimited transactions");
+              allFeatures.push("Unlimited transactions");
             } else if (plan.features.maxTransactions > 0) {
-              keyFeatures.push(`${plan.features.maxTransactions} transactions`);
+              allFeatures.push(`${plan.features.maxTransactions} transactions/month`);
             }
+            
+            // Accounts
             if (plan.features.maxAccounts === -1) {
-              keyFeatures.push("Unlimited accounts");
+              allFeatures.push("Unlimited accounts");
             } else if (plan.features.maxAccounts > 0) {
-              keyFeatures.push(`${plan.features.maxAccounts} accounts`);
+              allFeatures.push(`${plan.features.maxAccounts} accounts`);
             }
+            
+            // Investments
+            if (plan.features.hasInvestments) {
+              allFeatures.push("Investment tracking");
+            }
+            
+            // Advanced Reports
+            if (plan.features.hasAdvancedReports) {
+              allFeatures.push("Advanced reports");
+            }
+            
+            // CSV Export
+            if (plan.features.hasCsvExport) {
+              allFeatures.push("CSV export");
+            }
+            
+            // Debts
+            if (plan.features.hasDebts) {
+              allFeatures.push("Debt tracking");
+            }
+            
+            // Goals
+            if (plan.features.hasGoals) {
+              allFeatures.push("Goals tracking");
+            }
+            
+            // Household Members
             if (plan.name !== "free") {
-              keyFeatures.push("All features");
+              allFeatures.push("Household members");
             }
 
             const isPopular = plan.name === "basic";
             const isPremium = plan.name === "premium";
+            const isFree = plan.name === "free";
             
             return (
               <Card 
                 key={plan.id} 
-                className={`relative transition-all ${
-                  isCurrent 
-                    ? "border-primary ring-2 ring-primary/20" 
+                className={`relative transition-all border flex flex-col h-full ${
+                  isFree || isCurrent
+                    ? "border-border" 
                     : isPopular 
-                      ? "border-primary/50" 
-                      : ""
-                } ${isCurrent ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
+                      ? "border-primary ring-2 ring-primary/30 shadow-lg bg-gradient-to-br from-primary/5 to-primary/10" 
+                      : "border-border"
+                } ${isCurrent || isPopular ? "opacity-100" : "opacity-90 hover:opacity-100"}`}
               >
-                {isCurrent && (
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground text-xs px-2 py-0.5">
-                      Current
-                    </Badge>
-                  </div>
-                )}
                 {isPopular && !isCurrent && (
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-primary/10 text-primary px-2 py-0.5 text-xs flex items-center gap-1">
-                      <Star className="h-3 w-3 fill-current" />
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                    <Badge className="bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold flex items-center gap-1.5 shadow-md">
+                      <Star className="h-3.5 w-3.5 fill-current" />
                       Popular
                     </Badge>
                   </div>
@@ -302,9 +327,9 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pb-4">
+                <CardContent className="pb-4 flex-1">
                   <ul className="space-y-2">
-                    {keyFeatures.slice(0, 3).map((feature, index) => (
+                    {allFeatures.map((feature, index) => (
                       <li key={index} className="flex items-center gap-2 text-sm">
                         <Check className="h-4 w-4 text-primary flex-shrink-0" />
                         <span className="text-muted-foreground">{feature}</span>
@@ -312,7 +337,7 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                     ))}
                   </ul>
                 </CardContent>
-                <CardFooter className="pt-4">
+                <CardFooter className="pt-4 mt-auto">
                   <Button
                     className="w-full"
                     variant={isCurrent ? "secondary" : isPopular ? "default" : "outline"}
@@ -327,6 +352,29 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
           })}
         </div>
       )}
+
+      {/* Disclaimer */}
+      <div className="mt-8 pt-6 border-t">
+        <div className="max-w-3xl mx-auto text-center space-y-2">
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-foreground">Important:</strong> All plans can be canceled at any time with no commitment. 
+            You'll retain access to your plan features until the end of your current billing period. 
+            No refunds are provided for partial billing periods. 
+            By subscribing, you agree to our{" "}
+            <a href="/terms-of-use" className="text-primary hover:underline">
+              Terms of Service
+            </a>
+            {" "}and{" "}
+            <a href="/privacy-policy" className="text-primary hover:underline">
+              Privacy Policy
+            </a>
+            .
+          </p>
+          <p className="text-xs text-muted-foreground/80">
+            Subscriptions automatically renew unless canceled. You can manage or cancel your subscription at any time from your billing settings.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

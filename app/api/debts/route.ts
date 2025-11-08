@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       interestRate: validatedData.interestRate,
       totalMonths: validatedData.totalMonths,
       firstPaymentDate: validatedData.firstPaymentDate,
+      startDate: validatedData.startDate,
       monthlyPayment: validatedData.monthlyPayment,
       paymentFrequency: validatedData.paymentFrequency,
       paymentAmount: validatedData.paymentAmount,
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

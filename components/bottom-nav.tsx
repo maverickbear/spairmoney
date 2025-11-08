@@ -9,8 +9,7 @@ import { LayoutDashboard, Receipt, Target, FolderTree, Wallet, TrendingUp, FileT
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: Receipt },
-  { href: "/budgets", label: "Budgets", icon: Target },
-  { href: "/goals", label: "Goals", icon: PiggyBank },
+  { href: "/budgets", label: "Budgets & Goals", icon: PiggyBank },
   { href: "/debts", label: "Debts", icon: CreditCard },
 ];
 
@@ -37,7 +36,9 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
       <div className="flex h-16 items-center justify-around">
         {navItems.slice(0, 5).map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          // Extract base path without query params for comparison
+          const basePath = item.href.split("?")[0];
+          const isActive = pathname === basePath || pathname === item.href || (basePath !== "/" && pathname.startsWith(basePath));
           return (
             <Link
               key={item.href}

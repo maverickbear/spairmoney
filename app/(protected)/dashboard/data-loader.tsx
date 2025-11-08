@@ -11,7 +11,6 @@ import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 interface DashboardData {
   selectedMonthTransactions: any[];
   lastMonthTransactions: any[];
-  allIncomeTransactions: any[];
   savings: number;
   budgets: any[];
   upcomingTransactions: any[];
@@ -54,7 +53,6 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
   const [
     selectedMonthTransactions,
     lastMonthTransactions,
-    allIncomeTransactions,
     savings,
     budgets,
     upcomingTransactions,
@@ -115,54 +113,23 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
       console.error("Error fetching last month transactions:", error);
       return [];
     }),
-    // Fetch ALL income transactions (no date filter) for the Total Income widget
-    getTransactions({
-      type: "income",
-    }).then(async (transactions) => {
-      console.log("🔍 [data-loader] All Income Transactions loaded for Total Income Widget:", {
-        count: transactions.length,
-        transactions: transactions.slice(0, 5).map(t => ({
-          id: t?.id,
-          type: t?.type,
-          amount: t?.amount,
-          amountType: typeof t?.amount,
-          parsedAmount: t?.amount != null ? (typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount)) : null,
-          date: t?.date,
-          description: t?.description,
-          accountId: t?.accountId,
-        })),
-        totalIncome: transactions.reduce((sum, t) => {
-          const amount = t?.amount != null ? (typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount)) : 0;
-          return sum + (isNaN(amount) ? 0 : amount);
-        }, 0),
-      });
-
-      // If no transactions found, check if user has accounts
-      if (transactions.length === 0) {
-        const { getAccounts } = await import("@/lib/api/accounts");
-        const userAccounts = await getAccounts();
-        console.log("🔍 [data-loader] No income transactions found. Checking user accounts:", {
-          accountsCount: userAccounts.length,
-          accounts: userAccounts.map(acc => ({
-            id: acc.id,
-            name: acc.name,
-            userId: (acc as any).userId,
-            ownerIds: (acc as any).ownerIds,
-          })),
-        });
-      }
-
-      return transactions;
-    }).catch((error) => {
-      console.error("❌ [data-loader] Error fetching all income transactions:", error);
-      return [];
-    }),
     getTotalInvestmentsValue().catch((error) => {
       console.error("Error fetching total investments value:", error);
       return 0;
     }),
-    getBudgets(selectedMonth).catch((error) => {
-      console.error("Error fetching budgets:", error);
+    getBudgets(selectedMonth).then((budgets) => {
+      console.log("🔍 [data-loader] Budgets loaded:", {
+        count: budgets?.length || 0,
+        budgets: budgets?.map((b: any) => ({
+          id: b.id,
+          category: b.category?.name,
+          amount: b.amount,
+          period: b.period,
+        })),
+      });
+      return budgets;
+    }).catch((error) => {
+      console.error("❌ [data-loader] Error fetching budgets:", error);
       return [];
     }),
     getUpcomingTransactions(5).catch((error) => {
@@ -177,8 +144,20 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
       });
       return null;
     }),
-    getGoals().catch((error) => {
-      console.error("Error fetching goals:", error);
+    getGoals().then((goals) => {
+      console.log("🔍 [data-loader] Goals loaded:", {
+        count: goals?.length || 0,
+        goals: goals?.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          targetAmount: g.targetAmount,
+          currentBalance: g.currentBalance,
+          isCompleted: g.isCompleted,
+        })),
+      });
+      return goals;
+    }).catch((error) => {
+      console.error("❌ [data-loader] Error fetching goals:", error);
       return [];
     }),
     getTransactions({
@@ -231,10 +210,25 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
   // Last month's balance = current balance - current month net change
   const lastMonthTotalBalance = totalBalance - currentMonthNetChange;
 
+  // Debug: Log final data being returned
+  console.log("🔍 [data-loader] Final dashboard data:", {
+    budgetsCount: budgets?.length || 0,
+    goalsCount: goals?.length || 0,
+    budgets: budgets?.length > 0 ? budgets.slice(0, 3).map((b: any) => ({
+      id: b.id,
+      category: b.category?.name,
+      amount: b.amount,
+    })) : [],
+    goals: goals?.length > 0 ? goals.slice(0, 3).map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      targetAmount: g.targetAmount,
+    })) : [],
+  });
+
   return {
     selectedMonthTransactions,
     lastMonthTransactions,
-    allIncomeTransactions,
     savings,
     budgets,
     upcomingTransactions,

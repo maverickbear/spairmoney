@@ -14,7 +14,7 @@ import {
 import { TransactionForm } from "@/components/forms/transaction-form";
 import { CsvImportDialog } from "@/components/forms/csv-import-dialog";
 import { formatMoney } from "@/components/common/money";
-import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check } from "lucide-react";
+import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -63,6 +63,7 @@ export default function TransactionsPage() {
   const { limits, loading: limitsLoading } = usePlanLimits();
 
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -251,6 +252,7 @@ export default function TransactionsPage() {
     
     // Optimistic update: remove from UI immediately
     setTransactions(prev => prev.filter(t => t.id !== id));
+    setDeletingId(id);
 
     try {
       const { deleteTransactionClient } = await import("@/lib/api/transactions-client");
@@ -275,6 +277,8 @@ export default function TransactionsPage() {
         description: error instanceof Error ? error.message : "Failed to delete transaction",
         variant: "destructive",
       });
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -542,8 +546,13 @@ export default function TransactionsPage() {
                       size="icon"
                       className="h-7 w-7 md:h-10 md:w-10"
                       onClick={() => handleDelete(tx.id)}
+                      disabled={deletingId === tx.id}
                     >
-                      <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                      {deletingId === tx.id ? (
+                        <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                      )}
                     </Button>
                   </div>
                 </TableCell>

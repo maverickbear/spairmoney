@@ -21,9 +21,11 @@ import { formatMoney } from "@/components/common/money";
 
 interface FinancialHealthWidgetProps {
   data: FinancialHealthData;
+  lastMonthIncome?: number;
+  lastMonthExpenses?: number;
 }
 
-export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
+export function FinancialHealthWidget({ data, lastMonthIncome, lastMonthExpenses }: FinancialHealthWidgetProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Log data for debugging
@@ -188,6 +190,8 @@ export function FinancialHealthWidget({ data }: FinancialHealthWidgetProps) {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         data={data}
+        lastMonthIncome={lastMonthIncome}
+        lastMonthExpenses={lastMonthExpenses}
       />
     </>
   );

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ProgressRing } from "@/components/goals/progress-ring";
 import { formatMoney } from "@/components/common/money";
 import { Badge } from "@/components/ui/badge";
-import { Target, TrendingUp, CheckCircle2, Clock } from "lucide-react";
+import { Target, TrendingUp, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -15,7 +15,6 @@ interface Goal {
   currentBalance: number;
   incomePercentage: number;
   priority: "High" | "Medium" | "Low";
-  isPaused: boolean;
   isCompleted: boolean;
   progressPct?: number;
   monthsToGoal?: number | null;
@@ -37,7 +36,7 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Target className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">No goals yet</p>
-            <Link href="/goals">
+            <Link href="/budgets?tab=goals">
               <Button variant="outline">Create Your First Goal</Button>
             </Link>
           </div>
@@ -47,9 +46,8 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
   }
 
   // Calculate statistics
-  const activeGoals = goals.filter((g) => !g.isCompleted && !g.isPaused);
+  const activeGoals = goals.filter((g) => !g.isCompleted);
   const completedGoals = goals.filter((g) => g.isCompleted);
-  const pausedGoals = goals.filter((g) => g.isPaused);
 
   const totalTarget = goals.reduce((sum, g) => sum + g.targetAmount, 0);
   const totalBalance = goals.reduce((sum, g) => sum + g.currentBalance, 0);
@@ -86,7 +84,7 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
             <CardTitle>Goals Overview</CardTitle>
             <CardDescription>Track your financial progress</CardDescription>
           </div>
-          <Link href="/goals">
+          <Link href="/budgets?tab=goals">
             <Button variant="ghost">
               View All
             </Button>
@@ -144,13 +142,6 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
             </div>
             <p className="text-lg font-semibold">{totalMonthlyContribution.toFixed(1)}%</p>
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>Paused</span>
-            </div>
-            <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">{pausedGoals.length}</p>
-          </div>
         </div>
 
         {/* Top Goals */}
@@ -161,7 +152,7 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
               {topGoals.map((goal) => (
                 <Link
                   key={goal.id}
-                  href="/goals"
+                  href="/budgets?tab=goals"
                   className="block group"
                 >
                   <div className="flex items-center gap-3 p-2 rounded-[12px] hover:bg-muted/50 transition-colors">

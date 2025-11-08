@@ -26,6 +26,8 @@ import { formatMoney } from "@/components/common/money";
 import { type Goal as GoalType } from "@/lib/api/goals";
 import { calculateProgress, calculateIncomePercentageFromTargetMonths } from "@/lib/utils/goals";
 import { useToast } from "@/components/toast-provider";
+import { Loader2 } from "lucide-react";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 
 interface Goal {
   id: string;
@@ -35,7 +37,6 @@ interface Goal {
   incomePercentage: number;
   priority: "High" | "Medium" | "Low";
   description?: string | null;
-  isPaused: boolean;
   isCompleted: boolean;
   expectedIncome?: number | null;
   targetMonths?: number | null;
@@ -45,7 +46,7 @@ interface GoalFormProps {
   goal?: Goal;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: () => void | Promise<void>;
 }
 
 export function GoalForm({
@@ -55,6 +56,7 @@ export function GoalForm({
   onSuccess,
 }: GoalFormProps) {
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [forecast, setForecast] = useState<{
     monthlyContribution: number;
     monthsToGoal: number | null;
@@ -73,7 +75,6 @@ export function GoalForm({
       incomePercentage: undefined,
       priority: "Medium",
       description: "",
-      isPaused: false,
       expectedIncome: undefined,
       targetMonths: undefined,
     },
@@ -84,7 +85,6 @@ export function GoalForm({
   const currentBalance = form.watch("currentBalance");
   const incomePercentage = form.watch("incomePercentage");
   const priority = form.watch("priority");
-  const isPaused = form.watch("isPaused");
   const expectedIncome = form.watch("expectedIncome");
   const targetMonths = form.watch("targetMonths");
 
@@ -107,7 +107,6 @@ export function GoalForm({
         const effectiveTargetAmount = targetAmount || 0;
         const effectiveCurrentBalance = currentBalance || 0;
         const baseIncomePercentage = incomePercentage !== undefined && incomePercentage !== null ? incomePercentage : undefined;
-        const effectiveIsPaused = isPaused || false;
         const effectiveTargetMonths = targetMonths !== undefined && targetMonths !== null ? targetMonths : undefined;
         const effectiveExpectedIncome = expectedIncome || null;
         const effectivePriority = (priority || "Medium") as "High" | "Medium" | "Low";
@@ -147,7 +146,7 @@ export function GoalForm({
           throw new Error("Failed to fetch goals");
         }
         const goals = await res.json();
-        const otherGoals = goals.filter((g: any) => g.id !== goal?.id && !g.isCompleted && !g.isPaused);
+        const otherGoals = goals.filter((g: any) => g.id !== goal?.id && !g.isCompleted);
         const totalAllocation = otherGoals.reduce((sum: number, g: any) => sum + (g.incomePercentage || 0), 0) + effectiveIncomePercentage;
 
         let allocationError: string | undefined;
@@ -163,7 +162,6 @@ export function GoalForm({
           currentBalance: effectiveCurrentBalance,
           incomePercentage: effectiveIncomePercentage,
           priority: effectivePriority,
-          isPaused: effectiveIsPaused,
           isCompleted: effectiveCurrentBalance >= effectiveTargetAmount,
           completedAt: null,
           description: null,
@@ -189,7 +187,7 @@ export function GoalForm({
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [targetAmount, currentBalance, incomePercentage, priority, isPaused, expectedIncome, targetMonths, open, goal, form]);
+  }, [targetAmount, currentBalance, incomePercentage, priority, expectedIncome, targetMonths, open, goal, form]);
 
   // Load goal data when editing
   useEffect(() => {
@@ -201,7 +199,6 @@ export function GoalForm({
         incomePercentage: goal.incomePercentage ?? undefined,
         priority: goal.priority || "Medium",
         description: goal.description || "",
-        isPaused: goal.isPaused ?? false,
         expectedIncome: goal.expectedIncome ?? undefined,
         targetMonths: goal.targetMonths ?? undefined,
       });
@@ -213,7 +210,6 @@ export function GoalForm({
         incomePercentage: undefined,
         priority: "Medium",
         description: "",
-        isPaused: false,
         expectedIncome: undefined,
         targetMonths: undefined,
       });
@@ -222,12 +218,14 @@ export function GoalForm({
 
   async function onSubmit(data: GoalFormData) {
     try {
+      setIsSubmitting(true);
       if (forecast?.allocationError) {
         toast({
           title: "Validation Error",
           description: forecast.allocationError,
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -243,7 +241,6 @@ export function GoalForm({
             incomePercentage: data.incomePercentage,
             priority: data.priority,
             description: data.description || "",
-            isPaused: data.isPaused,
             expectedIncome: data.expectedIncome,
             targetMonths: data.targetMonths,
           }),
@@ -265,7 +262,6 @@ export function GoalForm({
             incomePercentage: data.incomePercentage,
             priority: data.priority,
             description: data.description || "",
-            isPaused: data.isPaused,
             expectedIncome: data.expectedIncome,
             targetMonths: data.targetMonths,
           }),
@@ -282,8 +278,9 @@ export function GoalForm({
       form.reset();
 
       // Call onSuccess after successful request to refresh the list
+      // Await it to ensure the list is updated before showing the toast
       if (onSuccess) {
-        onSuccess();
+        await onSuccess();
       }
 
       toast({
@@ -298,6 +295,8 @@ export function GoalForm({
         description: error instanceof Error ? error.message : "Failed to save goal",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -321,7 +320,9 @@ export function GoalForm({
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
               <div className="space-y-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Goal Name *</label>
+            <label className="text-sm font-medium">
+              Goal Name {!form.watch("name") && <span className="text-gray-400 text-[12px]">required</span>}
+            </label>
             <Input
               {...form.register("name")}
               placeholder="e.g., Emergency Fund, Down Payment"
@@ -335,12 +336,13 @@ export function GoalForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium">Target Amount *</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                {...form.register("targetAmount", { valueAsNumber: true })}
+              <label className="text-sm font-medium">
+                Target Amount {(!form.watch("targetAmount") || form.watch("targetAmount") === 0) && <span className="text-gray-400 text-[12px]">required</span>}
+              </label>
+              <DollarAmountInput
+                value={form.watch("targetAmount") || undefined}
+                onChange={(value) => form.setValue("targetAmount", value ?? 0, { shouldValidate: true })}
+                placeholder="$ 0.00"
               />
               {form.formState.errors.targetAmount && (
                 <p className="text-xs text-destructive">
@@ -351,13 +353,12 @@ export function GoalForm({
 
             <div className="space-y-1">
               <label className="text-sm font-medium">
-                Starting Balance *
+                Starting Balance {(!form.watch("currentBalance") || form.watch("currentBalance") === 0) && <span className="text-gray-400 text-[12px]">required</span>}
               </label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                {...form.register("currentBalance", { valueAsNumber: true })}
+              <DollarAmountInput
+                value={form.watch("currentBalance") || undefined}
+                onChange={(value) => form.setValue("currentBalance", value ?? 0, { shouldValidate: true })}
+                placeholder="$ 0.00"
               />
               {form.formState.errors.currentBalance && (
                 <p className="text-xs text-destructive">
@@ -368,7 +369,9 @@ export function GoalForm({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Target Months *</label>
+            <label className="text-sm font-medium">
+              Target Months {!form.watch("targetMonths") && <span className="text-gray-400 text-[12px]">required</span>}
+            </label>
             <Select
               value={form.watch("targetMonths") ? form.watch("targetMonths")!.toString() : undefined}
               onValueChange={(value) => {
@@ -402,7 +405,9 @@ export function GoalForm({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Priority *</label>
+            <label className="text-sm font-medium">
+              Priority {!form.watch("priority") && <span className="text-gray-400 text-[12px]">required</span>}
+            </label>
             <Select
               value={form.watch("priority")}
               onValueChange={(value) =>
@@ -440,26 +445,26 @@ export function GoalForm({
               <div className="lg:sticky lg:top-0 w-full lg:w-[280px]">
           {forecast ? (
             <div className="rounded-[12px] border bg-muted/50 p-6 space-y-3 h-fit">
-              <h4 className="text-sm font-semibold">Forecast</h4>
+              <h4 className="text-sm font-semibold">Goal Forecast</h4>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Monthly Contribution</p>
+                  <p className="text-xs text-muted-foreground mb-1">Monthly savings amount</p>
                   <p className="text-base font-semibold">
                     {formatMoney(forecast.monthlyContribution)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Progress</p>
+                  <p className="text-xs text-muted-foreground mb-1">Current progress</p>
                   <p className="text-base font-semibold">
                     {forecast.progressPct.toFixed(1)}%
                   </p>
                 </div>
                 {forecast.monthsToGoal !== null && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">ETA</p>
+                    <p className="text-xs text-muted-foreground mb-1">Estimated time to reach goal</p>
                     <p className="text-base font-semibold">
                       {forecast.monthsToGoal === 0
-                        ? "Goal reached!"
+                        ? "Goal reached! 🎉"
                         : forecast.monthsToGoal < 12
                         ? `${Math.round(forecast.monthsToGoal)} month${Math.round(forecast.monthsToGoal) !== 1 ? "s" : ""}`
                         : `${Math.floor(forecast.monthsToGoal / 12)} year${Math.floor(forecast.monthsToGoal / 12) !== 1 ? "s" : ""}, ${Math.round(forecast.monthsToGoal % 12)} month${Math.round(forecast.monthsToGoal % 12) !== 1 ? "s" : ""}`}
@@ -468,19 +473,19 @@ export function GoalForm({
                 )}
                 <div className="pt-2 border-t space-y-1.5">
                   <div className="text-xs text-muted-foreground leading-tight">
-                    Based on income basis: {formatMoney(forecast.incomeBasis)}/month
+                    Based on your average monthly income: {formatMoney(forecast.incomeBasis)}
                   </div>
                   <div className="text-xs text-muted-foreground leading-tight">
-                    Total allocation: {forecast.totalAllocation.toFixed(2)}%
+                    {forecast.totalAllocation.toFixed(2)}% of your income is allocated to this goal
                   </div>
                 </div>
               </div>
             </div>
           ) : (
             <div className="rounded-[12px] border bg-muted/50 p-6 space-y-3 h-fit">
-              <h4 className="text-sm font-semibold">Forecast</h4>
+              <h4 className="text-sm font-semibold">Goal Forecast</h4>
               <p className="text-xs text-muted-foreground">
-                Enter goal details to see forecast calculations
+                Enter goal details to see when you'll reach your target
               </p>
             </div>
           )}
@@ -493,11 +498,19 @@ export function GoalForm({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!!forecast?.allocationError}>
-              {goal ? "Update" : "Create"} Goal
+            <Button type="submit" disabled={isSubmitting || !!forecast?.allocationError}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {goal ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                goal ? "Update" : "Create"
+              )} Goal
             </Button>
           </DialogFooter>
         </form>

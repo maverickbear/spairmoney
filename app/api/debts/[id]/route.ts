@@ -18,6 +18,7 @@ export async function PATCH(
       interestRate: data.interestRate,
       totalMonths: data.totalMonths,
       firstPaymentDate: data.firstPaymentDate,
+      startDate: data.startDate,
       monthlyPayment: data.monthlyPayment,
       paymentFrequency: data.paymentFrequency,
       paymentAmount: data.paymentAmount,
@@ -65,6 +66,7 @@ export async function DELETE(
     );
   }
 }
+
 
 
 

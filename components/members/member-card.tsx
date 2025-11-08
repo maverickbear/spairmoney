@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InvitationStatus } from "./invitation-status";
-import { Edit, Trash2, Crown, Mail } from "lucide-react";
+import { Edit, Trash2, Crown, Mail, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { MemberForm } from "./member-form";
 
@@ -26,12 +26,15 @@ function getInitials(name: string | null | undefined): string {
 
 export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   async function handleDelete() {
     if (!confirm(`Are you sure you want to remove ${member.name || member.email} from your household?`)) {
       return;
     }
 
+    setIsDeleting(true);
     try {
       const res = await fetch(`/api/members/${member.id}`, {
         method: "DELETE",
@@ -46,10 +49,13 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
     } catch (error) {
       console.error("Error removing member:", error);
       alert(error instanceof Error ? error.message : "Failed to remove member");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
   async function handleResend() {
+    setIsResending(true);
     try {
       const res = await fetch(`/api/members/${member.id}/resend`, {
         method: "POST",
@@ -64,6 +70,8 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
     } catch (error) {
       console.error("Error resending invitation:", error);
       alert(error instanceof Error ? error.message : "Failed to resend invitation");
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -138,14 +146,25 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                     <Button
                       variant="outline"
                       onClick={handleResend}
+                      disabled={isResending}
                     >
-                      <Mail className="mr-2 h-4 w-4" />
-                      Resend
+                      {isResending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Resending...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="mr-2 h-4 w-4" />
+                          Resend
+                        </>
+                      )}
                     </Button>
                   )}
                   <Button
                     variant="outline"
                     onClick={() => setIsEditOpen(true)}
+                    disabled={isDeleting}
                   >
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
@@ -154,9 +173,19 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                     variant="outline"
                     onClick={handleDelete}
                     className="text-destructive hover:text-destructive"
+                    disabled={isDeleting}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Removing...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove
+                      </>
+                    )}
                   </Button>
                 </>
               )}

@@ -109,12 +109,12 @@ Para instruções detalhadas, veja [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md)
 │   ├── api/            # Server actions
 │   ├── validations/    # Zod schemas
 │   └── csv/            # CSV import/export
-└── prisma/             # Prisma schema and seed
+└── supabase/           # Supabase migrations
 ```
 
 ## Database Schema
 
-The app uses Prisma with PostgreSQL (Supabase). Key models:
+The app uses Supabase (PostgreSQL) directly. Key tables:
 
 - `Account` - Banking and investment accounts
 - `Transaction` - Income, expense, and transfer transactions

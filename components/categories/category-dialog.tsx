@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
-import { Plus, Edit, X, Check } from "lucide-react";
+import { Plus, Edit, X, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import type { Category, Macro } from "@/lib/api/categories-client";
 
@@ -68,6 +68,7 @@ export function CategoryDialog({
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
   const [isAddingSubcategory, setIsAddingSubcategory] = useState(false);
   const [isSubmittingSubcategory, setIsSubmittingSubcategory] = useState(false);
+  const [deletingSubcategoryId, setDeletingSubcategoryId] = useState<string | null>(null);
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(category?.id || null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
@@ -356,6 +357,7 @@ export function CategoryDialog({
       return;
     }
 
+    setDeletingSubcategoryId(subcategoryId);
     try {
       setIsSubmittingSubcategory(true);
       const res = await fetch(`/api/categories/subcategories/${subcategoryId}`, {
@@ -383,6 +385,7 @@ export function CategoryDialog({
       });
     } finally {
       setIsSubmittingSubcategory(false);
+      setDeletingSubcategoryId(null);
     }
   }
 
@@ -617,9 +620,13 @@ export function CategoryDialog({
                             variant="ghost"
                             className="h-5 w-5"
                             onClick={() => handleDeleteSubcategory(subcategory.id)}
-                            disabled={isSubmittingSubcategory}
+                            disabled={isSubmittingSubcategory || deletingSubcategoryId === subcategory.id}
                           >
-                            <X className="h-3 w-3 text-black" />
+                            {deletingSubcategoryId === subcategory.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-black" />
+                            ) : (
+                              <X className="h-3 w-3 text-black" />
+                            )}
                           </Button>
                         </div>
                       )}
@@ -705,17 +712,38 @@ export function CategoryDialog({
             </Button>
             {!currentCategoryId && !isSystemCategory && (
               <Button type="submit" disabled={isSubmitting || !form.watch("name") || !form.watch("macroId")}>
-                {isSubmitting ? "Saving..." : "Create"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Create"
+                )}
               </Button>
             )}
             {currentCategoryId && category && !isSystemCategory && (
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Update"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Update"
+                )}
               </Button>
             )}
             {isSystemCategory && category && (
               <Button type="submit" disabled={isSubmitting || isSubmittingSubcategory}>
-                {isSubmitting ? "Saving..." : "Save"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
               </Button>
             )}
           </DialogFooter>

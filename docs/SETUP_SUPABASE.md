@@ -58,8 +58,7 @@ DATABASE_URL="postgresql://postgres:[SUA-SENHA-CODIFICADA]@db.dvshwrtzazoetkbzxo
 Após configurar, execute:
 
 ```bash
-npm run prisma:generate
-npm run db:push
+npm run db:seed
 ```
 
 Se der erro de autenticação, verifique:

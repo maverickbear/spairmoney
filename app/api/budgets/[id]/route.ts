@@ -11,7 +11,6 @@ export async function PATCH(
     
     const budget = await updateBudget(id, {
       amount: data.amount,
-      note: data.note,
     });
     
     return NextResponse.json(budget, { status: 200 });

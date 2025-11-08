@@ -17,14 +17,16 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/components/common/money";
-import { calculateDebtMetrics, convertToMonthlyPayment, type DebtForCalculation } from "@/lib/utils/debts";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
+import { PercentageInput } from "@/components/common/percentage-input";
+import { calculateDebtMetrics, convertToMonthlyPayment, convertFromMonthlyPayment, calculateMonthlyPayment, calculatePaymentsFromDate, type DebtForCalculation } from "@/lib/utils/debts";
 import { useToast } from "@/components/toast-provider";
+import { Loader2 } from "lucide-react";
 
 interface Debt {
   id: string;
@@ -62,6 +64,7 @@ export function DebtForm({
   onSuccess,
 }: DebtFormProps) {
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [forecast, setForecast] = useState<{
     monthsRemaining: number | null;
     totalInterestRemaining: number;
@@ -71,18 +74,21 @@ export function DebtForm({
   
   const isInitialLoad = useRef(false);
   const isDataLoaded = useRef(false);
+  const isPaymentAmountManuallyEdited = useRef(false);
+  const isPrincipalPaidManuallyEdited = useRef(false);
 
   const form = useForm<DebtFormData>({
     resolver: zodResolver(debtSchema),
     defaultValues: {
       name: "",
-      loanType: "other",
+      loanType: "",
       initialAmount: 0,
       downPayment: 0,
       currentBalance: 0,
       interestRate: 0,
       totalMonths: 0,
       firstPaymentDate: new Date(),
+      startDate: new Date(),
       paymentFrequency: "monthly",
       paymentAmount: 0,
       monthlyPayment: 0,
@@ -109,6 +115,238 @@ export function DebtForm({
   const additionalContributions = form.watch("additionalContributions");
   const additionalContributionAmount = form.watch("additionalContributionAmount");
   const isPaused = form.watch("isPaused");
+  const firstPaymentDate = form.watch("firstPaymentDate");
+  const startDate = form.watch("startDate");
+  const loanType = form.watch("loanType");
+
+  // Helper functions for loan type specific configurations
+  const getFieldConfig = () => {
+    const type = loanType || "";
+    const configs: Record<string, {
+      showDownPayment: boolean;
+      downPaymentRequired: boolean;
+      showTotalMonths: boolean;
+      totalMonthsRequired: boolean;
+      showPaymentFrequency: boolean;
+      paymentFrequencyLocked: boolean;
+      paymentFrequencyDefault: string;
+      initialAmountLabel: string;
+      startDateLabel: string;
+      firstPaymentDateLabel: string;
+      paymentAmountLabel: string;
+      totalMonthsPresets: number[];
+    }> = {
+      mortgage: {
+        showDownPayment: true,
+        downPaymentRequired: true,
+        showTotalMonths: true,
+        totalMonthsRequired: true,
+        showPaymentFrequency: true,
+        paymentFrequencyLocked: false,
+        paymentFrequencyDefault: "monthly",
+        initialAmountLabel: "Original Amount",
+        startDateLabel: "Start Date",
+        firstPaymentDateLabel: "First Payment Date",
+        paymentAmountLabel: "Payment Amount",
+        totalMonthsPresets: [300, 360],
+      },
+      car_loan: {
+        showDownPayment: true,
+        downPaymentRequired: true,
+        showTotalMonths: true,
+        totalMonthsRequired: true,
+        showPaymentFrequency: true,
+        paymentFrequencyLocked: false,
+        paymentFrequencyDefault: "monthly",
+        initialAmountLabel: "Original Amount",
+        startDateLabel: "Start Date",
+        firstPaymentDateLabel: "First Payment Date",
+        paymentAmountLabel: "Payment Amount",
+        totalMonthsPresets: [24, 36, 48, 60, 72, 84],
+      },
+      personal_loan: {
+        showDownPayment: true,
+        downPaymentRequired: false,
+        showTotalMonths: true,
+        totalMonthsRequired: true,
+        showPaymentFrequency: true,
+        paymentFrequencyLocked: false,
+        paymentFrequencyDefault: "monthly",
+        initialAmountLabel: "Original Amount",
+        startDateLabel: "Start Date",
+        firstPaymentDateLabel: "First Payment Date",
+        paymentAmountLabel: "Payment Amount",
+        totalMonthsPresets: [12, 24, 36, 48, 60],
+      },
+      credit_card: {
+        showDownPayment: false,
+        downPaymentRequired: false,
+        showTotalMonths: false,
+        totalMonthsRequired: false,
+        showPaymentFrequency: true,
+        paymentFrequencyLocked: true,
+        paymentFrequencyDefault: "monthly",
+        initialAmountLabel: "Current Balance",
+        startDateLabel: "Statement Start Date",
+        firstPaymentDateLabel: "Next Due Date",
+        paymentAmountLabel: "Planned Monthly Payment",
+        totalMonthsPresets: [],
+      },
+      student_loan: {
+        showDownPayment: true,
+        downPaymentRequired: false,
+        showTotalMonths: true,
+        totalMonthsRequired: true,
+        showPaymentFrequency: true,
+        paymentFrequencyLocked: false,
+        paymentFrequencyDefault: "monthly",
+        initialAmountLabel: "Original Amount",
+        startDateLabel: "Start Date",
+        firstPaymentDateLabel: "First Payment Date",
+        paymentAmountLabel: "Payment Amount",
+        totalMonthsPresets: [120, 180, 240, 300, 360],
+      },
+      business_loan: {
+        showDownPayment: true,
+        downPaymentRequired: false,
+        showTotalMonths: true,
+        totalMonthsRequired: true,
+        showPaymentFrequency: true,
+        paymentFrequencyLocked: false,
+        paymentFrequencyDefault: "monthly",
+        initialAmountLabel: "Original Amount",
+        startDateLabel: "Start Date",
+        firstPaymentDateLabel: "First Payment Date",
+        paymentAmountLabel: "Payment Amount",
+        totalMonthsPresets: [12, 24, 36, 48, 60, 72, 84, 96, 120],
+      },
+      other: {
+        showDownPayment: true,
+        downPaymentRequired: false,
+        showTotalMonths: true,
+        totalMonthsRequired: true,
+        showPaymentFrequency: true,
+        paymentFrequencyLocked: false,
+        paymentFrequencyDefault: "monthly",
+        initialAmountLabel: "Original Amount",
+        startDateLabel: "Start Date",
+        firstPaymentDateLabel: "First Payment Date",
+        paymentAmountLabel: "Payment Amount",
+        totalMonthsPresets: [12, 24, 36, 48, 60, 72, 84, 96, 120, 180, 240, 300, 360],
+      },
+    };
+    return configs[type] || configs.other;
+  };
+
+  const fieldConfig = getFieldConfig();
+
+  // Set payment frequency to monthly for credit cards
+  useEffect(() => {
+    if (loanType === "credit_card" && form.watch("paymentFrequency") !== "monthly") {
+      form.setValue("paymentFrequency", "monthly", { shouldValidate: false });
+    }
+  }, [loanType, form]);
+
+  // Get total months options based on loan type
+  const getTotalMonthsOptions = () => {
+    if (loanType === "credit_card") {
+      return [];
+    }
+    
+    const presets = fieldConfig.totalMonthsPresets;
+    const allOptions = [6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 72, 84, 96, 108, 120, 144, 180, 240, 300, 360];
+    
+    // If we have specific presets, show those plus common options
+    if (presets.length > 0) {
+      const combined = [...new Set([...presets, ...allOptions])].sort((a, b) => a - b);
+      return combined;
+    }
+    
+    return allOptions;
+  };
+
+  // Calculate payment amount automatically based on initial amount, down payment, interest rate, total months, and payment frequency
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    
+    // Don't calculate during initial data load
+    if (!isDataLoaded.current) {
+      return;
+    }
+    
+    // Reset manual edit flag when base values change significantly
+    // This allows recalculation when user changes the loan parameters
+    if (initialAmount || downPayment || interestRate || totalMonths || paymentFrequency) {
+      // Only reset if we're about to recalculate (not if user just edited payment amount)
+      // We'll check this by seeing if the current payment amount matches what we'd calculate
+    }
+    
+    // Treat empty values as 0
+    const effectiveInitialAmount = initialAmount || 0;
+    const effectiveInterestRate = interestRate || 0;
+    const effectiveDownPayment = downPayment || 0;
+    
+    // Only calculate if we have all required values
+    if (effectiveInitialAmount > 0 && totalMonths && totalMonths > 0 && paymentFrequency) {
+      const principal = effectiveInitialAmount - effectiveDownPayment;
+      
+      if (principal > 0) {
+        // Calculate monthly payment using amortization formula
+        const calculatedMonthlyPayment = calculateMonthlyPayment(
+          principal,
+          effectiveInterestRate,
+          totalMonths
+        );
+        
+        // Convert monthly payment to payment amount based on frequency
+        const calculatedPaymentAmount = convertFromMonthlyPayment(
+          calculatedMonthlyPayment,
+          paymentFrequency as "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"
+        );
+        
+        // Only update if the calculated value is different from current
+        const currentPaymentAmount = form.getValues("paymentAmount");
+        
+        // If the calculated value is significantly different, reset manual edit flag and recalculate
+        if (Math.abs(calculatedPaymentAmount - currentPaymentAmount) > 0.01) {
+          // If user manually edited, but the base values changed, allow recalculation
+          if (isPaymentAmountManuallyEdited.current) {
+            // Check if this is due to base value changes (not just initial load)
+            // If calculated value is very different, it's likely due to base value changes
+            const difference = Math.abs(calculatedPaymentAmount - currentPaymentAmount);
+            const percentageDifference = currentPaymentAmount > 0 
+              ? (difference / currentPaymentAmount) * 100 
+              : 100;
+            
+            // If difference is more than 5%, likely due to base value changes, allow recalculation
+            if (percentageDifference > 5) {
+              isPaymentAmountManuallyEdited.current = false;
+            }
+          }
+          
+          // Only update if not manually edited (or if we just reset the flag)
+          if (!isPaymentAmountManuallyEdited.current) {
+            form.setValue("paymentAmount", calculatedPaymentAmount, { shouldValidate: false });
+            form.setValue("monthlyPayment", calculatedMonthlyPayment, { shouldValidate: false });
+          }
+        }
+      } else if (effectiveInitialAmount === 0 || effectiveInterestRate === 0) {
+        // If amount or interest is 0, set payment amount to 0
+        if (!isPaymentAmountManuallyEdited.current) {
+          form.setValue("paymentAmount", 0, { shouldValidate: false });
+          form.setValue("monthlyPayment", 0, { shouldValidate: false });
+        }
+      }
+    } else if (effectiveInitialAmount === 0 || !totalMonths || totalMonths === 0 || !paymentFrequency) {
+      // If required values are missing, set payment amount to 0
+      if (!isPaymentAmountManuallyEdited.current) {
+        form.setValue("paymentAmount", 0, { shouldValidate: false });
+        form.setValue("monthlyPayment", 0, { shouldValidate: false });
+      }
+    }
+  }, [initialAmount, downPayment, interestRate, totalMonths, paymentFrequency, form, open]);
 
   // Calculate monthly payment from paymentAmount and frequency
   // Only calculate when user manually changes values (not during initial load)
@@ -135,6 +373,87 @@ export function DebtForm({
       }
     }
   }, [paymentAmount, paymentFrequency, form, open]);
+
+  // Calculate principal paid automatically based on first payment date
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    
+    // Don't calculate during initial data load
+    if (!isDataLoaded.current) {
+      return;
+    }
+    
+    // Don't calculate if user manually edited principal paid
+    if (isPrincipalPaidManuallyEdited.current) {
+      return;
+    }
+    
+    // Only calculate if we have all required values
+    const effectiveInitialAmount = initialAmount || 0;
+    const effectiveDownPayment = downPayment || 0;
+    const effectiveInterestRate = interestRate || 0;
+    const effectiveTotalMonths = totalMonths || 0;
+    const effectivePaymentFrequency = paymentFrequency;
+    const effectivePaymentAmount = paymentAmount || 0;
+    const effectiveMonthlyPayment = monthlyPayment || 0;
+    const effectiveAdditionalContributions = additionalContributions || false;
+    const effectiveAdditionalContributionAmount = additionalContributionAmount || 0;
+    
+    if (effectiveInitialAmount > 0 && effectiveTotalMonths > 0 && effectivePaymentFrequency && firstPaymentDate) {
+      // Create debt object for calculation
+      const debtForCalculation: DebtForCalculation = {
+        id: debt?.id || "",
+        name: debt?.name || "",
+        initialAmount: effectiveInitialAmount,
+        downPayment: effectiveDownPayment,
+        currentBalance: currentBalance || 0,
+        interestRate: effectiveInterestRate,
+        totalMonths: effectiveTotalMonths,
+        firstPaymentDate: firstPaymentDate instanceof Date ? firstPaymentDate : new Date(firstPaymentDate),
+        monthlyPayment: effectiveMonthlyPayment,
+        paymentFrequency: effectivePaymentFrequency as "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily",
+        paymentAmount: effectivePaymentAmount,
+        principalPaid: principalPaid || 0,
+        interestPaid: 0,
+        additionalContributions: effectiveAdditionalContributions,
+        additionalContributionAmount: effectiveAdditionalContributionAmount,
+        priority: debt?.priority || "Medium",
+        isPaused: isPaused || false,
+        isPaidOff: false,
+        description: debt?.description || null,
+      };
+      
+      // Calculate payments from date
+      const calculatedPayments = calculatePaymentsFromDate(debtForCalculation);
+      
+      // Update principal paid, interest paid, and current balance
+      const currentPrincipalPaid = form.getValues("principalPaid") || 0;
+      if (Math.abs(calculatedPayments.principalPaid - currentPrincipalPaid) > 0.01) {
+        form.setValue("principalPaid", calculatedPayments.principalPaid, { shouldValidate: false });
+        form.setValue("interestPaid", calculatedPayments.interestPaid, { shouldValidate: false });
+        form.setValue("currentBalance", calculatedPayments.currentBalance, { shouldValidate: false });
+      }
+    }
+  }, [
+    open,
+    initialAmount,
+    downPayment,
+    interestRate,
+    totalMonths,
+    paymentFrequency,
+    paymentAmount,
+    monthlyPayment,
+    additionalContributions,
+    additionalContributionAmount,
+    firstPaymentDate,
+    isPaused,
+    form,
+    debt,
+    currentBalance,
+    principalPaid,
+  ]);
 
   // Calculate forecast when values change
   useEffect(() => {
@@ -236,6 +555,8 @@ export function DebtForm({
       // Reset form when dialog closes
       isInitialLoad.current = false;
       isDataLoaded.current = false;
+      isPaymentAmountManuallyEdited.current = false;
+      isPrincipalPaidManuallyEdited.current = false;
       form.reset();
       return;
     }
@@ -266,6 +587,23 @@ export function DebtForm({
         firstPaymentDateValue = new Date();
       }
 
+      // Parse startDate - handle both string and Date
+      let startDateValue: Date;
+      const debtStartDate = (debt as any).startDate;
+      if (debtStartDate) {
+        if (typeof debtStartDate === 'string') {
+          const parsedDate = new Date(debtStartDate);
+          startDateValue = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+        } else {
+          const dateValue = debtStartDate as any;
+          startDateValue = dateValue instanceof Date 
+            ? dateValue 
+            : new Date(dateValue);
+        }
+      } else {
+        startDateValue = firstPaymentDateValue; // Default to first payment date if not set
+      }
+
       form.reset({
         name: debt.name ?? "",
         loanType: (debt.loanType ?? "other") as "other" | "car_loan" | "mortgage" | "personal_loan" | "credit_card" | "student_loan" | "business_loan",
@@ -273,8 +611,9 @@ export function DebtForm({
         downPayment: debt.downPayment ?? 0,
         currentBalance: debt.currentBalance ?? 0,
         interestRate: debt.interestRate ?? 0,
-        totalMonths: debt.totalMonths ?? 0,
+        totalMonths: debt.totalMonths ?? (debt.loanType === "credit_card" ? null : 0),
         firstPaymentDate: firstPaymentDateValue,
+        startDate: startDateValue,
         paymentFrequency: (debt as any).paymentFrequency ?? "monthly",
         paymentAmount: (debt as any).paymentAmount ?? 0,
         monthlyPayment: debt.monthlyPayment ?? 0,
@@ -292,27 +631,30 @@ export function DebtForm({
       setTimeout(() => {
         isDataLoaded.current = true;
       }, 100);
-    } else {
-      // New debt - reset to defaults
-      form.reset({
-        name: "",
-        loanType: "other",
-        initialAmount: 0,
-        downPayment: 0,
-        currentBalance: 0,
-        interestRate: 0,
-        totalMonths: 0,
-        firstPaymentDate: new Date(),
-        monthlyPayment: 0,
-        principalPaid: 0,
-        interestPaid: 0,
-        additionalContributions: false,
-        additionalContributionAmount: 0,
-        priority: "Medium",
-        description: "",
-        accountId: undefined,
-        isPaused: false,
-      });
+      } else {
+        // New debt - reset to defaults
+        form.reset({
+          name: "",
+          loanType: "",
+          initialAmount: 0,
+          downPayment: 0,
+          currentBalance: 0,
+          interestRate: 0,
+          totalMonths: null,
+          firstPaymentDate: new Date(),
+          startDate: new Date(),
+          paymentFrequency: "monthly",
+          paymentAmount: 0,
+          monthlyPayment: 0,
+          principalPaid: 0,
+          interestPaid: 0,
+          additionalContributions: false,
+          additionalContributionAmount: 0,
+          priority: "Medium",
+          description: "",
+          accountId: undefined,
+          isPaused: false,
+        });
       
       // Mark data as loaded for new debt too
       setTimeout(() => {
@@ -323,6 +665,7 @@ export function DebtForm({
 
   async function onSubmit(data: DebtFormData) {
     try {
+      setIsSubmitting(true);
       // Calculate initial balance
       const calculatedBalance = data.currentBalance > 0
         ? data.currentBalance
@@ -332,6 +675,11 @@ export function DebtForm({
       const firstPaymentDateValue = data.firstPaymentDate instanceof Date
         ? data.firstPaymentDate.toISOString()
         : data.firstPaymentDate;
+
+      // Convert startDate to ISO string for API
+      const startDateValue = data.startDate instanceof Date
+        ? data.startDate.toISOString()
+        : data.startDate;
 
       if (debt) {
         // Update existing debt
@@ -345,8 +693,9 @@ export function DebtForm({
               downPayment: data.downPayment,
               currentBalance: calculatedBalance,
               interestRate: data.interestRate,
-              totalMonths: data.totalMonths,
+              totalMonths: data.loanType === "credit_card" ? null : data.totalMonths,
               firstPaymentDate: firstPaymentDateValue,
+              startDate: startDateValue,
               monthlyPayment: data.monthlyPayment,
               paymentFrequency: data.paymentFrequency,
               paymentAmount: data.paymentAmount,
@@ -370,24 +719,25 @@ export function DebtForm({
         const res = await fetch("/api/debts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: data.name,
-            loanType: data.loanType,
-            initialAmount: data.initialAmount,
-            downPayment: data.downPayment,
-            interestRate: data.interestRate,
-            totalMonths: data.totalMonths,
-            firstPaymentDate: firstPaymentDateValue,
-            monthlyPayment: data.monthlyPayment,
-            paymentFrequency: data.paymentFrequency,
-            paymentAmount: data.paymentAmount,
-            additionalContributions: data.additionalContributions,
-            additionalContributionAmount: data.additionalContributionAmount || 0,
-            priority: data.priority || "Medium",
-            description: data.description || "",
-            accountId: data.accountId,
-            isPaused: data.isPaused,
-          }),
+            body: JSON.stringify({
+              name: data.name,
+              loanType: data.loanType,
+              initialAmount: data.initialAmount,
+              downPayment: data.downPayment,
+              interestRate: data.interestRate,
+              totalMonths: data.loanType === "credit_card" ? null : data.totalMonths,
+              firstPaymentDate: firstPaymentDateValue,
+              startDate: startDateValue,
+              monthlyPayment: data.monthlyPayment,
+              paymentFrequency: data.paymentFrequency,
+              paymentAmount: data.paymentAmount,
+              additionalContributions: data.additionalContributions,
+              additionalContributionAmount: data.additionalContributionAmount || 0,
+              priority: data.priority || "Medium",
+              description: data.description || "",
+              accountId: data.accountId,
+              isPaused: data.isPaused,
+            }),
         });
 
         if (!res.ok) {
@@ -415,6 +765,8 @@ export function DebtForm({
       });
       // Reload on error to revert optimistic update
       onSuccess?.();
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -423,215 +775,338 @@ export function DebtForm({
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>{debt ? "Edit" : "Create"} Debt</DialogTitle>
-          <DialogDescription>
-            {debt
-              ? "Update your debt details"
-              : "Create a new debt and track your payment progress"}
-          </DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Debt Name *</label>
-            <Input
-              {...form.register("name")}
-              placeholder="e.g., Car Loan, Mortgage"
-            />
-            {form.formState.errors.name && (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.name.message}
-              </p>
-            )}
-          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          {/* Loan Information */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold mb-1">Loan Information</h3>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Loan Type {!form.watch("loanType") && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <Select
+                  value={form.watch("loanType") || ""}
+                  onValueChange={(value) =>
+                    form.setValue("loanType", value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Loan Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mortgage">Mortgage</SelectItem>
+                    <SelectItem value="car_loan">Car Loan</SelectItem>
+                    <SelectItem value="personal_loan">Personal Loan</SelectItem>
+                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="student_loan">Student Loan</SelectItem>
+                    <SelectItem value="business_loan">Business Loan</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.loanType && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.loanType.message}
+                  </p>
+                )}
+              </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Loan Type *</label>
-            <Select
-              value={form.watch("loanType")}
-              onValueChange={(value) =>
-                form.setValue("loanType", value as any)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mortgage">Mortgage</SelectItem>
-                <SelectItem value="car_loan">Car Loan</SelectItem>
-                <SelectItem value="personal_loan">Personal Loan</SelectItem>
-                <SelectItem value="credit_card">Credit Card</SelectItem>
-                <SelectItem value="student_loan">Student Loan</SelectItem>
-                <SelectItem value="business_loan">Business Loan</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-            {form.formState.errors.loanType && (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.loanType.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Account *</label>
-            <Select
-              value={form.watch("accountId") || ""}
-              onValueChange={(value) => form.setValue("accountId", value || undefined)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {form.formState.errors.accountId && (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.accountId.message}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Initial Amount *</label>
-              <Input
-                type="number"
-                step="0.01"
-                {...form.register("initialAmount", { valueAsNumber: true })}
-                placeholder="0.00"
-              />
-              {form.formState.errors.initialAmount && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.initialAmount.message}
-                </p>
-              )}
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Debt Name {!form.watch("name") && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <Input
+                  {...form.register("name")}
+                />
+                {form.formState.errors.name && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Down Payment *</label>
-              <Input
-                type="number"
-                step="0.01"
-                {...form.register("downPayment", { valueAsNumber: true })}
-                placeholder="0.00"
-              />
-              {form.formState.errors.downPayment && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.downPayment.message}
-                </p>
-              )}
-            </div>
-          </div>
+            <div className={`grid gap-4 ${fieldConfig.showDownPayment ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {fieldConfig.initialAmountLabel} {(!form.watch("initialAmount") || form.watch("initialAmount") === 0) && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <DollarAmountInput
+                  value={form.watch("initialAmount") || undefined}
+                  onChange={(value) => form.setValue("initialAmount", value ?? 0, { shouldValidate: true })}
+                  placeholder="$ 0.00"
+                />
+                {form.formState.errors.initialAmount && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.initialAmount.message}
+                  </p>
+                )}
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Interest Rate (%) *</label>
-              <Input
-                type="number"
-                step="0.01"
-                {...form.register("interestRate", { valueAsNumber: true })}
-                placeholder="12.5"
-              />
-              {form.formState.errors.interestRate && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.interestRate.message}
-                </p>
+              {fieldConfig.showDownPayment && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    Down Payment {fieldConfig.downPaymentRequired && (!form.watch("downPayment") || form.watch("downPayment") === 0) && <span className="text-gray-400 text-[12px]">required</span>}
+                  </label>
+                  <DollarAmountInput
+                    value={form.watch("downPayment") || undefined}
+                    onChange={(value) => form.setValue("downPayment", value ?? 0, { shouldValidate: true })}
+                    placeholder="$ 0.00"
+                  />
+                  {form.formState.errors.downPayment && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.downPayment.message}
+                    </p>
+                  )}
+                </div>
               )}
-            </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Total Months *</label>
-              <Input
-                type="number"
-                {...form.register("totalMonths", { valueAsNumber: true })}
-                placeholder="60"
-              />
-              {form.formState.errors.totalMonths && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.totalMonths.message}
-                </p>
-              )}
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Interest Rate (APR) {(!form.watch("interestRate") || form.watch("interestRate") === 0) && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <PercentageInput
+                  value={form.watch("interestRate") || undefined}
+                  onChange={(value) => form.setValue("interestRate", value ?? 0, { shouldValidate: true })}
+                  placeholder="0.00 %"
+                />
+                {form.formState.errors.interestRate && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.interestRate.message}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Payment Frequency *</label>
-              <Select
-                value={form.watch("paymentFrequency")}
-                onValueChange={(value) =>
-                  form.setValue("paymentFrequency", value as any)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="biweekly">Biweekly</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="semimonthly">Semimonthly (Twice a month)</SelectItem>
-                  <SelectItem value="daily">Daily</SelectItem>
-                </SelectContent>
-              </Select>
-              {form.formState.errors.paymentFrequency && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.paymentFrequency.message}
-                </p>
-              )}
+          {/* Payment Details */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold mb-1">Payment Details</h3>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Payment Amount *</label>
-              <Input
-                type="number"
-                step="0.01"
-                {...form.register("paymentAmount", { valueAsNumber: true })}
-                placeholder="0.00"
-              />
-              {form.formState.errors.paymentAmount && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.paymentAmount.message}
-                </p>
+            <div className={`grid gap-4 ${fieldConfig.showTotalMonths ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {fieldConfig.showTotalMonths && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    Total Months {fieldConfig.totalMonthsRequired && (!form.watch("totalMonths") || form.watch("totalMonths") === 0) && <span className="text-gray-400 text-[12px]">required</span>}
+                  </label>
+                  <Select
+                    value={form.watch("totalMonths") ? form.watch("totalMonths")!.toString() : undefined}
+                    onValueChange={(value) => {
+                      form.setValue("totalMonths", Number(value), { shouldValidate: true });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select months" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getTotalMonthsOptions().map((months) => {
+                        const years = Math.floor(months / 12);
+                        const remainingMonths = months % 12;
+                        let label = `${months} months`;
+                        if (years > 0 && remainingMonths === 0) {
+                          label = `${months} months (${years} ${years === 1 ? 'year' : 'years'})`;
+                        } else if (years > 0) {
+                          label = `${months} months (${years} ${years === 1 ? 'year' : 'years'}, ${remainingMonths} ${remainingMonths === 1 ? 'month' : 'months'})`;
+                        }
+                        return (
+                          <SelectItem key={months} value={months.toString()}>
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  {form.formState.errors.totalMonths && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.totalMonths.message}
+                    </p>
+                  )}
+                </div>
               )}
-              {paymentAmount && paymentAmount > 0 && paymentFrequency && (
-                <p className="text-xs text-muted-foreground">
-                  Monthly equivalent: {formatMoney(convertToMonthlyPayment(
-                    paymentAmount,
-                    paymentFrequency as "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"
-                  ))}
-                </p>
-              )}
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Payment Frequency {!form.watch("paymentFrequency") && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <Select
+                  value={form.watch("paymentFrequency")}
+                  onValueChange={(value) =>
+                    form.setValue("paymentFrequency", value as any)
+                  }
+                  disabled={fieldConfig.paymentFrequencyLocked}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    {!fieldConfig.paymentFrequencyLocked && (
+                      <>
+                        <SelectItem value="biweekly">Biweekly</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="semimonthly">Semimonthly (Twice a month)</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.paymentFrequency && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.paymentFrequency.message}
+                  </p>
+                )}
+                {fieldConfig.paymentFrequencyLocked && (
+                  <p className="text-xs text-muted-foreground">
+                    Credit cards must use monthly payment frequency
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {fieldConfig.paymentAmountLabel} {loanType === "credit_card" && <span className="text-gray-400 text-[12px]">optional</span>}
+                </label>
+                <DollarAmountInput
+                  value={form.watch("paymentAmount") || undefined}
+                  onChange={(value) => {
+                    isPaymentAmountManuallyEdited.current = true;
+                    form.setValue("paymentAmount", value ?? 0, { shouldValidate: true });
+                  }}
+                  placeholder="$ 0.00"
+                />
+                {form.formState.errors.paymentAmount && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.paymentAmount.message}
+                  </p>
+                )}
+                {paymentAmount && paymentAmount > 0 && paymentFrequency && !fieldConfig.paymentFrequencyLocked && (
+                  <p className="text-xs text-muted-foreground">
+                    Monthly equivalent: {formatMoney(convertToMonthlyPayment(
+                      paymentAmount,
+                      paymentFrequency as "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"
+                    ))}
+                  </p>
+                )}
+                {loanType === "credit_card" && (
+                  <p className="text-xs text-muted-foreground">
+                    Because this is revolving credit, balances and interest can change monthly.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">First Payment Date *</label>
-            <Input
-              type="date"
-              value={
-                form.watch("firstPaymentDate")
-                  ? new Date(form.watch("firstPaymentDate")).toISOString().split("T")[0]
-                  : ""
-              }
-              onChange={(e) => {
-                const date = e.target.value ? new Date(e.target.value) : new Date();
-                form.setValue("firstPaymentDate", date, { shouldValidate: true });
-              }}
-            />
-            {form.formState.errors.firstPaymentDate && (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.firstPaymentDate.message}
-              </p>
+          {/* Account & Dates */}
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold mb-1">Account & Dates</h3>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Account {(!form.watch("accountId")) && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <Select
+                  value={form.watch("accountId") || ""}
+                  onValueChange={(value) => form.setValue("accountId", value || undefined)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.accountId && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.accountId.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {fieldConfig.startDateLabel} {loanType !== "credit_card" && (!form.watch("startDate")) && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <Input
+                  type="date"
+                  value={
+                    form.watch("startDate")
+                      ? new Date(form.watch("startDate")).toISOString().split("T")[0]
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : new Date();
+                    form.setValue("startDate", date, { shouldValidate: true });
+                  }}
+                />
+                {form.formState.errors.startDate && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.startDate.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {fieldConfig.firstPaymentDateLabel} {(!form.watch("firstPaymentDate")) && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
+                <Input
+                  type="date"
+                  value={
+                    form.watch("firstPaymentDate")
+                      ? new Date(form.watch("firstPaymentDate")).toISOString().split("T")[0]
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : new Date();
+                    form.setValue("firstPaymentDate", date, { shouldValidate: true });
+                  }}
+                />
+                {form.formState.errors.firstPaymentDate && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.firstPaymentDate.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {startDate && totalMonths && totalMonths > 0 && (
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Finish Date (calculated)</label>
+                  <Input
+                    type="text"
+                    value={(() => {
+                      try {
+                        const start = new Date(startDate);
+                        const finish = new Date(start);
+                        finish.setMonth(finish.getMonth() + totalMonths);
+                        return finish.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                      } catch {
+                        return '';
+                      }
+                    })()}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
             )}
           </div>
 
@@ -639,11 +1114,13 @@ export function DebtForm({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium">Principal Paid</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  {...form.register("principalPaid", { valueAsNumber: true })}
-                  placeholder="0.00"
+                <DollarAmountInput
+                  value={form.watch("principalPaid") || undefined}
+                  onChange={(value) => {
+                    isPrincipalPaidManuallyEdited.current = true;
+                    form.setValue("principalPaid", value ?? 0, { shouldValidate: true });
+                  }}
+                  placeholder="$ 0.00"
                 />
                 {form.formState.errors.principalPaid && (
                   <p className="text-xs text-destructive">
@@ -654,11 +1131,10 @@ export function DebtForm({
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">Interest Paid</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  {...form.register("interestPaid", { valueAsNumber: true })}
-                  placeholder="0.00"
+                <DollarAmountInput
+                  value={form.watch("interestPaid") || undefined}
+                  onChange={(value) => form.setValue("interestPaid", value ?? 0, { shouldValidate: true })}
+                  placeholder="$ 0.00"
                 />
                 {form.formState.errors.interestPaid && (
                   <p className="text-xs text-destructive">
@@ -708,11 +1184,19 @@ export function DebtForm({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit">
-              {debt ? "Update" : "Create"} Debt
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {debt ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                debt ? "Update" : "Create"
+              )} Debt
             </Button>
           </DialogFooter>
         </form>

@@ -27,13 +27,28 @@ interface FinancialHealthModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: FinancialHealthData;
+  lastMonthIncome?: number;
+  lastMonthExpenses?: number;
 }
 
 export function FinancialHealthModal({
   isOpen,
   onClose,
   data,
+  lastMonthIncome,
+  lastMonthExpenses,
 }: FinancialHealthModalProps) {
+  // Calculate month-over-month changes
+  const incomeMomChange = lastMonthIncome !== undefined && lastMonthIncome > 0
+    ? ((data.monthlyIncome - lastMonthIncome) / lastMonthIncome) * 100
+    : null;
+
+  const expensesMomChange = lastMonthExpenses !== undefined && lastMonthExpenses > 0
+    ? ((data.monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
+    : null;
+
+  const hasLastMonthIncome = lastMonthIncome !== undefined;
+  const hasLastMonthExpenses = lastMonthExpenses !== undefined;
   const getClassificationColor = (classification: string) => {
     switch (classification) {
       case "Excellent":
@@ -146,6 +161,16 @@ export function FinancialHealthModal({
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {formatMoney(data.monthlyIncome)}
                 </p>
+                <p className={`text-xs mt-1 ${
+                  hasLastMonthIncome && incomeMomChange !== null
+                    ? incomeMomChange >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    : "text-muted-foreground"
+                }`}>
+                  {hasLastMonthIncome && incomeMomChange !== null
+                    ? `${incomeMomChange >= 0 ? "+" : ""}${incomeMomChange.toFixed(1)}% vs last month`
+                    : "No data last month"
+                  }
+                </p>
               </div>
 
               <div className="p-4 rounded-[12px] bg-card">
@@ -157,6 +182,16 @@ export function FinancialHealthModal({
                 </div>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                   {formatMoney(data.monthlyExpenses)}
+                </p>
+                <p className={`text-xs mt-1 ${
+                  hasLastMonthExpenses && expensesMomChange !== null
+                    ? expensesMomChange >= 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+                    : "text-muted-foreground"
+                }`}>
+                  {hasLastMonthExpenses && expensesMomChange !== null
+                    ? `${expensesMomChange >= 0 ? "+" : ""}${expensesMomChange.toFixed(1)}% vs last month`
+                    : "No data last month"
+                  }
                 </p>
               </div>
             </div>

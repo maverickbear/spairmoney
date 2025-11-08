@@ -657,7 +657,14 @@ export function GroupDialog({
                 type="submit"
                 disabled={isSubmitting || !form.watch("name")}
               >
-                {isSubmitting ? "Creating..." : "Create Group"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Group"
+                )}
               </Button>
             )}
           </DialogFooter>

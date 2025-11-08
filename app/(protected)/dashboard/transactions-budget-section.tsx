@@ -10,6 +10,15 @@ export function TransactionsBudgetSection({
   budgets, 
   upcomingTransactions 
 }: TransactionsBudgetSectionProps) {
+  console.log("🔍 [TransactionsBudgetSection] Budgets received:", {
+    budgetsCount: budgets?.length || 0,
+    budgets: budgets?.slice(0, 3).map((b: any) => ({
+      id: b.id,
+      category: b.category?.name,
+      amount: b.amount,
+      percentage: b.percentage,
+    })),
+  });
 
   const budgetExecutionData = budgets
     .filter((b) => b.category)

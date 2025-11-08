@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Save, X, Upload, Camera } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { Loader2 } from "lucide-react";
 
 interface Profile {
   name: string;
@@ -449,8 +450,17 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
               type="submit" 
               disabled={saving || uploading || loading}
             >
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>

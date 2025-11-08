@@ -8,7 +8,6 @@ import { CashFlowSection } from "./cash-flow-section";
 import { TransactionsBudgetSection } from "./transactions-budget-section";
 import { ChartsSection } from "./charts-section";
 import { OnboardingWidget } from "@/components/dashboard/onboarding-widget";
-import { TotalIncomeWidget } from "@/components/dashboard/total-income-widget";
 import { loadDashboardData } from "./data-loader";
 
 interface DashboardProps {
@@ -24,9 +23,6 @@ async function DashboardContent({ selectedMonthDate }: { selectedMonthDate: Date
       {data.onboardingStatus && (
         <OnboardingWidget initialStatus={data.onboardingStatus} />
       )}
-
-      {/* Total Income Widget */}
-      <TotalIncomeWidget transactions={data.allIncomeTransactions} />
 
       {/* Summary Cards */}
       <SummaryCards 

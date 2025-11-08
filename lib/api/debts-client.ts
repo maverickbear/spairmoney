@@ -1,6 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
+import { calculatePaymentsFromDate, calculateDebtMetrics, type DebtForCalculation } from "@/lib/utils/debts";
 
 export interface Debt {
   id: string;
@@ -10,8 +11,9 @@ export interface Debt {
   downPayment: number;
   currentBalance: number;
   interestRate: number;
-  totalMonths: number;
+  totalMonths: number | null;
   firstPaymentDate: string;
+  startDate?: string | null;
   monthlyPayment: number;
   paymentFrequency?: string;
   paymentAmount?: number | null;
@@ -50,7 +52,71 @@ export async function getDebtsClient(): Promise<Debt[]> {
     return [];
   }
 
-  return debts || [];
+  if (!debts || debts.length === 0) {
+    return [];
+  }
+
+  // Calculate principal paid based on first payment date to today
+  const debtsWithCalculations = debts.map((debt: any) => {
+    const debtForCalculation: DebtForCalculation = {
+      id: debt.id,
+      name: debt.name,
+      initialAmount: debt.initialAmount,
+      downPayment: debt.downPayment,
+      currentBalance: debt.currentBalance,
+      interestRate: debt.interestRate,
+      totalMonths: debt.totalMonths,
+      firstPaymentDate: debt.firstPaymentDate,
+      monthlyPayment: debt.monthlyPayment,
+      paymentFrequency: debt.paymentFrequency,
+      paymentAmount: debt.paymentAmount,
+      principalPaid: debt.principalPaid,
+      interestPaid: debt.interestPaid,
+      additionalContributions: debt.additionalContributions,
+      additionalContributionAmount: debt.additionalContributionAmount,
+      priority: debt.priority,
+      isPaused: debt.isPaused,
+      isPaidOff: debt.isPaidOff,
+      description: debt.description,
+    };
+
+    // Calculate payments based on first payment date to today
+    // Only calculate if debt is not paused and not paid off
+    let calculatedPayments;
+    if (debt.isPaused || debt.isPaidOff) {
+      // Use stored values if paused or paid off
+      calculatedPayments = {
+        principalPaid: debt.principalPaid,
+        interestPaid: debt.interestPaid,
+        currentBalance: debt.currentBalance,
+        monthsPaid: 0,
+      };
+    } else {
+      // Calculate based on first payment date to today
+      calculatedPayments = calculatePaymentsFromDate(debtForCalculation);
+    }
+    
+    // Use calculated values for display
+    const updatedDebtForCalculation: DebtForCalculation = {
+      ...debtForCalculation,
+      principalPaid: calculatedPayments.principalPaid,
+      interestPaid: calculatedPayments.interestPaid,
+      currentBalance: calculatedPayments.currentBalance,
+    };
+
+    // Calculate metrics
+    const metrics = calculateDebtMetrics(updatedDebtForCalculation);
+
+    return {
+      ...debt,
+      principalPaid: calculatedPayments.principalPaid,
+      interestPaid: calculatedPayments.interestPaid,
+      currentBalance: calculatedPayments.currentBalance,
+      ...metrics,
+    };
+  });
+
+  return debtsWithCalculations;
 }
 
 /**

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { GoalCard } from "@/components/goals/goal-card";
 import { GoalForm } from "@/components/forms/goal-form";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +31,6 @@ interface Goal {
   currentBalance: number;
   incomePercentage: number;
   priority: "High" | "Medium" | "Low";
-  isPaused: boolean;
   isCompleted: boolean;
   completedAt?: string | null;
   description?: string | null;
@@ -55,9 +54,12 @@ export default function GoalsPage() {
   const [topUpAmount, setTopUpAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [sortBy, setSortBy] = useState<"priority" | "progress" | "eta">("priority");
-  const [filterBy, setFilterBy] = useState<"all" | "active" | "paused" | "completed">("all");
+  const [filterBy, setFilterBy] = useState<"all" | "active" | "completed">("all");
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [topUpLoading, setTopUpLoading] = useState(false);
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   useEffect(() => {
     loadGoals();
@@ -66,7 +68,8 @@ export default function GoalsPage() {
   async function loadGoals() {
     try {
       setLoading(true);
-      const res = await fetch("/api/goals");
+      // Add timestamp to bypass browser cache
+      const res = await fetch(`/api/goals?t=${Date.now()}`);
       if (!res.ok) {
         throw new Error("Failed to fetch goals");
       }
@@ -89,6 +92,7 @@ export default function GoalsPage() {
     
     // Optimistic update: remove from UI immediately
     setGoals(prev => prev.filter(g => g.id !== id));
+    setDeletingId(id);
 
     try {
       const { deleteGoalClient } = await import("@/lib/api/goals-client");
@@ -112,39 +116,11 @@ export default function GoalsPage() {
         description: error instanceof Error ? error.message : "Failed to delete goal",
         variant: "destructive",
       });
+    } finally {
+      setDeletingId(null);
     }
   }
 
-  async function handlePause(id: string, isPaused: boolean) {
-    const goal = goals.find(g => g.id === id);
-    
-    // Optimistic update: update UI immediately
-    setGoals(prev => prev.map(g => g.id === id ? { ...g, isPaused: !isPaused } : g));
-
-    try {
-      const { updateGoalClient } = await import("@/lib/api/goals-client");
-      await updateGoalClient(id, { isPaused: !isPaused });
-
-      toast({
-        title: !isPaused ? "Goal paused" : "Goal resumed",
-        description: !isPaused ? "Your goal has been paused." : "Your goal has been resumed.",
-        variant: "success",
-      });
-      
-      loadGoals();
-    } catch (error) {
-      console.error("Error pausing/resuming goal:", error);
-      // Revert optimistic update on error
-      if (goal) {
-        setGoals(prev => prev.map(g => g.id === id ? goal : g));
-      }
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update goal",
-        variant: "destructive",
-      });
-    }
-  }
 
   async function handleTopUp(id: string) {
     setSelectedGoal(goals.find((g) => g.id === id) || null);
@@ -172,6 +148,7 @@ export default function GoalsPage() {
     const goalId = selectedGoal.id;
     const oldBalance = selectedGoal.currentBalance;
     
+    setTopUpLoading(true);
     // Optimistic update: update UI immediately
     setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: g.currentBalance + amount } : g));
 
@@ -198,6 +175,8 @@ export default function GoalsPage() {
         description: error instanceof Error ? error.message : "Failed to add top-up",
         variant: "destructive",
       });
+    } finally {
+      setTopUpLoading(false);
     }
   }
 
@@ -226,6 +205,7 @@ export default function GoalsPage() {
     const goalId = selectedGoal.id;
     const oldBalance = selectedGoal.currentBalance;
     
+    setWithdrawLoading(true);
     // Optimistic update: update UI immediately
     setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: g.currentBalance - amount } : g));
 
@@ -252,13 +232,14 @@ export default function GoalsPage() {
         description: error instanceof Error ? error.message : "Failed to withdraw",
         variant: "destructive",
       });
+    } finally {
+      setWithdrawLoading(false);
     }
   }
 
   // Filter and sort goals
   const filteredGoals = goals.filter((goal) => {
-    if (filterBy === "active") return !goal.isCompleted && !goal.isPaused;
-    if (filterBy === "paused") return goal.isPaused;
+    if (filterBy === "active") return !goal.isCompleted;
     if (filterBy === "completed") return goal.isCompleted;
     return true;
   });
@@ -280,7 +261,7 @@ export default function GoalsPage() {
   });
 
   // Calculate total allocation
-  const activeGoals = goals.filter((g) => !g.isCompleted && !g.isPaused);
+  const activeGoals = goals.filter((g) => !g.isCompleted);
   const totalAllocation = activeGoals.reduce((sum, g) => sum + (g.incomePercentage || 0), 0);
 
 
@@ -313,7 +294,6 @@ export default function GoalsPage() {
             <SelectContent>
               <SelectItem value="all">All Goals</SelectItem>
               <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="paused">Paused</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
             </SelectContent>
           </Select>
@@ -359,8 +339,11 @@ export default function GoalsPage() {
               setSelectedGoal({ ...g, createdAt: goal.createdAt, updatedAt: goal.updatedAt });
               setIsFormOpen(true);
             }}
-            onDelete={handleDelete}
-            onPause={handlePause}
+            onDelete={(id) => {
+              if (deletingId !== id) {
+                handleDelete(id);
+              }
+            }}
             onTopUp={handleTopUp}
             onWithdraw={handleWithdraw}
           />
@@ -377,8 +360,8 @@ export default function GoalsPage() {
             setSelectedGoal(null);
           }
         }}
-        onSuccess={() => {
-          loadGoals();
+        onSuccess={async () => {
+          await loadGoals();
           setSelectedGoal(null);
         }}
       />
@@ -404,10 +387,19 @@ export default function GoalsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTopUpOpen(false)}>
+            <Button variant="outline" onClick={() => setIsTopUpOpen(false)} disabled={topUpLoading}>
               Cancel
             </Button>
-            <Button onClick={submitTopUp}>Add Top-up</Button>
+            <Button onClick={submitTopUp} disabled={topUpLoading}>
+              {topUpLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Top-up"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -438,10 +430,19 @@ export default function GoalsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsWithdrawOpen(false)}>
+            <Button variant="outline" onClick={() => setIsWithdrawOpen(false)} disabled={withdrawLoading}>
               Cancel
             </Button>
-            <Button onClick={submitWithdraw}>Withdraw</Button>
+            <Button onClick={submitWithdraw} disabled={withdrawLoading}>
+              {withdrawLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Withdrawing...
+                </>
+              ) : (
+                "Withdraw"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

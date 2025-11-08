@@ -164,7 +164,8 @@ CREATE TABLE IF NOT EXISTS "public"."Budget" (
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
     "macroId" "text",
-    "userId" "uuid"
+    "userId" "uuid",
+    "subcategoryId" "text"
 );
 
 
@@ -180,6 +181,17 @@ CREATE TABLE IF NOT EXISTS "public"."BudgetCategory" (
 
 
 ALTER TABLE "public"."BudgetCategory" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."BudgetSubcategory" (
+    "id" "text" NOT NULL,
+    "budgetId" "text" NOT NULL,
+    "subcategoryId" "text" NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE "public"."BudgetSubcategory" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."Category" (
@@ -485,6 +497,11 @@ ALTER TABLE ONLY "public"."BudgetCategory"
 
 
 
+ALTER TABLE ONLY "public"."BudgetSubcategory"
+    ADD CONSTRAINT "BudgetSubcategory_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."Budget"
     ADD CONSTRAINT "Budget_pkey" PRIMARY KEY ("id");
 
@@ -612,6 +629,18 @@ CREATE INDEX "BudgetCategory_categoryId_idx" ON "public"."BudgetCategory" USING 
 
 
 
+CREATE INDEX "BudgetSubcategory_budgetId_idx" ON "public"."BudgetSubcategory" USING "btree" ("budgetId");
+
+
+
+CREATE UNIQUE INDEX "BudgetSubcategory_budgetId_subcategoryId_key" ON "public"."BudgetSubcategory" USING "btree" ("budgetId", "subcategoryId");
+
+
+
+CREATE INDEX "BudgetSubcategory_subcategoryId_idx" ON "public"."BudgetSubcategory" USING "btree" ("subcategoryId");
+
+
+
 CREATE INDEX "Budget_categoryId_period_idx" ON "public"."Budget" USING "btree" ("categoryId", "period");
 
 
@@ -620,7 +649,7 @@ CREATE INDEX "Budget_macroId_idx" ON "public"."Budget" USING "btree" ("macroId")
 
 
 
-CREATE UNIQUE INDEX "Budget_period_categoryId_key" ON "public"."Budget" USING "btree" ("period", "categoryId") WHERE ("categoryId" IS NOT NULL);
+CREATE UNIQUE INDEX "Budget_period_categoryId_subcategoryId_key" ON "public"."Budget" USING "btree" ("period", "categoryId", COALESCE("subcategoryId", ''::"text")) WHERE ("categoryId" IS NOT NULL);
 
 
 
@@ -629,6 +658,10 @@ CREATE INDEX "Budget_period_idx" ON "public"."Budget" USING "btree" ("period");
 
 
 CREATE UNIQUE INDEX "Budget_period_macroId_key" ON "public"."Budget" USING "btree" ("period", "macroId") WHERE ("macroId" IS NOT NULL);
+
+
+
+CREATE INDEX "Budget_subcategoryId_idx" ON "public"."Budget" USING "btree" ("subcategoryId");
 
 
 
@@ -910,6 +943,16 @@ ALTER TABLE ONLY "public"."BudgetCategory"
 
 
 
+ALTER TABLE ONLY "public"."BudgetSubcategory"
+    ADD CONSTRAINT "BudgetSubcategory_budgetId_fkey" FOREIGN KEY ("budgetId") REFERENCES "public"."Budget"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."BudgetSubcategory"
+    ADD CONSTRAINT "BudgetSubcategory_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "public"."Subcategory"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."Budget"
     ADD CONSTRAINT "Budget_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "public"."Category"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
@@ -917,6 +960,11 @@ ALTER TABLE ONLY "public"."Budget"
 
 ALTER TABLE ONLY "public"."Budget"
     ADD CONSTRAINT "Budget_macroId_fkey" FOREIGN KEY ("macroId") REFERENCES "public"."Macro"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."Budget"
+    ADD CONSTRAINT "Budget_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "public"."Subcategory"("id") ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 
@@ -1049,16 +1097,6 @@ ALTER TABLE "public"."AccountInvestmentValue" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."AccountOwner" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "Admins can read all users" ON "public"."User" FOR SELECT USING ((("auth"."uid"() = "id") OR (EXISTS ( SELECT 1
-   FROM "public"."HouseholdMember"
-  WHERE (("HouseholdMember"."ownerId" = "User"."id") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text")))) OR "public"."is_current_user_admin"()));
-
-
-
-CREATE POLICY "Anyone can view by invitation token" ON "public"."HouseholdMember" FOR SELECT USING (true);
-
-
-
 CREATE POLICY "Anyone can view securities" ON "public"."Security" FOR SELECT USING (true);
 
 
@@ -1118,42 +1156,6 @@ ALTER TABLE "public"."InvestmentTransaction" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."Macro" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "Members can accept invitations" ON "public"."HouseholdMember" FOR UPDATE USING ((("auth"."uid"() = "memberId") OR ("auth"."uid"() = "ownerId") OR (("status" = 'pending'::"text") AND "public"."check_invitation_email_match"("email")))) WITH CHECK ((("auth"."uid"() = "memberId") OR ("auth"."uid"() = "ownerId") OR (("status" = 'pending'::"text") AND "public"."check_invitation_email_match"("email"))));
-
-
-
-CREATE POLICY "Members can read owner basic info" ON "public"."User" FOR SELECT USING ((("auth"."uid"() = "id") OR (EXISTS ( SELECT 1
-   FROM "public"."HouseholdMember"
-  WHERE (("HouseholdMember"."ownerId" = "User"."id") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
-
-
-
-CREATE POLICY "Members can read owner subscriptions" ON "public"."Subscription" FOR SELECT USING ((("auth"."uid"() = "userId") OR (EXISTS ( SELECT 1
-   FROM "public"."HouseholdMember"
-  WHERE (("HouseholdMember"."ownerId" = "Subscription"."userId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
-
-
-
-CREATE POLICY "Members can view own household relationships" ON "public"."HouseholdMember" FOR SELECT USING (("auth"."uid"() = "memberId"));
-
-
-
-CREATE POLICY "Owners can delete own household members" ON "public"."HouseholdMember" FOR DELETE USING (("auth"."uid"() = "ownerId"));
-
-
-
-CREATE POLICY "Owners can invite household members" ON "public"."HouseholdMember" FOR INSERT WITH CHECK (("auth"."uid"() = "ownerId"));
-
-
-
-CREATE POLICY "Owners can update own household members" ON "public"."HouseholdMember" FOR UPDATE USING (("auth"."uid"() = "ownerId"));
-
-
-
-CREATE POLICY "Owners can view own household members" ON "public"."HouseholdMember" FOR SELECT USING (("auth"."uid"() = "ownerId"));
-
-
-
 ALTER TABLE "public"."Plan" ENABLE ROW LEVEL SECURITY;
 
 
@@ -1206,7 +1208,13 @@ ALTER TABLE "public"."Transaction" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."User" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "Users can delete account owners" ON "public"."AccountOwner" FOR DELETE USING (("public"."is_account_owner_by_userid"("accountId") OR "public"."is_current_user_admin"()));
+CREATE POLICY "Users can delete account owners" ON "public"."AccountOwner" FOR DELETE USING ((("ownerId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+   FROM "public"."Account"
+  WHERE (("Account"."id" = "AccountOwner"."accountId") AND ("Account"."userId" = "auth"."uid"()))))));
+
+
+
+CREATE POLICY "Users can delete household members" ON "public"."HouseholdMember" FOR DELETE USING (("ownerId" = "auth"."uid"()));
 
 
 
@@ -1216,11 +1224,7 @@ CREATE POLICY "Users can delete own account investment values" ON "public"."Acco
 
 
 
-CREATE POLICY "Users can delete own accounts" ON "public"."Account" FOR DELETE USING ((("auth"."uid"() = "userId") OR (EXISTS ( SELECT 1
-   FROM "public"."AccountOwner"
-  WHERE (("AccountOwner"."accountId" = "Account"."id") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'admin'::"text"))))));
+CREATE POLICY "Users can delete own accounts" ON "public"."Account" FOR DELETE USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1230,7 +1234,7 @@ CREATE POLICY "Users can delete own budget categories" ON "public"."BudgetCatego
 
 
 
-CREATE POLICY "Users can delete own budgets" ON "public"."Budget" FOR DELETE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can delete own budgets" ON "public"."Budget" FOR DELETE USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1238,15 +1242,15 @@ CREATE POLICY "Users can delete own categories" ON "public"."Category" FOR DELET
 
 
 
-CREATE POLICY "Users can delete own debts" ON "public"."Debt" FOR DELETE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can delete own debts" ON "public"."Debt" FOR DELETE USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can delete own goals" ON "public"."Goal" FOR DELETE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can delete own goals" ON "public"."Goal" FOR DELETE USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can delete own investment accounts" ON "public"."InvestmentAccount" FOR DELETE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can delete own investment accounts" ON "public"."InvestmentAccount" FOR DELETE USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1272,26 +1276,17 @@ CREATE POLICY "Users can delete own subcategories" ON "public"."Subcategory" FOR
 
 
 
-CREATE POLICY "Users can delete own transactions" ON "public"."Transaction" FOR DELETE USING ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can delete own transactions" ON "public"."Transaction" FOR DELETE USING (("userId" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can insert account owners" ON "public"."AccountOwner" FOR INSERT WITH CHECK ((("ownerId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."AccountOwner"
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM ("public"."AccountOwner"
-     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
+  WHERE (("Account"."id" = "AccountOwner"."accountId") AND ("Account"."userId" = "auth"."uid"()))))));
 
 
 
-CREATE POLICY "Users can insert account owners" ON "public"."AccountOwner" FOR INSERT WITH CHECK ((("public"."is_account_owner_by_userid"("accountId") OR "public"."is_account_owner_via_accountowner"("accountId") OR "public"."is_current_user_admin"()) AND (("auth"."uid"() = "ownerId") OR ("public"."is_account_owner_by_userid"("accountId") AND (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE ("User"."id" = "AccountOwner"."ownerId")))) OR (("public"."is_account_owner_via_accountowner"("accountId") AND ((EXISTS ( SELECT 1
-   FROM "public"."HouseholdMember"
-  WHERE (("HouseholdMember"."ownerId" = "auth"."uid"()) AND ("HouseholdMember"."memberId" = "AccountOwner"."ownerId") AND ("HouseholdMember"."status" = 'active'::"text")))) OR (EXISTS ( SELECT 1
-   FROM "public"."HouseholdMember"
-  WHERE (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text")))))) OR ("public"."is_current_user_admin"() AND (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE ("User"."id" = "AccountOwner"."ownerId"))))))));
+CREATE POLICY "Users can insert household members" ON "public"."HouseholdMember" FOR INSERT WITH CHECK (("ownerId" = "auth"."uid"()));
 
 
 
@@ -1301,7 +1296,7 @@ CREATE POLICY "Users can insert own account investment values" ON "public"."Acco
 
 
 
-CREATE POLICY "Users can insert own accounts" ON "public"."Account" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert own accounts" ON "public"."Account" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
@@ -1311,7 +1306,7 @@ CREATE POLICY "Users can insert own budget categories" ON "public"."BudgetCatego
 
 
 
-CREATE POLICY "Users can insert own budgets" ON "public"."Budget" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert own budgets" ON "public"."Budget" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
@@ -1319,15 +1314,15 @@ CREATE POLICY "Users can insert own categories" ON "public"."Category" FOR INSER
 
 
 
-CREATE POLICY "Users can insert own debts" ON "public"."Debt" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert own debts" ON "public"."Debt" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can insert own goals" ON "public"."Goal" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert own goals" ON "public"."Goal" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can insert own investment accounts" ON "public"."InvestmentAccount" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert own investment accounts" ON "public"."InvestmentAccount" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
@@ -1341,7 +1336,7 @@ CREATE POLICY "Users can insert own macros" ON "public"."Macro" FOR INSERT WITH 
 
 
 
-CREATE POLICY "Users can insert own profile" ON "public"."User" FOR INSERT WITH CHECK (("auth"."uid"() = "id"));
+CREATE POLICY "Users can insert own profile" ON "public"."User" FOR INSERT WITH CHECK (("id" = "auth"."uid"()));
 
 
 
@@ -1357,30 +1352,17 @@ CREATE POLICY "Users can insert own subcategories" ON "public"."Subcategory" FOR
 
 
 
-CREATE POLICY "Users can insert own subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert own transactions" ON "public"."Transaction" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can insert own transactions" ON "public"."Transaction" FOR INSERT WITH CHECK ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can update account owners" ON "public"."AccountOwner" FOR UPDATE USING ((("ownerId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."AccountOwner"
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM ("public"."AccountOwner"
-     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
+  WHERE (("Account"."id" = "AccountOwner"."accountId") AND ("Account"."userId" = "auth"."uid"()))))));
 
 
 
-CREATE POLICY "Users can read own profile" ON "public"."User" FOR SELECT USING (("auth"."uid"() = "id"));
-
-
-
-CREATE POLICY "Users can read own subscriptions" ON "public"."Subscription" FOR SELECT USING (("auth"."uid"() = "userId"));
-
-
-
-CREATE POLICY "Users can update account owners" ON "public"."AccountOwner" FOR UPDATE USING (("public"."is_account_owner_by_userid"("accountId") OR "public"."is_current_user_admin"()));
+CREATE POLICY "Users can update household members" ON "public"."HouseholdMember" FOR UPDATE USING ((("ownerId" = "auth"."uid"()) OR ("memberId" = "auth"."uid"())));
 
 
 
@@ -1390,15 +1372,17 @@ CREATE POLICY "Users can update own account investment values" ON "public"."Acco
 
 
 
-CREATE POLICY "Users can update own accounts" ON "public"."Account" FOR UPDATE USING ((("auth"."uid"() = "userId") OR (EXISTS ( SELECT 1
-   FROM "public"."AccountOwner"
-  WHERE (("AccountOwner"."accountId" = "Account"."id") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'admin'::"text"))))));
+CREATE POLICY "Users can update own accounts" ON "public"."Account" FOR UPDATE USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can update own budgets" ON "public"."Budget" FOR UPDATE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can update own budget categories" ON "public"."BudgetCategory" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."Budget"
+  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can update own budgets" ON "public"."Budget" FOR UPDATE USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1406,15 +1390,15 @@ CREATE POLICY "Users can update own categories" ON "public"."Category" FOR UPDAT
 
 
 
-CREATE POLICY "Users can update own debts" ON "public"."Debt" FOR UPDATE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can update own debts" ON "public"."Debt" FOR UPDATE USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can update own goals" ON "public"."Goal" FOR UPDATE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can update own goals" ON "public"."Goal" FOR UPDATE USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can update own investment accounts" ON "public"."InvestmentAccount" FOR UPDATE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can update own investment accounts" ON "public"."InvestmentAccount" FOR UPDATE USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1428,7 +1412,7 @@ CREATE POLICY "Users can update own macros" ON "public"."Macro" FOR UPDATE USING
 
 
 
-CREATE POLICY "Users can update own profile" ON "public"."User" FOR UPDATE USING (("auth"."uid"() = "id"));
+CREATE POLICY "Users can update own profile" ON "public"."User" FOR UPDATE USING (("id" = "auth"."uid"()));
 
 
 
@@ -1444,20 +1428,17 @@ CREATE POLICY "Users can update own subcategories" ON "public"."Subcategory" FOR
 
 
 
-CREATE POLICY "Users can update own transactions" ON "public"."Transaction" FOR UPDATE USING ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can update own transactions" ON "public"."Transaction" FOR UPDATE USING (("userId" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view account owners" ON "public"."AccountOwner" FOR SELECT USING ((("ownerId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."AccountOwner"
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM ("public"."AccountOwner"
-     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
+  WHERE (("Account"."id" = "AccountOwner"."accountId") AND ("Account"."userId" = "auth"."uid"()))))));
 
 
 
-CREATE POLICY "Users can view account owners" ON "public"."AccountOwner" FOR SELECT USING ((("auth"."uid"() = "ownerId") OR (EXISTS ( SELECT 1
-   FROM "public"."HouseholdMember"
-  WHERE (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
+CREATE POLICY "Users can view household members" ON "public"."HouseholdMember" FOR SELECT USING ((("ownerId" = "auth"."uid"()) OR ("memberId" = "auth"."uid"())));
 
 
 
@@ -1467,12 +1448,7 @@ CREATE POLICY "Users can view own account investment values" ON "public"."Accoun
 
 
 
-CREATE POLICY "Users can view own accounts" ON "public"."Account" FOR SELECT USING ((("auth"."uid"() = "userId") OR (EXISTS ( SELECT 1
-   FROM "public"."AccountOwner"
-  WHERE (("AccountOwner"."accountId" = "Account"."id") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM ("public"."AccountOwner"
-     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
-  WHERE (("AccountOwner"."accountId" = "Account"."id") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
+CREATE POLICY "Users can view own accounts" ON "public"."Account" FOR SELECT USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1482,19 +1458,19 @@ CREATE POLICY "Users can view own budget categories" ON "public"."BudgetCategory
 
 
 
-CREATE POLICY "Users can view own budgets" ON "public"."Budget" FOR SELECT USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can view own budgets" ON "public"."Budget" FOR SELECT USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can view own debts" ON "public"."Debt" FOR SELECT USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can view own debts" ON "public"."Debt" FOR SELECT USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can view own goals" ON "public"."Goal" FOR SELECT USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can view own goals" ON "public"."Goal" FOR SELECT USING (("userId" = "auth"."uid"()));
 
 
 
-CREATE POLICY "Users can view own investment accounts" ON "public"."InvestmentAccount" FOR SELECT USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can view own investment accounts" ON "public"."InvestmentAccount" FOR SELECT USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1504,20 +1480,21 @@ CREATE POLICY "Users can view own investment transactions" ON "public"."Investme
 
 
 
+CREATE POLICY "Users can view own profile" ON "public"."User" FOR SELECT USING (("id" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can view own simple investment entries" ON "public"."SimpleInvestmentEntry" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."Account"
   WHERE (("Account"."id" = "SimpleInvestmentEntry"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
 
 
 
-CREATE POLICY "Users can view own transactions" ON "public"."Transaction" FOR SELECT USING ((("userId" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM "public"."Account"
-  WHERE (("Account"."id" = "Transaction"."accountId") AND ("Account"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."AccountOwner"
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("AccountOwner"."ownerId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM ("public"."AccountOwner"
-     JOIN "public"."HouseholdMember" ON (("HouseholdMember"."ownerId" = "AccountOwner"."ownerId")))
-  WHERE (("AccountOwner"."accountId" = "Transaction"."accountId") AND ("HouseholdMember"."memberId" = "auth"."uid"()) AND ("HouseholdMember"."status" = 'active'::"text"))))));
+CREATE POLICY "Users can view own subscriptions" ON "public"."Subscription" FOR SELECT USING (("userId" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view own transactions" ON "public"."Transaction" FOR SELECT USING (("userId" = "auth"."uid"()));
 
 
 
@@ -1536,10 +1513,6 @@ CREATE POLICY "Users can view system and own subcategories" ON "public"."Subcate
 
 
 CREATE POLICY "Users cannot delete own profile" ON "public"."User" FOR DELETE USING (false);
-
-
-
-CREATE POLICY "Users cannot update subscriptions" ON "public"."Subscription" FOR UPDATE USING (false);
 
 
 
@@ -1607,6 +1580,12 @@ GRANT ALL ON TABLE "public"."Budget" TO "service_role";
 GRANT ALL ON TABLE "public"."BudgetCategory" TO "anon";
 GRANT ALL ON TABLE "public"."BudgetCategory" TO "authenticated";
 GRANT ALL ON TABLE "public"."BudgetCategory" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."BudgetSubcategory" TO "anon";
+GRANT ALL ON TABLE "public"."BudgetSubcategory" TO "authenticated";
+GRANT ALL ON TABLE "public"."BudgetSubcategory" TO "service_role";
 
 
 

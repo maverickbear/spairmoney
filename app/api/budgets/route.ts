@@ -11,10 +11,11 @@ export async function POST(request: NextRequest) {
     const budget = await createBudget({
       period,
       categoryId: body.categoryId,
+      subcategoryId: body.subcategoryId,
       macroId: body.macroId,
       categoryIds: body.categoryIds,
+      subcategoryIds: body.subcategoryIds,
       amount: body.amount,
-      note: body.note,
     });
     
     return NextResponse.json(budget, { status: 201 });

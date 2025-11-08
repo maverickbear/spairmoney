@@ -9,7 +9,6 @@ export const goalSchema = z.object({
     errorMap: () => ({ message: "Priority must be High, Medium, or Low" }),
   }),
   description: z.string().optional(),
-  isPaused: z.boolean().default(false),
   expectedIncome: z.number().positive("Expected income must be positive").optional(),
   targetMonths: z.number().positive("Target months must be positive"),
 });

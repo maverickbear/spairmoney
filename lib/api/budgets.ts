@@ -1,7 +1,6 @@
 "use server";
 
 import { unstable_cache } from "next/cache";
-import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 import { requireBudgetOwnership } from "@/lib/utils/security";
@@ -21,8 +20,16 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
         macro:Macro(*)
       ),
       macro:Macro(*),
+      subcategory:Subcategory(
+        *
+      ),
       budgetCategories:BudgetCategory(
         category:Category(
+          *
+        )
+      ),
+      budgetSubcategories:BudgetSubcategory(
+        subcategory:Subcategory(
           *
         )
       )
@@ -49,6 +56,7 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
     const category = Array.isArray(budget.category) ? budget.category[0] : budget.category;
     const categoryMacro = category && Array.isArray(category.macro) ? category.macro[0] : category?.macro;
     const macro = Array.isArray(budget.macro) ? budget.macro[0] : budget.macro;
+    const subcategory = Array.isArray(budget.subcategory) ? budget.subcategory[0] : budget.subcategory;
     const budgetCategories = Array.isArray(budget.budgetCategories) ? budget.budgetCategories : [];
     
     return {
@@ -58,6 +66,7 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
         macro: categoryMacro || null,
       } : null,
       macro: macro || null,
+      subcategory: subcategory || null,
       budgetCategories: budgetCategories.map((bc: any) => ({
         ...bc,
         category: Array.isArray(bc.category) ? bc.category[0] : bc.category,
@@ -68,18 +77,32 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
   // Fetch all transactions for the period once
   const { data: allTransactions } = await supabase
     .from("Transaction")
-    .select("categoryId, amount")
+    .select("categoryId, subcategoryId, amount")
     .eq("type", "expense")
     .gte("date", formatDateStart(startOfMonth))
     .lte("date", formatDateEnd(endOfMonth));
 
-  // Create a map of categoryId -> total amount for quick lookup
+  // Create maps for quick lookup
+  // Map for categoryId -> total amount (all transactions in that category)
   const categorySpendMap = new Map<string, number>();
+  // Map for categoryId+subcategoryId -> total amount (transactions with specific subcategory)
+  const categorySubcategorySpendMap = new Map<string, number>();
+  
   if (allTransactions) {
     for (const tx of allTransactions) {
       if (tx.categoryId) {
-        const current = categorySpendMap.get(tx.categoryId) || 0;
-        categorySpendMap.set(tx.categoryId, current + (Number(tx.amount) || 0));
+        const amount = Number(tx.amount) || 0;
+        
+        // Add to category total (all transactions in this category)
+        const currentCategoryTotal = categorySpendMap.get(tx.categoryId) || 0;
+        categorySpendMap.set(tx.categoryId, currentCategoryTotal + amount);
+        
+        // If subcategoryId exists, also add to category+subcategory map
+        if (tx.subcategoryId) {
+          const key = `${tx.categoryId}:${tx.subcategoryId}`;
+          const currentSubcategoryTotal = categorySubcategorySpendMap.get(key) || 0;
+          categorySubcategorySpendMap.set(key, currentSubcategoryTotal + amount);
+        }
       }
     }
   }
@@ -90,6 +113,7 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
     
     if (budget.macroId && budget.budgetCategories && budget.budgetCategories.length > 0) {
       // Budget grouped by macro: sum transactions from all related categories
+      // Note: Grouped budgets don't have subcategories, so we sum all transactions from those categories
       const categoryIds = budget.budgetCategories
         .map((bc: any) => bc.category?.id)
         .filter((id: string) => id);
@@ -98,16 +122,27 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
         actualSpend += categorySpendMap.get(categoryId) || 0;
       }
     } else if (budget.categoryId) {
-      // Single category budget: sum transactions from that category
-      actualSpend = categorySpendMap.get(budget.categoryId) || 0;
+      // Single category budget
+      if (budget.subcategoryId) {
+        // Budget with subcategory: sum only transactions with this specific category+subcategory
+        const key = `${budget.categoryId}:${budget.subcategoryId}`;
+        actualSpend = categorySubcategorySpendMap.get(key) || 0;
+      } else {
+        // Budget without subcategory: sum all transactions from this category
+        actualSpend = categorySpendMap.get(budget.categoryId) || 0;
+      }
     }
 
-      const percentage = budget.amount > 0 ? (actualSpend / budget.amount) * 100 : 0;
+    // Calculate percentage as remaining budget (decreases as money is spent)
+    // If actualSpend >= budget.amount, percentage = 0 (no budget left)
+    const remaining = Math.max(0, budget.amount - actualSpend);
+    const percentage = budget.amount > 0 ? (remaining / budget.amount) * 100 : 0;
 
       let status: "ok" | "warning" | "over" = "ok";
-      if (percentage > 100) {
+      if (actualSpend >= budget.amount) {
         status = "over";
-      } else if (percentage > 90) {
+      } else if (percentage <= 10) {
+        // Less than 10% remaining
         status = "warning";
       }
 
@@ -136,10 +171,33 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
 }
 
 export async function getBudgets(period: Date) {
-  // Get tokens from cookies outside of cached function
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get("sb-access-token")?.value;
-  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  // Get tokens from Supabase client directly (not from cookies)
+  // This is more reliable because Supabase SSR manages cookies automatically
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  
+  try {
+    const { createServerClient } = await import("@/lib/supabase-server");
+    const supabase = await createServerClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      accessToken = session.access_token;
+      refreshToken = session.refresh_token;
+    }
+    
+    // Log token availability (only in development)
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔍 [getBudgets] Token check:", {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        hasSession: !!session,
+      });
+    }
+  } catch (error: any) {
+    // If we can't get tokens (e.g., inside unstable_cache), continue without them
+    console.warn("⚠️ [getBudgets] Could not get tokens:", error?.message);
+  }
   
   const cacheKey = `budgets-${period.getFullYear()}-${period.getMonth()}`;
   return unstable_cache(
@@ -152,10 +210,11 @@ export async function getBudgets(period: Date) {
 export async function createBudget(data: {
   period: Date;
   categoryId?: string;
+  subcategoryId?: string;
   macroId?: string;
   categoryIds?: string[];
+  subcategoryIds?: string[];
   amount: number;
-  note?: string;
 }) {
     const supabase = await createServerClient();
 
@@ -182,7 +241,6 @@ export async function createBudget(data: {
     id,
     period: periodDate,
     amount: data.amount,
-    note: data.note || null,
     userId: user.id,
     createdAt: now,
     updatedAt: now,
@@ -192,10 +250,15 @@ export async function createBudget(data: {
     // Grouped budget: use macroId, categoryId is null
     budgetData.macroId = data.macroId;
     budgetData.categoryId = null;
+    budgetData.subcategoryId = null; // Grouped budgets don't have subcategories
   } else {
-    // Single category budget: use categoryId, macroId is null
+    // Single category budget: use categoryId
+    // For single category budgets, we DON'T save macroId to avoid conflicts with Budget_period_macroId_key constraint
+    // The macroId is only used for grouped budgets
     budgetData.categoryId = data.categoryId || data.categoryIds?.[0];
-    budgetData.macroId = null;
+    budgetData.macroId = null; // Don't save macroId for single category budgets
+    // Use subcategoryId if provided (now we only support single subcategory)
+    budgetData.subcategoryId = data.subcategoryId || (data.subcategoryIds && data.subcategoryIds.length > 0 ? data.subcategoryIds[0] : null);
   }
 
   const { data: budget, error } = await supabase
@@ -208,8 +271,13 @@ export async function createBudget(data: {
     console.error("Supabase error creating budget:", error);
     // Check if it's a unique constraint violation (budget already exists)
     if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
-      const budgetType = isGrouped ? "group" : "category";
-      throw new Error(`Budget already exists for this ${budgetType} in this period`);
+      if (isGrouped) {
+        throw new Error(`Budget already exists for this group in this period`);
+      } else if (data.subcategoryId || (data.subcategoryIds && data.subcategoryIds.length > 0)) {
+        throw new Error(`Budget already exists for this category and subcategory in this period`);
+      } else {
+        throw new Error(`Budget already exists for this category in this period`);
+      }
     }
     throw new Error(`Failed to create budget: ${error.message || JSON.stringify(error)}`);
   }
@@ -235,10 +303,12 @@ export async function createBudget(data: {
     }
   }
 
+  // Note: subcategoryId is now stored directly in Budget, not in BudgetSubcategory
+
   return budget;
 }
 
-export async function updateBudget(id: string, data: { amount: number; note?: string }) {
+export async function updateBudget(id: string, data: { amount: number }) {
     const supabase = await createServerClient();
 
   // Verify ownership before updating
@@ -248,9 +318,6 @@ export async function updateBudget(id: string, data: { amount: number; note?: st
     amount: data.amount,
     updatedAt: formatTimestamp(new Date()),
   };
-  if (data.note !== undefined) {
-    updateData.note = data.note || null;
-  }
 
   const { data: budget, error } = await supabase
     .from("Budget")

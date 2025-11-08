@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Trash2, ChevronRight, ChevronDown, X } from "lucide-react";
+import { Edit, Trash2, ChevronRight, ChevronDown, X, Loader2 } from "lucide-react";
 import { CategoryDialog } from "@/components/categories/category-dialog";
 import { GroupDialog } from "@/components/categories/group-dialog";
 import {
@@ -43,6 +43,9 @@ export default function CategoriesPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+  const [deletingSubcategoryId, setDeletingSubcategoryId] = useState<string | null>(null);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -216,6 +219,7 @@ export default function CategoriesPage() {
     
     // Optimistic update: remove from UI immediately
     setCategories(prev => prev.filter(c => c.id !== id));
+    setDeletingCategoryId(id);
 
     try {
       const { deleteCategoryClient } = await import("@/lib/api/categories-client");
@@ -240,12 +244,15 @@ export default function CategoriesPage() {
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setDeletingCategoryId(null);
     }
   }
 
   async function handleDeleteSubcategory(id: string) {
     if (!confirm("Are you sure you want to delete this subcategory?")) return;
 
+    setDeletingSubcategoryId(id);
     try {
       const { deleteSubcategoryClient } = await import("@/lib/api/categories-client");
       await deleteSubcategoryClient(id);
@@ -265,6 +272,8 @@ export default function CategoriesPage() {
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setDeletingSubcategoryId(null);
     }
   }
 
@@ -275,6 +284,7 @@ export default function CategoriesPage() {
     
     // Optimistic update: remove from UI immediately
     setMacros(prev => prev.filter(m => m.id !== macroId));
+    setDeletingGroupId(macroId);
 
     try {
       const { deleteMacroClient } = await import("@/lib/api/categories-client");
@@ -299,6 +309,8 @@ export default function CategoriesPage() {
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setDeletingGroupId(null);
     }
   }
 
@@ -420,8 +432,13 @@ export default function CategoriesPage() {
                                               className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                                               onClick={() => handleDeleteSubcategory(subcat.id)}
                                               title="Delete subcategory"
+                                              disabled={deletingSubcategoryId === subcat.id}
                                             >
-                                              <X className="h-3 w-3 text-destructive" />
+                                              {deletingSubcategoryId === subcat.id ? (
+                                                <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                                              ) : (
+                                                <X className="h-3 w-3 text-destructive" />
+                                              )}
                                             </Button>
                                           )}
                                         </div>
@@ -519,8 +536,13 @@ export default function CategoriesPage() {
                                   className="h-7 w-7 md:h-10 md:w-10"
                                   onClick={() => handleDeleteGroup(group.macro.id)}
                                   title="Delete group"
+                                  disabled={deletingGroupId === group.macro.id}
                                 >
-                                  <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                  {deletingGroupId === group.macro.id ? (
+                                    <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                  )}
                                 </Button>
                               </div>
                             )}
@@ -557,8 +579,13 @@ export default function CategoriesPage() {
                                               className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
                                               onClick={() => handleDeleteSubcategory(subcat.id)}
                                               title="Delete subcategory"
+                                              disabled={deletingSubcategoryId === subcat.id}
                                             >
-                                              <X className="h-3 w-3 text-destructive" />
+                                              {deletingSubcategoryId === subcat.id ? (
+                                                <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                                              ) : (
+                                                <X className="h-3 w-3 text-destructive" />
+                                              )}
                                             </Button>
                                           )}
                                         </div>
@@ -589,8 +616,13 @@ export default function CategoriesPage() {
                                         className="h-7 w-7 md:h-10 md:w-10"
                                         onClick={() => handleDeleteCategory(category.id)}
                                         title="Delete category"
+                                        disabled={deletingCategoryId === category.id}
                                       >
-                                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                        {deletingCategoryId === category.id ? (
+                                          <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                        )}
                                       </Button>
                                     )}
                                   </div>

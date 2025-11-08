@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { budgetSchema, BudgetFormData } from "@/lib/validations/budget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -23,6 +22,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/toast-provider";
+import { Loader2 } from "lucide-react";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Macro {
   id: string;
@@ -85,8 +87,10 @@ export function BudgetForm({
   onSuccess,
 }: BudgetFormProps) {
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMacroId, setSelectedMacroId] = useState<string>("");
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
+  const [subcategoriesMap, setSubcategoriesMap] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
 
   const form = useForm<BudgetFormData>({
     resolver: zodResolver(budgetSchema),
@@ -94,13 +98,13 @@ export function BudgetForm({
       period,
       macroId: "",
       categoryId: "",
-      categoryIds: [],
+      subcategoryId: "",
       amount: 0,
-      note: "",
     },
   });
 
-  const categoryIds = form.watch("categoryIds") || [];
+  const selectedCategoryId = form.watch("categoryId") || "";
+  const selectedSubcategoryId = form.watch("subcategoryId") || "";
 
   // Load categories when macro is selected (only for new budgets)
   useEffect(() => {
@@ -117,6 +121,28 @@ export function BudgetForm({
       }
       const cats = await res.json();
       setAvailableCategories(cats || []);
+      
+      // Load subcategories for all categories
+      const newSubcategoriesMap = new Map<string, Array<{ id: string; name: string }>>();
+      for (const category of cats || []) {
+        if (category.subcategories && category.subcategories.length > 0) {
+          newSubcategoriesMap.set(category.id, category.subcategories);
+        } else {
+          // Fetch subcategories if not included
+          try {
+            const subRes = await fetch(`/api/categories?categoryId=${category.id}`);
+            if (subRes.ok) {
+              const subcats = await subRes.json();
+              if (subcats && subcats.length > 0) {
+                newSubcategoriesMap.set(category.id, subcats);
+              }
+            }
+          } catch (err) {
+            console.error("Error loading subcategories:", err);
+          }
+        }
+      }
+      setSubcategoriesMap(newSubcategoriesMap);
     } catch (error) {
       console.error("Error loading categories:", error);
       setAvailableCategories([]);
@@ -137,6 +163,10 @@ export function BudgetForm({
         if (budgetCategory) {
           setSelectedMacroId(budgetCategory.macroId);
           loadCategoriesForMacro(budgetCategory.macroId);
+          // If budget has subcategoryId, ensure subcategories are loaded
+          if (budget.subcategoryId) {
+            // Subcategories will be loaded by loadCategoriesForMacro
+          }
         }
       }
     } else if (open && !budget) {
@@ -150,16 +180,12 @@ export function BudgetForm({
     if (open) {
       if (budget) {
         // Load budget data
-        const categoryIds = budget.budgetCategories?.map(bc => bc.category?.id).filter((id): id is string => !!id) || 
-                      (budget.categoryId ? [budget.categoryId] : []);
-        
         form.reset({
           period: new Date(budget.period),
           categoryId: budget.categoryId || "",
+          subcategoryId: budget.subcategoryId || "",
           macroId: budget.macroId || "",
-          categoryIds: categoryIds,
           amount: budget.amount,
-          note: budget.note || "",
         });
       } else {
         // Reset form for new budget
@@ -167,9 +193,8 @@ export function BudgetForm({
           period,
           macroId: "",
           categoryId: "",
-          categoryIds: [],
+          subcategoryId: "",
           amount: 0,
-          note: "",
         });
       }
     }
@@ -178,25 +203,22 @@ export function BudgetForm({
   function handleMacroChange(macroId: string) {
     setSelectedMacroId(macroId);
     form.setValue("macroId", macroId);
-    form.setValue("categoryIds", []);
     form.setValue("categoryId", "");
+    form.setValue("subcategoryId", "");
   }
 
-  function handleCategoryToggle(categoryId: string) {
-    const currentIds = categoryIds || [];
-    if (currentIds.includes(categoryId)) {
-      form.setValue("categoryIds", currentIds.filter((id) => id !== categoryId));
-    } else {
-      form.setValue("categoryIds", [...currentIds, categoryId]);
-    }
+  function handleCategoryChange(categoryId: string) {
+    form.setValue("categoryId", categoryId);
+    form.setValue("subcategoryId", ""); // Clear subcategory when category changes
+  }
+
+  function handleSubcategoryChange(subcategoryId: string) {
+    form.setValue("subcategoryId", subcategoryId);
   }
 
   async function onSubmit(data: BudgetFormData) {
     try {
-      // Debug: log the form data
-      console.log("Form data:", data);
-      console.log("Category IDs:", categoryIds);
-      console.log("Selected Macro ID:", selectedMacroId);
+      setIsSubmitting(true);
 
       if (budget) {
         // Editing: update single budget
@@ -205,7 +227,6 @@ export function BudgetForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: data.amount,
-            note: data.note || "",
           }),
         });
 
@@ -232,41 +253,30 @@ export function BudgetForm({
         });
         return; // Exit early for update case
       } else {
-        // Creating: create a single budget (grouped if multiple categories selected)
-        // Use categoryIds from form data first, then fallback to local state, then single categoryId
-        const idsToUse = (data.categoryIds && data.categoryIds.length > 0)
-          ? data.categoryIds
-          : (categoryIds && categoryIds.length > 0)
-            ? categoryIds
-            : (data.categoryId ? [data.categoryId] : []);
-
-        if (idsToUse.length === 0) {
-          throw new Error("At least one category must be selected");
+        // Creating: create a single budget
+        if (!data.categoryId) {
+          throw new Error("Category must be selected");
         }
 
         if (!data.amount || data.amount <= 0) {
           throw new Error("Amount must be greater than zero");
         }
 
-        console.log("Creating budget for categories:", idsToUse);
-
-        // Create a single budget (grouped if multiple categories)
+        // Create a single budget
         const requestBody: Record<string, unknown> = {
           period: data.period.toISOString(),
           amount: data.amount,
-          note: data.note || "",
+          categoryId: data.categoryId,
         };
 
-        if (idsToUse.length > 1) {
-          // Multiple categories: create grouped budget with macroId
-          if (!selectedMacroId) {
-            throw new Error("Group must be selected when creating a grouped budget");
-          }
+        // Add macroId if selected
+        if (selectedMacroId) {
           requestBody.macroId = selectedMacroId;
-          requestBody.categoryIds = idsToUse;
-        } else {
-          // Single category: create regular budget
-          requestBody.categoryId = idsToUse[0];
+        }
+
+        // Add subcategoryId if selected
+        if (data.subcategoryId) {
+          requestBody.subcategoryId = data.subcategoryId;
         }
 
         const res = await fetch("/api/budgets", {
@@ -308,6 +318,8 @@ export function BudgetForm({
       if (onSuccess) {
         onSuccess();
       }
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -375,38 +387,67 @@ export function BudgetForm({
                   </div>
                 </>
               ) : (
-                // Single category budget: show category (read-only)
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select
-                    value={form.watch("categoryId")}
-                    disabled={true}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => {
-                        const macro = Array.isArray(category.macro) 
-                          ? category.macro[0] 
-                          : category.macro;
-                        const macroName = macro?.name || "Unknown";
-                        return (
-                          <SelectItem key={category.id} value={category.id}>
-                            {macroName} - {category.name}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                // Single category budget: show category and subcategory (read-only)
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Category</label>
+                    <Select
+                      value={form.watch("categoryId")}
+                      disabled={true}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => {
+                          const macro = Array.isArray(category.macro) 
+                            ? category.macro[0] 
+                            : category.macro;
+                          const macroName = macro?.name || "Unknown";
+                          return (
+                            <SelectItem key={category.id} value={category.id}>
+                              {macroName} - {category.name}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {form.watch("subcategoryId") && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">Subcategory</label>
+                      <Select
+                        value={form.watch("subcategoryId")}
+                        disabled={true}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(() => {
+                            const selectedCategoryId = form.watch("categoryId");
+                            if (!selectedCategoryId) return null;
+                            const subcategories = subcategoriesMap.get(selectedCategoryId) || [];
+                            return subcategories.map((subcategory) => (
+                              <SelectItem key={subcategory.id} value={subcategory.id}>
+                                {subcategory.name}
+                              </SelectItem>
+                            ));
+                          })()}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               )}
             </>
           ) : (
-            // Creating mode: show group selection and multiple categories
+            // Creating mode: show group selection and category/subcategory
             <>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Group *</label>
+                <label className="text-sm font-medium">
+                  Group {!selectedMacroId && <span className="text-gray-400 text-[12px]">required</span>}
+                </label>
                 <Select
                   value={selectedMacroId}
                   onValueChange={handleMacroChange}
@@ -425,40 +466,73 @@ export function BudgetForm({
               </div>
 
               {selectedMacroId && (
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Categories *</label>
-                  <div className="border rounded-[12px] p-4 max-h-60 overflow-y-auto space-y-2">
-                    {availableCategories.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No categories found for this group
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Category {!selectedCategoryId && <span className="text-gray-400 text-[12px]">required</span>}
+                    </label>
+                    <Select
+                      value={selectedCategoryId}
+                      onValueChange={handleCategoryChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCategories.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">
+                            No categories found for this group
+                          </div>
+                        ) : (
+                          availableCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.categoryId && (
+                      <p className="text-xs text-destructive">
+                        {form.formState.errors.categoryId.message}
                       </p>
-                    ) : (
-                      availableCategories.map((category) => (
-                        <div key={category.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={category.id}
-                            checked={categoryIds.includes(category.id)}
-                            onCheckedChange={() => handleCategoryToggle(category.id)}
-                          />
-                          <label
-                            htmlFor={category.id}
-                            className="text-sm font-medium cursor-pointer flex-1"
-                          >
-                            {category.name}
-                          </label>
-                        </div>
-                      ))
                     )}
                   </div>
-                  {categoryIds.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {categoryIds.length} categor{categoryIds.length === 1 ? "y" : "ies"} selected
-                    </p>
-                  )}
-                  {form.formState.errors.categoryIds && (
-                    <p className="text-xs text-destructive">
-                      {form.formState.errors.categoryIds.message}
-                    </p>
+
+                  {selectedCategoryId && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Subcategory <span className="text-gray-400 text-[12px]">(optional)</span>
+                      </label>
+                      <Select
+                        value={selectedSubcategoryId}
+                        onValueChange={handleSubcategoryChange}
+                        disabled={(() => {
+                          const subcategories = subcategoriesMap.get(selectedCategoryId) || [];
+                          return subcategories.length === 0;
+                        })()}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a subcategory" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(() => {
+                            const subcategories = subcategoriesMap.get(selectedCategoryId) || [];
+                            return subcategories.length === 0 ? (
+                              <div className="p-2 text-sm text-muted-foreground">
+                                No subcategories found for this category
+                              </div>
+                            ) : (
+                              subcategories.map((subcategory) => (
+                                <SelectItem key={subcategory.id} value={subcategory.id}>
+                                  {subcategory.name}
+                                </SelectItem>
+                              ))
+                            );
+                          })()}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
                 </div>
               )}
@@ -466,12 +540,13 @@ export function BudgetForm({
           )}
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Amount *</label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              {...form.register("amount", { valueAsNumber: true })}
+            <label className="text-sm font-medium">
+              Amount {(!form.watch("amount") || form.watch("amount") === 0) && <span className="text-gray-400 text-[12px]">required</span>}
+            </label>
+            <DollarAmountInput
+              value={form.watch("amount") || undefined}
+              onChange={(value) => form.setValue("amount", value ?? 0, { shouldValidate: true })}
+              placeholder="$ 0.00"
             />
             {form.formState.errors.amount && (
               <p className="text-xs text-destructive">
@@ -480,18 +555,22 @@ export function BudgetForm({
             )}
           </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Note (optional)</label>
-            <Input {...form.register("note")} />
-          </div>
-
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

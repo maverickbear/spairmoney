@@ -26,6 +26,8 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { supabase } from "@/lib/supabase";
 import { LimitWarning } from "@/components/billing/limit-warning";
+import { Loader2 } from "lucide-react";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 
 interface Account {
   id: string;
@@ -63,6 +65,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [accountLimit, setAccountLimit] = useState<{ current: number; limit: number } | null>(null);
   const [loadingLimit, setLoadingLimit] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
@@ -218,12 +221,14 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
 
   async function onSubmit(data: AccountFormData) {
     try {
+      setIsSubmitting(true);
       if (!currentUserId) {
         toast({
           title: "Error",
           description: "Unable to identify current user",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -235,6 +240,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
             description: `You've reached your account limit (${currentAccountLimit.limit}). Upgrade your plan to add more accounts.`,
             variant: "destructive",
           });
+          setIsSubmitting(false);
           return;
         }
       }
@@ -319,6 +325,8 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
       });
       // Reload limit after error
       loadAccountLimit();
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -389,21 +397,10 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
               {accountType === "credit" && (
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Credit Limit</label>
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    min="0"
-                    {...form.register("creditLimit", { 
-                      valueAsNumber: true,
-                      setValueAs: (value) => {
-                        if (value === "" || value === null || value === undefined) {
-                          return undefined;
-                        }
-                        const num = Number(value);
-                        return isNaN(num) ? undefined : num;
-                      }
-                    })}
+                  <DollarAmountInput
+                    value={form.watch("creditLimit") || undefined}
+                    onChange={(value) => form.setValue("creditLimit", value ?? undefined, { shouldValidate: true })}
+                    placeholder="$ 0.00"
                   />
                   {form.formState.errors.creditLimit && (
                     <p className="text-sm text-destructive">{form.formState.errors.creditLimit.message}</p>
@@ -414,20 +411,10 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
               {(accountType === "checking" || accountType === "savings") && (
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Initial Balance</label>
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    {...form.register("initialBalance", { 
-                      valueAsNumber: true,
-                      setValueAs: (value) => {
-                        if (value === "" || value === null || value === undefined) {
-                          return undefined;
-                        }
-                        const num = Number(value);
-                        return isNaN(num) ? undefined : num;
-                      }
-                    })}
+                  <DollarAmountInput
+                    value={form.watch("initialBalance") || undefined}
+                    onChange={(value) => form.setValue("initialBalance", value ?? undefined, { shouldValidate: true })}
+                    placeholder="$ 0.00"
                   />
                   {form.formState.errors.initialBalance && (
                     <p className="text-sm text-destructive">{form.formState.errors.initialBalance.message}</p>
@@ -485,11 +472,20 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
             {(!account && isLimitReached) ? null : (
-              <Button type="submit">Save</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
             )}
           </DialogFooter>
         </form>

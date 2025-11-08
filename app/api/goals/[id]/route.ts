@@ -16,7 +16,6 @@ export async function PATCH(
       incomePercentage: data.incomePercentage,
       priority: data.priority,
       description: data.description,
-      isPaused: data.isPaused,
       expectedIncome: data.expectedIncome,
       targetMonths: data.targetMonths,
     });

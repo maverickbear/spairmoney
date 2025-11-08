@@ -148,6 +148,18 @@ export function SummaryCards({
     expenseTransactionsCount: pastTransactions.filter((t) => t && t.type === "expense").length,
   });
 
+  const lastMonthIncome = pastLastMonthTransactions
+    .filter((t) => t && t.type === "income")
+    .reduce((sum, t) => {
+      // Handle various amount formats: number, string, null, undefined
+      let amount = 0;
+      if (t.amount != null) {
+        const parsed = typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount);
+        amount = isNaN(parsed) ? 0 : parsed;
+      }
+      return sum + amount;
+    }, 0);
+
   const lastMonthExpenses = pastLastMonthTransactions
     .filter((t) => t && t.type === "expense")
     .reduce((sum, t) => {
@@ -160,7 +172,11 @@ export function SummaryCards({
       return sum + amount;
     }, 0);
 
-  const momChange = lastMonthExpenses > 0
+  const incomeMomChange = lastMonthIncome > 0
+    ? ((currentIncome - lastMonthIncome) / lastMonthIncome) * 100
+    : 0;
+
+  const expensesMomChange = lastMonthExpenses > 0
     ? ((currentExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
     : 0;
 
@@ -181,7 +197,7 @@ export function SummaryCards({
           onClick={() => setIsModalOpen(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs text-muted-foreground font-normal">Total Balance</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground font-normal">Total Balance</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -204,31 +220,51 @@ export function SummaryCards({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-xs text-muted-foreground font-normal">Monthly Income</CardTitle>
+          <CardTitle className="text-sm text-muted-foreground font-normal">Monthly Income</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
             <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-500" />
             <div className="text-lg md:text-xl font-semibold text-foreground">{formatMoney(currentIncome)}</div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-xs text-muted-foreground font-normal">Monthly Expenses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-500" />
-            <div className="text-lg md:text-xl font-semibold text-foreground">{formatMoney(currentExpenses)}</div>
+          <div className={`text-xs mt-1 ${
+            lastMonthIncome > 0
+              ? incomeMomChange >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+              : "text-muted-foreground"
+          }`}>
+            {lastMonthIncome > 0
+              ? `${incomeMomChange >= 0 ? "+" : ""}${incomeMomChange.toFixed(1)}% vs last month`
+              : "No data last month"
+            }
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-xs text-muted-foreground font-normal">Savings/Investments</CardTitle>
+          <CardTitle className="text-sm text-muted-foreground font-normal">Monthly Expenses</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-500" />
+            <div className="text-lg md:text-xl font-semibold text-foreground">{formatMoney(currentExpenses)}</div>
+          </div>
+          <div className={`text-xs mt-1 ${
+            lastMonthExpenses > 0
+              ? expensesMomChange >= 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+              : "text-muted-foreground"
+          }`}>
+            {lastMonthExpenses > 0
+              ? `${expensesMomChange >= 0 ? "+" : ""}${expensesMomChange.toFixed(1)}% vs last month`
+              : "No data last month"
+            }
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm text-muted-foreground font-normal">Savings/Investments</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-lg md:text-xl font-semibold text-foreground">{formatMoney(savings)}</div>

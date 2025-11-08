@@ -2,32 +2,73 @@ import { z } from "zod";
 
 export const debtSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  loanType: z.enum(["mortgage", "car_loan", "personal_loan", "credit_card", "student_loan", "business_loan", "other"], {
-    errorMap: () => ({ message: "Loan type must be one of the supported types" }),
-  }),
+  loanType: z.string().min(1, "Loan type is required").refine(
+    (val) => ["mortgage", "car_loan", "personal_loan", "credit_card", "student_loan", "business_loan", "other"].includes(val),
+    {
+      message: "Loan type must be one of the supported types",
+    }
+  ),
   initialAmount: z.number().positive("Initial amount must be positive"),
-  downPayment: z.number().nonnegative("Down payment must be non-negative").default(0),
-  currentBalance: z.number().nonnegative("Current balance must be non-negative"),
-  interestRate: z.number().nonnegative("Interest rate must be non-negative"),
-  totalMonths: z.number().positive("Total months must be positive"),
-  firstPaymentDate: z.coerce.date({
-    errorMap: () => ({ message: "First payment date is required" }),
-  }),
+  totalMonths: z.number().positive("Total months must be positive").nullable().optional(),
   paymentFrequency: z.enum(["monthly", "biweekly", "weekly", "semimonthly", "daily"], {
-    errorMap: () => ({ message: "Payment frequency must be one of the supported options" }),
-  }).default("monthly"),
-  paymentAmount: z.number().positive("Payment amount must be positive"),
-  monthlyPayment: z.number().positive("Monthly payment must be positive"),
-  principalPaid: z.number().nonnegative("Principal paid must be non-negative").default(0),
-  interestPaid: z.number().nonnegative("Interest paid must be non-negative").default(0),
-  additionalContributions: z.boolean().default(false),
+    errorMap: () => ({ message: "Payment frequency is required" }),
+  }),
+  downPayment: z.number().nonnegative("Down payment must be non-negative").optional().default(0),
+  currentBalance: z.number().nonnegative("Current balance must be non-negative").optional(),
+  interestRate: z.number().nonnegative("Interest rate must be non-negative").optional(),
+  firstPaymentDate: z.coerce.date().optional(),
+  startDate: z.coerce.date().optional(),
+  paymentAmount: z.number().nonnegative("Payment amount must be non-negative").optional(),
+  monthlyPayment: z.number().nonnegative("Monthly payment must be non-negative").optional(),
+  principalPaid: z.number().nonnegative("Principal paid must be non-negative").optional().default(0),
+  interestPaid: z.number().nonnegative("Interest paid must be non-negative").optional().default(0),
+  additionalContributions: z.boolean().optional().default(false),
   additionalContributionAmount: z.number().nonnegative("Additional contribution amount must be non-negative").optional().default(0),
   priority: z.enum(["High", "Medium", "Low"], {
     errorMap: () => ({ message: "Priority must be High, Medium, or Low" }),
   }).optional().default("Medium"),
   description: z.string().optional(),
-  accountId: z.string().min(1, "Account is required").optional(),
-  isPaused: z.boolean().default(false),
+  accountId: z.string().min(1, "Account is required"),
+  isPaused: z.boolean().optional().default(false),
+}).refine((data) => {
+  // Credit Card: totalMonths is not required (revolving credit)
+  if (data.loanType === "credit_card") {
+    return true; // totalMonths can be null/undefined for credit cards
+  }
+  // All other loan types: totalMonths is required
+  return data.totalMonths !== null && data.totalMonths !== undefined && data.totalMonths > 0;
+}, {
+  message: "Total months is required for this loan type",
+  path: ["totalMonths"],
+}).refine((data) => {
+  // Credit Card: paymentFrequency must be monthly
+  if (data.loanType === "credit_card") {
+    return data.paymentFrequency === "monthly";
+  }
+  return true;
+}, {
+  message: "Credit cards must have monthly payment frequency",
+  path: ["paymentFrequency"],
+}).refine((data) => {
+  // Credit Card: firstPaymentDate is required (Next Due Date)
+  if (data.loanType === "credit_card") {
+    return data.firstPaymentDate !== null && data.firstPaymentDate !== undefined;
+  }
+  // All other loan types: firstPaymentDate is required
+  return data.firstPaymentDate !== null && data.firstPaymentDate !== undefined;
+}, {
+  message: "First Payment Date is required",
+  path: ["firstPaymentDate"],
+}).refine((data) => {
+  // Credit Card: startDate is optional (Statement Start Date)
+  if (data.loanType === "credit_card") {
+    return true; // startDate is optional for credit cards
+  }
+  // All other loan types: startDate is required
+  return data.startDate !== null && data.startDate !== undefined;
+}, {
+  message: "Start Date is required for this loan type",
+  path: ["startDate"],
 });
 
 export type DebtFormData = z.infer<typeof debtSchema>;

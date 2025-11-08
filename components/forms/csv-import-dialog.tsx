@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { parseCSV, mapCSVToTransactions, ColumnMapping, CSVRow } from "@/lib/csv/import";
 import { usePlanLimits } from "@/hooks/use-plan-limits";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
+import { Loader2 } from "lucide-react";
 
 interface Account {
   id: string;
@@ -279,7 +280,14 @@ export function CsvImportDialog({
               onClick={handleImport} 
               disabled={isImporting || !mapping.date || !mapping.amount || (!hasCsvAccess && !limitsLoading)}
             >
-              {isImporting ? "Importing..." : "Import"}
+              {isImporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                "Import"
+              )}
             </Button>
           </div>
         </div>

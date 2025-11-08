@@ -1,8 +1,6 @@
 "use server";
 
-import { unstable_cache } from "next/cache";
-import { cookies } from "next/headers";
-
+import { unstable_cache, revalidateTag } from "next/cache";
 import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 import { startOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
@@ -143,7 +141,7 @@ export async function validateAllocation(
 /**
  * Get all goals with calculated progress, ETA, and monthly contribution
  */
-async function getGoalsInternal(accessToken?: string, refreshToken?: string): Promise<GoalWithCalculations[]> {
+export async function getGoalsInternal(accessToken?: string, refreshToken?: string): Promise<GoalWithCalculations[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
 
   // Get current user to verify authentication
@@ -208,10 +206,33 @@ async function getGoalsInternal(accessToken?: string, refreshToken?: string): Pr
 }
 
 export async function getGoals(): Promise<GoalWithCalculations[]> {
-  // Get tokens from cookies outside of cached function
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get("sb-access-token")?.value;
-  const refreshToken = cookieStore.get("sb-refresh-token")?.value;
+  // Get tokens from Supabase client directly (not from cookies)
+  // This is more reliable because Supabase SSR manages cookies automatically
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  
+  try {
+    const { createServerClient } = await import("@/lib/supabase-server");
+    const supabase = await createServerClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      accessToken = session.access_token;
+      refreshToken = session.refresh_token;
+    }
+    
+    // Log token availability (only in development)
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔍 [getGoals] Token check:", {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        hasSession: !!session,
+      });
+    }
+  } catch (error: any) {
+    // If we can't get tokens (e.g., inside unstable_cache), continue without them
+    console.warn("⚠️ [getGoals] Could not get tokens:", error?.message);
+  }
   
   return unstable_cache(
     async () => getGoalsInternal(accessToken, refreshToken),
@@ -299,6 +320,9 @@ export async function createGoal(data: {
     console.error("Supabase error creating goal:", error);
     throw new Error(`Failed to create goal: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache to ensure fresh data on next fetch
+  revalidateTag('goals');
 
   return goal;
 }
@@ -402,6 +426,9 @@ export async function updateGoal(
     throw new Error(`Failed to update goal: ${error.message || JSON.stringify(error)}`);
   }
 
+  // Invalidate cache to ensure fresh data on next fetch
+  revalidateTag('goals');
+
   return goal;
 }
 
@@ -420,6 +447,9 @@ export async function deleteGoal(id: string): Promise<void> {
     console.error("Supabase error deleting goal:", error);
     throw new Error(`Failed to delete goal: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache to ensure fresh data on next fetch
+  revalidateTag('goals');
 }
 
 /**
@@ -467,6 +497,9 @@ export async function addTopUp(id: string, amount: number): Promise<Goal> {
     console.error("Supabase error adding top-up:", error);
     throw new Error(`Failed to add top-up: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache to ensure fresh data on next fetch
+  revalidateTag('goals');
 
   return updatedGoal;
 }
@@ -516,6 +549,9 @@ export async function withdraw(id: string, amount: number): Promise<Goal> {
     console.error("Supabase error withdrawing from goal:", error);
     throw new Error(`Failed to withdraw: ${error.message || JSON.stringify(error)}`);
   }
+
+  // Invalidate cache to ensure fresh data on next fetch
+  revalidateTag('goals');
 
   return updatedGoal;
 }

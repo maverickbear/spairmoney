@@ -25,6 +25,8 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { Transaction } from "@/lib/api/transactions-client";
 import { LimitWarning } from "@/components/billing/limit-warning";
+import { Loader2 } from "lucide-react";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 
 interface TransactionFormProps {
   open: boolean;
@@ -66,6 +68,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
   const [selectedMacroId, setSelectedMacroId] = useState<string>("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [transactionLimit, setTransactionLimit] = useState<{ current: number; limit: number } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -266,6 +269,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
   async function onSubmit(data: TransactionFormData) {
     try {
+      setIsSubmitting(true);
       // Check limit before creating (only for new transactions)
       if (!transaction && transactionLimit) {
         if (transactionLimit.limit !== -1 && transactionLimit.current >= transactionLimit.limit) {
@@ -274,6 +278,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
             description: `You've reached your monthly transaction limit (${transactionLimit.limit}). Upgrade your plan to continue adding transactions.`,
             variant: "destructive",
           });
+          setIsSubmitting(false);
           return;
         }
       }
@@ -333,6 +338,8 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       });
       // Reload limit after error
       loadTransactionLimit();
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -563,12 +570,16 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
             <div className="space-y-1">
               <label className="text-sm font-medium">Amount</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                {...form.register("amount", { valueAsNumber: true })}
+              <DollarAmountInput
+                value={form.watch("amount") || undefined}
+                onChange={(value) => form.setValue("amount", value ?? 0, { shouldValidate: true })}
+                placeholder="$ 0.00"
               />
+              {form.formState.errors.amount && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.amount.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1 md:col-span-2">
@@ -594,10 +605,19 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

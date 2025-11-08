@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { UpgradePlanModal } from "@/components/billing/upgrade-plan-modal";
+import { usePricingModal } from "@/contexts/pricing-modal-context";
 
 interface LimitWarningProps {
   current: number;
@@ -15,7 +14,7 @@ interface LimitWarningProps {
 }
 
 export function LimitWarning({ current, limit, type, className = "", onUpgradeSuccess }: LimitWarningProps) {
-  const [modalOpen, setModalOpen] = useState(false);
+  const { openModal } = usePricingModal();
   // Show warning when at 80% or more
   const percentage = (current / limit) * 100;
   const showWarning = percentage >= 80;
@@ -60,23 +59,14 @@ export function LimitWarning({ current, limit, type, className = "", onUpgradeSu
           </div>
         </div>
         <Button 
-          variant="outline" 
+          variant="default" 
           className="w-full sm:w-auto"
-          onClick={() => setModalOpen(true)}
+          onClick={openModal}
         >
           {isAtLimit ? "Unlock Unlimited Access" : "Upgrade Plan"}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </AlertDescription>
-      
-      <UpgradePlanModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        onSuccess={() => {
-          setModalOpen(false);
-          onUpgradeSuccess?.();
-        }}
-      />
     </Alert>
   );
 }

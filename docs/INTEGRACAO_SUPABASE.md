@@ -4,41 +4,23 @@ A aplicação está integrada com Supabase PostgreSQL!
 
 ## Status da Integração
 
-✅ **Prisma Schema** - Configurado para PostgreSQL  
 ✅ **Supabase Client** - Cliente criado para uso no cliente  
 ✅ **Supabase Server Client** - Cliente criado para uso no servidor  
-✅ **Prisma Client** - Gerado e configurado  
 ✅ **Variáveis de Ambiente** - Configuradas  
 
 ## Arquivos de Configuração
 
-### 1. Prisma (`prisma/schema.prisma`)
-- ✅ Provider: PostgreSQL
-- ✅ Connection via `DATABASE_URL`
-
-### 2. Clientes Supabase
+### 1. Clientes Supabase
 - ✅ `lib/supabase.ts` - Cliente para componentes client
 - ✅ `lib/supabase-server.ts` - Cliente para server components/API routes
 
-### 3. Variáveis de Ambiente (`.env`)
+### 2. Variáveis de Ambiente (`.env`)
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://dvshwrtzazoetkbzxolv.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
-DATABASE_URL=postgresql://postgres:[PASSWORD]@db.dvshwrtzazoetkbzxolv.supabase.co:5432/postgres
 ```
 
 ## Como Usar
-
-### Prisma (Banco de Dados)
-
-O Prisma está totalmente integrado e pronto para uso:
-
-```typescript
-import { prisma } from "@/lib/prisma";
-
-// Usar normalmente em server components e API routes
-const accounts = await prisma.account.findMany();
-```
 
 ### Supabase Client (Cliente)
 
@@ -120,13 +102,12 @@ O banco está configurado com:
 
 ## Troubleshooting
 
-### Erro: "Environment variable not found: DATABASE_URL"
-- Verifique se o arquivo `.env` existe e tem `DATABASE_URL` configurado
-- O Prisma CLI lê o arquivo `.env` (não `.env.local`)
+### Erro: "Missing Supabase environment variables"
+- Verifique se o arquivo `.env.local` existe e tem `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` configurados
 
 ### Erro: "Authentication failed"
-- Verifique se a senha no `DATABASE_URL` está correta
-- Certifique-se de que caracteres especiais estão codificados (URL encoding)
+- Verifique se as credenciais do Supabase estão corretas
+- Certifique-se de que está usando a chave anônima correta
 
 ### Erro: "Permission denied" ou "new row violates row-level security policy"
 - Verifique se está incluindo `userId` ao criar registros

@@ -4,9 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { PlanFeatures } from "@/lib/validations/plan";
 import { LimitCheckResult } from "@/lib/api/limits";
-import Link from "next/link";
 import { ArrowRight, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { usePricingModal } from "@/contexts/pricing-modal-context";
 
 interface UsageLimitsProps {
   limits: PlanFeatures;
@@ -15,6 +15,8 @@ interface UsageLimitsProps {
 }
 
 export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLimitsProps) {
+  const { openModal } = usePricingModal();
+  
   const getProgress = (limit: LimitCheckResult) => {
     if (limit.limit === -1) return 0; // Unlimited
     return Math.min((limit.current / limit.limit) * 100, 100);
@@ -80,11 +82,9 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{transactionLimit.message}</p>
               {isAtLimit(transactionLimit) && (
-                <Button asChild variant="outline">
-                  <Link href="/pricing">
+                <Button onClick={openModal} variant="default">
                     Upgrade
                     <ArrowRight className="ml-1 w-3 h-3" />
-                  </Link>
                 </Button>
               )}
             </div>
@@ -129,11 +129,9 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{accountLimit.message}</p>
               {isAtLimit(accountLimit) && (
-                <Button asChild variant="outline">
-                  <Link href="/pricing">
+                <Button onClick={openModal} variant="default">
                     Upgrade
                     <ArrowRight className="ml-1 w-3 h-3" />
-                  </Link>
                 </Button>
               )}
             </div>
@@ -149,10 +147,8 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
               ) : (
                 <>
                   <Badge variant="secondary" className="text-xs">Disabled</Badge>
-                  <Button asChild variant="ghost" className="h-6 px-2 text-xs">
-                    <Link href="/pricing">
+                  <Button onClick={openModal} variant="default" className="h-6 px-2 text-xs">
                       Upgrade
-                    </Link>
                   </Button>
                 </>
               )}
@@ -166,10 +162,8 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
               ) : (
                 <>
                   <Badge variant="secondary" className="text-xs">Disabled</Badge>
-                  <Button asChild variant="ghost" className="h-6 px-2 text-xs">
-                    <Link href="/pricing">
+                  <Button onClick={openModal} variant="default" className="h-6 px-2 text-xs">
                       Upgrade
-                    </Link>
                   </Button>
                 </>
               )}
@@ -183,10 +177,8 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
               ) : (
                 <>
                   <Badge variant="secondary" className="text-xs">Disabled</Badge>
-                  <Button asChild variant="ghost" className="h-6 px-2 text-xs">
-                    <Link href="/pricing">
+                  <Button onClick={openModal} variant="default" className="h-6 px-2 text-xs">
                       Upgrade
-                    </Link>
                   </Button>
                 </>
               )}

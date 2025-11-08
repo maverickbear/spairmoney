@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import type { HouseholdMember } from "@/lib/api/members-client";
 
 interface MemberFormProps {
@@ -33,6 +34,7 @@ interface MemberFormProps {
 export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberFormProps) {
   const isEditing = !!member;
   const schema = isEditing ? memberUpdateSchema : memberInviteSchema;
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const form = useForm<MemberInviteFormData | MemberUpdateFormData>({
     resolver: zodResolver(schema),
@@ -63,6 +65,7 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
 
   async function onSubmit(data: MemberInviteFormData | MemberUpdateFormData) {
     try {
+      setIsSubmitting(true);
       if (isEditing) {
         // Update member
         const res = await fetch(`/api/members/${member.id}`, {
@@ -95,6 +98,8 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
     } catch (error) {
       console.error("Error saving member:", error);
       alert(error instanceof Error ? error.message : "Failed to save member");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -168,10 +173,19 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit">{isEditing ? "Update" : "Invite"}</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditing ? "Updating..." : "Inviting..."}
+                </>
+              ) : (
+                isEditing ? "Update" : "Invite"
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

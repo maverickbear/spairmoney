@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, CreditCard } from "lucide-react";
+import { Plus, Edit, Trash2, CreditCard, Loader2 } from "lucide-react";
 import { formatMoney } from "@/components/common/money";
 import { AccountForm } from "@/components/forms/account-form";
 import { TableSkeleton } from "@/components/ui/list-skeleton";
@@ -34,6 +34,7 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [accountLimit, setAccountLimit] = useState<{ current: number; limit: number } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -83,6 +84,7 @@ export default function AccountsPage() {
     
     // Optimistic update: remove from UI immediately
     setAccounts(prev => prev.filter(a => a.id !== id));
+    setDeletingId(id);
 
     try {
       const { deleteAccountClient } = await import("@/lib/api/accounts-client");
@@ -108,6 +110,8 @@ export default function AccountsPage() {
         description: error instanceof Error ? error.message : "Failed to delete account",
         variant: "destructive",
       });
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -206,8 +210,13 @@ export default function AccountsPage() {
                         size="icon"
                         className="h-7 w-7 md:h-10 md:w-10"
                         onClick={() => handleDelete(account.id)}
+                        disabled={deletingId === account.id}
                       >
-                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                        {deletingId === account.id ? (
+                          <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                        )}
                       </Button>
                     </div>
                   </TableCell>

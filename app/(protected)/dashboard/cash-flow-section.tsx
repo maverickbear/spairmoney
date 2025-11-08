@@ -1,6 +1,6 @@
 import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { FinancialHealthWidget } from "@/components/dashboard/financial-health-widget";
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from "date-fns";
 
 interface CashFlowSectionProps {
   chartTransactions: any[];
@@ -43,11 +43,33 @@ export function CashFlowSection({
     };
   });
 
+  // Calculate last month's income and expenses
+  const lastMonth = subMonths(selectedMonthDate, 1);
+  const lastMonthStart = startOfMonth(lastMonth);
+  const lastMonthEnd = endOfMonth(lastMonth);
+  
+  const lastMonthTransactions = chartTransactions.filter((t) => {
+    const txDate = new Date(t.date);
+    return txDate >= lastMonthStart && txDate <= lastMonthEnd;
+  });
+
+  const lastMonthIncome = lastMonthTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+  const lastMonthExpenses = lastMonthTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
   return (
     <div className="grid gap-6 md:gap-8 grid-cols-1 md:grid-cols-2">
       <IncomeExpensesChart data={monthlyData} />
       {financialHealth && (
-        <FinancialHealthWidget data={financialHealth} />
+        <FinancialHealthWidget 
+          data={financialHealth}
+          lastMonthIncome={lastMonthIncome}
+          lastMonthExpenses={lastMonthExpenses}
+        />
       )}
     </div>
   );

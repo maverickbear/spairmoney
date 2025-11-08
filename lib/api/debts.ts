@@ -183,6 +183,7 @@ export async function createDebt(data: {
   interestRate: number;
   totalMonths: number;
   firstPaymentDate: Date | string;
+  startDate?: Date | string;
   monthlyPayment: number;
   paymentFrequency?: string;
   paymentAmount?: number;
@@ -220,6 +221,7 @@ export async function createDebt(data: {
     interestRate: data.interestRate,
     totalMonths: data.totalMonths,
     firstPaymentDate: formatTimestamp(new Date(data.firstPaymentDate)),
+    startDate: data.startDate ? formatTimestamp(new Date(data.startDate)) : formatTimestamp(new Date(data.firstPaymentDate)),
     monthlyPayment: data.monthlyPayment,
     paymentFrequency: data.paymentFrequency ?? "monthly",
     paymentAmount: data.paymentAmount ?? null,
@@ -266,6 +268,7 @@ export async function updateDebt(
     interestRate?: number;
     totalMonths?: number;
     firstPaymentDate?: Date | string;
+    startDate?: Date | string;
     monthlyPayment?: number;
     paymentFrequency?: string;
     paymentAmount?: number;
@@ -319,6 +322,9 @@ export async function updateDebt(
   if (data.totalMonths !== undefined) updateData.totalMonths = data.totalMonths;
   if (data.firstPaymentDate !== undefined) {
     updateData.firstPaymentDate = formatTimestamp(new Date(data.firstPaymentDate));
+  }
+  if (data.startDate !== undefined) {
+    updateData.startDate = formatTimestamp(new Date(data.startDate));
   }
   if (data.monthlyPayment !== undefined) updateData.monthlyPayment = data.monthlyPayment;
   if (data.paymentFrequency !== undefined) updateData.paymentFrequency = data.paymentFrequency;

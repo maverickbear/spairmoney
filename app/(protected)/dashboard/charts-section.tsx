@@ -10,6 +10,14 @@ export function ChartsSection({
   selectedMonthTransactions, 
   goals 
 }: ChartsSectionProps) {
+  console.log("🔍 [ChartsSection] Goals received:", {
+    goalsCount: goals?.length || 0,
+    goals: goals?.slice(0, 3).map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      targetAmount: g.targetAmount,
+    })),
+  });
 
   const currentIncome = selectedMonthTransactions
     .filter((t) => t.type === "income")

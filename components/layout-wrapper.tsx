@@ -8,12 +8,7 @@ import { useEffect, useState, useRef } from "react";
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
-  const [hasSubscription, setHasSubscription] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const subscriptionCheckedRef = useRef(false);
-  const checkingRef = useRef(false);
-  const lastCheckedPathnameRef = useRef<string | null>(null);
+  // Determine if this is a dashboard route early to set initial state correctly
   const isApiRoute = pathname?.startsWith("/api");
   const isAuthPage = pathname?.startsWith("/auth");
   const isAcceptPage = pathname?.startsWith("/members/accept");
@@ -21,6 +16,15 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const isWelcomePage = pathname === "/welcome";
   const isLandingPage = pathname === "/";
   const isPricingPage = pathname === "/pricing";
+  const isDashboardRoute = !isAuthPage && !isAcceptPage && !isLandingPage && !isPricingPage && !isApiRoute && !isSelectPlanPage && !isWelcomePage;
+  
+  // Initialize hasSubscription optimistically for dashboard routes to prevent menu from disappearing on reload
+  const [checking, setChecking] = useState(true);
+  const [hasSubscription, setHasSubscription] = useState(isDashboardRoute);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const subscriptionCheckedRef = useRef(false);
+  const checkingRef = useRef(false);
+  const lastCheckedPathnameRef = useRef<string | null>(null);
 
   console.log("[LAYOUT-WRAPPER] Render:", {
     pathname,
@@ -82,14 +86,16 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     // For protected routes, check subscription immediately
     // If we're on a protected route, assume user has subscription optimistically
     const isProtectedRoute = !isSelectPlanPage && !isWelcomePage;
-    const isDashboardRoute = !isAuthPage && !isAcceptPage && !isLandingPage && !isPricingPage && !isApiRoute;
     
     if (isProtectedRoute) {
       // If we're on a dashboard route, show nav optimistically while checking
-      if (isDashboardRoute && !subscriptionCheckedRef.current) {
+      // Always set optimistic state for dashboard routes to prevent menu from disappearing
+      if (isDashboardRoute) {
         console.log("[LAYOUT-WRAPPER] Dashboard route detected, showing nav optimistically");
-        setHasSubscription(true); // Optimistic update
-        setChecking(true);
+        setHasSubscription(true); // Optimistic update - always show menu on dashboard
+        if (!subscriptionCheckedRef.current) {
+          setChecking(true);
+        }
       }
       
       // Check subscription immediately (no delay for better UX)
@@ -98,7 +104,10 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         checkSubscription();
       } else {
         console.log("[LAYOUT-WRAPPER] Already checking or checked subscription, skipping");
-        setChecking(false);
+        // Don't set checking to false if we're on dashboard route - keep optimistic state
+        if (!isDashboardRoute) {
+          setChecking(false);
+        }
       }
     } else {
       // For select-plan and welcome pages, we still check subscription but don't block
@@ -179,8 +188,11 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         const errorData = await response.json().catch(() => ({}));
         console.error("[LAYOUT-WRAPPER] checkSubscription: Error data:", errorData);
         
-        // For errors, assume no subscription to avoid issues
-        setHasSubscription(false);
+        // For errors on dashboard routes, keep menu visible optimistically
+        // Only set to false if we're not on a dashboard route
+        if (!isDashboardRoute) {
+          setHasSubscription(false);
+        }
         subscriptionCheckedRef.current = true;
         
         // Only redirect if we're not already on select-plan or welcome page
@@ -194,8 +206,11 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("[LAYOUT-WRAPPER] checkSubscription: Error:", error);
-      // For errors, assume no subscription to avoid issues
-      setHasSubscription(false);
+      // For errors on dashboard routes, keep menu visible optimistically
+      // Only set to false if we're not on a dashboard route
+      if (!isDashboardRoute) {
+        setHasSubscription(false);
+      }
       subscriptionCheckedRef.current = true;
       
       // Only redirect on network errors if we're not already on select-plan or welcome page
@@ -218,8 +233,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   // Always render Nav and BottomNav to maintain consistent hook order
   // They will return null internally if hasSubscription is false or on auth pages
   // Show nav optimistically if we're on a dashboard route and checking
-  const isDashboardRoute = pathname?.startsWith("/dashboard") && !isAuthPage && !isAcceptPage;
-  const shouldShowNav = !isApiRoute && !isAuthPage && !isAcceptPage && !isSelectPlanPage && !isWelcomePage && !isLandingPage && !isPricingPage && (hasSubscription || (isDashboardRoute && checking));
+  const shouldShowNav = !isApiRoute && !isAuthPage && !isAcceptPage && !isSelectPlanPage && !isWelcomePage && !isLandingPage && !isPricingPage && (hasSubscription || isDashboardRoute);
 
   console.log("[LAYOUT-WRAPPER] Render decision:", {
     shouldShowNav,
@@ -279,7 +293,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   }
 
   // Normal layout with nav for users with subscription or optimistically for dashboard routes
-  const showNav = hasSubscription || (isDashboardRoute && checking);
+  // Always show nav on dashboard routes to prevent it from disappearing on reload
+  const showNav = hasSubscription || isDashboardRoute;
   console.log("[LAYOUT-WRAPPER] Rendering normal layout with nav", { showNav, hasSubscription, isDashboardRoute, checking });
   return (
     <>

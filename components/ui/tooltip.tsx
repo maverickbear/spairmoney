@@ -50,16 +50,16 @@ export function TooltipContent({ children, className, side = "bottom" }: Tooltip
   };
 
   const arrowClasses = {
-    top: "absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-popover",
-    bottom: "absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-popover",
-    left: "absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-l-4 border-transparent border-l-popover",
-    right: "absolute left-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-popover",
+    top: "absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-primary",
+    bottom: "absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-primary",
+    left: "absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-l-4 border-transparent border-l-primary",
+    right: "absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-l-4 border-transparent border-l-primary",
   };
 
   return (
     <span
       className={cn(
-        "absolute px-2 py-1 text-xs bg-popover text-popover-foreground border border-border rounded-[12px] opacity-0 group-hover/tooltip:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-md",
+        "absolute px-2 py-1 text-xs bg-primary text-primary-foreground rounded-[12px] opacity-0 group-hover/tooltip:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[60] shadow-md",
         sideClasses[side],
         className
       )}

@@ -6,6 +6,7 @@ import { LayoutWrapper } from "@/components/layout-wrapper";
 import { KBarWrapper } from "@/components/kbar-wrapper";
 import { ToastProvider } from "@/components/toast-provider";
 import { PlanLimitsProvider } from "@/contexts/plan-limits-context";
+import { PricingModalProvider } from "@/contexts/pricing-modal-context";
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -36,8 +37,10 @@ export default function RootLayout({
         >
           <ToastProvider>
             <PlanLimitsProvider>
+              <PricingModalProvider>
               <LayoutWrapper>{children}</LayoutWrapper>
               <KBarWrapper />
+              </PricingModalProvider>
             </PlanLimitsProvider>
           </ToastProvider>
         </ThemeProvider>

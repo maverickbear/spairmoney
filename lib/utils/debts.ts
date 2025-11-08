@@ -10,7 +10,7 @@ export interface DebtForCalculation {
   downPayment: number;
   currentBalance: number;
   interestRate: number; // Annual interest rate as percentage
-  totalMonths: number;
+  totalMonths: number | null;
   firstPaymentDate: string | Date;
   monthlyPayment: number;
   paymentFrequency?: string; // "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"
@@ -50,6 +50,71 @@ export function convertToMonthlyPayment(
     default:
       return paymentAmount;
   }
+}
+
+/**
+ * Convert monthly payment to payment amount based on frequency
+ */
+export function convertFromMonthlyPayment(
+  monthlyPayment: number,
+  frequency: "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"
+): number {
+  switch (frequency) {
+    case "monthly":
+      return monthlyPayment;
+    case "biweekly":
+      // Biweekly: 26 payments per year = 26/12 = 2.1667 per month
+      return monthlyPayment / (26 / 12);
+    case "weekly":
+      // Weekly: 52 payments per year = 52/12 = 4.3333 per month
+      return monthlyPayment / (52 / 12);
+    case "semimonthly":
+      // Semimonthly: 24 payments per year = 24/12 = 2 per month
+      return monthlyPayment / 2;
+    case "daily":
+      // Daily: 365 payments per year = 365/12 = 30.4167 per month
+      return monthlyPayment / (365 / 12);
+    default:
+      return monthlyPayment;
+  }
+}
+
+/**
+ * Calculate monthly payment (PMT) using amortization formula
+ * PMT = P * (r * (1 + r)^n) / ((1 + r)^n - 1)
+ * where:
+ * P = Principal (initialAmount - downPayment)
+ * r = Monthly interest rate (annualRate / 100 / 12)
+ * n = Number of months (totalMonths)
+ */
+export function calculateMonthlyPayment(
+  principal: number,
+  annualInterestRate: number,
+  totalMonths: number
+): number {
+  if (principal <= 0 || totalMonths <= 0) {
+    return 0;
+  }
+
+  // If no interest, simple division
+  if (annualInterestRate === 0) {
+    return principal / totalMonths;
+  }
+
+  const monthlyInterestRate = getMonthlyInterestRate(annualInterestRate);
+  
+  // PMT formula: P * (r * (1 + r)^n) / ((1 + r)^n - 1)
+  const onePlusR = 1 + monthlyInterestRate;
+  const onePlusRToN = Math.pow(onePlusR, totalMonths);
+  const numerator = monthlyInterestRate * onePlusRToN;
+  const denominator = onePlusRToN - 1;
+  
+  if (denominator <= 0) {
+    return 0;
+  }
+  
+  const monthlyPayment = principal * (numerator / denominator);
+  return Math.round(monthlyPayment * 100) / 100; // Round to 2 decimals
 }
 
 /**
@@ -273,8 +338,10 @@ export function calculatePaymentsFromDate(
   let totalPrincipalPaid = 0;
   let totalInterestPaid = 0;
   
-  // Limit to total months of the loan
-  const monthsToCalculate = Math.min(monthsDiff, debt.totalMonths);
+  // Limit to total months of the loan (if null, use monthsDiff for revolving credit)
+  const monthsToCalculate = debt.totalMonths !== null && debt.totalMonths > 0
+    ? Math.min(monthsDiff, debt.totalMonths)
+    : monthsDiff;
 
   // Calculate month by month amortization
   for (let month = 0; month < monthsToCalculate && balance > 0; month++) {

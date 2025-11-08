@@ -24,16 +24,16 @@ DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.dvshwrtzazoetkbzxolv.supa
 
 ### 3. Executar Migrations
 
-Após configurar o DATABASE_URL:
+As migrations são gerenciadas diretamente no Supabase via SQL. Os arquivos de migration estão em `supabase/migrations/`.
+
+Para aplicar as migrations:
+1. Acesse o Supabase Dashboard
+2. Vá em **SQL Editor**
+3. Execute os arquivos de migration na ordem
+
+### 4. Popular o banco com dados de exemplo
 
 ```bash
-# Gerar Prisma Client para PostgreSQL
-npm run prisma:generate
-
-# Fazer push do schema para o Supabase
-npm run db:push
-
-# Popular o banco com dados de exemplo
 npm run db:seed
 ```
 
@@ -41,18 +41,11 @@ npm run db:seed
 
 - `lib/supabase.ts` - Cliente Supabase para uso no cliente (client components)
 - `lib/supabase-server.ts` - Cliente Supabase para uso no servidor (server components/API routes)
-- `prisma/schema.prisma` - Schema do banco de dados (agora usando PostgreSQL)
-
-## Migração de SQLite para PostgreSQL
-
-Se você tinha dados no SQLite local:
-1. Os dados não serão migrados automaticamente
-2. Você precisará executar o seed novamente após configurar o Supabase
-3. Para migrar dados existentes, você precisaria exportar do SQLite e importar no PostgreSQL manualmente
+- `supabase/migrations/` - Arquivos SQL de migration do banco de dados
 
 ## Notas
 
-- O Prisma agora usa PostgreSQL em vez de SQLite
-- Todas as funcionalidades permanecem as mesmas
+- O projeto usa Supabase (PostgreSQL) diretamente via `@supabase/supabase-js`
+- Todas as funcionalidades usam o cliente Supabase
 - O Supabase também oferece autenticação, storage e outros recursos que podem ser adicionados posteriormente
 

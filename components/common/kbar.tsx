@@ -34,7 +34,6 @@ const commandGroups = [
     title: "Money Management",
     commands: [
       { id: "transactions", label: "Transactions", icon: Receipt, href: "/transactions" },
-      { id: "budgets", label: "Budgets", icon: Target, href: "/budgets" },
       { id: "categories", label: "Categories", icon: FolderTree, href: "/categories" },
       { id: "accounts", label: "Accounts", icon: Wallet, href: "/accounts" },
       { id: "households", label: "Households", icon: Users, href: "/members" },
@@ -43,7 +42,7 @@ const commandGroups = [
   {
     title: "Planning",
     commands: [
-      { id: "goals", label: "Goals", icon: PiggyBank, href: "/goals" },
+      { id: "goals", label: "Budgets & Goals", icon: PiggyBank, href: "/budgets" },
       { id: "debts", label: "Debts", icon: CreditCard, href: "/debts" },
       { id: "investments", label: "Investments", icon: TrendingUp, href: "/investments" },
     ],

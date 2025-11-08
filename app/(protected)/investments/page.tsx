@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
-import { Plus, Edit } from "lucide-react";
+import { Plus, Edit, Loader2 } from "lucide-react";
 import { FeatureGuard } from "@/components/common/feature-guard";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 
 interface InvestmentAccount {
   id: string;
@@ -62,6 +63,8 @@ export default function InvestmentsPage() {
   const [editingAccount, setEditingAccount] = useState<InvestmentAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
+  const [isSubmittingValue, setIsSubmittingValue] = useState(false);
 
   const entryForm = useForm<InvestmentEntryFormData>({
     resolver: zodResolver(investmentEntrySchema),
@@ -142,6 +145,7 @@ export default function InvestmentsPage() {
 
   async function handleSubmitEntry(data: InvestmentEntryFormData) {
     try {
+      setIsSubmittingEntry(true);
       const response = await fetch("/api/investments/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -160,11 +164,14 @@ export default function InvestmentsPage() {
       console.error("Error saving entry:", error);
       const message = error instanceof Error ? error.message : "Failed to save entry";
       alert(message);
+    } finally {
+      setIsSubmittingEntry(false);
     }
   }
 
   async function handleSubmitValue(data: AccountValueFormData) {
     try {
+      setIsSubmittingValue(true);
       const response = await fetch(`/api/investments/accounts/${data.accountId}/value`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -184,6 +191,8 @@ export default function InvestmentsPage() {
       console.error("Error updating value:", error);
       const message = error instanceof Error ? error.message : "Failed to update value";
       alert(message);
+    } finally {
+      setIsSubmittingValue(false);
     }
   }
 
@@ -402,11 +411,10 @@ export default function InvestmentsPage() {
 
               <div>
                 <label className="text-sm font-medium mb-2 block">Amount</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  {...entryForm.register("amount", { valueAsNumber: true })}
+                <DollarAmountInput
+                  value={entryForm.watch("amount") || undefined}
+                  onChange={(value) => entryForm.setValue("amount", value ?? 0, { shouldValidate: true })}
+                  placeholder="$ 0.00"
                 />
                 {entryForm.formState.errors.amount && (
                   <p className="text-xs text-destructive mt-1">
@@ -429,10 +437,20 @@ export default function InvestmentsPage() {
                   setOpenEntryDialog(false);
                   entryForm.reset();
                 }}
+                disabled={isSubmittingEntry}
               >
                 Cancel
               </Button>
-              <Button type="submit">Save</Button>
+              <Button type="submit" disabled={isSubmittingEntry}>
+                {isSubmittingEntry ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -459,11 +477,10 @@ export default function InvestmentsPage() {
           <form onSubmit={valueForm.handleSubmit(handleSubmitValue)} className="space-y-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Total Value</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                {...valueForm.register("totalValue", { valueAsNumber: true })}
+              <DollarAmountInput
+                value={valueForm.watch("totalValue") || undefined}
+                onChange={(value) => valueForm.setValue("totalValue", value ?? 0, { shouldValidate: true })}
+                placeholder="$ 0.00"
               />
               {valueForm.formState.errors.totalValue && (
                 <p className="text-xs text-destructive mt-1">
@@ -481,10 +498,20 @@ export default function InvestmentsPage() {
                   valueForm.reset();
                   setEditingAccount(null);
                 }}
+                disabled={isSubmittingValue}
               >
                 Cancel
               </Button>
-              <Button type="submit">Update</Button>
+              <Button type="submit" disabled={isSubmittingValue}>
+                {isSubmittingValue ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update"
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

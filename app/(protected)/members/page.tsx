@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Edit as EditIcon, Trash2, Crown, Mail, Users } from "lucide-react";
+import { Plus, Edit as EditIcon, Trash2, Crown, Mail, Users, Loader2 } from "lucide-react";
 import { MemberForm } from "@/components/members/member-form";
 import type { HouseholdMember } from "@/lib/api/members-client";
 import { usePlanLimits } from "@/hooks/use-plan-limits";
@@ -41,6 +41,7 @@ export default function MembersPage() {
   const [editingMember, setEditingMember] = useState<HouseholdMember | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<"admin" | "member" | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { limits, loading: limitsLoading } = usePlanLimits();
 
   const hasHouseholdMembersAccess = limits.hasInvestments;
@@ -82,6 +83,7 @@ export default function MembersPage() {
       return;
     }
 
+    setDeletingId(member.id);
     try {
       const { deleteMemberClient } = await import("@/lib/api/members-client");
       await deleteMemberClient(member.id);
@@ -89,6 +91,8 @@ export default function MembersPage() {
     } catch (error) {
       console.error("Error removing member:", error);
       alert(error instanceof Error ? error.message : "Failed to remove member");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -303,8 +307,13 @@ export default function MembersPage() {
                           size="icon"
                           className="h-7 w-7 md:h-10 md:w-10"
                           onClick={() => handleDelete(member)}
+                          disabled={deletingId === member.id}
                         >
-                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                          {deletingId === member.id ? (
+                            <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                          )}
                         </Button>
                       </div>
                     )}

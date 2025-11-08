@@ -5,7 +5,7 @@ import { DebtCard } from "@/components/debts/debt-card";
 import { DebtForm } from "@/components/forms/debt-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, CreditCard } from "lucide-react";
+import { Plus, CreditCard, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,9 +33,12 @@ interface Debt {
   downPayment: number;
   currentBalance: number;
   interestRate: number;
-  totalMonths: number;
+  totalMonths: number | null;
   firstPaymentDate: string;
+  startDate?: string | null;
   monthlyPayment: number;
+  paymentFrequency?: string;
+  paymentAmount?: number | null;
   principalPaid: number;
   interestPaid: number;
   additionalContributions: boolean;
@@ -63,6 +66,9 @@ export default function DebtsPage() {
   const [filterBy, setFilterBy] = useState<"all" | "active" | "paused" | "paid_off">("all");
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pausingId, setPausingId] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   useEffect(() => {
     loadDebts();
@@ -86,6 +92,7 @@ export default function DebtsPage() {
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this debt?")) return;
 
+    setDeletingId(id);
     try {
       const { deleteDebtClient } = await import("@/lib/api/debts-client");
       await deleteDebtClient(id);
@@ -94,10 +101,13 @@ export default function DebtsPage() {
     } catch (error) {
       console.error("Error deleting debt:", error);
       alert(error instanceof Error ? error.message : "Failed to delete debt");
+    } finally {
+      setDeletingId(null);
     }
   }
 
   async function handlePause(id: string, isPaused: boolean) {
+    setPausingId(id);
     try {
       const { updateDebtClient } = await import("@/lib/api/debts-client");
       await updateDebtClient(id, { isPaused: !isPaused });
@@ -106,6 +116,8 @@ export default function DebtsPage() {
     } catch (error) {
       console.error("Error pausing/resuming debt:", error);
       alert(error instanceof Error ? error.message : "Failed to update debt");
+    } finally {
+      setPausingId(null);
     }
   }
 
@@ -123,6 +135,7 @@ export default function DebtsPage() {
       return;
     }
 
+    setPaymentLoading(true);
     try {
       const { addPaymentClient } = await import("@/lib/api/debts-client");
       await addPaymentClient(selectedDebt.id, amount);
@@ -134,6 +147,8 @@ export default function DebtsPage() {
     } catch (error) {
       console.error("Error adding payment:", error);
       alert(error instanceof Error ? error.message : "Failed to add payment");
+    } finally {
+      setPaymentLoading(false);
     }
   }
 
@@ -210,37 +225,36 @@ export default function DebtsPage() {
       </div>
 
       {loading && debts.length > 0 ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center gap-6">
-                  <Skeleton className="h-20 w-20 rounded-full flex-shrink-0" />
-                  <div className="flex-1 min-w-0 space-y-4">
-                    <div className="flex items-start justify-between gap-4">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1">
+                      <Skeleton className="h-[60px] w-[60px] rounded-full flex-shrink-0" />
                       <div className="flex-1 space-y-2">
-                        <Skeleton className="h-6 w-32" />
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-3 w-48" />
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-24" />
                       </div>
-                      <Skeleton className="h-8 w-8 rounded" />
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[1, 2, 3, 4].map((j) => (
-                        <div key={j} className="space-y-1">
-                          <Skeleton className="h-3 w-20" />
-                          <Skeleton className="h-5 w-24" />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-                      {[1, 2, 3, 4].map((j) => (
-                        <div key={j} className="space-y-1">
-                          <Skeleton className="h-3 w-16" />
-                          <Skeleton className="h-4 w-20" />
-                        </div>
-                      ))}
-                    </div>
+                    <Skeleton className="h-8 w-8 rounded" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[1, 2, 3, 4].map((j) => (
+                      <div key={j} className="space-y-1">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                    {[1, 2].map((j) => (
+                      <div key={j} className="space-y-1">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    ))}
                   </div>
                 </div>
               </CardContent>
@@ -248,7 +262,7 @@ export default function DebtsPage() {
           ))}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {sortedDebts.map((debt) => (
             <DebtCard
               key={debt.id}
@@ -257,8 +271,16 @@ export default function DebtsPage() {
                 setSelectedDebt({ ...d, createdAt: debt.createdAt, updatedAt: debt.updatedAt });
                 setIsFormOpen(true);
               }}
-              onDelete={handleDelete}
-              onPause={handlePause}
+              onDelete={(id) => {
+                if (deletingId !== id) {
+                  handleDelete(id);
+                }
+              }}
+              onPause={(id, isPaused) => {
+                if (pausingId !== id) {
+                  handlePause(id, isPaused);
+                }
+              }}
               onPayment={handlePayment}
             />
           ))}
@@ -330,10 +352,20 @@ export default function DebtsPage() {
                 setPaymentAmount("");
                 setSelectedDebt(null);
               }}
+              disabled={paymentLoading}
             >
               Cancel
             </Button>
-            <Button onClick={submitPayment}>Record Payment</Button>
+            <Button onClick={submitPayment} disabled={paymentLoading}>
+              {paymentLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                "Record Payment"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

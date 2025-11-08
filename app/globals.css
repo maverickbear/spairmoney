@@ -112,6 +112,16 @@
   /* Smooth scroll for anchor links */
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+  
+  /* Prevent horizontal scroll when modal is open */
+  body {
+    overflow-x: hidden;
+  }
+  
+  body[data-scroll-locked] {
+    overflow-x: hidden !important;
   }
 
   /* Landing page animations */

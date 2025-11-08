@@ -33,7 +33,6 @@ const navSections = [
     title: "Money Management",
     items: [
       { href: "/transactions", label: "Transactions", icon: Receipt },
-      { href: "/budgets", label: "Budgets", icon: Target },
       { href: "/categories", label: "Categories", icon: FolderTree },
       { href: "/accounts", label: "Accounts", icon: Wallet },
       { href: "/members", label: "Households", icon: Users },
@@ -42,7 +41,7 @@ const navSections = [
   {
     title: "Planning",
     items: [
-      { href: "/goals", label: "Goals", icon: PiggyBank },
+      { href: "/budgets", label: "Budgets & Goals", icon: PiggyBank },
       { href: "/debts", label: "Debts", icon: CreditCard },
       { href: "/investments", label: "Investments", icon: TrendingUp },
     ],
@@ -186,13 +185,13 @@ export function Nav({ hasSubscription = true }: NavProps) {
         <aside
           className={cn(
             "fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-300 hidden md:block",
-            isCollapsed ? "w-16" : "w-64"
+            isCollapsed ? "w-16 overflow-visible" : "w-64 overflow-hidden"
           )}
         >
-          <div className="flex h-full flex-col">
+          <div className={cn("flex h-full flex-col", isCollapsed && "overflow-visible")}>
             <div
               className={cn(
-                "flex h-16 items-center border-b px-4",
+                "flex h-16 items-center border-b px-4 relative",
                 isCollapsed ? "justify-center" : "justify-between"
               )}
             >
@@ -201,28 +200,12 @@ export function Nav({ hasSubscription = true }: NavProps) {
                   Spare Finance
                 </Link>
               )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                  >
-                    {isCollapsed ? (
-                      <ChevronRight className="h-4 w-4" />
-                    ) : (
-                      <ChevronLeft className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side={isCollapsed ? "right" : "bottom"}>
-                  {isCollapsed ? "Expand menu" : "Collapse menu"}
-                </TooltipContent>
-              </Tooltip>
             </div>
 
-            <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+            <nav className={cn(
+              "flex-1 space-y-6 px-3 py-4",
+              isCollapsed ? "overflow-visible" : "overflow-y-auto"
+            )}>
               {navSections.map((section) => (
                 <div key={section.title} className="space-y-1">
                   {!isCollapsed && (
@@ -232,9 +215,12 @@ export function Nav({ hasSubscription = true }: NavProps) {
                   )}
                   {section.items.map((item) => {
                     const Icon = item.icon;
+                    // Extract base path without query params for comparison
+                    const basePath = item.href.split("?")[0];
                     const isActive =
                       pathname === item.href ||
-                      (item.href !== "/" && pathname.startsWith(item.href));
+                      pathname === basePath ||
+                      (basePath !== "/" && pathname.startsWith(basePath));
                     const linkElement = (
                       <Link
                         href={item.href}
@@ -263,10 +249,14 @@ export function Nav({ hasSubscription = true }: NavProps) {
                     if (isCollapsed) {
                       return (
                         <Tooltip key={item.href}>
-                          <TooltipTrigger asChild>{linkElement}</TooltipTrigger>
-                          <TooltipContent side="right">
-                            {item.label}
-                          </TooltipContent>
+                          <TooltipTrigger asChild>
+                            <div className="relative">
+                              {linkElement}
+                              <TooltipContent side="right">
+                                {item.label}
+                              </TooltipContent>
+                            </div>
+                          </TooltipTrigger>
                         </Tooltip>
                       );
                     }
@@ -404,6 +394,30 @@ export function Nav({ hasSubscription = true }: NavProps) {
             </div>
           </div>
         </aside>
+        {/* Toggle button rendered outside aside to avoid overflow clipping */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "fixed top-4 h-5 w-5 z-[50] bg-card border border-border shadow-sm hidden md:flex items-center justify-center",
+                isCollapsed ? "left-16" : "left-64"
+              )}
+              style={{ transform: 'translateX(-50%)' }}
+              onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronLeft className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side={isCollapsed ? "right" : "bottom"}>
+            {isCollapsed ? "Expand menu" : "Collapse menu"}
+          </TooltipContent>
+        </Tooltip>
       </TooltipProvider>
     </SidebarContext.Provider>
   );
