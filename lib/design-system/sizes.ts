@@ -149,10 +149,11 @@ export function getSizeClasses(
   component: keyof typeof componentSizes,
   size: "small" | "medium" | "large" | "icon" = DEFAULT_SIZE
 ): string {
-  const sizeConfig = componentSizes[component][size];
+  const componentSizesForComponent = componentSizes[component] as Record<string, Record<string, string>>;
+  const sizeConfig = componentSizesForComponent[size];
   if (!sizeConfig) {
     // Fallback to medium if size doesn't exist
-    const mediumConfig = componentSizes[component]["medium"];
+    const mediumConfig = componentSizesForComponent["medium"];
     return Object.values(mediumConfig).filter(Boolean).join(" ");
   }
   

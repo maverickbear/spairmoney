@@ -103,7 +103,7 @@ export async function createTransaction(data: TransactionFormData) {
     }
 
     // Invalidate cache to ensure dashboard shows updated data
-    revalidateTag('transactions');
+    revalidateTag('transactions', 'page');
 
     return { outgoing, incoming };
   }
@@ -143,7 +143,7 @@ export async function createTransaction(data: TransactionFormData) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions');
+  revalidateTag('transactions', 'page');
 
   return transaction;
 }
@@ -228,7 +228,7 @@ export async function deleteTransaction(id: string) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions');
+  revalidateTag('transactions', 'page');
 }
 
 export async function getTransactionsInternal(
@@ -324,7 +324,6 @@ export async function getTransactionsInternal(
   console.log("🔍 [getTransactionsInternal] Authentication check:", {
     hasUser: !!currentUser,
     userId: currentUser?.id,
-    authError: authError?.message,
   });
 
   const { data, error } = await query;
@@ -404,9 +403,6 @@ export async function getTransactionsInternal(
             oldest: allTransactions[allTransactions.length - 1]?.date,
             newest: allTransactions[0]?.date,
           } : null,
-          error: allError,
-          errorMessage: allError?.message,
-          errorCode: allError?.code,
         });
 
         // Check if user has accounts and if transactions belong to those accounts

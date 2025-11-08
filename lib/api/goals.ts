@@ -322,7 +322,7 @@ export async function createGoal(data: {
   }
 
   // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals');
+  revalidateTag('goals', 'page');
 
   return goal;
 }
@@ -427,7 +427,7 @@ export async function updateGoal(
   }
 
   // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals');
+  revalidateTag('goals', 'page');
 
   return goal;
 }
@@ -449,7 +449,7 @@ export async function deleteGoal(id: string): Promise<void> {
   }
 
   // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals');
+  revalidateTag('goals', 'page');
 }
 
 /**
@@ -499,7 +499,7 @@ export async function addTopUp(id: string, amount: number): Promise<Goal> {
   }
 
   // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals');
+  revalidateTag('goals', 'page');
 
   return updatedGoal;
 }
@@ -551,7 +551,7 @@ export async function withdraw(id: string, amount: number): Promise<Goal> {
   }
 
   // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals');
+  revalidateTag('goals', 'page');
 
   return updatedGoal;
 }

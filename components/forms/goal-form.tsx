@@ -37,6 +37,7 @@ interface Goal {
   incomePercentage: number;
   priority: "High" | "Medium" | "Low";
   description?: string | null;
+  isPaused?: boolean;
   isCompleted: boolean;
   expectedIncome?: number | null;
   targetMonths?: number | null;

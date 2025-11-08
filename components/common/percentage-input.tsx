@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export interface PercentageInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type"> {
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size"> {
   value?: number | string;
   onChange?: (value: number | undefined) => void;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  size?: "small" | "medium" | "large";
 }
 
 /**

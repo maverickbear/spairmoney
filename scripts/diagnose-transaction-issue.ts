@@ -162,16 +162,24 @@ async function diagnose() {
 
   // 6. Verificar RLS status
   console.log('\n6️⃣ Verificando status do RLS...');
-  const { data: rlsStatus, error: rlsError } = await supabase.rpc('exec_sql', {
-    query: `
-      SELECT 
-        tablename,
-        rowsecurity as "RLS Enabled"
-      FROM pg_tables
-      WHERE schemaname = 'public' 
-      AND tablename = 'Transaction';
-    `
-  }).catch(() => ({ data: null, error: null }));
+  let rlsStatus: any = null;
+  let rlsError: any = null;
+  try {
+    const result = await supabase.rpc('exec_sql', {
+      query: `
+        SELECT 
+          tablename,
+          rowsecurity as "RLS Enabled"
+        FROM pg_tables
+        WHERE schemaname = 'public' 
+        AND tablename = 'Transaction';
+      `
+    });
+    rlsStatus = result.data;
+    rlsError = result.error;
+  } catch (error) {
+    rlsError = error;
+  }
 
   if (rlsError) {
     console.log('⚠️ Não foi possível verificar RLS (normal se não tiver função exec_sql)');
@@ -181,17 +189,25 @@ async function diagnose() {
 
   // 7. Verificar políticas RLS
   console.log('\n7️⃣ Verificando políticas RLS...');
-  const { data: policies, error: policiesError } = await supabase.rpc('exec_sql', {
-    query: `
-      SELECT 
-        policyname,
-        cmd,
-        qual
-      FROM pg_policies
-      WHERE schemaname = 'public' 
-      AND tablename = 'Transaction';
-    `
-  }).catch(() => ({ data: null, error: null }));
+  let policies: any = null;
+  let policiesError: any = null;
+  try {
+    const result = await supabase.rpc('exec_sql', {
+      query: `
+        SELECT 
+          policyname,
+          cmd,
+          qual
+        FROM pg_policies
+        WHERE schemaname = 'public' 
+        AND tablename = 'Transaction';
+      `
+    });
+    policies = result.data;
+    policiesError = result.error;
+  } catch (error) {
+    policiesError = error;
+  }
 
   if (policiesError) {
     console.log('⚠️ Não foi possível verificar políticas (normal se não tiver função exec_sql)');

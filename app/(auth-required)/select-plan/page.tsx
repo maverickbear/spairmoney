@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { PlanSelector } from "@/components/billing/plan-selector";
 import { Plan } from "@/lib/validations/plan";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
-export default function SelectPlanPage() {
+function SelectPlanPageContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -131,6 +131,28 @@ export default function SelectPlanPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function SelectPlanPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="text-center space-y-3">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Choose Your Plan</h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Select a plan to get started
+            </p>
+          </div>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      </div>
+    }>
+      <SelectPlanPageContent />
+    </Suspense>
   );
 }
 
