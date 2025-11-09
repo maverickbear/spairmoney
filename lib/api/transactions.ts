@@ -10,6 +10,7 @@ import { calculateNextPaymentDates, type DebtForCalculation } from "@/lib/utils/
 import { getDebtCategoryMapping } from "@/lib/utils/debt-categories";
 import { guardTransactionLimit, getCurrentUserId, throwIfNotAllowed } from "@/lib/api/feature-guard";
 import { requireTransactionOwnership } from "@/lib/utils/security";
+import { suggestCategory } from "@/lib/api/category-learning";
 
 export async function createTransaction(data: TransactionFormData) {
     const supabase = await createServerClient();
@@ -26,10 +27,6 @@ export async function createTransaction(data: TransactionFormData) {
   const limitGuard = await guardTransactionLimit(userId, data.date instanceof Date ? data.date : new Date(data.date));
   await throwIfNotAllowed(limitGuard);
 
-  if (data.type === "transfer" && !data.transferToId) {
-    throw new Error("Transfer destination is required");
-  }
-
   // Ensure date is a Date object
   const date = data.date instanceof Date ? data.date : new Date(data.date);
   const now = formatTimestamp(new Date());
@@ -37,80 +34,40 @@ export async function createTransaction(data: TransactionFormData) {
   // Format date for PostgreSQL timestamp(3) without time zone: YYYY-MM-DD HH:MM:SS
   const formatDate = formatTimestamp;
 
-  if (data.type === "transfer") {
-    // Generate UUIDs for transactions
-    const outgoingId = crypto.randomUUID();
-    const incomingId = crypto.randomUUID();
-    const transferDate = formatDate(date);
-
-    // Create outgoing transaction
-    const { data: outgoing, error: outgoingError } = await supabase
-      .from("Transaction")
-      .insert({
-        id: outgoingId,
-        date: transferDate,
-        type: "transfer",
+  // Get category suggestion from learning model if no category is provided
+  let categorySuggestion = null;
+  if (!data.categoryId && data.description) {
+    try {
+      categorySuggestion = await suggestCategory(
+        userId,
+        data.description,
+        data.amount,
+        data.type
+      );
+      console.log('Category suggestion for manual transaction:', {
+        description: data.description?.substring(0, 50),
         amount: data.amount,
-        accountId: data.accountId,
-        userId: userId, // Add userId directly to transaction
-        description: data.description || null,
-        transferToId: data.transferToId!,
-        recurring: data.recurring ?? false,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .select()
-      .single();
-
-    if (outgoingError || !outgoing) {
-      console.error("Supabase error creating outgoing transaction:", outgoingError);
-      throw new Error(`Failed to create outgoing transaction: ${outgoingError?.message || JSON.stringify(outgoingError)}`);
+        type: data.type,
+        suggestion: categorySuggestion ? {
+          categoryId: categorySuggestion.categoryId,
+          confidence: categorySuggestion.confidence,
+          matchCount: categorySuggestion.matchCount,
+        } : null,
+      });
+    } catch (error) {
+      console.error('Error getting category suggestion:', error);
+      // Continue without suggestion if there's an error
     }
-
-    // Get userId for the destination account (same user for now, could be different for shared accounts)
-    // For now, use the same userId for both transactions
-    const { data: destAccount } = await supabase
-      .from("Account")
-      .select("userId")
-      .eq("id", data.transferToId!)
-      .single();
-    
-    const destUserId = destAccount?.userId || userId;
-
-    // Create incoming transaction
-    const { data: incoming, error: incomingError } = await supabase
-      .from("Transaction")
-      .insert({
-        id: incomingId,
-        date: transferDate,
-        type: "transfer",
-        amount: data.amount,
-        accountId: data.transferToId!,
-        userId: destUserId, // Add userId directly to transaction
-        description: data.description || null,
-        transferFromId: outgoing.id,
-        transferToId: null,
-        recurring: data.recurring ?? false,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .select()
-      .single();
-
-    if (incomingError || !incoming) {
-      console.error("Supabase error creating incoming transaction:", incomingError);
-      throw new Error(`Failed to create incoming transaction: ${incomingError?.message || JSON.stringify(incomingError)}`);
-    }
-
-    // Invalidate cache to ensure dashboard shows updated data
-    revalidateTag('transactions', 'page');
-
-    return { outgoing, incoming };
   }
 
   // Generate UUID for transaction
   const id = crypto.randomUUID();
   const transactionDate = formatDate(date);
+
+  // Use provided category if available, otherwise null (don't auto-categorize even with high confidence)
+  // We'll always show suggestions for user approval/rejection
+  const finalCategoryId = data.categoryId || null;
+  const finalSubcategoryId = data.subcategoryId || null;
 
   const { data: transaction, error } = await supabase
     .from("Transaction")
@@ -121,10 +78,9 @@ export async function createTransaction(data: TransactionFormData) {
         amount: data.amount,
         accountId: data.accountId,
         userId: user.id, // Add userId directly to transaction
-        categoryId: data.categoryId || null,
-        subcategoryId: data.subcategoryId || null,
+        categoryId: finalCategoryId,
+        subcategoryId: finalSubcategoryId,
         description: data.description || null,
-        tags: JSON.stringify(data.tags || []),
         recurring: data.recurring ?? false,
         createdAt: now,
         updatedAt: now,
@@ -142,8 +98,31 @@ export async function createTransaction(data: TransactionFormData) {
     throw new Error(`Failed to create transaction: ${error.message || JSON.stringify(error)}`);
   }
 
+  // If we have a suggestion (any confidence level), save it for user approval/rejection
+  if (categorySuggestion) {
+    const { error: updateError } = await supabase
+      .from('Transaction')
+      .update({
+        suggestedCategoryId: categorySuggestion.categoryId,
+        suggestedSubcategoryId: categorySuggestion.subcategoryId || null,
+        updatedAt: formatTimestamp(new Date()),
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('Error updating transaction with suggestion:', updateError);
+    } else {
+      console.log('Transaction updated with category suggestion:', {
+        transactionId: id,
+        suggestedCategoryId: categorySuggestion.categoryId,
+        confidence: categorySuggestion.confidence,
+        matchCount: categorySuggestion.matchCount,
+      });
+    }
+  }
+
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions', 'page');
+  revalidateTag('transactions');
 
   return transaction;
 }
@@ -168,9 +147,7 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
   if (data.subcategoryId !== undefined) updateData.subcategoryId = data.subcategoryId || null;
   if (data.description !== undefined) updateData.description = data.description || null;
-  if (data.tags !== undefined) updateData.tags = JSON.stringify(data.tags || []);
   if (data.recurring !== undefined) updateData.recurring = data.recurring;
-  if (data.transferToId !== undefined) updateData.transferToId = data.transferToId || null;
   updateData.updatedAt = formatTimestamp(new Date());
 
   const { data: transaction, error } = await supabase
@@ -206,29 +183,14 @@ export async function deleteTransaction(id: string) {
     throw new Error("Transaction not found");
   }
 
-  try {
-    if (transaction.transferFromId) {
-      // Delete the linked transfer transaction
-      await supabase.from("Transaction").delete().eq("id", transaction.transferFromId);
-      await supabase.from("Transaction").delete().eq("transferFromId", transaction.transferFromId);
-    } else if (transaction.transferToId) {
-      // Delete the outgoing transfer
-      await supabase.from("Transaction").delete().eq("id", id);
-      await supabase.from("Transaction").delete().eq("transferToId", transaction.transferToId);
-    } else {
-      const { error } = await supabase.from("Transaction").delete().eq("id", id);
-      if (error) {
-        console.error("Supabase error deleting transaction:", error);
-        throw new Error(`Failed to delete transaction: ${error.message || JSON.stringify(error)}`);
-      }
-    }
-  } catch (error) {
-    console.error("Error deleting transaction:", error);
-    throw error;
+  const { error } = await supabase.from("Transaction").delete().eq("id", id);
+  if (error) {
+    console.error("Supabase error deleting transaction:", error);
+    throw new Error(`Failed to delete transaction: ${error.message || JSON.stringify(error)}`);
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions', 'page');
+  revalidateTag('transactions');
 }
 
 export async function getTransactionsInternal(
@@ -603,20 +565,26 @@ export async function getUpcomingTransactions(limit: number = 5) {
   const endDate = new Date(now);
   endDate.setMonth(endDate.getMonth() + 1); // Look ahead 1 month
 
-  // Get all recurring transactions
+  // Get all recurring transactions (without joins to avoid RLS issues)
   const { data: recurringTransactions, error } = await supabase
     .from("Transaction")
     .select(`
       *,
       account:Account(*),
-      category:Category(*),
-      subcategory:Subcategory(*)
+      category:Category!Transaction_categoryId_fkey(*),
+      subcategory:Subcategory!Transaction_subcategoryId_fkey(*)
     `)
     .eq("recurring", true)
     .order("date", { ascending: true });
 
   if (error) {
     console.error("Supabase error fetching recurring transactions:", error);
+    // Return empty array if there's an error
+    return [];
+  }
+
+  if (!recurringTransactions || recurringTransactions.length === 0) {
+    return [];
   }
 
   // Handle relations for recurring transactions
@@ -840,7 +808,7 @@ export async function getAccountBalance(accountId: string) {
 
   const { data: transactions, error } = await supabase
     .from("Transaction")
-    .select("type, amount, transferToId, transferFromId, date")
+    .select("type, amount, date")
     .eq("accountId", accountId)
     .lte("date", today.toISOString());
 
@@ -865,12 +833,6 @@ export async function getAccountBalance(accountId: string) {
       balance += (Number(tx.amount) || 0);
     } else if (tx.type === "expense") {
       balance -= (Number(tx.amount) || 0);
-    } else if (tx.type === "transfer") {
-      if (tx.transferToId) {
-        balance -= (Number(tx.amount) || 0); // Outgoing
-      } else {
-        balance += (Number(tx.amount) || 0); // Incoming
-      }
     }
   }
 

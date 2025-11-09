@@ -462,6 +462,7 @@ function getDefaultFeatures(): PlanFeatures {
     hasCsvExport: false,
     hasDebts: true,
     hasGoals: true,
+    hasBankIntegration: false,
   };
 }
 

@@ -1,6 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateAccount, deleteAccount } from "@/lib/api/accounts";
 import { AccountFormData } from "@/lib/validations/account";
+import { createServerClient } from "@/lib/supabase-server";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createServerClient();
+    
+    // Get account first
+    const { data: account, error: accountError } = await supabase
+      .from('Account')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (accountError || !account) {
+      console.error('Error fetching account:', accountError);
+      return NextResponse.json(
+        { error: 'Account not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get institution name and logo from PlaidConnection if account has plaidItemId
+    let institutionName: string | null = null;
+    let institutionLogo: string | null = null;
+    if (account.plaidItemId) {
+      const { data: plaidConnection, error: plaidError } = await supabase
+        .from('PlaidConnection')
+        .select('institutionName, institutionLogo')
+        .eq('itemId', account.plaidItemId)
+        .single();
+
+      if (!plaidError && plaidConnection) {
+        institutionName = plaidConnection.institutionName || null;
+        institutionLogo = plaidConnection.institutionLogo || null;
+      }
+    }
+
+    return NextResponse.json({
+      ...account,
+      institutionName,
+      institutionLogo,
+    });
+  } catch (error) {
+    console.error("Error fetching account:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to fetch account" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function PATCH(
   request: NextRequest,

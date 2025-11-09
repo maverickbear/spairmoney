@@ -117,10 +117,10 @@ export function PricingSection() {
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-            Our pricing plans
+            Simple, Transparent Pricing
           </h2>
           <p className="text-lg text-muted-foreground">
-            Discover your ultimate finance management solution for individuals, startups, and enterprises
+            Start free forever. Upgrade when you're ready for advanced features like bank integration, unlimited transactions, and family sharing.
           </p>
         </div>
 

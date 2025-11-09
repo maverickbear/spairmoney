@@ -21,21 +21,21 @@ export function HeroSection() {
         <div className="max-w-4xl mx-auto text-center space-y-8">
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight">
-            Powerful Tools for Easy Money Management
+            Take Control of Your Finances. Automatically.
           </h1>
 
           {/* Sub-headline */}
           <p className="text-lg sm:text-xl md:text-2xl text-white/80 max-w-2xl mx-auto">
-            Simple, modern, and designed to put you in control of your future
+            Connect your bank accounts, track spending, manage budgets, and reach your financial goals—all in one powerful platform. Join thousands who've transformed their financial future.
           </p>
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Button
               asChild
-              className="bg-[#a78bfa] text-white hover:bg-[#a78bfa]/90 text-base font-semibold px-8 py-6 h-auto rounded-[12px]"
+              className="bg-[#a78bfa] text-white hover:bg-[#a78bfa]/90 text-base font-semibold px-8 py-6 h-auto rounded-[12px] shadow-lg hover:shadow-xl transition-all"
             >
-              <Link href="#pricing">Start a free trial</Link>
+              <Link href="#pricing">Start Free Forever</Link>
             </Button>
             <Button
               asChild

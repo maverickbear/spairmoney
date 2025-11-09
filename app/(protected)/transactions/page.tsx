@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/table";
 import { TransactionForm } from "@/components/forms/transaction-form";
 import { CsvImportDialog } from "@/components/forms/csv-import-dialog";
+import { CategorySelectionModal } from "@/components/transactions/category-selection-modal";
 import { formatMoney } from "@/components/common/money";
-import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2 } from "lucide-react";
+import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, Clock } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -22,6 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { getAccounts } from "@/lib/api/accounts";
@@ -32,6 +41,8 @@ import type { Transaction } from "@/lib/api/transactions-client";
 import type { Category } from "@/lib/api/categories-client";
 import { usePlanLimits } from "@/hooks/use-plan-limits";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Account {
   id: string;
@@ -47,7 +58,11 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [transactionForCategory, setTransactionForCategory] = useState<Transaction | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("this-month");
   const [filters, setFilters] = useState({
     startDate: "",
@@ -64,23 +79,29 @@ export default function TransactionsPage() {
 
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [processingSuggestionId, setProcessingSuggestionId] = useState<string | null>(null);
+  const [suggestionsGenerated, setSuggestionsGenerated] = useState(false);
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
+  const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
-    // Set default date range (this month)
+    // Set default date range (past 30 days to include Plaid transactions)
     const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - 30); // Last 30 days
+    const endDate = new Date(today);
     
     // Read categoryId from URL if present
     const categoryIdFromUrl = searchParams.get("categoryId");
     
     setFilters(prev => ({
       ...prev,
-      startDate: startOfMonth.toISOString().split('T')[0],
-      endDate: endOfMonth.toISOString().split('T')[0],
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
       categoryId: categoryIdFromUrl || "all",
     }));
+    setDateRange("past-30-days");
   }, [searchParams]);
 
   // Debounce search filter
@@ -238,6 +259,29 @@ export default function TransactionsPage() {
       if (filters.recurring && filters.recurring !== "all") transactionFilters.recurring = filters.recurring === "true";
       const data = await getTransactionsClient(transactionFilters);
       setTransactions(data);
+
+      // Generate suggestions for existing transactions without category (only once per page load)
+      if (!suggestionsGenerated) {
+        const hasUncategorizedTransactions = data.some(tx => !tx.categoryId && !tx.suggestedCategoryId);
+        if (hasUncategorizedTransactions) {
+          setSuggestionsGenerated(true);
+          // Generate suggestions in the background (don't wait for it)
+          fetch("/api/transactions/generate-suggestions", { method: "POST" })
+            .then(response => response.json())
+            .then(result => {
+              if (result.processed > 0) {
+                console.log(`Generated ${result.processed} category suggestions for existing transactions`);
+                // Reload transactions to show the new suggestions
+                setTimeout(() => {
+                  loadTransactions();
+                }, 500); // Small delay to ensure database is updated
+              }
+            })
+            .catch(error => {
+              console.error("Error generating suggestions:", error);
+            });
+        }
+      }
     } catch (error) {
       console.error("Error loading transactions:", error);
     } finally {
@@ -282,6 +326,53 @@ export default function TransactionsPage() {
     }
   }
 
+  async function handleCategoryUpdate(categoryId: string | null, subcategoryId: string | null = null) {
+    if (!transactionForCategory) return;
+
+    try {
+      const { updateTransactionClient } = await import("@/lib/api/transactions-client");
+      
+      // Optimistic update
+      setTransactions(prev => prev.map(tx => 
+        tx.id === transactionForCategory.id 
+          ? { ...tx, categoryId: categoryId || undefined, subcategoryId: subcategoryId || undefined }
+          : tx
+      ));
+
+      await updateTransactionClient(transactionForCategory.id, {
+        categoryId: categoryId || undefined,
+        subcategoryId: subcategoryId || undefined,
+      });
+
+      toast({
+        title: "Category updated",
+        description: "The transaction category has been updated successfully.",
+        variant: "success",
+      });
+
+      setIsCategoryModalOpen(false);
+      setTransactionForCategory(null);
+      
+      // Reload transactions to get updated category/subcategory names
+      loadTransactions();
+    } catch (error) {
+      console.error("Error updating category:", error);
+      
+      // Revert optimistic update
+      setTransactions(prev => prev.map(tx => 
+        tx.id === transactionForCategory.id 
+          ? transactionForCategory
+          : tx
+      ));
+
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update category",
+        variant: "destructive",
+      });
+    }
+  }
+
   function handleExport() {
     // Check if user has access to CSV export
     if (!limits.hasCsvExport) {
@@ -313,6 +404,167 @@ export default function TransactionsPage() {
     }
   }
 
+  async function handleApplySuggestion(transactionId: string) {
+    const transaction = transactions.find(tx => tx.id === transactionId);
+    if (!transaction) return;
+
+    setProcessingSuggestionId(transactionId);
+    
+    // Optimistic update immediately
+    setTransactions(prev => prev.map(tx => 
+      tx.id === transactionId 
+        ? { 
+            ...tx, 
+            categoryId: tx.suggestedCategoryId || tx.categoryId,
+            subcategoryId: tx.suggestedSubcategoryId || tx.subcategoryId,
+            suggestedCategoryId: null,
+            suggestedSubcategoryId: null,
+            suggestedCategory: null,
+            suggestedSubcategory: null,
+            // Use suggested category as category until we fetch the real one
+            category: tx.suggestedCategory || tx.category,
+            subcategory: tx.suggestedSubcategory || tx.subcategory,
+          }
+        : tx
+    ));
+
+    try {
+      const response = await fetch(`/api/transactions/${transactionId}/apply-suggestion`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to apply suggestion");
+      }
+
+      // No need to fetch again - we already have the category data from suggestedCategory
+      // The optimistic update already shows the correct category, so we're done
+
+      toast({
+        title: "Category applied",
+        description: "The suggested category has been applied successfully.",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Error applying suggestion:", error);
+      
+      // Revert optimistic update on error
+      setTransactions(prev => prev.map(tx => 
+        tx.id === transactionId ? transaction : tx
+      ));
+
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to apply suggestion",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingSuggestionId(null);
+    }
+  }
+
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedTransactionIds(new Set(transactions.map(tx => tx.id)));
+    } else {
+      setSelectedTransactionIds(new Set());
+    }
+  }
+
+  function handleSelectTransaction(transactionId: string, checked: boolean) {
+    setSelectedTransactionIds(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(transactionId);
+      } else {
+        newSet.delete(transactionId);
+      }
+      return newSet;
+    });
+  }
+
+  const allSelected = transactions.length > 0 && selectedTransactionIds.size === transactions.length;
+  const someSelected = selectedTransactionIds.size > 0 && selectedTransactionIds.size < transactions.length;
+
+  // Clear selection when transactions change (filters applied)
+  useEffect(() => {
+    // Only keep selected IDs that are still in the current transactions list
+    setSelectedTransactionIds(prev => {
+      const currentIds = new Set(transactions.map(tx => tx.id));
+      const filtered = new Set([...prev].filter(id => currentIds.has(id)));
+      return filtered;
+    });
+  }, [transactions]);
+
+  // Update indeterminate state of select all checkbox
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  async function handleRejectSuggestion(transactionId: string) {
+    const transaction = transactions.find(tx => tx.id === transactionId);
+    if (!transaction) return;
+
+    setProcessingSuggestionId(transactionId);
+    
+    // Optimistic update immediately
+    setTransactions(prev => prev.map(tx => 
+      tx.id === transactionId 
+        ? { 
+            ...tx, 
+            suggestedCategoryId: null,
+            suggestedSubcategoryId: null,
+            suggestedCategory: null,
+            suggestedSubcategory: null,
+          }
+        : tx
+    ));
+
+    try {
+      const response = await fetch(`/api/transactions/${transactionId}/reject-suggestion`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to reject suggestion");
+      }
+
+      toast({
+        title: "Suggestion rejected",
+        description: "You can now manually select a category.",
+        variant: "success",
+      });
+
+      // Open category selection modal
+      const updatedTransaction = transactions.find(tx => tx.id === transactionId);
+      if (updatedTransaction) {
+        setTransactionForCategory(updatedTransaction);
+        setSelectedCategoryId(null);
+        setSelectedSubcategoryId(null);
+        setIsCategoryModalOpen(true);
+      }
+    } catch (error) {
+      console.error("Error rejecting suggestion:", error);
+      
+      // Revert optimistic update on error
+      setTransactions(prev => prev.map(tx => 
+        tx.id === transactionId ? transaction : tx
+      ));
+
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to reject suggestion",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingSuggestionId(null);
+    }
+  }
+
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -323,21 +575,19 @@ export default function TransactionsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setIsImportOpen(true)} className="text-xs md:text-sm">
-            <Upload className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
-            <span className="hidden sm:inline">Import CSV</span>
-            <span className="sm:hidden">Import</span>
+            <Upload className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden md:inline">Import CSV</span>
           </Button>
           <Button variant="outline" onClick={handleExport} className="text-xs md:text-sm">
-            <Download className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
-            <span className="hidden sm:inline">Export CSV</span>
-            <span className="sm:hidden">Export</span>
+            <Download className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden md:inline">Export CSV</span>
           </Button>
           <Button onClick={() => {
             setSelectedTransaction(null);
             setIsFormOpen(true);
           }} className="text-xs md:text-sm">
-            <Plus className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
-            Add Transaction
+            <Plus className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden md:inline">Add Transaction</span>
           </Button>
         </div>
       </div>
@@ -383,11 +633,10 @@ export default function TransactionsPage() {
           <SelectTrigger className="h-9 w-auto min-w-[90px] text-xs">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
-          <SelectContent>
+            <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="expense">Expense</SelectItem>
             <SelectItem value="income">Income</SelectItem>
-            <SelectItem value="transfer">Transfer</SelectItem>
           </SelectContent>
         </Select>
         <Input
@@ -480,11 +729,20 @@ export default function TransactionsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  ref={selectAllCheckboxRef}
+                  checked={allSelected}
+                  onCheckedChange={handleSelectAll}
+                  className="h-4 w-4"
+                />
+              </TableHead>
               <TableHead className="text-xs md:text-sm">Date</TableHead>
               <TableHead className="text-xs md:text-sm">Type</TableHead>
               <TableHead className="text-xs md:text-sm hidden md:table-cell">Account</TableHead>
               <TableHead className="text-xs md:text-sm hidden sm:table-cell">Category</TableHead>
               <TableHead className="text-xs md:text-sm hidden lg:table-cell">Description</TableHead>
+              <TableHead className="text-xs md:text-sm hidden xl:table-cell">Status</TableHead>
               <TableHead className="text-right text-xs md:text-sm">Amount</TableHead>
               <TableHead className="text-xs md:text-sm">Actions</TableHead>
             </TableRow>
@@ -492,14 +750,53 @@ export default function TransactionsPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Loading transactions...
                 </TableCell>
               </TableRow>
             ) : (
-              transactions.map((tx) => (
+              transactions.map((tx) => {
+                // Debug: log all transactions without category to see if they have suggestions
+                if (!tx.categoryId) {
+                  console.log('[TransactionsPage] Transaction without category:', {
+                    id: tx.id,
+                    description: tx.description,
+                    amount: tx.amount,
+                    type: tx.type,
+                    categoryId: tx.categoryId,
+                    suggestedCategoryId: tx.suggestedCategoryId,
+                    suggestedSubcategoryId: tx.suggestedSubcategoryId,
+                    suggestedCategory: tx.suggestedCategory,
+                    suggestedSubcategory: tx.suggestedSubcategory,
+                    hasSuggestedCategoryId: !!tx.suggestedCategoryId,
+                    hasSuggestedCategory: !!tx.suggestedCategory,
+                    willShowSuggestion: !!tx.suggestedCategoryId,
+                  });
+                }
+                const plaidMeta = tx.plaidMetadata as any;
+                const isPending = plaidMeta?.pending;
+                const authorizedDate = plaidMeta?.authorized_date || plaidMeta?.authorized_datetime;
+                const currencyCode = plaidMeta?.iso_currency_code || plaidMeta?.unofficial_currency_code;
+                
+                return (
               <TableRow key={tx.id}>
-                <TableCell className="font-medium text-xs md:text-sm whitespace-nowrap">{format(new Date(tx.date), "MMM dd, yyyy")}</TableCell>
+                <TableCell>
+                  <Checkbox
+                    checked={selectedTransactionIds.has(tx.id)}
+                    onCheckedChange={(checked) => handleSelectTransaction(tx.id, checked as boolean)}
+                    className="h-4 w-4"
+                  />
+                </TableCell>
+                <TableCell className="font-medium text-xs md:text-sm whitespace-nowrap">
+                  <div className="flex flex-col gap-0.5">
+                    <span>{format(new Date(tx.date), "MMM dd, yyyy")}</span>
+                    {authorizedDate && (
+                      <span className="text-[10px] text-muted-foreground">
+                        Auth: {format(new Date(authorizedDate), "MMM dd")}
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <span className={`rounded-[12px] px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs ${
@@ -517,16 +814,110 @@ export default function TransactionsPage() {
                   </div>
                 </TableCell>
                 <TableCell className="text-xs md:text-sm hidden md:table-cell">{tx.account?.name}</TableCell>
-                <TableCell className="text-xs md:text-sm hidden sm:table-cell">
-                  {tx.category?.name}
-                  {tx.subcategory && ` / ${tx.subcategory.name}`}
+                <TableCell 
+                  className="text-xs md:text-sm hidden sm:table-cell"
+                >
+                  {tx.category?.name ? (
+                    <span 
+                      className="text-blue-600 dark:text-blue-400 underline decoration-dashed underline-offset-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        setTransactionForCategory(tx);
+                        setSelectedCategoryId(tx.categoryId || null);
+                        setSelectedSubcategoryId(tx.subcategoryId || null);
+                        setIsCategoryModalOpen(true);
+                      }}
+                    >
+                      {tx.category.name}
+                      {tx.subcategory && ` / ${tx.subcategory.name}`}
+                    </span>
+                  ) : tx.suggestedCategoryId ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground italic">
+                        {tx.suggestedCategory?.name || "Suggested category"}
+                        {tx.suggestedSubcategory && ` / ${tx.suggestedSubcategory.name}`}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6 rounded-[8px] bg-white border border-gray-300 text-red-600 hover:text-red-700 hover:bg-red-50 dark:bg-white dark:border-gray-300 dark:hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRejectSuggestion(tx.id);
+                          }}
+                          disabled={processingSuggestionId === tx.id}
+                          title="Reject suggestion and select manually"
+                        >
+                          {processingSuggestionId === tx.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <X className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-6 w-6 rounded-[8px] bg-white border border-gray-300 text-green-600 hover:text-green-700 hover:bg-green-50 dark:bg-white dark:border-gray-300 dark:hover:bg-green-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApplySuggestion(tx.id);
+                          }}
+                          disabled={processingSuggestionId === tx.id}
+                          title="Apply suggestion"
+                        >
+                          {processingSuggestionId === tx.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span 
+                      className="text-blue-600 dark:text-blue-400 underline decoration-dashed underline-offset-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        setTransactionForCategory(tx);
+                        setSelectedCategoryId(tx.categoryId || null);
+                        setSelectedSubcategoryId(tx.subcategoryId || null);
+                        setIsCategoryModalOpen(true);
+                      }}
+                    >
+                      Add Category
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="text-xs md:text-sm hidden lg:table-cell max-w-[150px] truncate">{tx.description || "-"}</TableCell>
+                <TableCell className="text-xs md:text-sm hidden xl:table-cell">
+                  <div className="flex flex-col gap-1">
+                    {isPending && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400">
+                        <Clock className="h-2.5 w-2.5 mr-1" />
+                        Pending
+                      </Badge>
+                    )}
+                    {currencyCode && currencyCode !== "USD" && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                        {currencyCode}
+                      </Badge>
+                    )}
+                    {!isPending && (!currencyCode || currencyCode === "USD") && (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className={`text-right font-medium text-xs md:text-sm ${
                   tx.type === "income" ? "text-green-600 dark:text-green-400" :
                   tx.type === "expense" ? "text-red-600 dark:text-red-400" : ""
                 }`}>
-                  {tx.type === "expense" ? "-" : ""}{formatMoney(tx.amount)}
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span>{tx.type === "expense" ? "-" : ""}{formatMoney(tx.amount)}</span>
+                    {currencyCode && currencyCode !== "USD" && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {currencyCode}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-1 md:space-x-2">
@@ -557,7 +948,8 @@ export default function TransactionsPage() {
                   </div>
                 </TableCell>
               </TableRow>
-              ))
+              );
+              })
             )}
           </TableBody>
         </Table>
@@ -577,6 +969,56 @@ export default function TransactionsPage() {
         accounts={accounts}
         categories={categories}
       />
+
+      {/* Category Selection Modal */}
+      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {transactionForCategory?.category?.name ? "Change Category" : "Add Category"}
+            </DialogTitle>
+            <DialogDescription>
+              Select a category for this transaction
+            </DialogDescription>
+          </DialogHeader>
+          <CategorySelectionModal
+            transaction={transactionForCategory}
+            categories={categories}
+            onSelect={(categoryId, subcategoryId) => {
+              setSelectedCategoryId(categoryId);
+              setSelectedSubcategoryId(subcategoryId);
+            }}
+            onClear={() => {
+              setSelectedCategoryId(null);
+              setSelectedSubcategoryId(null);
+              handleCategoryUpdate(null, null);
+            }}
+          />
+          <DialogFooter>
+            {transactionForCategory?.categoryId && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSelectedCategoryId(null);
+                  setSelectedSubcategoryId(null);
+                  handleCategoryUpdate(null, null);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+            <Button
+              type="button"
+              onClick={() => {
+                handleCategoryUpdate(selectedCategoryId, selectedSubcategoryId);
+              }}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

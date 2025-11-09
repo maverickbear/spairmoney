@@ -11,42 +11,42 @@ import { ChartDemo } from "./demo/chart-demo";
 export function ParallaxFeaturesSection() {
   const features = [
     {
-      title: "Advanced Analytics",
-      description: "Gain instant insights into your spending patterns and make smarter financial decisions. Track your expenses, income, and savings with detailed analytics and visualizations.",
+      title: "Complete Financial Dashboard",
+      description: "See everything in one place: spending, income, budgets, and goals. Get instant insights with beautiful charts and visualizations that make complex data simple to understand.",
       icon: <BarChart3 className="w-16 h-16 text-primary" />,
       demoComponent: <DashboardPreviewDemo />,
       reverse: false,
     },
     {
-      title: "Take Control with Spend Limits",
-      description: "You can set a spend limit on any Privacy Card so you won't be charged for more than you authorize. Perfect for managing recurring bill payments or subscription fees.",
+      title: "Automatic Bank Account Sync",
+      description: "Connect your bank accounts in seconds. Transactions import automatically—no more manual entry. Your financial data stays up-to-date 24/7, so you always know where you stand.",
       icon: <Wallet className="w-16 h-16 text-primary" />,
       demoComponent: <SpendLimitDemo />,
       reverse: true,
     },
     {
       title: "Smart Budget Management",
-      description: "Create and manage budgets effortlessly with intelligent recommendations. Set spending limits, track progress, and achieve your financial goals with ease.",
+      description: "Set budgets by category and watch your progress in real-time. Get visual alerts when you're approaching limits. Our system learns your patterns and helps you stay on track effortlessly.",
       icon: <PieChart className="w-16 h-16 text-primary" />,
       demoComponent: <BudgetDemo />,
       reverse: false,
     },
     {
-      title: "Cash Flow Tracking",
-      description: "Monitor your income and expenses with detailed cash flow analysis. Visualize your financial trends and make informed decisions about your money.",
+      title: "Investment Portfolio Tracking",
+      description: "Track stocks, ETFs, crypto, and more. Monitor your portfolio value, calculate returns, and see how your investments are performing—all integrated with your overall financial picture.",
       icon: <TrendingUp className="w-16 h-16 text-primary" />,
       demoComponent: <ChartDemo />,
       reverse: true,
     },
     {
-      title: "Secure & Encrypted",
-      description: "Your financial data is protected with bank-level encryption. We use industry-leading security practices to keep your information safe and private.",
+      title: "Bank-Level Security",
+      description: "Your data is encrypted with industry-leading security. We use the same technology banks trust. Your financial information is private, secure, and never shared—period.",
       icon: <Shield className="w-16 h-16 text-primary" />,
       reverse: false,
     },
     {
-      title: "Goal Setting & Tracking",
-      description: "Set financial goals and track your progress. Whether it's saving for a vacation, paying off debt, or building an emergency fund, we help you stay on track.",
+      title: "Savings Goals That Actually Work",
+      description: "Set multiple savings goals and allocate a percentage of your income to each. Watch your progress with beautiful visualizations and get accurate estimates of when you'll reach your goals.",
       icon: <Target className="w-16 h-16 text-primary" />,
       demoComponent: <GoalsDemo />,
       reverse: true,
@@ -59,10 +59,10 @@ export function ParallaxFeaturesSection() {
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-            Powerful Features for Your Financial Success
+            Stop Managing Money. Start Mastering It.
           </h2>
           <p className="text-lg text-muted-foreground">
-            Discover how our platform can transform the way you manage your money
+            See how thousands of users are taking control of their finances with features that actually save time and money
           </p>
         </div>
 

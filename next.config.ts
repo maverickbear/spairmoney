@@ -34,18 +34,18 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            value: "camera=(self \"https://cdn.plaid.com\"), microphone=(), geolocation=()", // Allow camera for Plaid Link card scanning
           },
           {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // Note: 'unsafe-eval' and 'unsafe-inline' may be needed for Next.js
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.plaid.com", // Note: 'unsafe-eval' and 'unsafe-inline' may be needed for Next.js, cdn.plaid.com for Plaid Link
               "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind CSS
               "img-src 'self' data: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co https://api.stripe.com",
-              "frame-src 'self' https://js.stripe.com",
+              "connect-src 'self' https://*.supabase.co https://api.stripe.com https://*.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com",
+              "frame-src 'self' https://js.stripe.com https://cdn.plaid.com https://*.plaid.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",

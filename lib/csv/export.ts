@@ -1,10 +1,9 @@
 import type { Transaction } from "@/lib/api/transactions-client";
 
 export function exportTransactionsToCSV(transactions: Transaction[]): string {
-  const headers = ["Date", "Type", "Amount", "Account", "Category", "Subcategory", "Description", "Tags"];
+  const headers = ["Date", "Type", "Amount", "Account", "Category", "Subcategory", "Description"];
   
   const rows = transactions.map((tx) => {
-    const tags = tx.tags ? (Array.isArray(tx.tags) ? tx.tags.join(", ") : JSON.parse(tx.tags).join(", ")) : "";
     return [
       tx.date,
       tx.type,
@@ -13,7 +12,6 @@ export function exportTransactionsToCSV(transactions: Transaction[]): string {
       tx.category?.name || "",
       tx.subcategory?.name || "",
       tx.description || "",
-      tags,
     ];
   });
 

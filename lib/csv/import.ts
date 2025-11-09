@@ -12,7 +12,6 @@ export interface ColumnMapping {
   category?: string;
   subcategory?: string;
   type?: string;
-  tags?: string;
 }
 
 export function parseCSV(file: File): Promise<CSVRow[]> {
@@ -54,7 +53,6 @@ interface TransactionInput {
   categoryId?: string;
   subcategoryId?: string;
   description?: string;
-  tags: string[];
 }
 
 export function mapCSVToTransactions(
@@ -75,8 +73,6 @@ export function mapCSVToTransactions(
     const categoryName = mapping.category ? row[mapping.category] : "";
     const subcategoryName = mapping.subcategory ? row[mapping.subcategory] : "";
     const type = (mapping.type ? row[mapping.type]?.toLowerCase() : "expense") || "expense";
-    const tagsStr = mapping.tags ? row[mapping.tags] : "";
-    const tags = tagsStr ? tagsStr.split(",").map((t) => t.trim()) : [];
 
     const account = accounts.find((a) => a.name === accountName);
     const category = categories.find((c) => c.name === categoryName);
@@ -94,7 +90,6 @@ export function mapCSVToTransactions(
       categoryId: category?.id,
       subcategoryId: subcategory?.id,
       description: description || "",
-      tags,
     };
   });
 }

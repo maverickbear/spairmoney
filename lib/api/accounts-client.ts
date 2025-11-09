@@ -35,7 +35,7 @@ export async function getAccountsClient(): Promise<Account[]> {
   
   const { data: transactions } = await supabase
     .from("Transaction")
-    .select("accountId, type, amount, transferToId, transferFromId, date")
+    .select("accountId, type, amount, date")
     .lte("date", today.toISOString());
 
   // Calculate balances in memory
@@ -64,12 +64,6 @@ export async function getAccountsClient(): Promise<Account[]> {
       balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
     } else if (tx.type === "expense") {
       balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
-    } else if (tx.type === "transfer") {
-      if (tx.transferToId) {
-        balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
-      } else {
-        balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
-      }
     }
   }
 
@@ -132,8 +126,39 @@ export async function getAccountsClient(): Promise<Account[]> {
       balance: balances.get(account.id) || 0,
       householdName,
       ownerIds,
+      isConnected: (account as any).isConnected || false,
+      lastSyncedAt: (account as any).lastSyncedAt || null,
+      institutionName: null, // Will be fetched separately if needed
+      institutionLogo: null, // Will be fetched separately if needed
     };
   });
+
+  // Fetch institution names and logos from PlaidConnection for connected accounts
+  const connectedAccounts = accountsWithBalances.filter(acc => acc.plaidItemId);
+  if (connectedAccounts.length > 0) {
+    const plaidItemIds = connectedAccounts.map(acc => acc.plaidItemId).filter(Boolean) as string[];
+    
+    const { data: plaidConnections } = await supabase
+      .from('PlaidConnection')
+      .select('itemId, institutionName, institutionLogo')
+      .in('itemId', plaidItemIds);
+
+    if (plaidConnections) {
+      const connectionMap = new Map(
+        plaidConnections.map(conn => [conn.itemId, conn])
+      );
+
+      accountsWithBalances.forEach(account => {
+        if (account.plaidItemId) {
+          const connection = connectionMap.get(account.plaidItemId);
+          if (connection) {
+            (account as any).institutionName = connection.institutionName || null;
+            (account as any).institutionLogo = connection.institutionLogo || null;
+          }
+        }
+      });
+    }
+  }
 
   return accountsWithBalances;
 }

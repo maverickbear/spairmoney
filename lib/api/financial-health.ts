@@ -66,7 +66,7 @@ async function calculateFinancialHealthInternal(
     })),
   });
   
-  // Filter out transfer transactions - only count income and expense
+  // Only count income and expense transactions
   const monthlyIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);

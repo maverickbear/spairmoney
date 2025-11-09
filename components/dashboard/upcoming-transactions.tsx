@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/components/common/money";
 import { format } from "date-fns";
-import { Calendar, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CheckCircle2 } from "lucide-react";
+import { Calendar, ArrowUpRight, ArrowDownRight, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface UpcomingTransaction {
@@ -101,8 +101,6 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
         return <ArrowUpRight className="h-4 w-4 text-green-600" />;
       case "expense":
         return <ArrowDownRight className="h-4 w-4 text-red-600" />;
-      case "transfer":
-        return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
       default:
         return null;
     }
@@ -114,8 +112,6 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
         return "text-green-600";
       case "expense":
         return "text-red-600";
-      case "transfer":
-        return "text-blue-600";
       default:
         return "";
     }

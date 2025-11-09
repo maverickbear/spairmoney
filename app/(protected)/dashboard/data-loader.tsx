@@ -6,6 +6,8 @@ import { calculateFinancialHealth } from "@/lib/api/financial-health";
 import { getGoals } from "@/lib/api/goals";
 import { getAccounts } from "@/lib/api/accounts";
 import { checkOnboardingStatus } from "@/lib/api/onboarding";
+import { getUserLiabilities } from "@/lib/api/plaid/liabilities";
+import { getCurrentUserId } from "@/lib/api/feature-guard";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
 interface DashboardData {
@@ -20,6 +22,7 @@ interface DashboardData {
   totalBalance: number;
   lastMonthTotalBalance: number;
   accounts: any[];
+  liabilities: any[];
   onboardingStatus: any;
 }
 
@@ -49,6 +52,9 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
     },
   });
 
+  // Get current user ID for liabilities
+  const userId = await getCurrentUserId();
+
   // Fetch all data in parallel
   const [
     selectedMonthTransactions,
@@ -60,6 +66,7 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
     goals,
     chartTransactions,
     accounts,
+    liabilities,
     onboardingStatus,
   ] = await Promise.all([
     getTransactions({
@@ -171,6 +178,10 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
       console.error("Error fetching accounts:", error);
       return [];
     }),
+    userId ? getUserLiabilities(userId).catch((error) => {
+      console.error("Error fetching liabilities:", error);
+      return [];
+    }) : Promise.resolve([]),
     checkOnboardingStatus().catch((error) => {
       console.error("Error checking onboarding status:", error);
       return null;
@@ -199,10 +210,6 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
       return sum + (Number(tx.amount) || 0);
     } else if (tx.type === "expense") {
       return sum - (Number(tx.amount) || 0);
-    } else if (tx.type === "transfer") {
-      // For transfers, we need to check if it's incoming or outgoing
-      // This is simplified - in a real scenario, we'd need to check transferToId
-      return sum; // Transfers don't change total balance
     }
     return sum;
   }, 0);
@@ -238,6 +245,7 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
     totalBalance,
     lastMonthTotalBalance,
     accounts,
+    liabilities,
     onboardingStatus,
   };
 }

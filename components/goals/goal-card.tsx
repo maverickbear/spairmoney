@@ -52,9 +52,9 @@ export function GoalCard({
   onWithdraw,
 }: GoalCardProps) {
   const priorityColors = {
-    High: "bg-red-500 dark:bg-red-600 text-white",
-    Medium: "bg-yellow-500 dark:bg-yellow-600 text-white",
-    Low: "bg-blue-500 dark:bg-blue-600 text-white",
+    High: "bg-red-500 dark:bg-red-600 text-white hover:bg-red-500 dark:hover:bg-red-600",
+    Medium: "bg-yellow-500 dark:bg-yellow-600 text-white hover:bg-yellow-500 dark:hover:bg-yellow-600",
+    Low: "bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-500 dark:hover:bg-blue-600",
   };
 
   return (

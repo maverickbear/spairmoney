@@ -187,6 +187,34 @@ export async function guardHouseholdMembers(userId: string): Promise<GuardResult
 }
 
 /**
+ * Guard bank integration - validates if user has access to bank integration feature
+ */
+export async function guardBankIntegration(userId: string): Promise<GuardResult> {
+  try {
+    const hasAccess = await checkFeatureAccess(userId, 'hasBankIntegration');
+    
+    if (!hasAccess) {
+      return {
+        allowed: false,
+        error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
+          feature: 'hasBankIntegration',
+        }),
+      };
+    }
+    
+    return { allowed: true };
+  } catch (error) {
+    console.error("Error in guardBankIntegration:", error);
+    return {
+      allowed: false,
+      error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
+        feature: 'hasBankIntegration',
+      }),
+    };
+  }
+}
+
+/**
  * Get current user ID from session
  */
 export async function getCurrentUserId(): Promise<string | null> {

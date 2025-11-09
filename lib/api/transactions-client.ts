@@ -1,8 +1,11 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
+import { formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 import { TransactionFormData } from "@/lib/validations/transaction";
 import { formatTimestamp } from "@/lib/utils/timestamp";
+
+import type { PlaidTransactionMetadata } from '@/lib/api/plaid/types';
 
 export interface Transaction {
   id: string;
@@ -13,13 +16,15 @@ export interface Transaction {
   categoryId?: string | null;
   subcategoryId?: string | null;
   description?: string | null;
-  tags?: string[];
   recurring?: boolean;
-  transferToId?: string | null;
-  transferFromId?: string | null;
+  suggestedCategoryId?: string | null;
+  suggestedSubcategoryId?: string | null;
+  plaidMetadata?: PlaidTransactionMetadata | null;
   account?: { id: string; name: string } | null;
   category?: { id: string; name: string } | null;
   subcategory?: { id: string; name: string } | null;
+  suggestedCategory?: { id: string; name: string } | null;
+  suggestedSubcategory?: { id: string; name: string } | null;
 }
 
 /**
@@ -34,26 +39,29 @@ export async function getTransactionsClient(filters?: {
   search?: string;
   recurring?: boolean;
 }): Promise<Transaction[]> {
+  // Use explicit foreign key names to avoid ambiguity
+  // Since we now have two relationships to Category (categoryId and suggestedCategoryId),
+  // we need to specify which one to use
   let query = supabase
     .from("Transaction")
     .select(`
       *,
       account:Account(*),
-      category:Category(*),
-      subcategory:Subcategory(*)
+      category:Category!Transaction_categoryId_fkey(*),
+      subcategory:Subcategory!Transaction_subcategoryId_fkey(*)
     `)
     .order("date", { ascending: false });
 
   if (filters?.startDate) {
-    const startDate = new Date(filters.startDate);
-    startDate.setHours(0, 0, 0, 0);
-    query = query.gte("date", startDate.toISOString());
+    // Use formatDateStart to ensure proper PostgreSQL timestamp format
+    const startDateStr = formatDateStart(filters.startDate);
+    query = query.gte("date", startDateStr);
   }
 
   if (filters?.endDate) {
-    const endDate = new Date(filters.endDate);
-    endDate.setHours(23, 59, 59, 999);
-    query = query.lte("date", endDate.toISOString());
+    // Use formatDateEnd to ensure proper PostgreSQL timestamp format
+    const endDateStr = formatDateEnd(filters.endDate);
+    query = query.lte("date", endDateStr);
   }
 
   if (filters?.categoryId) {
@@ -84,7 +92,69 @@ export async function getTransactionsClient(filters?: {
   }
 
   if (!data || data.length === 0) {
+    console.log("[getTransactionsClient] No transactions found with filters:", {
+      startDate: filters?.startDate ? formatDateStart(filters.startDate) : undefined,
+      endDate: filters?.endDate ? formatDateEnd(filters.endDate) : undefined,
+      accountId: filters?.accountId,
+      type: filters?.type,
+    });
+    
+    // Try to fetch all transactions without filters to debug
+    const { data: allData, error: allError } = await supabase
+      .from("Transaction")
+      .select("id, date, type, amount, accountId, userId")
+      .order("date", { ascending: false })
+      .limit(10);
+    
+    if (!allError && allData) {
+      console.log(`[getTransactionsClient] Found ${allData.length} total transactions in database (sample):`, allData);
+    }
+    
     return [];
+  }
+
+  console.log(`[getTransactionsClient] Found ${data.length} transactions with filters`);
+
+  // Get unique suggested category IDs
+  const suggestedCategoryIds = [...new Set(data.map((tx: any) => tx.suggestedCategoryId).filter(Boolean))];
+  const suggestedSubcategoryIds = [...new Set(data.map((tx: any) => tx.suggestedSubcategoryId).filter(Boolean))];
+
+  console.log('[getTransactionsClient] Suggested category IDs:', suggestedCategoryIds);
+  console.log('[getTransactionsClient] Transactions with suggestions:', data.filter((tx: any) => tx.suggestedCategoryId).length);
+
+  // Fetch suggested categories separately
+  const suggestedCategoriesMap = new Map<string, { id: string; name: string }>();
+  const suggestedSubcategoriesMap = new Map<string, { id: string; name: string }>();
+
+  if (suggestedCategoryIds.length > 0) {
+    const { data: suggestedCategories, error: suggestedCategoriesError } = await supabase
+      .from("Category")
+      .select("id, name")
+      .in("id", suggestedCategoryIds);
+
+    if (suggestedCategoriesError) {
+      console.error('[getTransactionsClient] Error fetching suggested categories:', suggestedCategoriesError);
+    } else if (suggestedCategories) {
+      console.log('[getTransactionsClient] Fetched suggested categories:', suggestedCategories.length);
+      suggestedCategories.forEach((cat) => {
+        suggestedCategoriesMap.set(cat.id, cat);
+      });
+    }
+  }
+
+  if (suggestedSubcategoryIds.length > 0) {
+    const { data: suggestedSubcategories, error: suggestedSubcategoriesError } = await supabase
+      .from("Subcategory")
+      .select("id, name")
+      .in("id", suggestedSubcategoryIds);
+
+    if (suggestedSubcategoriesError) {
+      console.error('[getTransactionsClient] Error fetching suggested subcategories:', suggestedSubcategoriesError);
+    } else if (suggestedSubcategories) {
+      suggestedSubcategories.forEach((subcat) => {
+        suggestedSubcategoriesMap.set(subcat.id, subcat);
+      });
+    }
   }
 
   // Handle relations
@@ -103,13 +173,35 @@ export async function getTransactionsClient(filters?: {
     if (tx.subcategory) {
       subcategory = Array.isArray(tx.subcategory) ? (tx.subcategory.length > 0 ? tx.subcategory[0] : null) : tx.subcategory;
     }
+
+    const suggestedCategory = tx.suggestedCategoryId ? suggestedCategoriesMap.get(tx.suggestedCategoryId) || null : null;
+    const suggestedSubcategory = tx.suggestedSubcategoryId ? suggestedSubcategoriesMap.get(tx.suggestedSubcategoryId) || null : null;
     
+    // Debug log for transactions with suggestions
+    if (tx.suggestedCategoryId) {
+      console.log('[getTransactionsClient] Transaction with suggestion:', {
+        id: tx.id,
+        description: tx.description,
+        suggestedCategoryId: tx.suggestedCategoryId,
+        suggestedSubcategoryId: tx.suggestedSubcategoryId,
+        suggestedCategory: suggestedCategory,
+        suggestedSubcategory: suggestedSubcategory,
+        hasCategory: !!tx.categoryId,
+        categoryId: tx.categoryId,
+      });
+    }
+    
+    // Ensure all fields are preserved, especially suggestedCategoryId and suggestedSubcategoryId
     return {
       ...tx,
       account: account || null,
       category: category || null,
       subcategory: subcategory || null,
-      tags: tx.tags ? (typeof tx.tags === 'string' ? JSON.parse(tx.tags) : tx.tags) : [],
+      // Explicitly preserve suggestedCategoryId and suggestedSubcategoryId
+      suggestedCategoryId: tx.suggestedCategoryId || null,
+      suggestedSubcategoryId: tx.suggestedSubcategoryId || null,
+      suggestedCategory: suggestedCategory || null,
+      suggestedSubcategory: suggestedSubcategory || null,
     };
   });
 
@@ -120,10 +212,6 @@ export async function getTransactionsClient(filters?: {
  * Create a transaction
  */
 export async function createTransactionClient(data: TransactionFormData): Promise<Transaction> {
-  if (data.type === "transfer" && !data.transferToId) {
-    throw new Error("Transfer destination is required");
-  }
-
   // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
@@ -134,72 +222,6 @@ export async function createTransactionClient(data: TransactionFormData): Promis
   const date = data.date instanceof Date ? data.date : new Date(data.date);
   const now = formatTimestamp(new Date());
   const formatDate = formatTimestamp;
-
-  if (data.type === "transfer") {
-    const outgoingId = crypto.randomUUID();
-    const incomingId = crypto.randomUUID();
-    const transferDate = formatDate(date);
-
-    // Create outgoing transaction
-    const { data: outgoing, error: outgoingError } = await supabase
-      .from("Transaction")
-      .insert({
-        id: outgoingId,
-        date: transferDate,
-        type: "transfer",
-        amount: data.amount,
-        accountId: data.accountId,
-        userId: userId, // Add userId directly to transaction
-        description: data.description || null,
-        transferToId: data.transferToId!,
-        recurring: data.recurring ?? false,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .select()
-      .single();
-
-    if (outgoingError || !outgoing) {
-      console.error("Supabase error creating outgoing transaction:", outgoingError);
-      throw new Error(`Failed to create outgoing transaction: ${outgoingError?.message || JSON.stringify(outgoingError)}`);
-    }
-
-    // Get userId for the destination account (same user for now, could be different for shared accounts)
-    const { data: destAccount } = await supabase
-      .from("Account")
-      .select("userId")
-      .eq("id", data.transferToId!)
-      .single();
-    
-    const destUserId = destAccount?.userId || userId;
-
-    // Create incoming transaction
-    const { data: incoming, error: incomingError } = await supabase
-      .from("Transaction")
-      .insert({
-        id: incomingId,
-        date: transferDate,
-        type: "transfer",
-        amount: data.amount,
-        accountId: data.transferToId!,
-        userId: destUserId, // Add userId directly to transaction
-        description: data.description || null,
-        transferFromId: outgoing.id,
-        transferToId: null,
-        recurring: data.recurring ?? false,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .select()
-      .single();
-
-    if (incomingError || !incoming) {
-      console.error("Supabase error creating incoming transaction:", incomingError);
-      throw new Error(`Failed to create incoming transaction: ${incomingError?.message || JSON.stringify(incomingError)}`);
-    }
-
-    return { ...outgoing, tags: [] };
-  }
 
   const id = crypto.randomUUID();
   const transactionDate = formatDate(date);
@@ -216,7 +238,6 @@ export async function createTransactionClient(data: TransactionFormData): Promis
       categoryId: data.categoryId || null,
       subcategoryId: data.subcategoryId || null,
       description: data.description || null,
-      tags: JSON.stringify(data.tags || []),
       recurring: data.recurring ?? false,
       createdAt: now,
       updatedAt: now,
@@ -229,7 +250,7 @@ export async function createTransactionClient(data: TransactionFormData): Promis
     throw new Error(`Failed to create transaction: ${error.message || JSON.stringify(error)}`);
   }
 
-  return { ...transaction, tags: data.tags || [] };
+  return transaction;
 }
 
 /**
@@ -250,9 +271,7 @@ export async function updateTransactionClient(id: string, data: Partial<Transact
   if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
   if (data.subcategoryId !== undefined) updateData.subcategoryId = data.subcategoryId || null;
   if (data.description !== undefined) updateData.description = data.description || null;
-  if (data.tags !== undefined) updateData.tags = JSON.stringify(data.tags || []);
   if (data.recurring !== undefined) updateData.recurring = data.recurring;
-  if (data.transferToId !== undefined) updateData.transferToId = data.transferToId || null;
   updateData.updatedAt = formatTimestamp(new Date());
 
   const { data: transaction, error } = await supabase
@@ -267,7 +286,7 @@ export async function updateTransactionClient(id: string, data: Partial<Transact
     throw new Error(`Failed to update transaction: ${error.message || JSON.stringify(error)}`);
   }
 
-  return { ...transaction, tags: transaction.tags ? (typeof transaction.tags === 'string' ? JSON.parse(transaction.tags) : transaction.tags) : [] };
+  return transaction;
 }
 
 /**
@@ -286,25 +305,10 @@ export async function deleteTransactionClient(id: string): Promise<void> {
     throw new Error("Transaction not found");
   }
 
-  try {
-    if (transaction.transferFromId) {
-      // Delete the linked transfer transaction
-      await supabase.from("Transaction").delete().eq("id", transaction.transferFromId);
-      await supabase.from("Transaction").delete().eq("transferFromId", transaction.transferFromId);
-    } else if (transaction.transferToId) {
-      // Delete the outgoing transfer
-      await supabase.from("Transaction").delete().eq("id", id);
-      await supabase.from("Transaction").delete().eq("transferToId", transaction.transferToId);
-    } else {
-      const { error } = await supabase.from("Transaction").delete().eq("id", id);
-      if (error) {
-        console.error("Supabase error deleting transaction:", error);
-        throw new Error(`Failed to delete transaction: ${error.message || JSON.stringify(error)}`);
-      }
-    }
-  } catch (error) {
-    console.error("Error deleting transaction:", error);
-    throw error;
+  const { error } = await supabase.from("Transaction").delete().eq("id", id);
+  if (error) {
+    console.error("Supabase error deleting transaction:", error);
+    throw new Error(`Failed to delete transaction: ${error.message || JSON.stringify(error)}`);
   }
 }
 

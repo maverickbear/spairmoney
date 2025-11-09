@@ -39,7 +39,7 @@ export function FeatureGuard({
     }
 
     // Determine required plan based on feature
-    const plan = requiredPlan || (feature === "hasInvestments" || feature === "hasAdvancedReports" || feature === "hasCsvExport" ? "basic" : "premium");
+    const plan = requiredPlan || (feature === "hasInvestments" || feature === "hasAdvancedReports" || feature === "hasCsvExport" || feature === "hasBankIntegration" ? "basic" : "premium");
     const name = featureName || getFeatureName(feature);
 
     return (
@@ -63,6 +63,7 @@ function getFeatureName(feature: keyof PlanFeatures): string {
     hasCsvExport: "CSV Export",
     hasDebts: "Debts",
     hasGoals: "Goals",
+    hasBankIntegration: "Bank Integration",
   };
 
   return names[feature] || feature;

@@ -12,6 +12,14 @@ export interface Database {
     creditLimit: number | null;
     userId: string | null;
     initialBalance: number | null;
+    plaidItemId: string | null;
+    plaidAccountId: string | null;
+    isConnected: boolean | null;
+    lastSyncedAt: string | null;
+    syncEnabled: boolean | null;
+    plaidMask: string | null;
+    plaidOfficialName: string | null;
+    plaidVerificationStatus: string | null;
   };
   AccountInvestmentValue: {
     id: string;
@@ -214,6 +222,9 @@ export interface Database {
     createdAt: string;
     updatedAt: string;
     recurring: boolean;
+    suggestedCategoryId: string | null;
+    suggestedSubcategoryId: string | null;
+    plaidMetadata: Record<string, unknown> | null;
   };
   User: {
     id: string;
@@ -224,6 +235,47 @@ export interface Database {
     updatedAt: string;
     role: string;
     phoneNumber: string | null;
+  };
+  PlaidConnection: {
+    id: string;
+    userId: string;
+    itemId: string;
+    accessToken: string;
+    institutionId: string | null;
+    institutionName: string | null;
+    institutionLogo: string | null;
+    createdAt: string;
+    updatedAt: string;
+    errorCode: string | null;
+    errorMessage: string | null;
+  };
+  TransactionSync: {
+    id: string;
+    accountId: string;
+    plaidTransactionId: string;
+    transactionId: string | null;
+    syncDate: string;
+    status: string;
+  };
+  PlaidLiability: {
+    id: string;
+    accountId: string;
+    liabilityType: string;
+    apr: number | null;
+    interestRate: number | null;
+    minimumPayment: number | null;
+    lastPaymentAmount: number | null;
+    lastPaymentDate: string | null;
+    nextPaymentDueDate: string | null;
+    lastStatementBalance: number | null;
+    lastStatementDate: string | null;
+    creditLimit: number | null;
+    currentBalance: number | null;
+    availableCredit: number | null;
+    plaidAccountId: string | null;
+    plaidItemId: string | null;
+    createdAt: string;
+    updatedAt: string;
   };
 }
 

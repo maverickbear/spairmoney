@@ -110,24 +110,6 @@ export function BudgetExecutionChart({ data }: BudgetExecutionChartProps) {
         })}
         </div>
       )}
-
-      {/* Legend */}
-      <div className="mt-6 pt-4 border-t">
-        <div className="flex items-center justify-center gap-6 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-emerald-400 dark:bg-emerald-500" />
-            <span className="text-muted-foreground">On Track (&lt;90%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-amber-400 dark:bg-amber-500" />
-            <span className="text-muted-foreground">Warning (90-100%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-red-400 dark:bg-red-500" />
-            <span className="text-muted-foreground">Over Budget (&gt;100%)</span>
-          </div>
-        </div>
-      </div>
     </ChartCard>
   );
 }

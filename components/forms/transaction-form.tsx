@@ -33,7 +33,7 @@ interface TransactionFormProps {
   onOpenChange: (open: boolean) => void;
   transaction?: Transaction | null;
   onSuccess?: () => void;
-  defaultType?: "expense" | "income" | "transfer";
+  defaultType?: "expense" | "income";
 }
 
 interface Account {
@@ -76,7 +76,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       date: new Date(),
       type: "expense",
       amount: 0,
-      tags: [],
       recurring: false,
     },
   });
@@ -88,14 +87,12 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       if (transaction) {
         form.reset({
           date: new Date(transaction.date),
-          type: transaction.type as "expense" | "income" | "transfer",
+          type: transaction.type as "expense" | "income",
           amount: transaction.amount,
           accountId: transaction.accountId,
           categoryId: transaction.categoryId || undefined,
           subcategoryId: transaction.subcategoryId || undefined,
           description: transaction.description || "",
-          tags: Array.isArray(transaction.tags) ? transaction.tags : (transaction.tags ? JSON.parse(transaction.tags) : []),
-          transferToId: transaction.transferToId || undefined,
           recurring: transaction.recurring ?? false,
         });
       } else {
@@ -103,7 +100,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           date: new Date(),
           type: defaultType,
           amount: 0,
-          tags: [],
           recurring: false,
         });
         setSelectedMacroId("");
@@ -343,8 +339,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
     }
   }
 
-  const isTransfer = form.watch("type") === "transfer";
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col !p-0 !gap-0">
@@ -388,21 +382,8 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
               <Select
                 value={form.watch("type")}
                 onValueChange={(value) => {
-                  const newType = value as "expense" | "income" | "transfer";
+                  const newType = value as "expense" | "income";
                   form.setValue("type", newType);
-                  
-                  // Clear category/subcategory when switching to transfer
-                  if (newType === "transfer") {
-                    form.setValue("categoryId", undefined);
-                    form.setValue("subcategoryId", undefined);
-                    setSelectedMacroId("");
-                    setCategories([]);
-                    setSubcategories([]);
-                  }
-                  // Clear transferToId when switching away from transfer
-                  else if (form.watch("type") === "transfer") {
-                    form.setValue("transferToId", undefined);
-                  }
                 }}
               >
                 <SelectTrigger>
@@ -411,7 +392,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                 <SelectContent>
                   <SelectItem value="expense">Expense</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -435,31 +415,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
               </Select>
             </div>
 
-            {isTransfer && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Transfer To</label>
-                <Select
-                  value={form.watch("transferToId")}
-                  onValueChange={(value) => form.setValue("transferToId", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts
-                      .filter((a) => a.id !== form.watch("accountId"))
-                      .map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {!isTransfer && (
-              <>
+            <>
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Group</label>
                   <Select 
@@ -565,8 +521,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                     )}
                   </div>
                 )}
-              </>
-            )}
+            </>
 
             <div className="space-y-1">
               <label className="text-sm font-medium">Amount</label>

@@ -21,6 +21,7 @@ const defaultLimits: PlanFeatures = {
   hasCsvExport: false,
   hasDebts: true,
   hasGoals: true,
+  hasBankIntegration: false,
 };
 
 export function PlanLimitsProvider({ children }: { children: ReactNode }) {

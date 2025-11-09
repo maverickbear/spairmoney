@@ -71,9 +71,9 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
     .slice(0, 3);
 
   const priorityColors = {
-    High: "bg-red-500 dark:bg-red-600",
-    Medium: "bg-yellow-500 dark:bg-yellow-600",
-    Low: "bg-blue-500 dark:bg-blue-600",
+    High: "bg-red-500 dark:bg-red-600 hover:bg-red-500 dark:hover:bg-red-600",
+    Medium: "bg-yellow-500 dark:bg-yellow-600 hover:bg-yellow-500 dark:hover:bg-yellow-600",
+    Low: "bg-blue-500 dark:bg-blue-600 hover:bg-blue-500 dark:hover:bg-blue-600",
   };
 
   return (
@@ -116,31 +116,6 @@ export function GoalsOverview({ goals }: GoalsOverviewProps) {
                 <span className="font-medium">{formatMoney(totalTarget)}</span>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Statistics Grid */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Target className="h-3 w-3" />
-              <span>Active Goals</span>
-            </div>
-            <p className="text-lg font-semibold">{activeGoals.length}</p>
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-              <span>Completed</span>
-            </div>
-            <p className="text-lg font-semibold text-green-600 dark:text-green-400">{completedGoals.length}</p>
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3" />
-              <span>Monthly Allocation</span>
-            </div>
-            <p className="text-lg font-semibold">{totalMonthlyContribution.toFixed(1)}%</p>
           </div>
         </div>
 

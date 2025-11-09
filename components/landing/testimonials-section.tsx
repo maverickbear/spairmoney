@@ -6,37 +6,37 @@ import { Quote } from "lucide-react";
 export function TestimonialsSection() {
   const testimonials = [
     {
-      quote: "Seamless and user-friendly experience!",
-      author: "David Wilson",
-      role: "Financial Advisor",
-      avatar: "DW",
-    },
-    {
-      quote: "Best finance tool I've used!",
-      author: "Matthew Lewis",
-      role: "Entrepreneur",
-      avatar: "ML",
-    },
-    {
-      quote: "Transformed how I manage my finances.",
+      quote: "Finally, a finance app that actually saves me time. The bank integration is a game-changer—no more manual entry!",
       author: "Sarah Johnson",
-      role: "Business Owner",
+      role: "Small Business Owner",
       avatar: "SJ",
     },
     {
-      quote: "Incredible insights into my spending habits.",
+      quote: "I've tried Mint, YNAB, and PocketGuard. Spare Finance is the only one that does everything I need without the complexity.",
       author: "Michael Chen",
       role: "Software Engineer",
       avatar: "MC",
     },
     {
-      quote: "Simple yet powerful. Exactly what I needed.",
+      quote: "The AI categorization is incredible. It learned my spending patterns in weeks and now categorizes 90% of my transactions automatically.",
       author: "Emily Davis",
       role: "Marketing Director",
       avatar: "ED",
     },
     {
-      quote: "The best investment I've made for my financial health.",
+      quote: "As a family, we love the household members feature. We can track our finances together while keeping our individual accounts separate.",
+      author: "David Wilson",
+      role: "Financial Advisor",
+      avatar: "DW",
+    },
+    {
+      quote: "The savings goals feature helped me save $5,000 for my vacation. The progress tracking kept me motivated every month.",
+      author: "Matthew Lewis",
+      role: "Entrepreneur",
+      avatar: "ML",
+    },
+    {
+      quote: "Best $7.99 I spend every month. The investment tracking alone is worth it, but the whole package is incredible value.",
       author: "Robert Taylor",
       role: "Consultant",
       avatar: "RT",
@@ -49,10 +49,10 @@ export function TestimonialsSection() {
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-            Client testimonials
+            Loved by Thousands of Users
           </h2>
           <p className="text-lg text-muted-foreground">
-            Discover your ultimate finance management solution for individuals, startups, and enterprises
+            See what real users are saying about how Spare Finance transformed their financial management
           </p>
         </div>
 

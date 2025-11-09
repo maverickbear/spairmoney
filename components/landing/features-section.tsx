@@ -7,34 +7,34 @@ export function FeaturesSection() {
   const features = [
     {
       icon: BarChart3,
-      title: "Advanced Analytics",
-      description: "Gain instant insights into your spending patterns and make smarter financial decisions.",
-      value: "$22,630",
-      label: "Finance Management",
+      title: "Bank Account Integration",
+      description: "Connect your accounts securely with Plaid. Transactions sync automatically—no manual entry required. Save hours every month.",
+      value: "Auto-sync",
+      label: "Bank Integration",
     },
     {
       icon: Globe,
-      title: "Real-time Global Collaborations",
-      description: "Gain instant insights into your spending patterns and make smarter financial decisions.",
+      title: "AI-Powered Categorization",
+      description: "Our smart system learns your spending patterns and automatically categorizes transactions. Just approve or adjust—it gets smarter over time.",
       iconLarge: true,
     },
     {
       icon: Zap,
-      title: "Lightning Fast",
-      description: "Experience blazing fast performance with real-time updates and instant synchronization.",
+      title: "Real-Time Dashboard",
+      description: "See your complete financial picture at a glance. Track spending, monitor budgets, and watch your savings grow—all updated in real-time.",
     },
     {
       icon: TrendingUp,
-      title: "Smart Insights",
-      description: "Get AI-powered recommendations to optimize your financial health and savings.",
+      title: "Smart Goal Tracking",
+      description: "Set savings goals with automatic progress tracking. Our system calculates how long it'll take to reach your goals based on your actual income.",
     },
   ];
 
   const stats = [
-    { value: "2000+", label: "Trusted Partners", icon: "↑" },
-    { value: "5M+", label: "Active Users", icon: "↑" },
-    { value: "98%", label: "Faster Ops", icon: "↑" },
-    { value: "$10B+", label: "Financial Data", icon: "↑" },
+    { value: "100%", label: "Secure & Encrypted", icon: "🔒" },
+    { value: "Auto", label: "Bank Sync", icon: "⚡" },
+    { value: "24/7", label: "Real-Time Updates", icon: "🔄" },
+    { value: "$0", label: "Start Free", icon: "✨" },
   ];
 
   return (
@@ -43,10 +43,10 @@ export function FeaturesSection() {
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-            Real-time expense tracking made simple
+            Everything You Need to Master Your Money
           </h2>
           <p className="text-lg text-muted-foreground">
-            Instantly uncover spending habits and improve your financial decisions
+            Stop juggling spreadsheets and multiple apps. Get a complete financial command center that works automatically—so you can focus on what matters.
           </p>
         </div>
 

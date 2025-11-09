@@ -26,7 +26,7 @@ export async function getAccounts() {
   
   const { data: transactions } = await supabase
     .from("Transaction")
-    .select("accountId, type, amount, transferToId, transferFromId, date")
+    .select("accountId, type, amount, date")
     .lte("date", today.toISOString());
 
   // Calculate balances in memory
@@ -56,14 +56,6 @@ export async function getAccounts() {
       balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
     } else if (tx.type === "expense") {
       balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
-    } else if (tx.type === "transfer") {
-      if (tx.transferToId) {
-        // Outgoing transfer - reduce balance
-        balances.set(tx.accountId, currentBalance - (Number(tx.amount) || 0));
-      } else {
-        // Ingoing transfer - increase balance
-        balances.set(tx.accountId, currentBalance + (Number(tx.amount) || 0));
-      }
     }
   }
 
