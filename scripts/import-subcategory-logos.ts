@@ -28,6 +28,9 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
 
 // Create service role client directly (bypasses RLS)
 function createServiceRoleClient() {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error("Supabase environment variables are not set");
+  }
   return createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
       persistSession: false,
@@ -60,7 +63,6 @@ const subcategoryDomainMap: Record<string, string> = {
   "Car Loan": "", // Genérico
   "Car Insurance": "", // Genérico
   "Fuel": "", // Genérico
-  "Maintenance": "", // Genérico
   "Parking": "", // Genérico
   "Vehicle Maintenance": "", // Genérico
   

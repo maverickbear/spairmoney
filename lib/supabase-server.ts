@@ -201,7 +201,8 @@ export function createServiceRoleClient() {
     });
   }
 
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+  // TypeScript now knows supabaseServiceRoleKey is not undefined after the check above
+  return createClient(supabaseUrl, supabaseServiceRoleKey as string, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
