@@ -22,7 +22,7 @@ async function main() {
   await supabase.from("Transaction").delete().neq("id", "");
   await supabase.from("Subcategory").delete().neq("id", "");
   await supabase.from("Category").delete().neq("id", "");
-  await supabase.from("Macro").delete().neq("id", "");
+  await supabase.from("Group").delete().neq("id", "");
   await supabase.from("Account").delete().neq("id", "");
 
   // Create Accounts
@@ -70,7 +70,7 @@ async function main() {
   ];
 
   const { data: createdMacros, error: macrosError } = await supabase
-    .from("Macro")
+    .from("Group")
     .insert(macros)
     .select();
 

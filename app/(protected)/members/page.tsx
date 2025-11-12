@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { InvitationStatus } from "@/components/members/invitation-status";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { PageHeader } from "@/components/common/page-header";
 
 // Members helper
 function getInitials(name: string | null | undefined): string {
@@ -141,14 +142,10 @@ export default function MembersPage() {
   if (!limitsLoading && !hasHouseholdMembersAccess) {
     return (
       <div className="space-y-4 md:space-y-6">
-        <div className="space-y-2">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Household Members</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Manage household members and invitations
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Household Members"
+          description="Manage household members and invitations"
+        />
         <UpgradePrompt
           feature="Household Members"
           currentPlan="free"
@@ -161,15 +158,10 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-2">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Household Members</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Manage household members and invitations
-            </p>
-          </div>
-        </div>
+      <PageHeader
+        title="Household Members"
+        description="Manage household members and invitations"
+      >
         {(currentUserRole === "admin" || currentUserRole === null) && members.length > 0 && (
           <Button
             onClick={() => setIsFormOpen(true)}
@@ -178,7 +170,7 @@ export default function MembersPage() {
             Invite Member
           </Button>
         )}
-      </div>
+      </PageHeader>
 
       {loading ? (
         <Card>

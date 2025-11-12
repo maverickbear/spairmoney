@@ -27,7 +27,7 @@ import type { SystemCategory } from "@/lib/api/admin";
 
 const categorySchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
-  macroId: z.string().min(1, "Macro is required"),
+  macroId: z.string().min(1, "Group is required"),
 });
 
 type CategoryFormData = z.infer<typeof categorySchema>;
@@ -113,7 +113,7 @@ export function CategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>
             {category ? "Edit System Category" : "Create System Category"}
@@ -125,7 +125,8 @@ export function CategoryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -142,14 +143,14 @@ export function CategoryDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="macroId">Macro</Label>
+            <Label htmlFor="macroId">Group</Label>
             <Select
               value={form.watch("macroId")}
               onValueChange={(value) => form.setValue("macroId", value)}
               required
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a macro" />
+                <SelectValue placeholder="Select a group" />
               </SelectTrigger>
               <SelectContent>
                 {availableMacros.map((macro) => (
@@ -164,6 +165,7 @@ export function CategoryDialog({
                 {form.formState.errors.macroId.message}
               </p>
             )}
+          </div>
           </div>
 
           <DialogFooter>

@@ -295,7 +295,7 @@ export function Nav({ hasSubscription = true }: NavProps) {
             </nav>
 
             {/* Trial Widget - Show if user is in trial */}
-            {userData?.subscription?.status === "trialing" && !isCollapsed && (
+            {!loading && userData && userData.subscription?.status === "trialing" && !isCollapsed && (
               <TrialWidget
                 daysRemaining={calculateTrialDaysRemaining(userData.subscription.trialEndDate)}
                 progress={calculateTrialProgress(userData.subscription.trialStartDate, userData.subscription.trialEndDate)}
@@ -305,7 +305,7 @@ export function Nav({ hasSubscription = true }: NavProps) {
             )}
 
             {/* Upgrade Card - Only show if not premium and not in trial */}
-            {userData?.plan?.name !== "premium" && userData?.subscription?.status !== "trialing" && (
+            {!loading && userData && userData.plan?.name !== "premium" && userData.subscription?.status !== "trialing" && (
               <div className={cn(
                 "border-t px-3 py-3",
                 isCollapsed && "px-2"

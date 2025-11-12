@@ -348,7 +348,7 @@ export function IntegrationDropdown({
               To connect your Questrade account, you need to generate an authorization token in the Questrade API Centre.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-6">
             <div className="space-y-2">
               <Label htmlFor="token">Authorization Token</Label>
               <Input

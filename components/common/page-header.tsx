@@ -66,8 +66,8 @@ export function PageHeader({ title, description, children, className }: PageHead
           </div>
         </div>
       </div>
-      {/* Spacer to prevent content from going under fixed header */}
-      <div className="h-[calc(4rem+1px+4rem)] lg:h-[calc(5rem+1px)] md:h-[calc(5rem+1px+4rem)]" />
+      {/* Spacer to prevent content from going under fixed header + 40px spacing */}
+      <div className="h-[calc(4rem+1px+4rem+2.5rem)] lg:h-[calc(5rem+1px+2.5rem)] md:h-[calc(5rem+1px+4rem+2.5rem)]" />
     </>
   );
 }

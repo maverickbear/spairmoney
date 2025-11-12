@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { PageHeader } from "@/components/common/page-header";
 
 interface Goal {
   id: string;
@@ -276,15 +277,10 @@ export default function GoalsPage() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-2">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Goals</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Track your progress toward your financial goals
-            </p>
-          </div>
-        </div>
+      <PageHeader
+        title="Goals"
+        description="Track your progress toward your financial goals"
+      >
         {!(sortedGoals.length === 0 && filterBy === "all") && (
           <Button
             onClick={() => {
@@ -296,7 +292,7 @@ export default function GoalsPage() {
             Create Goal
           </Button>
         )}
-      </div>
+      </PageHeader>
 
       {goals.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

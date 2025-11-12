@@ -31,6 +31,7 @@ import { SpendingPatternsSection } from "@/components/reports/spending-patterns-
 import { FinancialHealthInsights } from "@/components/reports/financial-health-insights";
 import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { CategoryExpensesChart } from "@/components/charts/category-expenses-chart";
+import { PageHeader } from "@/components/common/page-header";
 
 interface ReportsContentProps {
   limits: PlanFeatures;
@@ -148,14 +149,10 @@ export function ReportsContent({
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="space-y-2">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Reports</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Complete financial overview and analysis for {format(now, "MMMM yyyy")}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Reports"
+        description={`Complete financial overview and analysis for ${format(now, "MMMM yyyy")}`}
+      />
 
       {/* Financial Overview - Always visible */}
       <FinancialOverviewCard

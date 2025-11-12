@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/toast-provider";
-import { Loader2, Plus, Search } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +55,41 @@ interface Security {
   class: string;
 }
 
+// Helper function to get logo URL for a security
+function getSecurityLogo(symbol: string, securityClass: string): string {
+  const normalizedSymbol = symbol.toUpperCase();
+  
+  if (securityClass.toLowerCase() === "crypto") {
+    return `https://cryptoicons.org/api/icon/${normalizedSymbol.toLowerCase()}/200`;
+  }
+  
+  return `https://assets.polygon.io/logos/${normalizedSymbol}/logo.png`;
+}
+
+// Component for security logo with fallback
+function SecurityLogo({ symbol, securityClass, logoUrl }: { symbol: string; securityClass: string; logoUrl?: string }) {
+  const [logoError, setLogoError] = useState(false);
+  
+  if (logoError) {
+    return (
+      <span className="text-xs font-semibold text-muted-foreground">
+        {symbol.charAt(0)}
+      </span>
+    );
+  }
+  
+  const logo = logoUrl || getSecurityLogo(symbol, securityClass);
+  
+  return (
+    <img 
+      src={logo} 
+      alt={symbol}
+      className="h-full w-full object-cover"
+      onError={() => setLogoError(true)}
+    />
+  );
+}
+
 export function InvestmentTransactionForm({ 
   open, 
   onOpenChange, 
@@ -71,6 +107,14 @@ export function InvestmentTransactionForm({
   const [searchedSecurity, setSearchedSecurity] = useState<{ symbol: string; name: string; class: string; price?: number } | null>(null);
   const [searchResults, setSearchResults] = useState<Array<{ symbol: string; name: string; class: string; exchange?: string }>>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("");
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [securitySearch, setSecuritySearch] = useState("");
+  const [showSecurityDropdown, setShowSecurityDropdown] = useState(false);
+  const [apiSearchResults, setApiSearchResults] = useState<Array<{ symbol: string; name: string; class: string; exchange?: string; logo?: string }>>([]);
+  const [isSearchingSecurities, setIsSearchingSecurities] = useState(false);
 
   const form = useForm<InvestmentTransactionFormData & { currentPrice?: number; security?: { symbol: string; name: string; class: string } }>({
     resolver: zodResolver(investmentTransactionSchema),
@@ -89,6 +133,9 @@ export function InvestmentTransactionForm({
 
   useEffect(() => {
     if (open) {
+      // Reset accounts to empty when dialog opens to show loading state
+      setAccounts([]);
+      setIsLoadingAccounts(true);
       loadData();
       form.reset({
         date: new Date(),
@@ -99,10 +146,21 @@ export function InvestmentTransactionForm({
         notes: "",
         securityId: undefined,
       });
+      setShowSecurityDropdown(false);
+      setSecuritySearch("");
+      setApiSearchResults([]);
+    } else {
+      // Reset state when dialog closes
+      setIsAddingAccount(false);
+      setNewAccountName("");
+      setShowSecurityDropdown(false);
+      setSecuritySearch("");
+      setApiSearchResults([]);
     }
   }, [open]);
 
   async function loadData() {
+    setIsLoadingAccounts(true);
     try {
       const [accountsRes, securitiesRes] = await Promise.all([
         fetch("/api/investments/accounts"),
@@ -111,19 +169,151 @@ export function InvestmentTransactionForm({
 
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
-        setAccounts(accountsData);
+        setAccounts(accountsData || []);
+        if (!accountsData || accountsData.length === 0) {
+          console.warn("No investment accounts found. Make sure you have created investment accounts.");
+        }
+      } else {
+        const errorData = await accountsRes.json().catch(() => ({}));
+        console.error("Error loading investment accounts:", errorData);
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to load investment accounts",
+          variant: "destructive",
+        });
       }
 
       if (securitiesRes.ok) {
         const securitiesData = await securitiesRes.json().catch(() => []);
-        setSecurities(securitiesData);
+        setSecurities(securitiesData || []);
+      } else {
+        const errorData = await securitiesRes.json().catch(() => ({}));
+        console.error("Error loading securities:", errorData);
       }
     } catch (error) {
       console.error("Error loading data:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to load data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingAccounts(false);
     }
   }
 
-  // Debounce search function
+  async function checkAccountExists(name: string): Promise<boolean> {
+    try {
+      const res = await fetch("/api/investments/accounts");
+      if (!res.ok) return false;
+      
+      const accounts = await res.json().catch(() => []);
+      return accounts.some((acc: InvestmentAccount) => 
+        acc.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+    } catch (error) {
+      console.error("Error checking account existence:", error);
+      return false;
+    }
+  }
+
+  async function createAccountQuickly(name: string) {
+    if (!name || !name.trim()) {
+      return;
+    }
+
+    const trimmedName = name.trim();
+    
+    // Check if account already exists
+    const exists = await checkAccountExists(trimmedName);
+    if (exists) {
+      toast({
+        title: "Account already exists",
+        description: `An account named "${trimmedName}" already exists.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingAccount(true);
+    try {
+      const res = await fetch("/api/investments/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmedName }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to create account");
+      }
+
+      const newAccount = await res.json();
+      
+      // Add the new account to the list immediately (optimistic update)
+      setAccounts(prev => [...prev, newAccount]);
+      
+      // Select the newly created account
+      form.setValue("accountId", newAccount.id);
+      
+      // Reset input mode
+      setIsAddingAccount(false);
+      setNewAccountName("");
+      
+      toast({
+        title: "Success",
+        description: `Account "${trimmedName}" created successfully`,
+      });
+      
+      // Reload accounts list in background to ensure consistency
+      loadData();
+    } catch (error) {
+      console.error("Error creating account:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  }
+
+  async function handleAccountInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      await createAccountQuickly(newAccountName);
+    } else if (e.key === "Escape") {
+      setIsAddingAccount(false);
+      setNewAccountName("");
+    }
+  }
+
+  async function handleAccountInputBlur(e: React.FocusEvent<HTMLInputElement>) {
+    // Use setTimeout to allow click events to process first
+    setTimeout(async () => {
+      // Check if focus moved to another element in the form
+      const activeElement = document.activeElement;
+      if (activeElement && (
+        activeElement.closest('form') || 
+        activeElement.closest('[role="dialog"]') ||
+        activeElement.tagName === 'BUTTON'
+      )) {
+        // If focus is still within the form/dialog, don't save yet
+        // User might be clicking on another field
+        return;
+      }
+
+      if (newAccountName.trim()) {
+        await createAccountQuickly(newAccountName);
+      } else {
+        setIsAddingAccount(false);
+        setNewAccountName("");
+      }
+    }, 150);
+  }
+
+  // Debounce search function for security dialog
   useEffect(() => {
     if (!searchSymbol || searchSymbol.trim().length < 2) {
       setSearchResults([]);
@@ -137,6 +327,20 @@ export function InvestmentTransactionForm({
 
     return () => clearTimeout(timeoutId);
   }, [searchSymbol]);
+
+  // Debounce search function for security selector
+  useEffect(() => {
+    if (!securitySearch || securitySearch.trim().length < 2) {
+      setApiSearchResults([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      await handleSearchSecuritiesForSelector(securitySearch.trim());
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [securitySearch]);
 
   async function handleSearchSecurities(query: string) {
     if (!query || query.trim().length < 2) {
@@ -161,6 +365,31 @@ export function InvestmentTransactionForm({
       setSearchResults([]);
     } finally {
       setIsSearching(false);
+    }
+  }
+
+  async function handleSearchSecuritiesForSelector(query: string) {
+    if (!query || query.trim().length < 2) {
+      setApiSearchResults([]);
+      return;
+    }
+
+    setIsSearchingSecurities(true);
+    try {
+      const res = await fetch(`/api/investments/securities/search?query=${encodeURIComponent(query)}`);
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to search");
+      }
+
+      const data = await res.json();
+      setApiSearchResults(data.results || []);
+    } catch (error) {
+      console.error("Error searching securities:", error);
+      setApiSearchResults([]);
+    } finally {
+      setIsSearchingSecurities(false);
     }
   }
 
@@ -243,6 +472,9 @@ export function InvestmentTransactionForm({
       setNewSecurity({ symbol: "", name: "", class: "stock" });
       setSearchSymbol("");
       setSearchedSecurity(null);
+      setShowSecurityDropdown(false);
+      setSecuritySearch("");
+      setApiSearchResults([]);
       toast({
         title: "Success",
         description: "Security created successfully",
@@ -327,22 +559,94 @@ export function InvestmentTransactionForm({
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
               <div className="space-y-1">
-                <Label>Account</Label>
-                <Select
-                  value={form.watch("accountId") || ""}
-                  onValueChange={(value) => form.setValue("accountId", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({account.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <Label>Account</Label>
+                  {isAddingAccount ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingAccount(false);
+                        setNewAccountName("");
+                      }}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingAccount(true)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Add new
+                    </button>
+                  )}
+                </div>
+                {isAddingAccount ? (
+                  <div className="space-y-1">
+                    <Input
+                      type="text"
+                      placeholder="Enter account name..."
+                      value={newAccountName}
+                      onChange={(e) => setNewAccountName(e.target.value)}
+                      onKeyDown={handleAccountInputKeyDown}
+                      onBlur={handleAccountInputBlur}
+                      disabled={isCreatingAccount}
+                      autoFocus
+                      className={isCreatingAccount ? "opacity-50" : ""}
+                    />
+                    {isCreatingAccount && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Creating account...
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Press Enter to save
+                    </p>
+                  </div>
+                ) : (
+                  <Select
+                    value={form.watch("accountId") || ""}
+                    onValueChange={(value) => form.setValue("accountId", value)}
+                    disabled={isLoadingAccounts || accounts.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue 
+                        placeholder={
+                          isLoadingAccounts 
+                            ? "Loading accounts..." 
+                            : accounts.length === 0 
+                            ? "No investment accounts available" 
+                            : "Select account"
+                        } 
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingAccounts ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading accounts...
+                        </div>
+                      ) : accounts.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          No investment accounts found
+                        </div>
+                      ) : (
+                        accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+                {!isLoadingAccounts && accounts.length === 0 && !isAddingAccount && (
+                  <p className="text-sm text-muted-foreground">
+                    No investment accounts found. Click "Add new" to create one.
+                  </p>
+                )}
                 {form.formState.errors.accountId && (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.accountId.message}
@@ -350,90 +654,293 @@ export function InvestmentTransactionForm({
                 )}
               </div>
 
-              <div className="space-y-1">
-                <Label>Transaction Type</Label>
-                <Select
-                  value={form.watch("type")}
-                  onValueChange={(value: any) => form.setValue("type", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="buy">Buy</SelectItem>
-                    <SelectItem value="sell">Sell</SelectItem>
-                    <SelectItem value="dividend">Dividend</SelectItem>
-                    <SelectItem value="interest">Interest</SelectItem>
-                    <SelectItem value="transfer_in">Transfer In</SelectItem>
-                    <SelectItem value="transfer_out">Transfer Out</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label>Security</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="small"
-                    onClick={() => setShowSecurityDialog(true)}
-                    className="text-xs"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Transaction Type</Label>
+                  <Select
+                    value={form.watch("type")}
+                    onValueChange={(value: any) => form.setValue("type", value)}
                   >
-                    <Plus className="h-3 w-3 mr-1" />
-                    New
-                  </Button>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="buy">Buy</SelectItem>
+                      <SelectItem value="sell">Sell</SelectItem>
+                      <SelectItem value="dividend">Dividend</SelectItem>
+                      <SelectItem value="interest">Interest</SelectItem>
+                      <SelectItem value="transfer_in">Transfer In</SelectItem>
+                      <SelectItem value="transfer_out">Transfer Out</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select
-                  value={form.watch("securityId") || ""}
-                  onValueChange={(value) => form.setValue("securityId", value || undefined)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select or create security" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {securities.map((security) => (
-                      <SelectItem key={security.id} value={security.id}>
-                        {security.symbol} - {security.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!form.watch("securityId") && (transactionType === "buy" || transactionType === "sell") && (
-                  <p className="text-xs text-muted-foreground">
-                    You can create a new security using the "New" button above
-                  </p>
-                )}
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label>Security</Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSecurityDialog(true)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Add new
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="Search or select security..."
+                      value={(() => {
+                        const securityId = form.watch("securityId");
+                        if (securityId && securities.length > 0) {
+                          const security = securities.find((s) => s.id === securityId);
+                          if (security && !showSecurityDropdown) {
+                            return `${security.symbol} - ${security.name}`;
+                          }
+                        }
+                        return securitySearch;
+                      })()}
+                      onChange={(e) => {
+                        setSecuritySearch(e.target.value);
+                        setShowSecurityDropdown(true);
+                      }}
+                      onFocus={() => {
+                        setShowSecurityDropdown(true);
+                      }}
+                      onBlur={() => {
+                        // Delay hiding to allow click on results
+                        setTimeout(() => {
+                          setShowSecurityDropdown(false);
+                        }, 200);
+                      }}
+                      className="pr-8"
+                    />
+                    {isSearchingSecurities && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {form.watch("securityId") && !showSecurityDropdown && !isSearchingSecurities && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          form.setValue("securityId", undefined);
+                          setSecuritySearch("");
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        ×
+                      </button>
+                    )}
+                    {showSecurityDropdown && (
+                      <div 
+                        className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto"
+                        onMouseDown={(e) => e.preventDefault()}
+                      >
+                        {(() => {
+                          // Filter existing securities based on search
+                          // If we have API results, don't filter - show all existing securities
+                          // If we have search text but no API results yet, filter existing securities
+                          // If no search text, show all securities
+                          const filteredSecurities = securitySearch && securitySearch.length >= 2 && apiSearchResults.length === 0
+                            ? securities.filter((security) =>
+                                security.symbol.toLowerCase().includes(securitySearch.toLowerCase()) ||
+                                security.name.toLowerCase().includes(securitySearch.toLowerCase()) ||
+                                security.class.toLowerCase().includes(securitySearch.toLowerCase())
+                              )
+                            : securities;
+                          
+                          // Sort existing securities by symbol
+                          const sortedSecurities = [...filteredSecurities].sort((a, b) =>
+                            a.symbol.localeCompare(b.symbol)
+                          );
+                          
+                          // Check if we have API results or existing securities
+                          const hasApiResults = apiSearchResults.length > 0;
+                          const hasExistingSecurities = sortedSecurities.length > 0;
+                          
+                          if (!hasApiResults && !hasExistingSecurities) {
+                            if (isSearchingSecurities) {
+                              return (
+                                <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Searching...
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="px-3 py-2 text-sm text-muted-foreground">
+                                {securities.length === 0 ? "No securities available." : "No security found."}
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <>
+                              {/* Show existing securities first */}
+                              {sortedSecurities.map((security) => {
+                                const isSelected = form.watch("securityId") === security.id;
+                                return (
+                                  <div
+                                    key={security.id}
+                                    className={cn(
+                                      "px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground border-b",
+                                      isSelected && "bg-accent"
+                                    )}
+                                    onClick={() => {
+                                      form.setValue("securityId", security.id);
+                                      setShowSecurityDropdown(false);
+                                      setSecuritySearch("");
+                                      setApiSearchResults([]);
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Check
+                                        className={cn(
+                                          "h-4 w-4 shrink-0",
+                                          isSelected ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="h-8 w-8 shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                                        <SecurityLogo symbol={security.symbol} securityClass={security.class} />
+                                      </div>
+                                      <div className="flex flex-col flex-1">
+                                        <span className="font-medium">{security.symbol} - {security.name}</span>
+                                        <span className="text-xs text-muted-foreground">{security.class.toUpperCase()}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Show API search results */}
+                              {hasApiResults && (
+                                <>
+                                  {sortedSecurities.length > 0 && (
+                                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground border-b bg-muted/50">
+                                      Search Results
+                                    </div>
+                                  )}
+                                  {apiSearchResults.map((result, index) => {
+                                    // Check if this result already exists in our securities
+                                    const existingSecurity = securities.find(
+                                      (s) => s.symbol.toLowerCase() === result.symbol.toLowerCase()
+                                    );
+                                    
+                                    if (existingSecurity) {
+                                      // If it exists, show it in the existing securities section (already shown above)
+                                      return null;
+                                    }
+                                    
+                                    return (
+                                      <div
+                                        key={`api-${result.symbol}-${index}`}
+                                        className="px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground border-b last:border-b-0"
+                                        onClick={async () => {
+                                          // Check if security already exists
+                                          const existing = securities.find(
+                                            (s) => s.symbol.toLowerCase() === result.symbol.toLowerCase()
+                                          );
+                                          
+                                          if (existing) {
+                                            form.setValue("securityId", existing.id);
+                                          } else {
+                                            // Create the security automatically
+                                            try {
+                                              const res = await fetch("/api/investments/securities", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                  symbol: result.symbol.toUpperCase(),
+                                                  name: result.name,
+                                                  class: result.class,
+                                                }),
+                                              });
+                                              
+                                              if (res.ok) {
+                                                const newSecurity = await res.json();
+                                                setSecurities([...securities, newSecurity]);
+                                                form.setValue("securityId", newSecurity.id);
+                                                toast({
+                                                  title: "Success",
+                                                  description: `Security "${result.name}" created and selected`,
+                                                });
+                                              } else {
+                                                throw new Error("Failed to create security");
+                                              }
+                                            } catch (error) {
+                                              console.error("Error creating security:", error);
+                                              toast({
+                                                title: "Error",
+                                                description: "Failed to create security. Please try again.",
+                                                variant: "destructive",
+                                              });
+                                              return;
+                                            }
+                                          }
+                                          
+                                          setShowSecurityDropdown(false);
+                                          setSecuritySearch("");
+                                          setApiSearchResults([]);
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <div className="h-8 w-8 shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                                            <SecurityLogo symbol={result.symbol} securityClass={result.class} logoUrl={result.logo} />
+                                          </div>
+                                          <div className="flex flex-col flex-1">
+                                            <span className="font-medium">{result.symbol} - {result.name}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {result.class.toUpperCase()}
+                                              {result.exchange && ` • ${result.exchange}`}
+                                            </span>
+                                          </div>
+                                          <span className="text-xs text-muted-foreground">New</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {(transactionType === "buy" || transactionType === "sell") && (
                 <>
-                  <div className="space-y-1">
-                    <Label>Quantity</Label>
-                    <Input
-                      type="number"
-                      step="0.0001"
-                      placeholder="0.0000"
-                      {...form.register("quantity", { valueAsNumber: true })}
-                    />
-                    {form.formState.errors.quantity && (
-                      <p className="text-sm text-destructive">
-                        {form.formState.errors.quantity.message}
-                      </p>
-                    )}
-                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        placeholder="0.0000"
+                        {...form.register("quantity", { valueAsNumber: true })}
+                      />
+                      {form.formState.errors.quantity && (
+                        <p className="text-sm text-destructive">
+                          {form.formState.errors.quantity.message}
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label>Price per Share</Label>
-                    <DollarAmountInput
-                      value={form.watch("price") || undefined}
-                      onChange={(value) => form.setValue("price", value)}
-                    />
-                    {form.formState.errors.price && (
-                      <p className="text-sm text-destructive">
-                        {form.formState.errors.price.message}
-                      </p>
-                    )}
+                    <div className="space-y-1">
+                      <Label>Price per Share</Label>
+                      <DollarAmountInput
+                        value={form.watch("price") || undefined}
+                        onChange={(value) => form.setValue("price", value)}
+                      />
+                      {form.formState.errors.price && (
+                        <p className="text-sm text-destructive">
+                          {form.formState.errors.price.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -514,14 +1021,15 @@ export function InvestmentTransactionForm({
           setShowSearchResults(false);
         }
       }}>
-        <SecurityDialogContent>
+        <SecurityDialogContent className="sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
           <SecurityDialogHeader>
             <SecurityDialogTitle>Create New Security</SecurityDialogTitle>
             <SecurityDialogDescription>
               Search for a security by symbol or create manually
             </SecurityDialogDescription>
           </SecurityDialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
               <div className="space-y-2">
               <Label>Search by Name or Symbol</Label>
               <div className="relative">
@@ -628,6 +1136,7 @@ export function InvestmentTransactionForm({
                   <SelectItem value="reit">REIT</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
             </div>
           </div>
           <SecurityDialogFooter>

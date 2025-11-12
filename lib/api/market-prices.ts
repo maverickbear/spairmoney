@@ -17,6 +17,37 @@ export interface SecurityInfo {
   price?: number;
   currency?: string;
   exchange?: string;
+  logo?: string;
+}
+
+/**
+ * Get logo URL for a security symbol
+ * Uses a generic logo service that works with ticker symbols
+ * Note: This is a free service that may not have all logos
+ * For production, consider using a paid service or maintaining your own logo database
+ */
+function getSecurityLogoUrl(symbol: string, securityClass: "stock" | "etf" | "crypto" | "bond" | "reit"): string {
+  const normalizedSymbol = symbol.toUpperCase();
+  
+  // For crypto, use a crypto logo service
+  if (securityClass === "crypto") {
+    // Use a generic crypto logo service
+    // Note: This is a placeholder - you may need to map symbols to specific coin IDs
+    return `https://cryptoicons.org/api/icon/${normalizedSymbol.toLowerCase()}/200`;
+  }
+  
+  // For stocks/ETFs, use a service that works with ticker symbols
+  // Using a free service that provides logos for many US stocks
+  // Format: https://logo.clearbit.com/{domain}
+  // But we need to convert symbol to domain, which is not always possible
+  
+  // Alternative: Use a service that works directly with symbols
+  // Some services provide logos via: https://{service}/logo/{symbol}
+  // For now, we'll use a pattern that works for many cases
+  
+  // Using a generic logo service that accepts symbols
+  // This service may not have all logos, but works for many major stocks
+  return `https://assets.polygon.io/logos/${normalizedSymbol}/logo.png`;
 }
 
 export interface SecuritySearchResult {
@@ -25,6 +56,7 @@ export interface SecuritySearchResult {
   class: "stock" | "etf" | "crypto" | "bond" | "reit";
   exchange?: string;
   type?: string;
+  logo?: string;
 }
 
 /**
@@ -53,10 +85,14 @@ export async function fetchYahooFinancePrice(symbol: string): Promise<number | n
         'Accept': 'application/json',
       },
       next: { revalidate: 60 }, // Cache for 60 seconds
+    }).catch((error) => {
+      // Handle certificate errors and other network issues
+      console.error(`Network error fetching price for ${symbol} (${normalizedSymbol}):`, error.message);
+      return null;
     });
 
-    if (!response.ok) {
-      console.error(`Failed to fetch price for ${symbol} (${normalizedSymbol}): ${response.statusText}`);
+    if (!response || !response.ok) {
+      console.error(`Failed to fetch price for ${symbol} (${normalizedSymbol}): ${response?.statusText || 'Network error'}`);
       return null;
     }
 
@@ -287,10 +323,14 @@ export async function searchSecurityBySymbol(symbol: string): Promise<SecurityIn
         'Accept': 'application/json',
       },
       next: { revalidate: 300 }, // Cache for 5 minutes
+    }).catch((error) => {
+      // Handle certificate errors and other network issues
+      console.error(`Network error fetching security info for ${symbol} (${normalizedSymbol}):`, error.message);
+      return null;
     });
 
-    if (!response.ok) {
-      console.error(`Failed to fetch security info for ${symbol} (${normalizedSymbol}): ${response.statusText}`);
+    if (!response || !response.ok) {
+      console.error(`Failed to fetch security info for ${symbol} (${normalizedSymbol}): ${response?.statusText || 'Network error'}`);
       return null;
     }
 
@@ -338,13 +378,16 @@ export async function searchSecurityBySymbol(symbol: string): Promise<SecurityIn
     // Get price
     const price = meta.regularMarketPrice || meta.currentPrice || meta.previousClose || undefined;
 
+    const finalSymbol = normalizedSymbol.includes('-USD') ? normalizedSymbol.split('-')[0] : normalizedSymbol;
+    
     return {
-      symbol: normalizedSymbol.includes('-USD') ? normalizedSymbol.split('-')[0] : normalizedSymbol,
+      symbol: finalSymbol,
       name: meta.longName || meta.shortName || normalizedSymbol,
       class: securityClass,
       price,
       currency: meta.currency || "USD",
       exchange: meta.exchangeName || meta.fullExchangeName || undefined,
+      logo: getSecurityLogoUrl(finalSymbol, securityClass),
     };
   } catch (error) {
     console.error(`Error searching security for ${symbol}:`, error);
@@ -373,10 +416,14 @@ export async function searchSecuritiesByName(query: string): Promise<SecuritySea
         'Accept': 'application/json',
       },
       next: { revalidate: 300 }, // Cache for 5 minutes
+    }).catch((error) => {
+      // Handle certificate errors and other network issues
+      console.error(`Network error searching securities for ${searchQuery}:`, error.message);
+      return null;
     });
 
-    if (!response.ok) {
-      console.error(`Failed to search securities for ${searchQuery}: ${response.statusText}`);
+    if (!response || !response.ok) {
+      console.error(`Failed to search securities for ${searchQuery}: ${response?.statusText || 'Network error'}`);
       return [];
     }
 
@@ -415,12 +462,15 @@ export async function searchSecuritiesByName(query: string): Promise<SecuritySea
         securityClass = "stock";
       }
 
+      const normalizedSymbolForLogo = symbol.replace("-USD", "");
+      
       results.push({
-        symbol: symbol.replace("-USD", ""), // Remove -USD suffix for crypto
+        symbol: normalizedSymbolForLogo,
         name: quote.longname || quote.shortname || quote.symbol,
         class: securityClass,
         exchange: quote.exchange || quote.exchangeDisp,
         type: quote.quoteType,
+        logo: getSecurityLogoUrl(normalizedSymbolForLogo, securityClass),
       });
     }
 

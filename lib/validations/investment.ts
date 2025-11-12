@@ -23,8 +23,7 @@ export type SecurityPriceFormData = z.infer<typeof securityPriceSchema>;
 
 export const investmentAccountSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  type: z.string().min(1, "Type is required"), // "tax_free", "retirement", "crypto", "brokerage", etc.
-  accountId: z.string().optional().nullable(), // Optional link to Account table
+  // Type is always "investment" - created in Account table
 });
 
 export type InvestmentAccountFormData = z.infer<typeof investmentAccountSchema>;

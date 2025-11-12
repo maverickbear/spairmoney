@@ -142,7 +142,7 @@ export interface Database {
     createdAt: string;
     updatedAt: string;
   };
-  Macro: {
+  Group: {
     id: string;
     name: string;
     createdAt: string;

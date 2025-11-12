@@ -87,12 +87,12 @@ export async function deleteSubcategoryClient(id: string): Promise<void> {
 /**
  * Delete a macro
  */
-export async function deleteMacroClient(id: string): Promise<void> {
-  const { error } = await supabase.from("Macro").delete().eq("id", id);
+export async function deleteGroupClient(id: string): Promise<void> {
+  const { error } = await supabase.from("Group").delete().eq("id", id);
 
   if (error) {
-    console.error("Supabase error deleting macro:", error);
-    throw new Error(`Failed to delete macro: ${error.message || JSON.stringify(error)}`);
+    console.error("Supabase error deleting group:", error);
+    throw new Error(`Failed to delete group: ${error.message || JSON.stringify(error)}`);
   }
 }
 

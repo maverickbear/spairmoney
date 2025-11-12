@@ -16,61 +16,61 @@ import {
 } from "@/components/ui/dialog";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import type { SystemMacro } from "@/lib/api/admin";
+import type { SystemGroup } from "@/lib/api/admin";
 
-const macroSchema = z.object({
+const groupSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
 });
 
-type MacroFormData = z.infer<typeof macroSchema>;
+type GroupFormData = z.infer<typeof groupSchema>;
 
-interface MacroDialogProps {
+interface GroupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  macro?: SystemMacro | null;
+  group?: SystemGroup | null;
   onSuccess?: () => void;
 }
 
-export function MacroDialog({
+export function GroupDialog({
   open,
   onOpenChange,
-  macro,
+  group,
   onSuccess,
-}: MacroDialogProps) {
+}: GroupDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<MacroFormData>({
-    resolver: zodResolver(macroSchema),
-    defaultValues: macro
+  const form = useForm<GroupFormData>({
+    resolver: zodResolver(groupSchema),
+    defaultValues: group
       ? {
-          name: macro.name,
+          name: group.name,
         }
       : {
           name: "",
         },
   });
 
-  const onSubmit = async (data: MacroFormData) => {
+  const onSubmit = async (data: GroupFormData) => {
     setIsSubmitting(true);
     try {
-      if (macro) {
+      if (group) {
         // Update
-        const response = await fetch("/api/admin/macros", {
+        const response = await fetch("/api/admin/groups", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            id: macro.id,
+            id: group.id,
             name: data.name,
           }),
         });
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || "Failed to update macro");
+          throw new Error(error.error || "Failed to update group");
         }
       } else {
         // Create
-        const response = await fetch("/api/admin/macros", {
+        const response = await fetch("/api/admin/groups", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -80,7 +80,7 @@ export function MacroDialog({
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || "Failed to create macro");
+          throw new Error(error.error || "Failed to create group");
         }
       }
 
@@ -90,8 +90,8 @@ export function MacroDialog({
         onSuccess();
       }
     } catch (error) {
-      console.error("Error saving macro:", error);
-      alert(error instanceof Error ? error.message : "Failed to save macro");
+      console.error("Error saving group:", error);
+      alert(error instanceof Error ? error.message : "Failed to save group");
     } finally {
       setIsSubmitting(false);
     }
@@ -99,19 +99,20 @@ export function MacroDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>
-            {macro ? "Edit System Macro" : "Create System Macro"}
+            {group ? "Edit System Group" : "Create System Group"}
           </DialogTitle>
           <DialogDescription>
-            {macro
-              ? "Update the system macro name below."
-              : "Create a new system macro that will be available to all users."}
+            {group
+              ? "Update the system group name below."
+              : "Create a new system group that will be available to all users."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -126,6 +127,7 @@ export function MacroDialog({
               </p>
             )}
           </div>
+          </div>
 
           <DialogFooter>
             <Button
@@ -138,7 +140,7 @@ export function MacroDialog({
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {macro ? "Update" : "Create"}
+              {group ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

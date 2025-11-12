@@ -315,8 +315,8 @@ export default function CategoriesPage() {
         setDeletingGroupId(macroId);
 
         try {
-          const { deleteMacroClient } = await import("@/lib/api/categories-client");
-          await deleteMacroClient(macroId);
+          const { deleteGroupClient } = await import("@/lib/api/categories-client");
+          await deleteGroupClient(macroId);
           
           toast({
             title: "Group deleted",

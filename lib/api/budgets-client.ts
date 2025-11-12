@@ -30,9 +30,9 @@ export async function getBudgetsClient(period: Date): Promise<Budget[]> {
       *,
       category:Category(
         *,
-        macro:Macro(*)
+        macro:Group(*)
       ),
-      macro:Macro(*),
+      macro:Group(*),
       subcategory:Subcategory(
         *
       ),

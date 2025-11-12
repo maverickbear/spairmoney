@@ -17,7 +17,6 @@ import { Loader2 } from "lucide-react";
 import type { Holding as SupabaseHolding } from "@/lib/api/investments";
 import { convertSupabaseHoldingToHolding, type Holding, type Account, type HistoricalDataPoint } from "@/lib/mock-data/portfolio-mock-data";
 import { IntegrationDropdown } from "@/components/banking/integration-dropdown";
-import { QuestradeDataTables } from "@/components/portfolio/questrade-data-tables";
 import { OrdersTabContent } from "@/components/portfolio/orders-tab-content";
 import { ExecutionsTabContent } from "@/components/portfolio/executions-tab-content";
 import { MarketDataTabContent } from "@/components/portfolio/market-data-tab-content";
@@ -25,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { InvestmentTransactionForm } from "@/components/forms/investment-transaction-form";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { PageHeader } from "@/components/common/page-header";
 
 // Types
 interface PortfolioSummary {
@@ -135,34 +135,29 @@ export default function InvestmentsPage() {
   return (
     <FeatureGuard feature="hasInvestments" featureName="Investments">
       <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="space-y-2">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Portfolio Management</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Overview of your investment portfolio
-            </p>
-          </div>
+      <PageHeader
+        title="Portfolio Management"
+        description="Overview of your investment portfolio"
+      >
+        <div className="flex items-center gap-2">
+          <IntegrationDropdown
+            onSync={() => {
+              loadPortfolioData();
+            }}
+            onDisconnect={() => {
+              loadPortfolioData();
+            }}
+            onSuccess={loadPortfolioData}
+          />
+          <Button
+            onClick={() => setShowTransactionForm(true)}
+            variant="default"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Transaction
+          </Button>
         </div>
-          <div className="flex items-center gap-2">
-            <IntegrationDropdown
-              onSync={() => {
-                loadPortfolioData();
-              }}
-              onDisconnect={() => {
-                loadPortfolioData();
-              }}
-              onSuccess={loadPortfolioData}
-            />
-            <Button
-              onClick={() => setShowTransactionForm(true)}
-              variant="default"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
-                    </div>
-        </div>
+      </PageHeader>
 
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-4 md:w-fit">
@@ -199,9 +194,6 @@ export default function InvestmentsPage() {
 
                 {/* Holdings Table */}
                 <HoldingsTable holdings={holdings} />
-
-                {/* Questrade Data Tables */}
-                <QuestradeDataTables />
               </div>
             )}
           </TabsContent>

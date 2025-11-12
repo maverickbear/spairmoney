@@ -453,22 +453,47 @@ export async function createSecurityPrice(data: SecurityPriceFormData) {
 }
 
 export async function getInvestmentAccounts() {
-    const supabase = await createServerClient();
+  const supabase = await createServerClient();
 
+  // Verify authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    console.error("Error getting user in getInvestmentAccounts:", authError);
+    return [];
+  }
+
+  console.log(`[getInvestmentAccounts] Fetching investment accounts from Account table for user: ${user.id}`);
+
+  // Get accounts of type "investment" from Account table
   const { data, error } = await supabase
-    .from("InvestmentAccount")
+    .from("Account")
     .select("*")
+    .eq("type", "investment")
     .order("name", { ascending: true });
 
   if (error) {
+    console.error("Error fetching investment accounts:", error);
     return [];
+  }
+
+  console.log(`[getInvestmentAccounts] Found ${data?.length || 0} investment accounts`);
+  
+  // Log account details for debugging
+  if (data && data.length > 0) {
+    console.log("[getInvestmentAccounts] Accounts:", data.map(acc => ({
+      id: acc.id,
+      name: acc.name,
+      type: acc.type,
+      userId: acc.userId,
+      hasUserId: !!acc.userId
+    })));
   }
 
   return data || [];
 }
 
 export async function createInvestmentAccount(data: InvestmentAccountFormData) {
-    const supabase = await createServerClient();
+  const supabase = await createServerClient();
 
   // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -479,13 +504,13 @@ export async function createInvestmentAccount(data: InvestmentAccountFormData) {
   const id = crypto.randomUUID();
   const now = formatTimestamp(new Date());
 
+  // Create account in Account table with type "investment"
   const { data: account, error } = await supabase
-    .from("InvestmentAccount")
+    .from("Account")
     .insert({
       id,
       name: data.name,
-      type: data.type,
-      accountId: data.accountId || null,
+      type: "investment", // Always set type to "investment"
       userId: user.id,
       createdAt: now,
       updatedAt: now,

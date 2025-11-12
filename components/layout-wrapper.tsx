@@ -318,7 +318,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
             isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
           }`}
         >
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">{children}</div>
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 lg:pb-8">{children}</div>
         </main>
       </div>
       <BottomNav hasSubscription={showNav} />

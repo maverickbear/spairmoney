@@ -117,7 +117,7 @@ export function SubcategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
           <DialogTitle>
             {subcategory ? "Edit System Subcategory" : "Create System Subcategory"}
@@ -129,7 +129,8 @@ export function SubcategoryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -196,6 +197,7 @@ export function SubcategoryDialog({
               />
             </div>
           )}
+          </div>
 
           <DialogFooter>
             <Button

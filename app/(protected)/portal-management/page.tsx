@@ -8,14 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { UsersTable } from "@/components/admin/users-table";
 import { PromoCodesTable } from "@/components/admin/promo-codes-table";
 import { PromoCodeDialog } from "@/components/admin/promo-code-dialog";
-import { MacrosTable } from "@/components/admin/macros-table";
-import { MacroDialog } from "@/components/admin/macro-dialog";
+import { GroupsTable } from "@/components/admin/groups-table";
+import { GroupDialog } from "@/components/admin/group-dialog";
 import { CategoriesTable } from "@/components/admin/categories-table";
 import { CategoryDialog } from "@/components/admin/category-dialog";
 import { SubcategoriesTable } from "@/components/admin/subcategories-table";
 import { SubcategoryDialog } from "@/components/admin/subcategory-dialog";
-import { Plus, Loader2, Users, Tag, FolderTree } from "lucide-react";
-import type { AdminUser, PromoCode, SystemMacro, SystemCategory, SystemSubcategory } from "@/lib/api/admin";
+import { Plus, Loader2, Users, Tag, FolderTree, BarChart3 } from "lucide-react";
+import type { AdminUser, PromoCode, SystemGroup, SystemCategory, SystemSubcategory } from "@/lib/api/admin";
+import { PageHeader } from "@/components/common/page-header";
+import { DashboardOverview } from "@/components/admin/dashboard-overview";
+import { FinancialOverview } from "@/components/admin/financial-overview";
 
 export default function PortalManagementPage() {
   const router = useRouter();
@@ -28,14 +31,22 @@ export default function PortalManagementPage() {
   const [availablePlans, setAvailablePlans] = useState<{ id: string; name: string }[]>([]);
   
   // System entities state
-  const [macros, setMacros] = useState<SystemMacro[]>([]);
+  const [groups, setGroups] = useState<SystemGroup[]>([]);
   const [categories, setCategories] = useState<SystemCategory[]>([]);
   const [subcategories, setSubcategories] = useState<SystemSubcategory[]>([]);
   const [loadingSystemEntities, setLoadingSystemEntities] = useState(false);
   
+  // Dashboard state
+  const [dashboardData, setDashboardData] = useState<{
+    overview: any;
+    financial: any;
+    planDistribution: any[];
+  } | null>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  
   // Dialog states
-  const [isMacroDialogOpen, setIsMacroDialogOpen] = useState(false);
-  const [editingMacro, setEditingMacro] = useState<SystemMacro | null>(null);
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<SystemGroup | null>(null);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<SystemCategory | null>(null);
   const [isSubcategoryDialogOpen, setIsSubcategoryDialogOpen] = useState(false);
@@ -51,6 +62,7 @@ export default function PortalManagementPage() {
       loadPromoCodes();
       loadPlans();
       loadSystemEntities();
+      loadDashboard();
     }
   }, [isSuperAdmin]);
 
@@ -115,6 +127,22 @@ export default function PortalManagementPage() {
     }
   }
 
+  async function loadDashboard() {
+    try {
+      setLoadingDashboard(true);
+      const response = await fetch("/api/admin/dashboard");
+      if (!response.ok) {
+        throw new Error("Failed to load dashboard data");
+      }
+      const data = await response.json();
+      setDashboardData(data);
+    } catch (error) {
+      console.error("Error loading dashboard:", error);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }
+
   function handleCreatePromoCode() {
     setEditingPromoCode(null);
     setIsDialogOpen(true);
@@ -160,15 +188,15 @@ export default function PortalManagementPage() {
   async function loadSystemEntities() {
     try {
       setLoadingSystemEntities(true);
-      const [macrosRes, categoriesRes, subcategoriesRes] = await Promise.all([
-        fetch("/api/admin/macros"),
+      const [groupsRes, categoriesRes, subcategoriesRes] = await Promise.all([
+        fetch("/api/admin/groups"),
         fetch("/api/admin/categories"),
         fetch("/api/admin/subcategories"),
       ]);
 
-      if (macrosRes.ok) {
-        const macrosData = await macrosRes.json();
-        setMacros(macrosData || []);
+      if (groupsRes.ok) {
+        const groupsData = await groupsRes.json();
+        setGroups(groupsData || []);
       }
 
       if (categoriesRes.ok) {
@@ -187,24 +215,24 @@ export default function PortalManagementPage() {
     }
   }
 
-  function handleCreateMacro() {
-    setEditingMacro(null);
-    setIsMacroDialogOpen(true);
+  function handleCreateGroup() {
+    setEditingGroup(null);
+    setIsGroupDialogOpen(true);
   }
 
-  function handleEditMacro(macro: SystemMacro) {
-    setEditingMacro(macro);
-    setIsMacroDialogOpen(true);
+  function handleEditGroup(group: SystemGroup) {
+    setEditingGroup(group);
+    setIsGroupDialogOpen(true);
   }
 
-  async function handleDeleteMacro(id: string) {
-    const response = await fetch(`/api/admin/macros?id=${id}`, {
+  async function handleDeleteGroup(id: string) {
+    const response = await fetch(`/api/admin/groups?id=${id}`, {
       method: "DELETE",
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Failed to delete macro");
+      throw new Error(error.error || "Failed to delete group");
     }
 
     await loadSystemEntities();
@@ -269,18 +297,18 @@ export default function PortalManagementPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="space-y-2">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Portal Management</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Manage users, promotional codes, and system entities (macros, categories, subcategories) for the platform.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4 md:space-y-6">
+      <PageHeader
+        title="Portal Management"
+        description="Manage users, promotional codes, and system entities (groups, categories, subcategories) for the platform."
+      />
 
-      <Tabs defaultValue="users" className="space-y-4">
+      <Tabs defaultValue="dashboard" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users
@@ -294,6 +322,55 @@ export default function PortalManagementPage() {
             System Entities
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Overview</CardTitle>
+                <CardDescription>
+                  Key metrics and statistics about the platform
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DashboardOverview
+                  overview={dashboardData?.overview || {
+                    totalUsers: 0,
+                    usersWithoutSubscription: 0,
+                    totalSubscriptions: 0,
+                    activeSubscriptions: 0,
+                    trialingSubscriptions: 0,
+                    cancelledSubscriptions: 0,
+                    pastDueSubscriptions: 0,
+                    churnRisk: 0,
+                  }}
+                  loading={loadingDashboard}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Financial Overview</CardTitle>
+                <CardDescription>
+                  Revenue metrics, MRR, and future revenue projections
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FinancialOverview
+                  financial={dashboardData?.financial || {
+                    mrr: 0,
+                    estimatedFutureMRR: 0,
+                    totalEstimatedMRR: 0,
+                    subscriptionDetails: [],
+                    upcomingTrials: [],
+                  }}
+                  loading={loadingDashboard}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
           <Card>
@@ -338,35 +415,35 @@ export default function PortalManagementPage() {
         </TabsContent>
 
         <TabsContent value="system-entities" className="space-y-4">
-          <Tabs defaultValue="macros" className="space-y-4">
+          <Tabs defaultValue="groups" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="macros">Macros</TabsTrigger>
+              <TabsTrigger value="groups">Groups</TabsTrigger>
               <TabsTrigger value="categories">Categories</TabsTrigger>
               <TabsTrigger value="subcategories">Subcategories</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="macros" className="space-y-4">
+            <TabsContent value="groups" className="space-y-4">
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>System Macros</CardTitle>
+                      <CardTitle>System Groups</CardTitle>
                       <CardDescription>
-                        Manage system macros that are available to all users.
+                        Manage system groups that are available to all users.
                       </CardDescription>
                     </div>
-                    <Button onClick={handleCreateMacro}>
+                    <Button onClick={handleCreateGroup}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Macro
+                      Create Group
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <MacrosTable
-                    macros={macros}
+                  <GroupsTable
+                    groups={groups}
                     loading={loadingSystemEntities}
-                    onEdit={handleEditMacro}
-                    onDelete={handleDeleteMacro}
+                    onEdit={handleEditGroup}
+                    onDelete={handleDeleteGroup}
                   />
                 </CardContent>
               </Card>
@@ -391,7 +468,7 @@ export default function PortalManagementPage() {
                 <CardContent>
                   <CategoriesTable
                     categories={categories}
-                    macros={macros.map((m) => ({ id: m.id, name: m.name }))}
+                    macros={groups.map((g) => ({ id: g.id, name: g.name }))}
                     loading={loadingSystemEntities}
                     onEdit={handleEditCategory}
                     onDelete={handleDeleteCategory}
@@ -446,15 +523,15 @@ export default function PortalManagementPage() {
         availablePlans={availablePlans}
       />
 
-      <MacroDialog
-        open={isMacroDialogOpen}
+      <GroupDialog
+        open={isGroupDialogOpen}
         onOpenChange={(open) => {
-          setIsMacroDialogOpen(open);
+          setIsGroupDialogOpen(open);
           if (!open) {
-            setEditingMacro(null);
+            setEditingGroup(null);
           }
         }}
-        macro={editingMacro}
+        group={editingGroup}
         onSuccess={() => {
           loadSystemEntities();
         }}
@@ -469,7 +546,7 @@ export default function PortalManagementPage() {
           }
         }}
         category={editingCategory}
-        availableMacros={macros.map((m) => ({ id: m.id, name: m.name }))}
+        availableMacros={groups.map((g) => ({ id: g.id, name: g.name }))}
         onSuccess={() => {
           loadSystemEntities();
         }}

@@ -56,9 +56,9 @@ async function getBudgetsInternal(period: Date, accessToken?: string, refreshTok
       *,
       category:Category(
         *,
-        macro:Macro(*)
+        macro:Group(*)
       ),
-      macro:Macro(*),
+      macro:Group(*),
       subcategory:Subcategory(
         *
       ),

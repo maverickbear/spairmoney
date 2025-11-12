@@ -11,24 +11,24 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Loader2, Edit, Trash2, FolderTree } from "lucide-react";
-import type { SystemMacro } from "@/lib/api/admin";
+import type { SystemGroup } from "@/lib/api/admin";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
-interface MacrosTableProps {
-  macros: SystemMacro[];
+interface GroupsTableProps {
+  groups: SystemGroup[];
   loading?: boolean;
-  onEdit: (macro: SystemMacro) => void;
+  onEdit: (group: SystemGroup) => void;
   onDelete: (id: string) => void;
 }
 
-export function MacrosTable({
-  macros: initialMacros,
+export function GroupsTable({
+  groups: initialGroups,
   loading: initialLoading,
   onEdit,
   onDelete,
-}: MacrosTableProps) {
+}: GroupsTableProps) {
   const { openDialog, ConfirmDialog } = useConfirmDialog();
-  const [macros, setMacros] = useState<SystemMacro[]>(initialMacros);
+  const [groups, setGroups] = useState<SystemGroup[]>(initialGroups);
   const [loading, setLoading] = useState(initialLoading);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -43,8 +43,8 @@ export function MacrosTable({
   const handleDelete = (id: string) => {
     openDialog(
       {
-        title: "Delete Macro",
-        description: "Are you sure you want to delete this system macro? This will also delete all associated categories and subcategories. This action cannot be undone.",
+        title: "Delete Group",
+        description: "Are you sure you want to delete this system group? This will also delete all associated categories and subcategories. This action cannot be undone.",
         variant: "destructive",
         confirmLabel: "Delete",
       },
@@ -52,10 +52,10 @@ export function MacrosTable({
         setDeletingId(id);
         try {
           await onDelete(id);
-          setMacros((prev) => prev.filter((m) => m.id !== id));
+          setGroups((prev) => prev.filter((g) => g.id !== id));
         } catch (error) {
-          console.error("Error deleting macro:", error);
-          alert(error instanceof Error ? error.message : "Failed to delete macro");
+          console.error("Error deleting group:", error);
+          alert(error instanceof Error ? error.message : "Failed to delete group");
         } finally {
           setDeletingId(null);
         }
@@ -83,31 +83,31 @@ export function MacrosTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {macros.length === 0 ? (
+          {groups.length === 0 ? (
             <TableRow>
               <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                 <div className="flex flex-col items-center gap-2">
                   <FolderTree className="h-8 w-8" />
-                  <p>No system macros found</p>
+                  <p>No system groups found</p>
                 </div>
               </TableCell>
             </TableRow>
           ) : (
-            macros.map((macro) => (
-              <TableRow key={macro.id}>
-                <TableCell className="font-medium">{macro.name}</TableCell>
+            groups.map((group) => (
+              <TableRow key={group.id}>
+                <TableCell className="font-medium">{group.name}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {formatDate(macro.createdAt)}
+                  {formatDate(group.createdAt)}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {formatDate(macro.updatedAt)}
+                  {formatDate(group.updatedAt)}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onEdit(macro)}
+                      onClick={() => onEdit(group)}
                       className="h-8 w-8"
                     >
                       <Edit className="h-4 w-4" />
@@ -115,11 +115,11 @@ export function MacrosTable({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDelete(macro.id)}
-                      disabled={deletingId === macro.id}
+                      onClick={() => handleDelete(group.id)}
+                      disabled={deletingId === group.id}
                       className="h-8 w-8 text-destructive hover:text-destructive"
                     >
-                      {deletingId === macro.id ? (
+                      {deletingId === group.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Trash2 className="h-4 w-4" />

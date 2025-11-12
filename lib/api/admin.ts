@@ -496,10 +496,10 @@ export async function togglePromoCodeActive(id: string, isActive: boolean): Prom
 }
 
 // ============================================
-// System Macros, Categories, and Subcategories Management
+// System Groups, Categories, and Subcategories Management
 // ============================================
 
-export interface SystemMacro {
+export interface SystemGroup {
   id: string;
   name: string;
   createdAt: Date;
@@ -514,7 +514,7 @@ export interface SystemCategory {
   createdAt: Date;
   updatedAt: Date;
   userId: null;
-  macro?: SystemMacro;
+  group?: SystemGroup;
   subcategories?: SystemSubcategory[];
 }
 
@@ -529,9 +529,9 @@ export interface SystemSubcategory {
 }
 
 /**
- * Get all system macros (userId IS NULL)
+ * Get all system groups (userId IS NULL)
  */
-export async function getAllSystemMacros(): Promise<SystemMacro[]> {
+export async function getAllSystemGroups(): Promise<SystemGroup[]> {
   if (!(await isSuperAdmin())) {
     throw new Error("Unauthorized: Only super_admin can access this function");
   }
@@ -539,8 +539,8 @@ export async function getAllSystemMacros(): Promise<SystemMacro[]> {
   try {
     const supabase = await createServerClient();
 
-    const { data: macros, error } = await supabase
-      .from("Macro")
+    const { data: groups, error } = await supabase
+      .from("Group")
       .select("*")
       .is("userId", null)
       .order("name", { ascending: true });
@@ -549,23 +549,23 @@ export async function getAllSystemMacros(): Promise<SystemMacro[]> {
       throw error;
     }
 
-    return (macros || []).map((m) => ({
-      id: m.id,
-      name: m.name,
-      createdAt: new Date(m.createdAt),
-      updatedAt: new Date(m.updatedAt),
+    return (groups || []).map((g) => ({
+      id: g.id,
+      name: g.name,
+      createdAt: new Date(g.createdAt),
+      updatedAt: new Date(g.updatedAt),
       userId: null,
     }));
   } catch (error) {
-    console.error("Error in getAllSystemMacros:", error);
+    console.error("Error in getAllSystemGroups:", error);
     throw error;
   }
 }
 
 /**
- * Create a system macro (userId IS NULL)
+ * Create a system group (userId IS NULL)
  */
-export async function createSystemMacro(data: { name: string }): Promise<SystemMacro> {
+export async function createSystemGroup(data: { name: string }): Promise<SystemGroup> {
   if (!(await isSuperAdmin())) {
     throw new Error("Unauthorized: Only super_admin can access this function");
   }
@@ -573,27 +573,27 @@ export async function createSystemMacro(data: { name: string }): Promise<SystemM
   try {
     const supabase = await createServerClient();
 
-    // Check if system macro with this name already exists
+    // Check if system group with this name already exists
     const { data: existing, error: checkError } = await supabase
-      .from("Macro")
+      .from("Group")
       .select("id")
       .eq("name", data.name)
       .is("userId", null)
       .single();
 
     if (existing && !checkError) {
-      throw new Error("A system macro with this name already exists");
+      throw new Error("A system group with this name already exists");
     }
 
-    const id = `mac_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
-    const { data: macro, error } = await supabase
-      .from("Macro")
+    const { data: group, error } = await supabase
+      .from("Group")
       .insert({
         id,
         name: data.name,
-        userId: null, // System macro
+        userId: null, // System group
         createdAt: now,
         updatedAt: now,
       })
@@ -604,26 +604,26 @@ export async function createSystemMacro(data: { name: string }): Promise<SystemM
       throw error;
     }
 
-    // Invalidate cache for all users since system macro was created
+    // Invalidate cache for all users since system group was created
     await invalidateAllCategoriesCache();
 
     return {
-      id: macro.id,
-      name: macro.name,
-      createdAt: new Date(macro.createdAt),
-      updatedAt: new Date(macro.updatedAt),
+      id: group.id,
+      name: group.name,
+      createdAt: new Date(group.createdAt),
+      updatedAt: new Date(group.updatedAt),
       userId: null,
     };
   } catch (error) {
-    console.error("Error in createSystemMacro:", error);
+    console.error("Error in createSystemGroup:", error);
     throw error;
   }
 }
 
 /**
- * Update a system macro
+ * Update a system group
  */
-export async function updateSystemMacro(id: string, data: { name?: string }): Promise<SystemMacro> {
+export async function updateSystemGroup(id: string, data: { name?: string }): Promise<SystemGroup> {
   if (!(await isSuperAdmin())) {
     throw new Error("Unauthorized: Only super_admin can access this function");
   }
@@ -631,25 +631,25 @@ export async function updateSystemMacro(id: string, data: { name?: string }): Pr
   try {
     const supabase = await createServerClient();
 
-    // Verify it's a system macro
+    // Verify it's a system group
     const { data: existing, error: checkError } = await supabase
-      .from("Macro")
+      .from("Group")
       .select("id, userId")
       .eq("id", id)
       .single();
 
     if (checkError || !existing) {
-      throw new Error("Macro not found");
+      throw new Error("Group not found");
     }
 
     if (existing.userId !== null) {
-      throw new Error("Cannot update user-created macros. Only system macros can be updated.");
+      throw new Error("Cannot update user-created groups. Only system groups can be updated.");
     }
 
-    // Check if another system macro with this name exists
+    // Check if another system group with this name exists
     if (data.name) {
       const { data: duplicate, error: dupError } = await supabase
-        .from("Macro")
+        .from("Group")
         .select("id")
         .eq("name", data.name)
         .is("userId", null)
@@ -657,7 +657,7 @@ export async function updateSystemMacro(id: string, data: { name?: string }): Pr
         .single();
 
       if (duplicate && !dupError) {
-        throw new Error("A system macro with this name already exists");
+        throw new Error("A system group with this name already exists");
       }
     }
 
@@ -668,8 +668,8 @@ export async function updateSystemMacro(id: string, data: { name?: string }): Pr
       updateData.name = data.name;
     }
 
-    const { data: macro, error } = await supabase
-      .from("Macro")
+    const { data: group, error } = await supabase
+      .from("Group")
       .update(updateData)
       .eq("id", id)
       .is("userId", null)
@@ -680,26 +680,26 @@ export async function updateSystemMacro(id: string, data: { name?: string }): Pr
       throw error;
     }
 
-    // Invalidate cache for all users since system macro was updated
+    // Invalidate cache for all users since system group was updated
     await invalidateAllCategoriesCache();
 
     return {
-      id: macro.id,
-      name: macro.name,
-      createdAt: new Date(macro.createdAt),
-      updatedAt: new Date(macro.updatedAt),
+      id: group.id,
+      name: group.name,
+      createdAt: new Date(group.createdAt),
+      updatedAt: new Date(group.updatedAt),
       userId: null,
     };
   } catch (error) {
-    console.error("Error in updateSystemMacro:", error);
+    console.error("Error in updateSystemGroup:", error);
     throw error;
   }
 }
 
 /**
- * Delete a system macro (will cascade delete categories and subcategories)
+ * Delete a system group (will cascade delete categories and subcategories)
  */
-export async function deleteSystemMacro(id: string): Promise<void> {
+export async function deleteSystemGroup(id: string): Promise<void> {
   if (!(await isSuperAdmin())) {
     throw new Error("Unauthorized: Only super_admin can access this function");
   }
@@ -707,24 +707,24 @@ export async function deleteSystemMacro(id: string): Promise<void> {
   try {
     const supabase = await createServerClient();
 
-    // Verify it's a system macro
+    // Verify it's a system group
     const { data: existing, error: checkError } = await supabase
-      .from("Macro")
+      .from("Group")
       .select("id, userId")
       .eq("id", id)
       .single();
 
     if (checkError || !existing) {
-      throw new Error("Macro not found");
+      throw new Error("Group not found");
     }
 
     if (existing.userId !== null) {
-      throw new Error("Cannot delete user-created macros. Only system macros can be deleted.");
+      throw new Error("Cannot delete user-created groups. Only system groups can be deleted.");
     }
 
-    // Delete macro (categories will be cascade deleted)
+    // Delete group (categories will be cascade deleted)
     const { error } = await supabase
-      .from("Macro")
+      .from("Group")
       .delete()
       .eq("id", id)
       .is("userId", null);
@@ -733,10 +733,10 @@ export async function deleteSystemMacro(id: string): Promise<void> {
       throw error;
     }
 
-    // Invalidate cache for all users since system macro was deleted
+    // Invalidate cache for all users since system group was deleted
     await invalidateAllCategoriesCache();
   } catch (error) {
-    console.error("Error in deleteSystemMacro:", error);
+    console.error("Error in deleteSystemGroup:", error);
     throw error;
   }
 }
@@ -756,7 +756,7 @@ export async function getAllSystemCategories(): Promise<SystemCategory[]> {
       .from("Category")
       .select(`
         *,
-        macro:Macro(*),
+        group:Group(*),
         subcategories:Subcategory(*)
       `)
       .is("userId", null)
@@ -773,12 +773,12 @@ export async function getAllSystemCategories(): Promise<SystemCategory[]> {
       createdAt: new Date(cat.createdAt),
       updatedAt: new Date(cat.updatedAt),
       userId: null,
-      macro: cat.macro
+      group: cat.group
         ? {
-            id: cat.macro.id,
-            name: cat.macro.name,
-            createdAt: new Date(cat.macro.createdAt),
-            updatedAt: new Date(cat.macro.updatedAt),
+            id: cat.group.id,
+            name: cat.group.name,
+            createdAt: new Date(cat.group.createdAt),
+            updatedAt: new Date(cat.group.updatedAt),
             userId: null,
           }
         : undefined,
@@ -808,22 +808,22 @@ export async function createSystemCategory(data: { name: string; macroId: string
   try {
     const supabase = await createServerClient();
 
-    // Verify macro is a system macro
-    const { data: macro, error: macroError } = await supabase
-      .from("Macro")
+    // Verify group is a system group
+    const { data: group, error: groupError } = await supabase
+      .from("Group")
       .select("id, userId")
       .eq("id", data.macroId)
       .single();
 
-    if (macroError || !macro) {
-      throw new Error("Macro not found");
+    if (groupError || !group) {
+      throw new Error("Group not found");
     }
 
-    if (macro.userId !== null) {
-      throw new Error("Cannot create system category under user-created macro");
+    if (group.userId !== null) {
+      throw new Error("Cannot create system category under user-created group");
     }
 
-    // Check if system category with this name already exists in this macro
+    // Check if system category with this name already exists in this group
     const { data: existing, error: checkError } = await supabase
       .from("Category")
       .select("id")
@@ -851,7 +851,7 @@ export async function createSystemCategory(data: { name: string; macroId: string
       })
       .select(`
         *,
-        macro:Macro(*),
+        group:Group(*),
         subcategories:Subcategory(*)
       `)
       .single();
@@ -870,12 +870,12 @@ export async function createSystemCategory(data: { name: string; macroId: string
       createdAt: new Date(category.createdAt),
       updatedAt: new Date(category.updatedAt),
       userId: null,
-      macro: category.macro
+      group: category.group
         ? {
-            id: category.macro.id,
-            name: category.macro.name,
-            createdAt: new Date(category.macro.createdAt),
-            updatedAt: new Date(category.macro.updatedAt),
+            id: category.group.id,
+            name: category.group.name,
+            createdAt: new Date(category.group.createdAt),
+            updatedAt: new Date(category.group.updatedAt),
             userId: null,
           }
         : undefined,
@@ -932,28 +932,28 @@ export async function updateSystemCategory(
         .single();
 
       if (duplicate && !dupError) {
-        throw new Error("A system category with this name already exists in this macro");
+        throw new Error("A system category with this name already exists in this group");
       }
       updateData.name = data.name;
     }
 
     if (data.macroId !== undefined) {
-      // Verify new macro is a system macro
-      const { data: macro, error: macroError } = await supabase
-        .from("Macro")
+      // Verify new group is a system group
+      const { data: group, error: groupError } = await supabase
+        .from("Group")
         .select("id, userId")
         .eq("id", data.macroId)
         .single();
 
-      if (macroError || !macro) {
-        throw new Error("Macro not found");
+      if (groupError || !group) {
+        throw new Error("Group not found");
       }
 
-      if (macro.userId !== null) {
-        throw new Error("Cannot move system category to user-created macro");
+      if (group.userId !== null) {
+        throw new Error("Cannot move system category to user-created group");
       }
 
-      // Check if another system category with this name exists in the new macro
+      // Check if another system category with this name exists in the new group
       if (data.name) {
         const { data: duplicate, error: dupError } = await supabase
           .from("Category")
@@ -979,7 +979,7 @@ export async function updateSystemCategory(
       .is("userId", null)
       .select(`
         *,
-        macro:Macro(*),
+        group:Group(*),
         subcategories:Subcategory(*)
       `)
       .single();
@@ -998,12 +998,12 @@ export async function updateSystemCategory(
       createdAt: new Date(category.createdAt),
       updatedAt: new Date(category.updatedAt),
       userId: null,
-      macro: category.macro
+      group: category.group
         ? {
-            id: category.macro.id,
-            name: category.macro.name,
-            createdAt: new Date(category.macro.createdAt),
-            updatedAt: new Date(category.macro.updatedAt),
+            id: category.group.id,
+            name: category.group.name,
+            createdAt: new Date(category.group.createdAt),
+            updatedAt: new Date(category.group.updatedAt),
             userId: null,
           }
         : undefined,

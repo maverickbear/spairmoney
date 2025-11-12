@@ -65,7 +65,7 @@ export async function getMacros() {
   if (authError || !authUser) {
     // If not authenticated, only return system defaults
     const { data, error } = await supabase
-      .from("Macro")
+      .from("Group")
       .select("*")
       .is("userId", null)
       .order("name", { ascending: true });
@@ -86,9 +86,9 @@ export async function getMacros() {
     return result;
   }
 
-  // Return system defaults (userId IS NULL) OR user's own macros
+  // Return system defaults (userId IS NULL) OR user's own groups
   const { data, error } = await supabase
-    .from("Macro")
+    .from("Group")
     .select("*")
     .or(`userId.is.null,userId.eq.${authUser.id}`)
     .order("name", { ascending: true });
@@ -231,7 +231,7 @@ export async function getAllCategories() {
         userId,
         createdAt,
         updatedAt,
-        macro:Macro(*),
+        macro:Group(*),
         subcategories:Subcategory(*)
       `)
       .is("userId", null)
@@ -266,7 +266,7 @@ export async function getAllCategories() {
       userId,
       createdAt,
       updatedAt,
-      macro:Macro(*),
+      macro:Group(*),
       subcategories:Subcategory(*)
     `)
     .or(`userId.is.null,userId.eq.${authUser.id}`)
@@ -310,7 +310,7 @@ export async function createCategory(data: { name: string; macroId: string }) {
 
   // Verify macro belongs to user or is system default
   const { data: macro, error: macroError } = await supabase
-    .from("Macro")
+    .from("Group")
     .select("id, userId")
     .eq("id", data.macroId)
     .single();
@@ -336,7 +336,7 @@ export async function createCategory(data: { name: string; macroId: string }) {
     })
     .select(`
       *,
-      macro:Macro(*),
+      macro:Group(*),
       subcategories:Subcategory(*)
     `)
     .single();
@@ -388,7 +388,7 @@ export async function updateCategory(id: string, data: { name?: string; macroId?
   if (data.macroId !== undefined) {
     // Verify new macro belongs to user or is system default
     const { data: macro, error: macroError } = await supabase
-      .from("Macro")
+      .from("Group")
       .select("id, userId")
       .eq("id", data.macroId)
       .single();
@@ -407,7 +407,7 @@ export async function updateCategory(id: string, data: { name?: string; macroId?
     .eq("userId", authUser.id) // Only update user's own categories
     .select(`
       *,
-      macro:Macro(*),
+      macro:Group(*),
       subcategories:Subcategory(*)
     `)
     .single();
@@ -673,7 +673,7 @@ export async function createMacro(data: { name: string }) {
   // Check if user already has a macro with this name
   // Note: Users can have macros with the same name as system defaults
   const { data: existingMacro, error: checkError } = await supabase
-    .from("Macro")
+    .from("Group")
     .select("id, userId")
     .eq("name", data.name)
     .eq("userId", authUser.id)
@@ -687,7 +687,7 @@ export async function createMacro(data: { name: string }) {
   const now = getCurrentTimestamp();
 
   const { data: macro, error } = await supabase
-    .from("Macro")
+    .from("Group")
     .insert({
       id,
       name: data.name,
@@ -724,7 +724,7 @@ export async function deleteMacro(id: string) {
 
   // Verify macro belongs to user (can't delete system defaults)
   const { data: existingMacro, error: checkError } = await supabase
-    .from("Macro")
+    .from("Group")
     .select("id, userId")
     .eq("id", id)
     .single();
@@ -739,7 +739,7 @@ export async function deleteMacro(id: string) {
 
   // Delete the macro (categories will be cascade deleted)
   const { error } = await supabase
-    .from("Macro")
+    .from("Group")
     .delete()
     .eq("id", id)
     .eq("userId", authUser.id); // Only delete user's own macros

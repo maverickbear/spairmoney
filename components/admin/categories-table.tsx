@@ -84,7 +84,7 @@ export function CategoriesTable({
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
-            <TableHead>Macro</TableHead>
+            <TableHead>Group</TableHead>
             <TableHead>Subcategories</TableHead>
             <TableHead>Created</TableHead>
             <TableHead>Updated</TableHead>

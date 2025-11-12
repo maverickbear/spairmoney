@@ -101,7 +101,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   return (
     <div className="space-y-4 sm:space-y-5 md:space-y-6">
       <PageHeader
-        title={`Hi, ${firstName}`}
+        title={`Welcome back, ${firstName}`}
         description="See your money move — and make it work for you."
       >
         <MonthSelector />

@@ -133,8 +133,8 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
   );
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-0 shadow-none">
+      <CardHeader className="p-0 pb-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <CardTitle>Holdings</CardTitle>
           <div className="flex gap-2">
@@ -173,7 +173,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {/* Mobile Card View */}
         <div className="lg:hidden space-y-3">
           {sortedHoldings.length === 0 ? (
