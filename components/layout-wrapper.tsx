@@ -80,31 +80,24 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  log.debug("Render:", {
-    pathname,
-    checking,
-    hasSubscription,
-    isPublicPage,
-    isDashboardRoute,
-  });
+  // Removed debug log to improve performance - only log in development if needed
+  if (process.env.NODE_ENV === 'development') {
+    log.debug("Render:", {
+      pathname,
+      checking,
+      hasSubscription,
+      isPublicPage,
+      isDashboardRoute,
+    });
+  }
 
   // Render API routes and public pages without nav
   if (isApiRoute || isPublicPage) {
     return <>{children}</>;
   }
 
-  // If checking and we're NOT on dashboard route, show loading state
-  if (checking && !isSelectPlanPage && !isWelcomePage && !isDashboardRoute) {
-    return (
-      <>
-        <Nav hasSubscription={false} />
-        <BottomNav hasSubscription={false} />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-pulse text-muted-foreground">Loading...</div>
-        </div>
-      </>
-    );
-  }
+  // Removed loading state that blocks navigation - allow instant navigation
+  // Subscription check happens in background and doesn't block navigation
 
   // If on select-plan or welcome page, show full screen without nav
   if (isSelectPlanPage || isWelcomePage) {

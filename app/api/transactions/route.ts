@@ -60,14 +60,20 @@ export async function GET(request: NextRequest) {
     
     const result = await getTransactions(filters);
     
-    // Add cache control headers to prevent browser caching
+    // Use appropriate cache headers based on whether search is active
+    // Search results should not be cached, but regular queries can be cached briefly
+    const hasSearch = !!filters.search;
+    const cacheHeaders = hasSearch
+      ? {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        }
+      : {
+          'Cache-Control': 'private, max-age=10, stale-while-revalidate=30',
+        };
+    
     return NextResponse.json(result, { 
       status: 200,
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      },
+      headers: cacheHeaders,
     });
   } catch (error) {
     console.error("Error fetching transactions:", error);

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const skipStripe = searchParams.get("skipStripe") === "true";
 
-    // Fetch subscription once and reuse it
+    // Fetch subscription once and reuse it (already has internal caching)
     const subscription = await getCurrentUserSubscription();
     // Pass subscription to checkPlanLimits to avoid duplicate fetch
     const { plan, limits } = await checkPlanLimits(authUser.id, subscription);
@@ -57,12 +57,21 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({
-      subscription,
-      plan,
-      limits,
-      interval,
-    });
+    // Add cache headers for better performance
+    // Cache for 10 seconds - subscription data doesn't change frequently
+    return NextResponse.json(
+      {
+        subscription,
+        plan,
+        limits,
+        interval,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=10, stale-while-revalidate=30',
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching subscription:", error);
     return NextResponse.json(

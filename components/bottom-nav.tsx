@@ -83,6 +83,7 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               onClick={(e) => {
                 if (!hasSubscription) {
                   e.preventDefault();
@@ -123,6 +124,7 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
                 <DropdownMenuItem key={item.href} asChild>
                   <Link
                     href={item.href}
+                    prefetch={true}
                     onClick={(e) => {
                       if (!hasSubscription) {
                         e.preventDefault();

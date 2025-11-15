@@ -135,11 +135,24 @@ async function calculateFinancialHealthInternal(
   
   // Calculate expense ratio (expenses as percentage of income)
   // This is the key metric for the new classification system
-  const expenseRatio = monthlyIncome > 0 
-    ? (monthlyExpenses / monthlyIncome) * 100 
-    : monthlyExpenses > 0 
-    ? 100 // If expenses but no income, ratio is 100%+
-    : 0; // No income and no expenses
+  let expenseRatio: number;
+  if (monthlyIncome > 0) {
+    expenseRatio = (monthlyExpenses / monthlyIncome) * 100;
+  } else if (monthlyExpenses > 0) {
+    // If expenses but no income, ratio is 100%+ (we'll cap it at 200% for calculation purposes)
+    expenseRatio = 100;
+  } else {
+    // No income and no expenses
+    expenseRatio = 0;
+  }
+  
+  log.debug("Financial Health Metrics:", {
+    monthlyIncome,
+    monthlyExpenses,
+    netAmount,
+    savingsRate,
+    expenseRatio,
+  });
   
   // Calculate score based on expense ratio
   // Score ranges from 0-100 based on expense ratio
@@ -149,7 +162,12 @@ async function calculateFinancialHealthInternal(
   // 81-90% expense ratio = 70-61 score (Poor)
   // 91-100%+ expense ratio = 60-0 score (Critical)
   let score: number;
-  if (expenseRatio <= 60) {
+  
+  // Ensure expenseRatio is a valid number
+  if (isNaN(expenseRatio) || !isFinite(expenseRatio)) {
+    log.warn("Invalid expenseRatio for score calculation:", expenseRatio);
+    score = 0;
+  } else if (expenseRatio <= 60) {
     // Excellent: 0-60% expenses, score 100-91
     score = Math.max(91, 100 - (expenseRatio / 60) * 9);
   } else if (expenseRatio <= 70) {
@@ -163,11 +181,15 @@ async function calculateFinancialHealthInternal(
     score = Math.max(61, 70 - ((expenseRatio - 80) / 10) * 9);
   } else {
     // Critical: 91-100%+ expenses, score 60-0
-    score = Math.max(0, 60 - ((expenseRatio - 90) / 10) * 60);
+    // For ratios > 100%, we cap the score at 0
+    const cappedRatio = Math.min(expenseRatio, 200); // Cap at 200% for calculation
+    score = Math.max(0, 60 - ((cappedRatio - 90) / 10) * 60);
   }
   
-  // Round score to nearest integer
-  score = Math.round(score);
+  // Round score to nearest integer and ensure it's between 0 and 100
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  
+  log.debug("Calculated Score:", { score, expenseRatio });
   
   // Determine classification based on expense ratio
   let classification: "Excellent" | "Good" | "Fair" | "Poor" | "Critical";
@@ -273,8 +295,13 @@ async function calculateFinancialHealthInternal(
 
   // Calculate spending discipline based on savings rate
   // Excellent: >= 30%, Good: 20-29%, Fair: 10-19%, Poor: 0-9%, Critical: < 0%
-  let spendingDiscipline: "Excellent" | "Good" | "Fair" | "Poor" | "Critical";
-  if (savingsRate >= 30) {
+  let spendingDiscipline: "Excellent" | "Good" | "Fair" | "Poor" | "Critical" | "Unknown";
+  
+  // Ensure savingsRate is a valid number
+  if (isNaN(savingsRate) || !isFinite(savingsRate)) {
+    log.warn("Invalid savingsRate for spending discipline calculation:", savingsRate);
+    spendingDiscipline = "Unknown";
+  } else if (savingsRate >= 30) {
     spendingDiscipline = "Excellent";
   } else if (savingsRate >= 20) {
     spendingDiscipline = "Good";
@@ -285,6 +312,8 @@ async function calculateFinancialHealthInternal(
   } else {
     spendingDiscipline = "Critical";
   }
+  
+  log.debug("Spending Discipline:", { savingsRate, spendingDiscipline });
 
   // Calculate debt exposure
   let debtExposure: "Low" | "Moderate" | "High" = "Low";
@@ -356,7 +385,7 @@ async function calculateFinancialHealthInternal(
     console.warn("⚠️ [calculateFinancialHealthInternal] Could not calculate emergency fund months:", error);
   }
   
-  return {
+  const result = {
     score,
     classification,
     monthlyIncome,
@@ -371,9 +400,20 @@ async function calculateFinancialHealthInternal(
     alerts,
     suggestions,
   };
+  
+  log.debug("Final Financial Health Result:", {
+    score: result.score,
+    classification: result.classification,
+    spendingDiscipline: result.spendingDiscipline,
+    savingsRate: result.savingsRate,
+  });
+  
+  return result;
 }
 
 export async function calculateFinancialHealth(selectedDate?: Date): Promise<FinancialHealthData> {
+  const log = logger.withPrefix("calculateFinancialHealth");
+  
   // Get tokens from Supabase client directly (not from cookies)
   // This is more reliable because Supabase SSR manages cookies automatically
   let accessToken: string | undefined;
@@ -391,19 +431,30 @@ export async function calculateFinancialHealth(selectedDate?: Date): Promise<Fin
     
   } catch (error: any) {
     // If we can't get tokens (e.g., inside unstable_cache), continue without them
-    console.warn("⚠️ [calculateFinancialHealth] Could not get tokens:", error?.message);
+    log.warn("Could not get tokens:", error?.message);
   }
   
   // Call directly without cache to avoid authentication issues
   // The cache was causing problems with token refresh and RLS
   // TODO: Re-enable cache once we have a better solution for token management
   try {
-    return await calculateFinancialHealthInternal(selectedDate, accessToken, refreshToken);
+    const result = await calculateFinancialHealthInternal(selectedDate, accessToken, refreshToken);
+    
+    // Validate result before returning
+    if (result.score === undefined || isNaN(result.score) || !isFinite(result.score)) {
+      log.error("Invalid score calculated:", result.score);
+      throw new Error("Invalid score calculated");
+    }
+    
+    if (!result.spendingDiscipline || result.spendingDiscipline === "Unknown") {
+      log.warn("Spending discipline is Unknown, this may indicate a calculation issue");
+    }
+    
+    return result;
   } catch (error: any) {
-    console.error("❌ [calculateFinancialHealth] Error calculating financial health:", error);
+    log.error("Error calculating financial health:", error);
     // Return a default/empty financial health data instead of throwing
     // This prevents the entire dashboard from failing
-    const date = selectedDate || new Date();
     return {
       score: 0,
       classification: "Critical" as const,
@@ -411,7 +462,7 @@ export async function calculateFinancialHealth(selectedDate?: Date): Promise<Fin
       monthlyExpenses: 0,
       netAmount: 0,
       savingsRate: 0,
-      message: "Unable to calculate financial health at this time.",
+      message: "Unable to calculate financial health at this time. Please check your transactions.",
       spendingDiscipline: "Unknown" as const,
       debtExposure: "Low" as const,
       emergencyFundMonths: 0,

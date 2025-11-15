@@ -243,9 +243,13 @@ export default function TransactionsPage() {
     }
   }, [editingDescriptionId]);
 
+  // Load initial data - only run once on mount
   useEffect(() => {
     loadData();
-    
+  }, []);
+
+  // Parse URL params when searchParams change
+  useEffect(() => {
     // Read filters from URL if present
     const categoryIdFromUrl = searchParams.get("categoryId");
     const typeFromUrl = searchParams.get("type");
@@ -337,7 +341,8 @@ export default function TransactionsPage() {
         abortControllerRef.current.abort();
       }
     };
-  }, [filters, currentPage, itemsPerPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, currentPage, itemsPerPage]); // loadTransactions is stable, no need to include in deps
 
   function getDateRangeDates(range: string): { startDate: string; endDate: string } | null {
     const today = new Date();
@@ -460,6 +465,7 @@ export default function TransactionsPage() {
 
   async function loadData() {
     try {
+      // Use dynamic imports to reduce initial bundle size
       const [
         { getAccountsClient },
         { getAllCategoriesClient },
@@ -467,10 +473,13 @@ export default function TransactionsPage() {
         import("@/lib/api/accounts-client"),
         import("@/lib/api/categories-client"),
       ]);
+      
+      // Load accounts and categories in parallel for better performance
       const [accountsData, categoriesData] = await Promise.all([
         getAccountsClient(),
         getAllCategoriesClient(),
       ]);
+      
       setAccounts(accountsData);
       setCategories(categoriesData);
       
@@ -527,18 +536,13 @@ export default function TransactionsPage() {
       params.append("limit", itemsPerPage.toString());
 
       // Use API route to get transactions (descriptions are decrypted on server)
-      // Add cache busting parameter to ensure fresh data after updates
-      const cacheBuster = `_t=${Date.now()}`;
+      // Removed cache busting to allow browser caching for better performance
       const queryString = params.toString();
-      const url = `/api/transactions${queryString ? `?${queryString}&${cacheBuster}` : `?${cacheBuster}`}`;
+      const url = `/api/transactions${queryString ? `?${queryString}` : ''}`;
       
-      console.log("[TransactionsPage] Loading transactions from:", url);
       const response = await fetch(url, {
-        cache: 'no-store', // Force no cache
+        // Use default cache strategy - API route already handles cache control
         signal: abortController.signal,
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
       });
 
       // Handle rate limiting (429)
@@ -574,44 +578,52 @@ export default function TransactionsPage() {
       // Handle both old format (array) and new format (object with transactions and total)
       if (Array.isArray(data)) {
         // Backward compatibility: if API returns array, use it directly
-        console.log("[TransactionsPage] Loaded transactions (legacy format):", data.length);
         setTransactions(data);
         setTotalTransactions(data.length);
       } else if (data.transactions && typeof data.total === 'number') {
         // New format with pagination
-        console.log("[TransactionsPage] Loaded transactions:", data.transactions.length, "of", data.total);
         setTransactions(data.transactions);
         setTotalTransactions(data.total);
       } else {
-        console.error("[TransactionsPage] Unexpected response format:", data);
+        logger.error("[TransactionsPage] Unexpected response format:", data);
         setTransactions([]);
         setTotalTransactions(0);
       }
 
       // Generate suggestions for existing transactions without category (only once per page load)
+      // Defer this to avoid blocking initial page load
       if (!suggestionsGenerated) {
         const transactionsToCheck = Array.isArray(data) ? data : (data.transactions || []);
         const hasUncategorizedTransactions = transactionsToCheck.some((tx: Transaction) => !tx.categoryId && !tx.suggestedCategoryId);
         if (hasUncategorizedTransactions) {
           setSuggestionsGenerated(true);
-          // Generate suggestions in the background (don't wait for it)
-          fetch("/api/transactions/generate-suggestions", { method: "POST" })
-            .then(response => response.json())
-            .then(result => {
-              if (result.processed > 0) {
-                console.log(`Generated ${result.processed} category suggestions for existing transactions`);
-                // Reload transactions to show the new suggestions after a delay
-                // Use a longer delay to avoid hitting rate limits
-                setTimeout(() => {
-                  if (!abortControllerRef.current?.signal.aborted) {
-                    loadTransactions();
-                  }
-                }, 2000); // Increased delay to prevent rate limit issues
-              }
-            })
-            .catch(error => {
-              console.error("Error generating suggestions:", error);
-            });
+          // Generate suggestions in the background after a delay to not block initial load
+          // Use requestIdleCallback if available, otherwise setTimeout
+          const generateSuggestions = () => {
+            fetch("/api/transactions/generate-suggestions", { method: "POST" })
+              .then(response => response.json())
+              .then(result => {
+                if (result.processed > 0) {
+                  // Reload transactions to show the new suggestions after a delay
+                  // Use a longer delay to avoid hitting rate limits
+                  setTimeout(() => {
+                    if (!abortControllerRef.current?.signal.aborted) {
+                      loadTransactions();
+                    }
+                  }, 3000); // Increased delay to prevent rate limit issues
+                }
+              })
+              .catch(error => {
+                logger.error("Error generating suggestions:", error);
+              });
+          };
+          
+          // Use requestIdleCallback if available (browser API), otherwise setTimeout
+          if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(generateSuggestions, { timeout: 5000 });
+          } else {
+            setTimeout(generateSuggestions, 2000);
+          }
         }
       }
     } catch (error) {
@@ -1691,23 +1703,6 @@ export default function TransactionsPage() {
               </TableRow>
             ) : (
               paginatedTransactions.map((tx) => {
-                // Debug: log all transactions without category to see if they have suggestions
-                if (!tx.categoryId) {
-                  console.log('[TransactionsPage] Transaction without category:', {
-                    id: tx.id,
-                    description: tx.description,
-                    amount: tx.amount,
-                    type: tx.type,
-                    categoryId: tx.categoryId,
-                    suggestedCategoryId: tx.suggestedCategoryId,
-                    suggestedSubcategoryId: tx.suggestedSubcategoryId,
-                    suggestedCategory: tx.suggestedCategory,
-                    suggestedSubcategory: tx.suggestedSubcategory,
-                    hasSuggestedCategoryId: !!tx.suggestedCategoryId,
-                    hasSuggestedCategory: !!tx.suggestedCategory,
-                    willShowSuggestion: !!tx.suggestedCategoryId,
-                  });
-                }
                 const plaidMeta = tx.plaidMetadata as any;
                 const isPending = plaidMeta?.pending;
                 const authorizedDate = plaidMeta?.authorized_date || plaidMeta?.authorized_datetime;
@@ -2121,7 +2116,6 @@ export default function TransactionsPage() {
         }}
         transaction={selectedTransaction}
         onSuccess={async () => {
-          console.log("[TransactionsPage] onSuccess called, reloading transactions");
           await loadTransactions();
           setSelectedTransaction(null);
         }}

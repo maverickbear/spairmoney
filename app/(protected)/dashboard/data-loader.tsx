@@ -299,7 +299,7 @@ async function loadDashboardDataInternal(
       // This ensures the widget can still render with an error message
       return {
         score: 0,
-        classification: "Unknown" as const,
+        classification: "Critical" as const,
         monthlyIncome: 0,
         monthlyExpenses: 0,
         netAmount: 0,

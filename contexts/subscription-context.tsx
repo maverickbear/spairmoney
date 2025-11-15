@@ -161,13 +161,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     log.log("Fetching subscription data");
     const promise = (async () => {
       try {
-        // Use cache: 'no-store' to bypass browser cache and ensure fresh data
-        const response = await fetch("/api/billing/subscription", {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
+        // Use default cache - the API route handles cache control
+        // Client-side cache (localStorage + global cache) already handles freshness
+        const response = await fetch("/api/billing/subscription");
         
         if (!response.ok) {
           if (response.status === 401) {

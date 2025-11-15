@@ -339,11 +339,11 @@ function NavComponent({ hasSubscription = true }: NavProps) {
               )}
             >
               {isCollapsed ? (
-                <Link href="/" className="flex items-center justify-center w-full h-full">
+                <Link href="/" prefetch={true} className="flex items-center justify-center w-full h-full">
                   <Logo variant="icon" color="auto" width={40} height={40} />
                 </Link>
               ) : (
-                <Link href="/" className="flex items-center justify-center w-full h-full">
+                <Link href="/" prefetch={true} className="flex items-center justify-center w-full h-full">
                   <Logo variant="wordmark" color="auto" width={150} height={40} />
                 </Link>
               )}
@@ -372,6 +372,7 @@ function NavComponent({ hasSubscription = true }: NavProps) {
                     const linkElement = (
                       <Link
                         href={item.href}
+                        prefetch={true}
                         onClick={(e) => {
                           if (!hasSubscription) {
                             e.preventDefault();
@@ -509,32 +510,32 @@ function NavComponent({ hasSubscription = true }: NavProps) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuItem asChild className="mb-1">
-                      <Link href="/settings" className="cursor-pointer">
+                      <Link href="/settings" prefetch={true} className="cursor-pointer">
                         <Settings className="mr-2 h-4 w-4" />
                         <span>My Account</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild className="mb-1">
-                      <Link href="/feedback" className="cursor-pointer">
+                      <Link href="/feedback" prefetch={true} className="cursor-pointer">
                         <MessageSquare className="mr-2 h-4 w-4" />
                         <span>Feedback</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="mb-1">
-                      <Link href="/help-support" className="cursor-pointer">
+                      <Link href="/help-support" prefetch={true} className="cursor-pointer">
                         <HelpCircle className="mr-2 h-4 w-4" />
                         <span>Help & Support</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="mb-1">
-                      <Link href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="cursor-pointer">
+                      <Link href="/privacy-policy" prefetch={true} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
                         <Shield className="mr-2 h-4 w-4" />
                         <span>Privacy Policy</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="mb-1">
-                      <Link href="/terms-of-service" target="_blank" rel="noopener noreferrer" className="cursor-pointer">
+                      <Link href="/terms-of-service" prefetch={true} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
                         <FileTextIcon className="mr-2 h-4 w-4" />
                         <span>Terms of Service</span>
                       </Link>
