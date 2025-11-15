@@ -91,12 +91,24 @@ export async function getAccountsClient(): Promise<Account[]> {
     const decryptedAmount = decryptAmount(tx.amount);
     
     // Skip transaction if amount is invalid (null, NaN, or unreasonably large)
+    // Note: In browser, encrypted amounts cannot be decrypted (no access to encryption key),
+    // so we silently skip them. The server API should handle decryption before sending to client.
     if (decryptedAmount === null || isNaN(decryptedAmount) || !isFinite(decryptedAmount)) {
-      console.warn('Skipping transaction with invalid amount:', {
-        accountId: tx.accountId,
-        amount: tx.amount,
-        decryptedAmount,
-      });
+      // Only log warning if the amount looks like it should be decryptable but failed
+      // (i.e., it's a long hex string indicating encrypted data)
+      const isEncryptedData = typeof tx.amount === 'string' && 
+        tx.amount.length >= 192 && 
+        /^[0-9a-f]+$/i.test(tx.amount);
+      
+      // Only warn if it's NOT encrypted data (meaning it's a real error)
+      // Encrypted data in browser is expected to fail decryption
+      if (!isEncryptedData) {
+        console.warn('Skipping transaction with invalid amount:', {
+          accountId: tx.accountId,
+          amount: tx.amount?.substring?.(0, 50) || tx.amount,
+          decryptedAmount,
+        });
+      }
       continue;
     }
     

@@ -121,8 +121,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const log = logger.withPrefix("NAV");
-  
-  log.log("Render:", { hasSubscription, pathname });
 
   // Load collapsed state from localStorage on mount
   useEffect(() => {
@@ -141,9 +139,7 @@ function NavComponent({ hasSubscription = true }: NavProps) {
 
   // Fetch user data - always run hooks, but only fetch if hasSubscription
   useEffect(() => {
-    log.log("useEffect triggered:", { hasSubscription });
     if (!hasSubscription) {
-      log.log("No subscription, skipping user data fetch");
       setLoading(false);
       setUserData(null);
       return;
@@ -154,7 +150,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
       const now = Date.now();
       if (navUserDataCache.data && (now - navUserDataCache.timestamp) < navUserDataCache.TTL) {
         // Use cached data
-        log.log("Using cached user data");
         setUserData(navUserDataCache.data);
         if (navUserDataCache.role && (now - navUserDataCache.roleTimestamp) < navUserDataCache.TTL) {
           setIsSuperAdmin(navUserDataCache.role === "super_admin");
@@ -166,7 +161,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
       // Reuse in-flight request if exists
       if (navUserDataCache.promise) {
         try {
-          log.log("Reusing in-flight user data request");
           setLoading(true);
           const result = await navUserDataCache.promise;
           setUserData(result);
@@ -179,8 +173,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
           log.error("Cached promise failed:", error);
         }
       }
-
-      log.log("Fetching user data");
       try {
         setLoading(true);
         
@@ -209,7 +201,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
         navUserDataCache.promise = fetchPromise;
 
         const data = await fetchPromise;
-        log.log("User data fetched:", data);
         setUserData(data);
         setIsSuperAdmin(navUserDataCache.role === "super_admin");
       } catch (error) {
@@ -226,7 +217,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
 
     // Listen for profile updates to update cache
     const handleProfileUpdate = (event: CustomEvent) => {
-      log.log("Profile update event received");
       const updatedProfile = event.detail;
       
       // Update cache directly if we have cached data
@@ -266,11 +256,8 @@ function NavComponent({ hasSubscription = true }: NavProps) {
   // Don't render Nav if user doesn't have subscription
   // But all hooks must be called before this return
   if (!hasSubscription) {
-    log.log("Returning null (no subscription)");
     return null;
   }
-
-  log.log("Rendering nav component");
 
   const handleLogout = useCallback(async () => {
     try {

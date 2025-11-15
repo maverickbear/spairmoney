@@ -145,7 +145,6 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
     const requestKey = `subscription:${userId}`;
     const cachedPromise = requestCache.get(requestKey);
     if (cachedPromise) {
-      log.debug("Using request-level cache");
       return await cachedPromise;
     }
 
@@ -163,14 +162,12 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
       if (!isExpired && !wasInvalidated) {
         if (cached.type === 'result') {
           // We have a cached result
-          log.debug("Using persistent cache result");
           const result = Promise.resolve(cached.subscription);
           requestCache.set(requestKey, result);
           setTimeout(() => requestCache.delete(requestKey), 100);
           return cached.subscription;
         } else if (cached.type === 'promise') {
           // There's an in-flight promise - reuse it
-          log.debug("Reusing in-flight promise");
           requestCache.set(requestKey, cached.promise);
           setTimeout(() => requestCache.delete(requestKey), 1000);
           return await cached.promise;
@@ -187,20 +184,16 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
     const doubleCheckCache = subscriptionCache.get(userId);
     if (doubleCheckCache && (now - doubleCheckCache.timestamp) < SUBSCRIPTION_CACHE_TTL) {
       if (doubleCheckCache.type === 'result') {
-        log.debug("Using persistent cache result (double-check)");
         const result = Promise.resolve(doubleCheckCache.subscription);
         requestCache.set(requestKey, result);
         setTimeout(() => requestCache.delete(requestKey), 100);
         return doubleCheckCache.subscription;
       } else if (doubleCheckCache.type === 'promise') {
-        log.debug("Reusing in-flight promise (double-check)");
         requestCache.set(requestKey, doubleCheckCache.promise);
         setTimeout(() => requestCache.delete(requestKey), 1000);
         return await doubleCheckCache.promise;
       }
     }
-    
-    log.debug("Fetching new subscription");
     
     // Create promise and cache it IMMEDIATELY (before awaiting) to prevent concurrent calls
     // This ensures all concurrent calls get the same promise
@@ -270,8 +263,6 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
     const supabase = await createServerClient();
     const log = logger.withPrefix("PLANS");
     
-    log.debug("Fetching subscription for user:", userId);
-    
     // Optimize: Check household membership and get ownerId in a single query
     const { data: member, error: memberError } = await supabase
       .from("HouseholdMember")
@@ -286,8 +277,6 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
 
     const isMember = member !== null;
     const ownerId = member?.ownerId || null;
-    
-    log.debug("Household membership check:", { isMember, ownerId });
     
     if (isMember && ownerId) {
       // User is a household member, inherit plan from owner
@@ -313,7 +302,6 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
         const ownerPlanId = ownerSubscription.planId;
         
         if (ownerPlanId === "basic" || ownerPlanId === "premium") {
-          log.debug("Returning shadow subscription for member with plan:", ownerPlanId);
           const mapped = mapSubscription(ownerSubscription);
           return {
             ...mapped,
@@ -343,26 +331,11 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
       log.error("Error fetching subscription:", error);
     }
 
-    log.debug("Subscription query result:", {
-      found: !!subscription,
-      status: subscription?.status || "none",
-      planId: subscription?.planId || "none",
-      error: error?.code || "none"
-    });
-
     if (!subscription) {
       // Return null if no subscription exists
       // User must select a plan on /select-plan page
       // This allows users to choose their plan before being redirected to dashboard
-      log.debug("No subscription found for user:", userId);
       return null;
-    }
-
-    // Allow access even if trial expired - user can still view the system
-    // We don't block access when trial expires, just return the subscription
-    if (!isTrialValid(subscription)) {
-      log.debug("Trial expired but allowing access to view system");
-      // Return subscription even if expired - user can still view the system
     }
 
     return mapSubscription(subscription);

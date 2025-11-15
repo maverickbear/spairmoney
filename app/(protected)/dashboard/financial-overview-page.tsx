@@ -84,6 +84,7 @@ const AlertsInsightsWidget = dynamic(
   }
 );
 
+
 interface FinancialOverviewPageProps {
   selectedMonthTransactions: any[];
   lastMonthTransactions: any[];
@@ -136,15 +137,26 @@ export function FinancialOverviewPage({
   }, [lastMonthTransactions]);
 
   // Calculate net worth (assets - debts)
-  // totalBalance already includes all accounts (checking, savings, investments, etc.)
+  // 
+  // ASSETS: totalBalance includes ALL account types:
+  // - Checking accounts (calculated from transactions)
+  // - Savings accounts (calculated from transactions)
+  // - Investment accounts (calculated from Questrade, AccountInvestmentValue, or Holdings)
+  // - All other account types
+  //
+  // The getAccounts() function already calculates investment account values correctly,
+  // so totalBalance is the sum of all account balances including investments.
   const totalAssets = useMemo(() => {
     return totalBalance;
   }, [totalBalance]);
 
+  // DEBTS: Sum of all liabilities and debts
+  // - PlaidLiabilities: debts from Plaid connections (credit cards, loans, etc.)
+  // - Debt table: manually entered debts (only those not paid off)
   const totalDebts = useMemo(() => {
     let total = 0;
 
-    // Calculate from PlaidLiabilities
+    // Calculate from PlaidLiabilities (from Plaid connections)
     if (liabilities && liabilities.length > 0) {
       const liabilitiesTotal = liabilities.reduce((sum: number, liability: any) => {
         // Try balance first (for backward compatibility), then currentBalance
@@ -176,7 +188,7 @@ export function FinancialOverviewPage({
       total += liabilitiesTotal;
     }
 
-    // Calculate from Debt table (only debts that are not paid off)
+    // Calculate from Debt table (manually entered debts, only those not paid off)
     if (debts && debts.length > 0) {
       const debtsTotal = debts.reduce((sum: number, debt: any) => {
         // Only include debts that are not paid off
@@ -199,7 +211,7 @@ export function FinancialOverviewPage({
           numValue = Number(balance);
         }
         
-        // Only add if it's a valid finite number
+        // Only add if it's a valid finite number and positive
         if (!isNaN(numValue) && isFinite(numValue) && numValue > 0) {
           return sum + numValue;
         }
@@ -213,11 +225,14 @@ export function FinancialOverviewPage({
     return total;
   }, [liabilities, debts]);
 
+  // NET WORTH = Total Assets - Total Debts
   const netWorth = totalAssets - totalDebts;
 
-  // Calculate emergency fund months
+  // Use emergency fund months from financial health if available (more accurate)
+  // Otherwise calculate from total balance and monthly expenses
   const monthlyExpenses = currentExpenses || 1; // Avoid division by zero
-  const emergencyFundMonths = totalBalance > 0 ? (totalBalance / monthlyExpenses) : 0;
+  const emergencyFundMonths = financialHealth?.emergencyFundMonths ?? 
+    (totalBalance > 0 ? (totalBalance / monthlyExpenses) : 0);
 
   // Calculate checking vs savings
   const checkingAccounts = accounts.filter((acc: any) => acc.type === 'checking' || acc.type === 'depository');

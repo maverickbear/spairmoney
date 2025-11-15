@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { InvestmentTransactionFormData, SecurityPriceFormData, InvestmentAccountFormData } from "@/lib/validations/investment";
 import { formatTimestamp, formatDateStart, formatDateEnd, formatDateOnly } from "@/lib/utils/timestamp";
 import { mapClassToSector } from "@/lib/utils/portfolio-utils";
+import { logger } from "@/lib/utils/logger";
 
 export interface Holding {
   securityId: string;
@@ -37,7 +38,7 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
     .order("lastUpdatedAt", { ascending: false });
 
   if (!positionsError && questradePositions && questradePositions.length > 0) {
-    console.log(`Found ${questradePositions.length} Questrade positions`);
+    // Questrade positions found - use them directly
     
     // Filter by accountId if provided
     let positions = questradePositions;
@@ -76,7 +77,7 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
   }
 
   // Fallback to calculating from transactions if no Questrade positions
-  console.log("No Questrade positions found, calculating from transactions");
+  const log = logger.withPrefix("INVESTMENTS");
 
   let query = supabase
     .from("InvestmentTransaction")
@@ -94,19 +95,19 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
   const { data: transactions, error } = await query;
 
   if (error) {
-    console.error("Error fetching investment transactions:", error);
+    log.error("Error fetching investment transactions:", error);
     return [];
   }
 
   if (!transactions || transactions.length === 0) {
-    console.log("No investment transactions found");
     return [];
   }
 
-  console.log(`Found ${transactions.length} investment transactions`);
-
   // Group by security and account (same security in different accounts = different holdings)
   const holdingKeyMap = new Map<string, Holding>();
+  
+  // Track skipped transactions for summary log
+  const skippedTransactions: string[] = [];
 
   for (const tx of transactions || []) {
     // Skip transactions without securityId/security, but allow transfer_in/transfer_out
@@ -117,8 +118,10 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
         // Silently skip transfer transactions as they don't affect holdings
         continue;
       }
-      // For other transaction types, log a warning
-      console.log(`Skipping transaction ${tx.id} (type: ${tx.type}) - no securityId or security`);
+      // Track skipped transactions for summary log (only in development)
+      if (process.env.NODE_ENV === "development") {
+        skippedTransactions.push(`${tx.id} (${tx.type})`);
+      }
       continue;
     }
 
@@ -219,7 +222,15 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
 
   // Filter out zero quantity holdings
   const holdings = Array.from(holdingKeyMap.values()).filter((h) => h.quantity > 0);
-  console.log(`Calculated ${holdings.length} holdings with quantity > 0`);
+  
+  // Log summary only in development and only if there were skipped transactions
+  if (process.env.NODE_ENV === "development" && skippedTransactions.length > 0) {
+    log.debug(`Skipped ${skippedTransactions.length} transactions without securityId:`, skippedTransactions.slice(0, 5));
+    if (skippedTransactions.length > 5) {
+      log.debug(`... and ${skippedTransactions.length - 5} more`);
+    }
+  }
+  
   return holdings;
 }
 
@@ -471,15 +482,14 @@ export async function createSecurityPrice(data: SecurityPriceFormData) {
 
 export async function getInvestmentAccounts() {
   const supabase = await createServerClient();
+  const log = logger.withPrefix("INVESTMENTS");
 
   // Verify authentication
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
-    console.error("Error getting user in getInvestmentAccounts:", authError);
+    log.error("Error getting user in getInvestmentAccounts:", authError);
     return [];
   }
-
-  console.log(`[getInvestmentAccounts] Fetching investment accounts from Account table for user: ${user.id}`);
 
   // Get accounts of type "investment" from Account table
   const { data, error } = await supabase
@@ -489,21 +499,8 @@ export async function getInvestmentAccounts() {
     .order("name", { ascending: true });
 
   if (error) {
-    console.error("Error fetching investment accounts:", error);
+    log.error("Error fetching investment accounts:", error);
     return [];
-  }
-
-  console.log(`[getInvestmentAccounts] Found ${data?.length || 0} investment accounts`);
-  
-  // Log account details for debugging
-  if (data && data.length > 0) {
-    console.log("[getInvestmentAccounts] Accounts:", data.map(acc => ({
-      id: acc.id,
-      name: acc.name,
-      type: acc.type,
-      userId: acc.userId,
-      hasUserId: !!acc.userId
-    })));
   }
 
   return data || [];

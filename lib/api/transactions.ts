@@ -393,14 +393,6 @@ export async function getTransactionsInternal(
     .order("date", { ascending: false });
 
   const log = logger.withPrefix("getTransactionsInternal");
-  
-  // Log the date filters being applied (only in development)
-  if (filters?.startDate || filters?.endDate) {
-    log.debug("Date filters:", {
-      startDate: filters.startDate ? formatDateStart(filters.startDate) : undefined,
-      endDate: filters.endDate ? formatDateEnd(filters.endDate) : undefined,
-    });
-  }
 
   // Apply filters to both queries
   const applyFilters = (q: any) => {
@@ -451,7 +443,6 @@ export async function getTransactionsInternal(
   
   // Se não estiver autenticado, retornar array vazio (não lançar erro)
   if (authError || !currentUser) {
-    log.debug("User not authenticated");
     return { transactions: [], total: 0 };
   }
 
@@ -473,26 +464,9 @@ export async function getTransactionsInternal(
     throw new Error(`Failed to fetch transactions: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Log resumido sobre o resultado (apenas em desenvolvimento)
-  if (data && data.length > 0) {
-    log.debug("Transactions found:", {
-      count: data.length,
-      total: count || 0,
-      types: [...new Set(data.map((t: any) => t.type))],
-    });
-  }
-
   if (!data || data.length === 0) {
-    log.debug("No transactions found");
     return { transactions: [], total: count || 0 };
   }
-
-  // Log resumido (apenas em desenvolvimento)
-  log.debug("Transactions loaded:", {
-    totalCount: data.length,
-    incomeCount: data.filter((t: any) => t.type === "income").length,
-    expenseCount: data.filter((t: any) => t.type === "expense").length,
-  });
 
   // Buscar relacionamentos separadamente para evitar problemas de RLS com joins
   // Coletar IDs únicos de relacionamentos

@@ -48,7 +48,6 @@ async function calculateFinancialHealthInternal(
   // Get transactions for selected month only (to match the cards at the top)
   // Call internal function directly to avoid reading cookies inside cached function
   const log = logger.withPrefix("calculateFinancialHealthInternal");
-  log.debug("Fetching transactions for month:", selectedMonth.toISOString().split('T')[0]);
 
   const transactionsResult = await getTransactionsInternal(
     {
@@ -63,12 +62,6 @@ async function calculateFinancialHealthInternal(
   const transactions = Array.isArray(transactionsResult)
     ? transactionsResult
     : (transactionsResult?.transactions || []);
-  
-  log.debug("Transactions received:", {
-    count: transactions.length,
-    incomeCount: transactions.filter(t => t?.type === "income").length,
-    expenseCount: transactions.filter(t => t?.type === "expense").length,
-  });
   
   // Only count income and expense transactions
   const monthlyIncome = transactions
@@ -86,15 +79,6 @@ async function calculateFinancialHealthInternal(
     }, 0);
   
   const netAmount = monthlyIncome - monthlyExpenses;
-  
-  // Log for debugging (only in development)
-  log.debug("Financial Health Calculation:", {
-    month: selectedMonth.toISOString().split('T')[0],
-    transactionsCount: transactions.length,
-    monthlyIncome,
-    monthlyExpenses,
-    netAmount,
-  });
   
   // Handle case when there are no transactions
   if (transactions.length === 0 || (monthlyIncome === 0 && monthlyExpenses === 0)) {
@@ -146,14 +130,6 @@ async function calculateFinancialHealthInternal(
     expenseRatio = 0;
   }
   
-  log.debug("Financial Health Metrics:", {
-    monthlyIncome,
-    monthlyExpenses,
-    netAmount,
-    savingsRate,
-    expenseRatio,
-  });
-  
   // Calculate score based on expense ratio
   // Score ranges from 0-100 based on expense ratio
   // 0-60% expense ratio = 100-91 score (Excellent)
@@ -188,8 +164,6 @@ async function calculateFinancialHealthInternal(
   
   // Round score to nearest integer and ensure it's between 0 and 100
   score = Math.max(0, Math.min(100, Math.round(score)));
-  
-  log.debug("Calculated Score:", { score, expenseRatio });
   
   // Determine classification based on expense ratio
   let classification: "Excellent" | "Good" | "Fair" | "Poor" | "Critical";
@@ -312,8 +286,6 @@ async function calculateFinancialHealthInternal(
   } else {
     spendingDiscipline = "Critical";
   }
-  
-  log.debug("Spending Discipline:", { savingsRate, spendingDiscipline });
 
   // Calculate debt exposure
   let debtExposure: "Low" | "Moderate" | "High" = "Low";
@@ -400,13 +372,6 @@ async function calculateFinancialHealthInternal(
     alerts,
     suggestions,
   };
-  
-  log.debug("Final Financial Health Result:", {
-    score: result.score,
-    classification: result.classification,
-    spendingDiscipline: result.spendingDiscipline,
-    savingsRate: result.savingsRate,
-  });
   
   return result;
 }
