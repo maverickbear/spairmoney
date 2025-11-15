@@ -36,6 +36,7 @@ export async function checkTransactionLimit(userId: string, month: Date = new Da
     const { count, error } = await supabase
       .from("Transaction")
       .select("*", { count: "exact", head: true })
+      .eq("userId", userId)
       .gte("date", startOfMonth.toISOString())
       .lte("date", endOfMonth.toISOString());
 
@@ -86,7 +87,8 @@ export async function checkAccountLimit(userId: string): Promise<LimitCheckResul
     
     const { count, error } = await supabase
       .from("Account")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("userId", userId);
 
     if (error) {
       console.error("Error checking account limit:", error);

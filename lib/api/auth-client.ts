@@ -116,15 +116,21 @@ export async function signUpClient(data: SignUpFormData): Promise<{ user: User |
     }
     
     // Sign up user with Supabase Auth
+    // Note: Supabase will automatically send OTP email if email confirmation is enabled
+    // We'll redirect to OTP verification page after signup
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "")}/auth/verify-otp?email=${encodeURIComponent(data.email)}`,
         data: {
           name: data.name || "",
         },
       },
     });
+
+    // If signup is successful but user needs email confirmation, 
+    // Supabase will send OTP automatically. If not, we'll resend it on the OTP page.
 
     if (authError || !authData.user) {
       // Get user-friendly error message (handles HIBP errors automatically)
@@ -132,21 +138,58 @@ export async function signUpClient(data: SignUpFormData): Promise<{ user: User |
       return { user: null, error: errorMessage };
     }
 
-    // Create user profile in User table (owners sign up directly, so they are admin)
-    const { data: userData, error: userError } = await supabase
-      .from("User")
-      .insert({
-        id: authData.user.id,
-        email: authData.user.email!,
-        name: data.name || null,
-        role: "admin", // Owners who sign up directly are admins
-      })
-      .select()
-      .single();
+    // Wait a moment for the session to be established (needed for RLS policies)
+    // This ensures auth.uid() is available when we try to insert
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-    if (userError) {
-      console.error("Error creating user profile:", userError);
-      // User is created in auth but not in User table - this is OK, will be created on first login
+    // Check if user profile already exists
+    let { data: userData, error: fetchError } = await supabase
+      .from("User")
+      .select("*")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+
+    // If user doesn't exist, create it
+    if (!userData) {
+      const { data: newUserData, error: userError } = await supabase
+        .from("User")
+        .insert({
+          id: authData.user.id,
+          email: authData.user.email!,
+          name: data.name || null,
+          role: "admin", // Owners who sign up directly are admins
+        })
+        .select()
+        .single();
+
+      if (userError) {
+        // Log detailed error information
+        console.error("Error creating user profile:", {
+          message: userError.message,
+          details: userError.details,
+          hint: userError.hint,
+          code: userError.code,
+          userId: authData.user.id,
+          email: authData.user.email,
+        });
+        
+        // If it's a duplicate key error, try to fetch the existing user
+        if (userError.code === "23505" || userError.message?.includes("duplicate") || userError.message?.includes("unique")) {
+          console.log("User already exists, fetching existing user...");
+          const { data: existingUser } = await supabase
+            .from("User")
+            .select("*")
+            .eq("id", authData.user.id)
+            .single();
+          
+          if (existingUser) {
+            userData = existingUser;
+          }
+        }
+        // User is created in auth but not in User table - this is OK, will be created on first login
+      } else {
+        userData = newUserData;
+      }
     }
 
     // Create household member record for the owner (owner is also a household member of themselves)

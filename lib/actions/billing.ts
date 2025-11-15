@@ -71,6 +71,7 @@ async function checkTransactionLimitWithLimits(userId: string, limits: PlanFeatu
     const { count, error } = await supabase
       .from("Transaction")
       .select("*", { count: "exact", head: true })
+      .eq("userId", userId)
       .gte("date", startOfMonth.toISOString())
       .lte("date", endOfMonth.toISOString());
 
@@ -120,7 +121,8 @@ async function checkAccountLimitWithLimits(userId: string, limits: PlanFeatures)
     
     const { count, error } = await supabase
       .from("Account")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("userId", userId);
 
     if (error) {
       console.error("Error checking account limit:", error);

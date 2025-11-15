@@ -133,7 +133,7 @@ export function ExpensesByCategoryWidget({
             <CardTitle>Expenses by Category</CardTitle>
             <CardDescription>Distribution of total expenses</CardDescription>
           </div>
-          <div suppressHydrationWarning>
+          <div>
             <Select value={expenseFilter} onValueChange={(value) => setExpenseFilter(value as ExpenseFilter)}>
               <SelectTrigger size="small" className="w-fit h-7 text-xs px-2.5">
                 <SelectValue />

@@ -59,6 +59,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(selectTriggerVariants({ size, className }))}
+    suppressHydrationWarning
     {...props}
   >
     {children}

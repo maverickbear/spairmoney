@@ -18,39 +18,21 @@ export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChar
   const txLimit = transactionLimit || defaultTransactionLimit;
   const accLimit = accountLimit || defaultAccountLimit;
 
-  const getTotalUsage = () => {
-    const transactionUsage = txLimit.limit === -1 ? 0 : txLimit.current;
-    const accountUsage = accLimit.limit === -1 ? 0 : accLimit.current;
-    return transactionUsage + accountUsage;
+  // Calculate individual usage percentages
+  const getTransactionUsagePercentage = () => {
+    if (txLimit.limit === -1) return 0;
+    if (txLimit.limit === 0) return 0;
+    return Math.min((txLimit.current / txLimit.limit) * 100, 100);
   };
 
-  const getTotalLimit = () => {
-    const transactionMax = txLimit.limit === -1 ? 0 : txLimit.limit;
-    const accountMax = accLimit.limit === -1 ? 0 : accLimit.limit;
-    return transactionMax + accountMax;
+  const getAccountUsagePercentage = () => {
+    if (accLimit.limit === -1) return 0;
+    if (accLimit.limit === 0) return 0;
+    return Math.min((accLimit.current / accLimit.limit) * 100, 100);
   };
 
-  const totalUsage = getTotalUsage();
-  const totalLimit = getTotalLimit();
-
-  // Calculate percentages based on total usage (for segmented bar)
-  const getTransactionPercentageOfUsage = () => {
-    if (totalUsage === 0) return 0;
-    const transactionUsage = txLimit.limit === -1 ? 0 : txLimit.current;
-    return (transactionUsage / totalUsage) * 100;
-  };
-
-  const getAccountPercentageOfUsage = () => {
-    if (totalUsage === 0) return 0;
-    const accountUsage = accLimit.limit === -1 ? 0 : accLimit.current;
-    return (accountUsage / totalUsage) * 100;
-  };
-
-  // Calculate overall usage percentage (for bar width)
-  const overallUsagePercentage = totalLimit > 0 ? (totalUsage / totalLimit) * 100 : 0;
-
-  const transactionPercentageOfUsage = getTransactionPercentageOfUsage();
-  const accountPercentageOfUsage = getAccountPercentageOfUsage();
+  const transactionUsagePercentage = getTransactionUsagePercentage();
+  const accountUsagePercentage = getAccountUsagePercentage();
 
   const formatLimit = (limit: number) => {
     if (limit === -1) return "Unlimited";
@@ -63,71 +45,42 @@ export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChar
         <CardTitle className="text-lg sm:text-xl">Usage</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pl-6 pr-6 pb-6 pt-0">
+        {/* Transactions Usage */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs sm:text-sm">
+            <span className="text-muted-foreground">Transactions (this month)</span>
             <span className="text-muted-foreground">
-              {totalUsage.toLocaleString()} / {formatLimit(totalLimit)} used this month
+              {txLimit.current.toLocaleString()} / {formatLimit(txLimit.limit)}
             </span>
           </div>
           
-          {/* Segmented Bar Chart */}
-          <div className="w-full h-4 bg-muted rounded-lg overflow-hidden relative">
-            <div 
-              className="h-full flex transition-all"
-              style={{ width: `${Math.min(overallUsagePercentage, 100)}%` }}
-            >
-              {txLimit.limit !== -1 && txLimit.current > 0 && (
-                <div
-                  className="bg-blue-500 h-full transition-all"
-                  style={{ width: `${transactionPercentageOfUsage}%` }}
-                />
-              )}
-              {accLimit.limit !== -1 && accLimit.current > 0 && (
-                <div
-                  className="bg-pink-500 h-full transition-all"
-                  style={{ width: `${accountPercentageOfUsage}%` }}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Legend */}
-          {totalUsage > 0 && (
-            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-              {txLimit.limit !== -1 && txLimit.current > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span>
-                    Transactions {Math.round(transactionPercentageOfUsage)}%
-                  </span>
-                </div>
-              )}
-              {accLimit.limit !== -1 && accLimit.current > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-pink-500" />
-                  <span>
-                    Accounts {Math.round(accountPercentageOfUsage)}%
-                  </span>
-                </div>
-              )}
+          {txLimit.limit !== -1 && (
+            <div className="w-full h-4 bg-muted rounded-lg overflow-hidden relative">
+              <div 
+                className="bg-blue-500 h-full transition-all"
+                style={{ width: `${Math.min(transactionUsagePercentage, 100)}%` }}
+              />
             </div>
           )}
         </div>
 
-        {/* Detailed breakdown */}
-        <div className="space-y-2 sm:space-y-3 pt-2 border-t">
-          <div className="flex justify-between items-center">
-            <span className="text-xs sm:text-sm">Transactions</span>
-            <span className="text-xs sm:text-sm font-medium">
-              {txLimit.current.toLocaleString()} / {formatLimit(txLimit.limit)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs sm:text-sm">Accounts</span>
-            <span className="text-xs sm:text-sm font-medium">
+        {/* Accounts Usage */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs sm:text-sm">
+            <span className="text-muted-foreground">Accounts</span>
+            <span className="text-muted-foreground">
               {accLimit.current.toLocaleString()} / {formatLimit(accLimit.limit)}
             </span>
           </div>
+          
+          {accLimit.limit !== -1 && (
+            <div className="w-full h-4 bg-muted rounded-lg overflow-hidden relative">
+              <div 
+                className="bg-pink-500 h-full transition-all"
+                style={{ width: `${Math.min(accountUsagePercentage, 100)}%` }}
+              />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

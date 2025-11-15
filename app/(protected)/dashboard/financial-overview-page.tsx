@@ -136,9 +136,10 @@ export function FinancialOverviewPage({
   }, [lastMonthTransactions]);
 
   // Calculate net worth (assets - debts)
+  // totalBalance already includes all accounts (checking, savings, investments, etc.)
   const totalAssets = useMemo(() => {
-    return totalBalance + savings; // Cash + investments
-  }, [totalBalance, savings]);
+    return totalBalance;
+  }, [totalBalance]);
 
   const totalDebts = useMemo(() => {
     let total = 0;

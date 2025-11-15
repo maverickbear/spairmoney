@@ -37,11 +37,11 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
   const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
   const invitationLink = `${appUrl}/members/accept?token=${data.invitationToken}`;
 
-  // Always use naor@maverickbear.co as the default sender
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "naor@maverickbear.co";
+  // Always use noreply@sparefinance.com as the default sender
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@sparefinance.com";
   
-  // Ensure we're using naor@maverickbear.co instead of onboarding@resend.dev
-  const finalFromEmail = fromEmail === "onboarding@resend.dev" ? "naor@maverickbear.co" : fromEmail;
+  // Ensure we're using noreply@sparefinance.com instead of onboarding@resend.dev
+  const finalFromEmail = fromEmail === "onboarding@resend.dev" ? "noreply@sparefinance.com" : fromEmail;
 
   try {
     const result = await resend.emails.send({
@@ -75,7 +75,7 @@ You can manually share this link with the invited member.
 
 🔧 To enable email sending to any recipient:
 1. Go to https://resend.com/domains
-2. Add and verify the domain: maverickbear.co
+2. Add and verify the domain: sparefinance.com
 3. Configure DNS records (SPF, DKIM, DMARC) as instructed by Resend
 4. Wait for domain verification (may take a few hours)
 
@@ -106,7 +106,7 @@ You can manually share this link with the invited member.
 
 🔧 To enable email sending to any recipient:
 1. Go to https://resend.com/domains
-2. Add and verify the domain: maverickbear.co
+2. Add and verify the domain: sparefinance.com
 3. Configure DNS records (SPF, DKIM, DMARC) as instructed by Resend
 4. Wait for domain verification (may take a few hours)
 
@@ -221,8 +221,8 @@ export async function sendCheckoutPendingEmail(data: CheckoutPendingEmailData): 
   console.log("[EMAIL] ✅ Resend initialized successfully");
 
   const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "naor@maverickbear.co";
-  const finalFromEmail = fromEmail === "onboarding@resend.dev" ? "naor@maverickbear.co" : fromEmail;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@sparefinance.com";
+  const finalFromEmail = fromEmail === "onboarding@resend.dev" ? "noreply@sparefinance.com" : fromEmail;
 
   console.log("[EMAIL] Email configuration:", {
     from: finalFromEmail,

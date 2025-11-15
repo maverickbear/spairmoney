@@ -1,6 +1,5 @@
 import { unstable_cache } from "next/cache";
 import { getTransactions } from "@/lib/api/transactions";
-import { getTotalInvestmentsValue } from "@/lib/api/simple-investments";
 import { getBudgets } from "@/lib/api/budgets";
 import { getUpcomingTransactions } from "@/lib/api/transactions";
 import { calculateFinancialHealth } from "@/lib/api/financial-health";
@@ -268,7 +267,6 @@ async function loadDashboardDataInternal(
   const [
     selectedMonthTransactionsResult,
     lastMonthTransactionsResult,
-    savings,
     budgets,
     upcomingTransactions,
     financialHealth,
@@ -286,10 +284,6 @@ async function loadDashboardDataInternal(
     getTransactionsInternal({ startDate: lastMonth, endDate: lastMonthEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching last month transactions:", error);
       return { transactions: [], total: 0 };
-    }),
-    getTotalInvestmentsValue().catch((error) => {
-      logger.error("Error fetching total investments value:", error);
-      return 0;
     }),
     getBudgetsInternal(selectedMonth, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching budgets:", error);
@@ -365,6 +359,11 @@ async function loadDashboardDataInternal(
     (sum: number, acc: any) => sum + (acc.balance || 0),
     0
   );
+
+  // Calculate savings as the sum of balances from savings accounts
+  const savings = accounts
+    .filter((acc: any) => acc.type === 'savings')
+    .reduce((sum: number, acc: any) => sum + (acc.balance || 0), 0);
 
   // Calculate last month's total balance more efficiently
   // Use centralized service for consistent calculation

@@ -304,7 +304,7 @@ export default function PrivacyPolicyPage() {
                 </li>
               </ul>
               <p className="text-sm text-muted-foreground">
-                To exercise these rights, please contact us at privacy@sparefinance.com or use 
+                To exercise these rights, please contact us at legal@sparefinance.com or use 
                 the account settings in the application.
               </p>
             </CardContent>
@@ -363,7 +363,7 @@ export default function PrivacyPolicyPage() {
               <div className="space-y-2 text-sm">
                 <p><strong>Company:</strong> Maverick Bear Design (Canadian company)</p>
                 <p><strong>Product:</strong> Spare Finance</p>
-                <p><strong>Email:</strong> privacy@sparefinance.com</p>
+                <p><strong>Email:</strong> legal@sparefinance.com</p>
                 <p><strong>Support:</strong> support@sparefinance.com</p>
               </div>
             </CardContent>

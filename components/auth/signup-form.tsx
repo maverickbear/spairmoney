@@ -113,6 +113,11 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
         return;
       }
 
+      // After signup, redirect to OTP verification page
+      // The user needs to verify their email before proceeding
+      router.push(`/auth/verify-otp?email=${encodeURIComponent(data.email)}${finalPlanId ? `&planId=${finalPlanId}&interval=${finalInterval}` : ""}${fromCheckout ? "&from_checkout=true" : ""}`);
+      return;
+
       // If user came from checkout, link their Stripe subscription
       if (fromCheckout && prefillEmail) {
         try {
