@@ -1,4 +1,6 @@
 import { Resend } from "resend";
+import fs from "fs";
+import path from "path";
 
 // Initialize Resend only if API key is available
 const getResend = () => {
@@ -23,6 +25,13 @@ export interface CheckoutPendingEmailData {
   planName: string;
   trialEndDate: Date | null;
   signupUrl: string;
+  appUrl?: string;
+}
+
+export interface WelcomeEmailData {
+  to: string;
+  userName: string;
+  founderName?: string;
   appUrl?: string;
 }
 
@@ -378,4 +387,125 @@ function getCheckoutPendingEmailTemplate(data: {
 </body>
 </html>
   `.trim();
+}
+
+export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
+  const resend = getResend();
+  
+  if (!resend) {
+    console.warn("RESEND_API_KEY not configured. Email will not be sent.");
+    return;
+  }
+
+  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+  const founderName = data.founderName || "Naor Tartarotti";
+  
+  // Use personal email address for welcome emails (from the founder)
+  const fromEmail = process.env.RESEND_WELCOME_FROM_EMAIL || "naor@sparefinance.com";
+  const finalFromEmail = fromEmail === "onboarding@resend.dev" ? "naor@sparefinance.com" : fromEmail;
+
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: `Welcome to Spare Finance!`,
+      html: getWelcomeEmailTemplate({
+        founderName,
+        email: data.to,
+      }),
+    });
+
+    if (result.error) {
+      const errorMessage = result.error.message || JSON.stringify(result.error);
+      console.error("Resend API error:", result.error);
+      throw new Error(`Resend API error: ${errorMessage}`);
+    } else {
+      console.log("✅ Welcome email sent successfully to:", data.to);
+    }
+  } catch (error) {
+    console.error("Error sending welcome email:", error);
+    // Don't throw - we don't want email failures to break the user flow
+  }
+}
+
+function getWelcomeEmailTemplate(data: {
+  founderName: string;
+  email: string;
+}): string {
+  try {
+    const templatePath = path.join(process.cwd(), 'email-templates/welcome.html');
+    let html = fs.readFileSync(templatePath, 'utf-8');
+    
+    // Replace variables
+    html = html.replace(/\{\{ \.FounderName \}\}/g, data.founderName);
+    html = html.replace(/\{\{ \.Email \}\}/g, data.email);
+    html = html.replace(/\{\{ \.Year \}\}/g, new Date().getFullYear().toString());
+    
+    return html;
+  } catch (error) {
+    console.error("Error reading welcome email template:", error);
+    // Fallback to inline template
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Spare Finance</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+          <tr>
+            <td style="padding: 30px 40px 20px; text-align: left;">
+              <img src="https://dvshwrtzazoetkbzxolv.supabase.co/storage/v1/object/public/images/spare-logo-purple.png" alt="Spare Finance" style="height: 32px; width: auto;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 40px;">
+              <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700; line-height: 1.3;">
+                Welcome to Spare Finance!
+              </h1>
+              <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                Hi,
+              </p>
+              <p style="margin:0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                I'm ${data.founderName}, founder of Spare Finance.
+              </p>
+              <p style="margin:0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                I hope you take full advantage of these 30 days to explore the platform and that it helps you organize your financial life, whether individually or as a family.
+              </p>
+              <p style="margin:0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                I created this platform with the goal of moving away from spreadsheets. I focused on building something that made sense to me, and I decided to make it a product available to everyone.
+              </p>
+              <p style="margin:0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                Your feedback is very welcome! If you have any questions, suggestions, or just want to share your experience, feel free to reply to this email. I read and respond to every message personally.
+              </p>
+              <p style="margin:0; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                Best regards,<br>
+                ${data.founderName}<br>
+                <span style="color: #8a8a8a; font-size: 14px;">Founder, Spare Finance</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0 0 8px; color: #8a8a8a; font-size: 12px; line-height: 1.5;">
+                This message was sent to ${data.email}. If you have questions or complaints, please contact us.
+              </p>
+              <p style="margin: 0; color: #8a8a8a; font-size: 12px;">
+                © ${new Date().getFullYear()} Spare Finance. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
 }

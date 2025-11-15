@@ -847,6 +847,23 @@ async function handleSubscriptionChange(
             });
             
             console.log("[WEBHOOK:SUBSCRIPTION] ✅ Checkout pending email sent successfully to:", customerEmail);
+            
+            // Send welcome email from founder
+            try {
+              const { sendWelcomeEmail } = await import("@/lib/utils/email");
+              
+              await sendWelcomeEmail({
+                to: customerEmail,
+                userName: "", // Not used anymore, but keeping for interface compatibility
+                founderName: "Naor Tartarotti",
+                appUrl: appUrl,
+              });
+              
+              console.log("[WEBHOOK:SUBSCRIPTION] ✅ Welcome email sent successfully to:", customerEmail);
+            } catch (welcomeEmailError) {
+              console.error("[WEBHOOK:SUBSCRIPTION] ❌ Error sending welcome email:", welcomeEmailError);
+              // Don't fail the webhook if welcome email fails
+            }
           } catch (emailError) {
             console.error("[WEBHOOK:SUBSCRIPTION] ❌ Error sending checkout pending email:", emailError);
             if (emailError instanceof Error) {
