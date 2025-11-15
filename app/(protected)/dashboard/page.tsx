@@ -1,9 +1,6 @@
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { MonthSelector } from "@/components/dashboard/month-selector";
-import { SummaryCardSkeleton } from "@/components/ui/card-skeleton";
-import { ChartSkeleton, BudgetExecutionSkeleton, CategoryExpensesSkeleton } from "@/components/ui/chart-skeleton";
-import { ListSkeleton, GoalsOverviewSkeleton, FinancialHealthSkeleton } from "@/components/ui/list-skeleton";
 import { loadDashboardData } from "./data-loader";
 import { PageHeader } from "@/components/common/page-header";
 import { getProfile } from "@/lib/api/profile";
@@ -79,44 +76,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         <MonthSelector />
       </PageHeader>
 
-      <Suspense fallback={
-        <>
-          {/* Summary Cards */}
-          <div className="grid gap-4 md:gap-5 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
-            <SummaryCardSkeleton />
-            <SummaryCardSkeleton />
-            <SummaryCardSkeleton />
-            <SummaryCardSkeleton />
-          </div>
-
-          {/* Expenses Pie Chart and Savings Distribution Widget */}
-          <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-2">
-            <ChartSkeleton height={400} />
-            <ChartSkeleton height={400} />
-          </div>
-
-          {/* Cash Flow and Financial Health */}
-          <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-2">
-            <ChartSkeleton height={240} />
-            <FinancialHealthSkeleton />
-          </div>
-
-          {/* Upcoming Transactions and Budget Execution */}
-          <div className="space-y-4">
-            <ListSkeleton itemCount={5} />
-            <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-2">
-              <BudgetExecutionSkeleton />
-              <ChartSkeleton height={400} />
-            </div>
-          </div>
-
-          {/* Charts */}
-          <div className="grid gap-4 md:gap-5 grid-cols-1 md:grid-cols-2">
-            <GoalsOverviewSkeleton />
-            <CategoryExpensesSkeleton />
-          </div>
-        </>
-      }>
+      <Suspense fallback={null}>
         <DashboardContent selectedMonthDate={selectedMonth} />
       </Suspense>
     </div>

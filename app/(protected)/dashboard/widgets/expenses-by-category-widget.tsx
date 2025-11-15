@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { cn } from "@/lib/utils";
 import { parseTransactionAmount } from "../utils/transaction-helpers";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCategoryColor } from "@/lib/utils/category-colors";
 
 interface ExpensesByCategoryWidgetProps {
@@ -134,13 +134,16 @@ export function ExpensesByCategoryWidget({
             <CardDescription>Distribution of total expenses</CardDescription>
           </div>
           <div suppressHydrationWarning>
-            <Tabs value={expenseFilter} onValueChange={(value) => setExpenseFilter(value as ExpenseFilter)}>
-              <TabsList className="h-9">
-                <TabsTrigger value="all" className="text-xs px-3">View All</TabsTrigger>
-                <TabsTrigger value="fixed" className="text-xs px-3">Fixed</TabsTrigger>
-                <TabsTrigger value="variable" className="text-xs px-3">Variable</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <Select value={expenseFilter} onValueChange={(value) => setExpenseFilter(value as ExpenseFilter)}>
+              <SelectTrigger size="small" className="w-fit h-7 text-xs px-2.5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">View All</SelectItem>
+                <SelectItem value="fixed">Fixed</SelectItem>
+                <SelectItem value="variable">Variable</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
