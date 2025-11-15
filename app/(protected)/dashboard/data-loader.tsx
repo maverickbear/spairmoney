@@ -179,6 +179,12 @@ async function loadDashboardDataInternal(
           paymentAmount: debt.paymentAmount,
           principalPaid: debt.principalPaid,
           interestPaid: debt.interestPaid,
+          additionalContributions: debt.additionalContributions ?? false,
+          additionalContributionAmount: debt.additionalContributionAmount,
+          priority: debt.priority ?? "Medium",
+          isPaused: debt.isPaused ?? false,
+          isPaidOff: debt.isPaidOff ?? false,
+          description: debt.description,
         };
 
         const metrics = calculateDebtMetrics(debtForCalculation);
