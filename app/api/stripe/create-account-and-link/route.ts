@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase-server";
+import { createServerClient, createServiceRoleClient } from "@/lib/supabase-server";
 import { validatePasswordAgainstHIBP } from "@/lib/utils/hibp";
 import Stripe from "stripe";
 
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user account
+    // Use regular client for auth.signUp (needs to create session)
     const supabase = await createServerClient();
     
     // Sign up the user
@@ -68,8 +69,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create user profile in User table
-    const { data: userData, error: userError } = await supabase
+    // Use service role client to bypass RLS for creating User and Subscription
+    const serviceRoleClient = createServiceRoleClient();
+
+    // Create user profile in User table using service role (bypasses RLS)
+    const { data: userData, error: userError } = await serviceRoleClient
       .from("User")
       .insert({
         id: authData.user.id,
@@ -85,12 +89,12 @@ export async function POST(request: NextRequest) {
       // User is created in auth but not in User table - this is OK, will be created on first login
     }
 
-    // Create household member record for the owner
+    // Create household member record for the owner using service role (bypasses RLS)
     if (userData) {
       const invitationToken = crypto.randomUUID();
       const now = new Date().toISOString();
       
-      const { error: householdMemberError } = await supabase
+      const { error: householdMemberError } = await serviceRoleClient
         .from("HouseholdMember")
         .insert({
           ownerId: userData.id,
@@ -143,8 +147,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find plan by price ID
-    const { data: plan, error: planError } = await supabase
+    // Find plan by price ID (using service role client)
+    const { data: plan, error: planError } = await serviceRoleClient
       .from("Plan")
       .select("id")
       .or(`stripePriceIdMonthly.eq.${priceId},stripePriceIdYearly.eq.${priceId}`)
@@ -166,34 +170,122 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Create subscription record
+    // Check if there's a pending subscription created by webhook (before user signed up)
     const subscriptionId = authData.user.id + "-" + plan.id;
-    const { error: insertError } = await supabase
+    
+    // First, check if there's a pending subscription with this customerId (created by webhook)
+    // Use service role client to bypass RLS
+    const { data: pendingSubByCustomer } = await serviceRoleClient
       .from("Subscription")
-      .insert({
-        id: subscriptionId,
-        userId: authData.user.id,
-        planId: plan.id,
-        stripeSubscriptionId: stripeSubscription.id,
-        stripeCustomerId: customerId,
-        status: stripeSubscription.status === "active" ? "active" : 
-                stripeSubscription.status === "trialing" ? "trialing" :
-                stripeSubscription.status === "past_due" ? "past_due" : "cancelled",
-        currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
-        currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
-        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-        trialStartDate: stripeSubscription.trial_start ? new Date(stripeSubscription.trial_start * 1000) : null,
-        trialEndDate: stripeSubscription.trial_end ? new Date(stripeSubscription.trial_end * 1000) : null,
-      });
+      .select("id, userId")
+      .eq("stripeCustomerId", customerId)
+      .is("userId", null)
+      .maybeSingle();
+    
+    // Also check by pendingEmail (in case customerId doesn't match)
+    const { data: pendingSubByEmail } = await serviceRoleClient
+      .from("Subscription")
+      .select("id, userId")
+      .eq("pendingEmail", authData.user.email!.toLowerCase())
+      .is("userId", null)
+      .maybeSingle();
+    
+    // Also check by stripeSubscriptionId
+    const { data: existingSubByStripeId } = await serviceRoleClient
+      .from("Subscription")
+      .select("id, userId")
+      .eq("stripeSubscriptionId", stripeSubscription.id)
+      .maybeSingle();
+    
+    // Prefer pending subscription by customerId, then by email, then by stripeSubscriptionId
+    const existingSub = pendingSubByCustomer || pendingSubByEmail || existingSubByStripeId;
+    
+    const subscriptionData: any = {
+      id: subscriptionId,
+      userId: authData.user.id,
+      planId: plan.id,
+      stripeSubscriptionId: stripeSubscription.id,
+      stripeCustomerId: customerId,
+      status: stripeSubscription.status === "active" ? "active" : 
+              stripeSubscription.status === "trialing" ? "trialing" :
+              stripeSubscription.status === "past_due" ? "past_due" : "cancelled",
+      currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+      currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
+      cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+      trialStartDate: stripeSubscription.trial_start ? new Date(stripeSubscription.trial_start * 1000) : null,
+      trialEndDate: stripeSubscription.trial_end ? new Date(stripeSubscription.trial_end * 1000) : null,
+      pendingEmail: null, // Clear pending email when linking
+      updatedAt: new Date(),
+    };
 
-    if (insertError) {
-      console.error("[CREATE-ACCOUNT] Error creating subscription:", insertError);
-      // Don't fail - account was created, subscription can be linked later
-      return NextResponse.json({
-        success: true,
-        message: "Account created. Subscription linking may need to be completed later.",
-        userId: authData.user.id,
-      });
+    if (existingSub) {
+      // Update existing subscription (could be pending from webhook or already linked)
+      if (existingSub.id !== subscriptionId) {
+        // If the ID is different (e.g., pending subscription), delete old and create new with correct ID
+        console.log("[CREATE-ACCOUNT] Updating subscription with different ID:", {
+          oldId: existingSub.id,
+          newId: subscriptionId,
+        });
+        
+        const { error: deleteError } = await serviceRoleClient
+          .from("Subscription")
+          .delete()
+          .eq("id", existingSub.id);
+        
+        if (deleteError) {
+          console.error("[CREATE-ACCOUNT] Error deleting old subscription:", deleteError);
+        }
+        
+        // Insert new subscription with correct ID using service role client
+        const { error: insertError } = await serviceRoleClient
+          .from("Subscription")
+          .insert(subscriptionData);
+        
+        if (insertError) {
+          console.error("[CREATE-ACCOUNT] Error creating subscription after deleting old one:", insertError);
+          return NextResponse.json({
+            success: true,
+            message: "Account created. Subscription linking may need to be completed later.",
+            userId: authData.user.id,
+          });
+        }
+        
+        console.log("[CREATE-ACCOUNT] Subscription updated from pending to linked:", subscriptionId);
+      } else {
+        // Same ID, just update using service role client
+        const { error: updateError } = await serviceRoleClient
+          .from("Subscription")
+          .update(subscriptionData)
+          .eq("id", subscriptionId);
+        
+        if (updateError) {
+          console.error("[CREATE-ACCOUNT] Error updating subscription:", updateError);
+          return NextResponse.json({
+            success: true,
+            message: "Account created. Subscription linking may need to be completed later.",
+            userId: authData.user.id,
+          });
+        }
+        
+        console.log("[CREATE-ACCOUNT] Subscription updated successfully:", subscriptionId);
+      }
+    } else {
+      // No existing subscription, create new one using service role client
+      const { error: insertError } = await serviceRoleClient
+        .from("Subscription")
+        .insert(subscriptionData);
+
+      if (insertError) {
+        console.error("[CREATE-ACCOUNT] Error creating subscription:", insertError);
+        // Don't fail - account was created, subscription can be linked later
+        return NextResponse.json({
+          success: true,
+          message: "Account created. Subscription linking may need to be completed later.",
+          userId: authData.user.id,
+        });
+      }
+      
+      console.log("[CREATE-ACCOUNT] Subscription created successfully:", subscriptionId);
     }
 
     // Invalidate cache
