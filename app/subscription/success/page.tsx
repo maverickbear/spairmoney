@@ -75,10 +75,13 @@ function SuccessContent() {
   }
 
 
-  async function syncSubscription() {
+  async function syncSubscription(retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+    
     try {
       setSyncing(true);
-      console.log("[SUCCESS] Syncing subscription from Stripe...");
+      console.log("[SUCCESS] Syncing subscription from Stripe...", { retryCount });
       
       const response = await fetch("/api/stripe/sync-subscription", {
         method: "POST",
@@ -100,24 +103,48 @@ function SuccessContent() {
         } catch (error) {
           console.error("[SUCCESS] Error invalidating cache:", error);
         }
+        
+        // Fetch subscription status to determine copy
+        try {
+          const { getUserClient } = await import("@/lib/api/user-client");
+          const userData = await getUserClient();
+          if (userData.subscription) {
+            setSubscriptionStatus(userData.subscription.status);
+            setTrialEndDate(userData.subscription.trialEndDate || null);
+          }
+        } catch (error) {
+          console.error("[SUCCESS] Error fetching subscription status:", error);
+        }
       } else {
         console.error("[SUCCESS] Failed to sync subscription:", data.error);
-        // Don't fail the page, just log the error
-      }
-
-      // Fetch subscription status to determine copy
-      try {
-        const { getUserClient } = await import("@/lib/api/user-client");
-        const userData = await getUserClient();
-        if (userData.subscription) {
-          setSubscriptionStatus(userData.subscription.status);
-          setTrialEndDate(userData.subscription.trialEndDate || null);
+        
+        // If the error indicates we should retry and we haven't exceeded max retries
+        if (data.retry && retryCount < maxRetries) {
+          console.log(`[SUCCESS] Retrying sync in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return syncSubscription(retryCount + 1);
         }
-      } catch (error) {
-        console.error("[SUCCESS] Error fetching subscription status:", error);
+        
+        // If it's a 404 and we haven't retried yet, try once more after a delay
+        // (subscription might still be processing in Stripe)
+        if (response.status === 404 && retryCount === 0) {
+          console.log(`[SUCCESS] Subscription not found, retrying once after ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return syncSubscription(retryCount + 1);
+        }
+        
+        // Don't fail the page, just log the error
+        console.warn("[SUCCESS] Subscription sync failed after retries:", data.error);
       }
     } catch (error) {
       console.error("[SUCCESS] Error syncing subscription:", error);
+      
+      // Retry on network errors if we haven't exceeded max retries
+      if (retryCount < maxRetries) {
+        console.log(`[SUCCESS] Network error, retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return syncSubscription(retryCount + 1);
+      }
     } finally {
       setSyncing(false);
       setLoading(false);

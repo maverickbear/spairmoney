@@ -59,16 +59,34 @@ export async function POST(request: NextRequest) {
       try {
         const customers = await stripe.customers.list({
           email: authUser.email!,
-          limit: 1,
+          limit: 10, // Increase limit to find customer even if there are multiple
         });
 
         if (customers.data.length > 0) {
-          customerId = customers.data[0].id;
+          // Prefer customer with userId in metadata matching current user
+          const customerWithUserId = customers.data.find(
+            c => c.metadata?.userId === authUser.id
+          );
+          customerId = customerWithUserId?.id || customers.data[0].id;
           console.log("[SYNC] Found customer in Stripe:", customerId);
+          
+          // Update customer metadata if it doesn't have userId
+          if (!customerWithUserId && customerId) {
+            try {
+              await stripe.customers.update(customerId, {
+                metadata: {
+                  userId: authUser.id,
+                },
+              });
+              console.log("[SYNC] Updated customer metadata with userId");
+            } catch (updateError) {
+              console.error("[SYNC] Error updating customer metadata:", updateError);
+            }
+          }
         } else {
           console.log("[SYNC] No customer found in Stripe");
           return NextResponse.json(
-            { error: "No Stripe customer found" },
+            { error: "No Stripe customer found. Please complete checkout first." },
             { status: 404 }
           );
         }
@@ -95,20 +113,27 @@ export async function POST(request: NextRequest) {
     });
 
     if (subscriptions.data.length === 0) {
-      console.log("[SYNC] No subscriptions found in Stripe");
+      console.log("[SYNC] No subscriptions found in Stripe for customer:", customerId);
+      // If we have a customer but no subscription, it might still be processing
+      // Return a more helpful error message
       return NextResponse.json(
-        { error: "No subscriptions found in Stripe" },
+        { 
+          error: "No subscriptions found in Stripe. The subscription may still be processing. Please wait a moment and try again.",
+          retry: true
+        },
         { status: 404 }
       );
     }
 
-    // Get the most recent active subscription
-    const activeSubscription = subscriptions.data.find(s => s.status === "active") || subscriptions.data[0];
+    // Get the most recent subscription (prefer active, but use any if active not available)
+    const activeSubscription = subscriptions.data.find(s => 
+      s.status === "active" || s.status === "trialing"
+    ) || subscriptions.data[0];
     
     if (!activeSubscription) {
-      console.log("[SYNC] No active subscription found");
+      console.log("[SYNC] No subscription found");
       return NextResponse.json(
-        { error: "No active subscription found" },
+        { error: "No subscription found in Stripe" },
         { status: 404 }
       );
     }

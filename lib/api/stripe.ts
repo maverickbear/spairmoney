@@ -616,9 +616,20 @@ async function handleSubscriptionChange(
     priceId: subscription.items.data[0]?.price.id
   });
   
-  // First, try to find user by existing subscription with stripeSubscriptionId (most direct)
+  // First, try to get userId from checkout session (most reliable when available)
   let userId: string | null = null;
-  console.log("[WEBHOOK:SUBSCRIPTION] Looking for existing subscription with stripeSubscriptionId:", subscription.id);
+  if (checkoutSession) {
+    const sessionUserId = checkoutSession.metadata?.userId || 
+                         (checkoutSession.client_reference_id?.startsWith('trial-') ? null : checkoutSession.client_reference_id);
+    if (sessionUserId) {
+      userId = sessionUserId;
+      console.log("[WEBHOOK:SUBSCRIPTION] Found userId from checkout session:", userId);
+    }
+  }
+  
+  // If not found in checkout session, try to find user by existing subscription with stripeSubscriptionId
+  if (!userId) {
+    console.log("[WEBHOOK:SUBSCRIPTION] Looking for existing subscription with stripeSubscriptionId:", subscription.id);
   const { data: existingSubByStripeId, error: existingSubByStripeIdError } = await supabase
     .from("Subscription")
     .select("userId")
@@ -630,11 +641,14 @@ async function handleSubscriptionChange(
     console.error("[WEBHOOK:SUBSCRIPTION] Error fetching subscription by stripeSubscriptionId:", existingSubByStripeIdError);
   }
 
-  if (existingSubByStripeId) {
-    userId = existingSubByStripeId.userId;
-    console.log("[WEBHOOK:SUBSCRIPTION] Found userId from existing subscription (by stripeSubscriptionId):", userId);
-  } else {
-    // Try to find by customer ID
+    if (existingSubByStripeId) {
+      userId = existingSubByStripeId.userId;
+      console.log("[WEBHOOK:SUBSCRIPTION] Found userId from existing subscription (by stripeSubscriptionId):", userId);
+    }
+  }
+  
+  // If still not found, try to find by customer ID
+  if (!userId) {
     console.log("[WEBHOOK:SUBSCRIPTION] Looking for existing subscription with customer ID:", customerId);
     const { data: existingSub, error: existingSubError } = await supabase
       .from("Subscription")
@@ -650,7 +664,11 @@ async function handleSubscriptionChange(
     if (existingSub) {
       userId = existingSub.userId;
       console.log("[WEBHOOK:SUBSCRIPTION] Found userId from existing subscription (by customerId):", userId);
-    } else {
+    }
+  }
+  
+  // If still not found, try to get userId from Stripe customer metadata
+  if (!userId) {
     console.log("[WEBHOOK:SUBSCRIPTION] No existing subscription found, trying to get userId from Stripe customer metadata");
     // If not found, try to get userId from Stripe customer metadata
     try {
