@@ -340,8 +340,8 @@ export async function createBudget(data: {
   // Note: subcategoryId is now stored directly in Budget, not in BudgetSubcategory
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('budgets', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateBudgetCaches } = await import('@/lib/services/cache-manager');
+  invalidateBudgetCaches();
 
   return budget;
 }
@@ -370,8 +370,8 @@ export async function updateBudget(id: string, data: { amount: number }) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('budgets', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateBudgetCaches } = await import('@/lib/services/cache-manager');
+  invalidateBudgetCaches();
 
   return budget;
 }
@@ -390,6 +390,6 @@ export async function deleteBudget(id: string) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('budgets', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateBudgetCaches } = await import('@/lib/services/cache-manager');
+  invalidateBudgetCaches();
 }

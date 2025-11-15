@@ -152,7 +152,8 @@ export async function createTransaction(data: TransactionFormData) {
     }
 
     // Invalidate cache to ensure dashboard shows updated data
-    revalidateTag('transactions', 'max');
+    const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
+    invalidateTransactionCaches();
 
     // Return the outgoing transaction as the main one
     return outgoingTransaction;
@@ -217,8 +218,8 @@ export async function createTransaction(data: TransactionFormData) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
+  invalidateTransactionCaches();
 
   return transaction;
 }
@@ -280,8 +281,8 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
+  invalidateTransactionCaches();
 
   // Decrypt amount and description before returning
   return {
@@ -316,8 +317,8 @@ export async function deleteTransaction(id: string) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
+  invalidateTransactionCaches();
 }
 
 export async function deleteMultipleTransactions(ids: string[]) {
@@ -354,8 +355,8 @@ export async function deleteMultipleTransactions(ids: string[]) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('transactions', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
+  invalidateTransactionCaches();
 }
 
 export async function getTransactionsInternal(
@@ -535,10 +536,11 @@ export async function getTransactionsInternal(
   }
 
   // Combinar transações com relacionamentos e descriptografar descriptions e amounts
-  let transactions = (data || []).map((tx: any) => ({
+  // Use batch decryption for better performance
+  const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
+  
+  let transactions = decryptTransactionsBatch(data || []).map((tx: any) => ({
       ...tx,
-      description: decryptDescription(tx.description),
-      amount: decryptAmount(tx.amount),
       account: accountsMap.get(tx.accountId) || null,
       category: categoriesMap.get(tx.categoryId) || null,
       subcategory: subcategoriesMap.get(tx.subcategoryId) || null,

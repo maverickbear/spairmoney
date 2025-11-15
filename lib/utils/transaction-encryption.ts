@@ -202,6 +202,46 @@ function isNodeCryptoAvailable(): boolean {
 }
 
 /**
+ * Batch decrypt transaction amounts
+ * More efficient than decrypting one by one
+ * @param encryptedAmounts - Array of encrypted amounts
+ * @returns Array of decrypted numbers
+ */
+export function decryptAmountBatch(
+  encryptedAmounts: Array<string | number | null>
+): Array<number | null> {
+  return encryptedAmounts.map(amount => decryptAmount(amount));
+}
+
+/**
+ * Batch decrypt transaction descriptions
+ * More efficient than decrypting one by one
+ * @param encryptedDescriptions - Array of encrypted descriptions
+ * @returns Array of decrypted strings
+ */
+export function decryptDescriptionBatch(
+  encryptedDescriptions: Array<string | null>
+): Array<string | null> {
+  return encryptedDescriptions.map(desc => decryptDescription(desc));
+}
+
+/**
+ * Decrypt transactions in batch (amounts and descriptions)
+ * @param transactions - Array of transactions with encrypted data
+ * @returns Array of transactions with decrypted data
+ */
+export function decryptTransactionsBatch<T extends { amount: any; description?: any }>(
+  transactions: T[]
+): T[] {
+  // Process all in one pass instead of calling decrypt functions separately
+  return transactions.map(tx => ({
+    ...tx,
+    amount: decryptAmount(tx.amount),
+    description: tx.description ? decryptDescription(tx.description) : null,
+  }));
+}
+
+/**
  * Decrypt a transaction description when reading from database
  * If decryption fails, assumes it's plain text (backward compatibility with old data)
  * In browser environment, returns text as-is (server should handle decryption)

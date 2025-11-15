@@ -7,7 +7,6 @@ import { getCurrentTimestamp, formatTimestamp } from "@/lib/utils/timestamp";
 import { getAccountBalance } from "./transactions";
 import { guardAccountLimit, throwIfNotAllowed } from "@/lib/api/feature-guard";
 import { requireAccountOwnership } from "@/lib/utils/security";
-import { decryptAmount } from "@/lib/utils/transaction-encryption";
 
 export async function getAccounts() {
     const supabase = await createServerClient();
@@ -37,53 +36,27 @@ export async function getAccounts() {
     .select("accountId, type, amount, date")
     .lte("date", todayEnd.toISOString());
 
-  // Calculate balances in memory
-  const balances = new Map<string, number>();
+  // Calculate balances using optimized service
+  // Import batch decryption for better performance
+  const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
+  const { calculateAccountBalances } = await import("@/lib/services/balance-calculator");
   
-  // Initialize accounts with their initialBalance (or 0 if not set)
-  accounts.forEach((account) => {
-    const initialBalance = (account as any).initialBalance ?? 0;
-    balances.set(account.id, initialBalance);
-  });
-
-  // Calculate balances from transactions (only past and today's transactions)
-  // Compare dates by year, month, day only to avoid timezone issues
-  const todayDate = new Date(todayYear, todayMonth, todayDay);
+  // Decrypt transactions in batch
+  const decryptedTransactions = decryptTransactionsBatch(transactions || []);
   
-  for (const tx of transactions || []) {
-    // Parse transaction date and compare only date part (ignore time)
-    const txDateObj = new Date(tx.date);
-    const txYear = txDateObj.getFullYear();
-    const txMonth = txDateObj.getMonth();
-    const txDay = txDateObj.getDate();
-    const txDate = new Date(txYear, txMonth, txDay);
-    
-    // Skip future transactions (date > today)
-    if (txDate > todayDate) {
-      continue;
-    }
-    
-    const currentBalance = balances.get(tx.accountId) || 0;
-    
-    // Decrypt amount if encrypted
-    const decryptedAmount = decryptAmount(tx.amount);
-    
-    // Skip transaction if amount is invalid (null, NaN, or unreasonably large)
-    if (decryptedAmount === null || isNaN(decryptedAmount) || !isFinite(decryptedAmount)) {
-      logger.warn('Skipping transaction with invalid amount:', {
-        accountId: tx.accountId,
-        amount: tx.amount,
-        decryptedAmount,
-      });
-      continue;
-    }
-    
-    if (tx.type === "income") {
-      balances.set(tx.accountId, currentBalance + decryptedAmount);
-    } else if (tx.type === "expense") {
-      balances.set(tx.accountId, currentBalance - Math.abs(decryptedAmount));
-    }
-  }
+  // Map accounts to the format expected by balance calculator
+  const accountsWithInitialBalance = accounts.map(account => ({
+    ...account,
+    initialBalance: (account as any).initialBalance ?? 0,
+    balance: 0, // Will be calculated
+  }));
+  
+  // Calculate all balances in one efficient pass
+  const balances = calculateAccountBalances(
+    accountsWithInitialBalance,
+    decryptedTransactions as any,
+    todayEnd
+  );
 
   // Fetch AccountOwner relationships for all accounts
   const { data: accountOwners } = await supabase
@@ -327,8 +300,8 @@ export async function updateAccount(id: string, data: Partial<AccountFormData>) 
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('accounts', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateAccountCaches } = await import('@/lib/services/cache-manager');
+  invalidateAccountCaches();
 
   return account;
 }
@@ -385,9 +358,9 @@ export async function transferAccountTransactions(
   }
 
   // Invalidate cache
-  revalidateTag('transactions', 'max');
-  revalidateTag('accounts', 'max');
-  revalidateTag('dashboard', 'max');
+  const { invalidateTransactionCaches, invalidateAccountCaches } = await import('@/lib/services/cache-manager');
+  invalidateTransactionCaches();
+  invalidateAccountCaches();
 
   return { transferred: transactions.length };
 }
@@ -441,7 +414,7 @@ export async function deleteAccount(id: string, transferToAccountId?: string) {
   }
 
   // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('accounts', 'max');
-  revalidateTag('dashboard', 'max');
-  revalidateTag('transactions', 'max');
+  const { invalidateAccountCaches, invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
+  invalidateAccountCaches();
+  invalidateTransactionCaches();
 }

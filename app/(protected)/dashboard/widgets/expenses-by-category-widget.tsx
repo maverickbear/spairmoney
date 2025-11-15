@@ -125,7 +125,7 @@ export function ExpensesByCategoryWidget({
   return (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex-1">
             <CardTitle>Expenses by Category</CardTitle>
             <CardDescription>Distribution of total expenses</CardDescription>

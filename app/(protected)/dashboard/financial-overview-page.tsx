@@ -52,14 +52,6 @@ const UpcomingBillsWidget = dynamic(
   }
 );
 
-const EmergencyFundWidget = dynamic(
-  () => import("./widgets/emergency-fund-widget").then(m => ({ default: m.EmergencyFundWidget })),
-  { 
-    ssr: true,
-    loading: () => <CardSkeleton />
-  }
-);
-
 const SavingsGoalsWidget = dynamic(
   () => import("./widgets/savings-goals-widget").then(m => ({ default: m.SavingsGoalsWidget })),
   { 
@@ -258,8 +250,8 @@ export function FinancialOverviewPage({
         />
       </div>
 
-      {/* Dashboard Grid */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {/* Cash Flow and Cash on Hand - Same Row */}
+      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2">
         {/* Cash Flow Timeline */}
         <CashFlowTimelineWidget
           chartTransactions={chartTransactions}
@@ -272,6 +264,10 @@ export function FinancialOverviewPage({
           checkingBalance={checkingBalance}
           savingsBalance={savingsBalance}
         />
+      </div>
+
+      {/* Dashboard Grid */}
+      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
         {/* 6. Budget Status */}
         <BudgetStatusWidget
@@ -284,13 +280,6 @@ export function FinancialOverviewPage({
             upcomingTransactions={upcomingTransactions}
           />
         </div>
-
-        {/* 8. Emergency Fund */}
-        <EmergencyFundWidget
-          emergencyFundMonths={emergencyFundMonths}
-          totalBalance={totalBalance}
-          monthlyExpenses={monthlyExpenses}
-        />
 
         {/* 9. Savings Goals */}
         <SavingsGoalsWidget

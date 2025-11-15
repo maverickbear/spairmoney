@@ -140,36 +140,12 @@ async function loadDashboardDataInternal(selectedMonthDate: Date, userId: string
   );
 
   // Calculate last month's total balance more efficiently
-  // Instead of fetching ALL transactions from beginning of time, we can:
-  // 1. Use the current account balance
-  // 2. Subtract transactions from current month to get last month's balance
-  // This is much more efficient than fetching all historical transactions
-  // Get current month transactions (we already have selectedMonthTransactions)
-  // Calculate the difference between current balance and current month transactions
-  // to get last month's balance
-  const currentMonthTransactions = selectedMonthTransactions;
-  
-  // Calculate last month's balance by subtracting current month transactions from current balance
-  // Use consistent parsing to handle string/number amounts
-  const currentMonthNetChange = currentMonthTransactions.reduce((sum: number, tx: any) => {
-    const amount = tx.amount != null 
-      ? (typeof tx.amount === 'string' ? parseFloat(tx.amount) : Number(tx.amount))
-      : 0;
-    
-    if (isNaN(amount) || !isFinite(amount)) {
-      return sum;
-    }
-    
-    if (tx.type === "income") {
-      return sum + amount;
-    } else if (tx.type === "expense") {
-      return sum - Math.abs(amount); // Ensure expenses are subtracted
-    }
-    return sum;
-  }, 0);
-
-  // Last month's balance = current balance - current month net change
-  const lastMonthTotalBalance = totalBalance - currentMonthNetChange;
+  // Use centralized service for consistent calculation
+  const { calculateLastMonthBalanceFromCurrent } = await import('@/lib/services/balance-calculator');
+  const lastMonthTotalBalance = calculateLastMonthBalanceFromCurrent(
+    totalBalance,
+    selectedMonthTransactions
+  );
 
   return {
     selectedMonthTransactions,
@@ -189,32 +165,39 @@ async function loadDashboardDataInternal(selectedMonthDate: Date, userId: string
   };
 }
 
-// Load dashboard data with optional caching
+// Load dashboard data with caching
 // Cache is invalidated when transactions, budgets, goals, or accounts change
 export async function loadDashboardData(selectedMonthDate: Date): Promise<DashboardData> {
   // Get userId BEFORE caching (cookies can't be accessed inside unstable_cache)
   const userId = await getCurrentUserId();
   
-  // Temporarily disable cache to debug the issue
-  // TODO: Re-enable cache once we confirm data is loading correctly
+  // Import cache utilities
+  const { withCache, generateCacheKey, CACHE_TAGS, CACHE_DURATIONS } = await import('@/lib/services/cache-manager');
+  
   try {
-    const data = await loadDashboardDataInternal(selectedMonthDate, userId);
+    // Use centralized cache manager with proper tags
+    const cacheKey = generateCacheKey.dashboard({
+      userId: userId || undefined,
+      month: selectedMonthDate,
+    });
     
-    return data;
+    return await withCache(
+      async () => loadDashboardDataInternal(selectedMonthDate, userId),
+      {
+        key: cacheKey,
+        tags: [
+          CACHE_TAGS.DASHBOARD,
+          CACHE_TAGS.TRANSACTIONS,
+          CACHE_TAGS.ACCOUNTS,
+          CACHE_TAGS.BUDGETS,
+          CACHE_TAGS.GOALS,
+        ],
+        revalidate: CACHE_DURATIONS.SHORT, // 10 seconds for fresh data
+      }
+    );
   } catch (error) {
     logger.error('[Dashboard] Error loading data:', error);
     throw error;
   }
-  
-  // Future implementation with cache:
-  // const monthKey = `${selectedMonthDate.getFullYear()}-${selectedMonthDate.getMonth()}`;
-  // return unstable_cache(
-  //   async () => loadDashboardDataInternal(selectedMonthDate, userId),
-  //   [`dashboard-${userId || 'anonymous'}-${monthKey}`],
-  //   {
-  //     tags: ['dashboard', 'transactions', 'budgets', 'goals', 'accounts'],
-  //     revalidate: 5, // Short revalidation time (5 seconds) to ensure fresh data while maintaining performance
-  //   }
-  // )();
 }
 

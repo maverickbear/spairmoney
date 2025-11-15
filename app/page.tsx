@@ -1,11 +1,14 @@
-import { HeroSection } from "@/components/landing/hero-section";
-import { FeaturesSection } from "@/components/landing/features-section";
-import { ParallaxFeaturesSection } from "@/components/landing/parallax-features-section";
-import { TestimonialsSection } from "@/components/landing/testimonials-section";
-import { PricingSection } from "@/components/landing/pricing-section";
+import dynamic from "next/dynamic";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { getCurrentUser } from "@/lib/api/auth";
+
+// Lazy load heavy landing page components for better initial load performance
+const HeroSection = dynamic(() => import("@/components/landing/hero-section").then(m => ({ default: m.HeroSection })), { ssr: true });
+const FeaturesSection = dynamic(() => import("@/components/landing/features-section").then(m => ({ default: m.FeaturesSection })), { ssr: true });
+const ParallaxFeaturesSection = dynamic(() => import("@/components/landing/parallax-features-section").then(m => ({ default: m.ParallaxFeaturesSection })), { ssr: true });
+const TestimonialsSection = dynamic(() => import("@/components/landing/testimonials-section").then(m => ({ default: m.TestimonialsSection })), { ssr: true });
+const PricingSection = dynamic(() => import("@/components/landing/pricing-section").then(m => ({ default: m.PricingSection })), { ssr: true });
 
 export const metadata = {
   title: "Spare Finance - Powerful Tools for Easy Money Management",
