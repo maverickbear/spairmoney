@@ -1,20 +1,96 @@
 "use client";
 
 import { useMemo } from "react";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ChartSkeleton } from "@/components/ui/chart-skeleton";
+import { CardSkeleton } from "@/components/ui/card-skeleton";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { FinancialSummaryWidget } from "./widgets/financial-summary-widget";
 import { FinancialHealthScoreWidget } from "./widgets/financial-health-score-widget";
-import { CashFlowTimelineWidget } from "./widgets/cash-flow-timeline-widget";
-import { ExpensesByCategoryWidget } from "./widgets/expenses-by-category-widget";
-import { CashOnHandWidget } from "./widgets/cash-on-hand-widget";
-import { BudgetStatusWidget } from "./widgets/budget-status-widget";
-import { UpcomingBillsWidget } from "./widgets/upcoming-bills-widget";
-import { EmergencyFundWidget } from "./widgets/emergency-fund-widget";
-import { SavingsGoalsWidget } from "./widgets/savings-goals-widget";
-import { NetWorthWidget } from "./widgets/net-worth-widget";
-import { InvestmentPortfolioWidget } from "./widgets/investment-portfolio-widget";
-import { AlertsInsightsWidget } from "./widgets/alerts-insights-widget";
 import { calculateTotalIncome, calculateTotalExpenses } from "./utils/transaction-helpers";
+
+// Lazy load widgets with heavy chart libraries (recharts) - no SSR
+const CashFlowTimelineWidget = dynamic(
+  () => import("./widgets/cash-flow-timeline-widget").then(m => ({ default: m.CashFlowTimelineWidget })),
+  { 
+    ssr: false, // recharts doesn't work well with SSR
+    loading: () => <ChartSkeleton height={400} />
+  }
+);
+
+// Lazy load widgets below the fold - with SSR
+const ExpensesByCategoryWidget = dynamic(
+  () => import("./widgets/expenses-by-category-widget").then(m => ({ default: m.ExpensesByCategoryWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
+
+const CashOnHandWidget = dynamic(
+  () => import("./widgets/cash-on-hand-widget").then(m => ({ default: m.CashOnHandWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
+
+const BudgetStatusWidget = dynamic(
+  () => import("./widgets/budget-status-widget").then(m => ({ default: m.BudgetStatusWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
+
+const UpcomingBillsWidget = dynamic(
+  () => import("./widgets/upcoming-bills-widget").then(m => ({ default: m.UpcomingBillsWidget })),
+  { 
+    ssr: true,
+    loading: () => <ListSkeleton itemCount={5} />
+  }
+);
+
+const EmergencyFundWidget = dynamic(
+  () => import("./widgets/emergency-fund-widget").then(m => ({ default: m.EmergencyFundWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
+
+const SavingsGoalsWidget = dynamic(
+  () => import("./widgets/savings-goals-widget").then(m => ({ default: m.SavingsGoalsWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
+
+const NetWorthWidget = dynamic(
+  () => import("./widgets/net-worth-widget").then(m => ({ default: m.NetWorthWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
+
+const InvestmentPortfolioWidget = dynamic(
+  () => import("./widgets/investment-portfolio-widget").then(m => ({ default: m.InvestmentPortfolioWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
+
+const AlertsInsightsWidget = dynamic(
+  () => import("./widgets/alerts-insights-widget").then(m => ({ default: m.AlertsInsightsWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
 
 interface FinancialOverviewPageProps {
   selectedMonthTransactions: any[];

@@ -82,6 +82,27 @@ function formatAccountType(type: string): string {
   return typeMap[type.toLowerCase()] || type;
 }
 
+// Helper function to map category/subcategory name to valid loanType values
+function mapToValidLoanType(name: string): "mortgage" | "car_loan" | "personal_loan" | "credit_card" | "student_loan" | "business_loan" | "other" {
+  const nameLower = name.toLowerCase();
+  
+  if (nameLower.includes("mortgage") || nameLower.includes("home")) {
+    return "mortgage";
+  } else if (nameLower.includes("car") || nameLower.includes("auto") || nameLower.includes("vehicle")) {
+    return "car_loan";
+  } else if (nameLower.includes("personal")) {
+    return "personal_loan";
+  } else if (nameLower.includes("credit") || nameLower.includes("card")) {
+    return "credit_card";
+  } else if (nameLower.includes("student") || nameLower.includes("education")) {
+    return "student_loan";
+  } else if (nameLower.includes("business")) {
+    return "business_loan";
+  }
+  
+  return "other";
+}
+
 export function DebtForm({
   debt,
   open,
@@ -923,9 +944,9 @@ export function DebtForm({
                       setSelectedSubcategoryId("");
                       const category = debtsCategories.find((cat) => cat.id === value);
                       if (category) {
-                        // Use category name as loanType for now (or we can store categoryId separately)
-                        // For backward compatibility, we'll map to a loanType value
-                        form.setValue("loanType", category.name.toLowerCase().replace(/\s+/g, "_") || "other");
+                        // Map category name to valid loanType values
+                        const mappedLoanType = mapToValidLoanType(category.name);
+                        form.setValue("loanType", mappedLoanType);
                       }
                     }}
                     required
@@ -961,12 +982,15 @@ export function DebtForm({
                           .find((cat) => cat.id === selectedCategoryId)
                           ?.subcategories?.find((sub) => sub.id === value);
                         if (subcategory) {
-                          form.setValue("loanType", subcategory.name.toLowerCase().replace(/\s+/g, "_") || "other");
+                          // Map subcategory name to valid loanType values
+                          const mappedLoanType = mapToValidLoanType(subcategory.name);
+                          form.setValue("loanType", mappedLoanType);
                         } else {
-                          // If subcategory is cleared, use category name
+                          // If subcategory is cleared, use category name mapping
                           const category = debtsCategories.find((cat) => cat.id === selectedCategoryId);
                           if (category) {
-                            form.setValue("loanType", category.name.toLowerCase().replace(/\s+/g, "_") || "other");
+                            const mappedLoanType = mapToValidLoanType(category.name);
+                            form.setValue("loanType", mappedLoanType);
                           }
                         }
                       }}

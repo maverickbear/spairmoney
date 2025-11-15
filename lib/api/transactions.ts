@@ -723,13 +723,8 @@ export async function getUpcomingTransactions(limit: number = 5) {
     }
 
     // Only include if it's within the next 15 days
-    // Compare dates properly (both normalized to start of day)
-    const nextDateNormalized = new Date(nextDate);
-    nextDateNormalized.setHours(0, 0, 0, 0);
-    const endDateNormalized = new Date(endDate);
-    endDateNormalized.setHours(23, 59, 59, 999);
-    
-    if (nextDateNormalized <= endDateNormalized) {
+    // Compare dates properly - endDate is already normalized to end of day
+    if (nextDate <= endDate) {
       upcoming.push({
         id: tx.id,
         date: nextDate,
@@ -748,10 +743,12 @@ export async function getUpcomingTransactions(limit: number = 5) {
   // Get debts and calculate upcoming debt payments
   try {
     const debts = await getDebts();
+    console.log(`[getUpcomingTransactions] Found ${debts.length} debts, endDate: ${endDate.toISOString()}, now: ${now.toISOString()}`);
     
     for (const debt of debts) {
       // Skip if debt is paid off or paused
       if (debt.isPaidOff || debt.isPaused || debt.currentBalance <= 0) {
+        console.log(`[getUpcomingTransactions] Skipping debt ${debt.name}: isPaidOff=${debt.isPaidOff}, isPaused=${debt.isPaused}, currentBalance=${debt.currentBalance}`);
         continue;
       }
 
@@ -784,6 +781,7 @@ export async function getUpcomingTransactions(limit: number = 5) {
         now,
         endDate
       );
+      console.log(`[getUpcomingTransactions] Debt ${debt.name} (firstPaymentDate: ${debt.firstPaymentDate}, frequency: ${debt.paymentFrequency}) has ${debtPayments.length} payments in next 15 days`);
 
       // Get account information if accountId is set
       let account = null;
@@ -867,6 +865,7 @@ export async function getUpcomingTransactions(limit: number = 5) {
 
   // Sort by date and limit
   upcoming.sort((a, b) => a.date.getTime() - b.date.getTime());
+  console.log(`[getUpcomingTransactions] Returning ${upcoming.length} upcoming transactions (recurring: ${upcoming.filter(t => !t.isDebtPayment).length}, debts: ${upcoming.filter(t => t.isDebtPayment).length})`);
   // Return all transactions within the 15-day window, not just the limit
   // The limit is applied by the caller if needed
   return upcoming;

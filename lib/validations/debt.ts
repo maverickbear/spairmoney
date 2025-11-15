@@ -2,7 +2,9 @@ import { z } from "zod";
 
 export const debtSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  loanType: z.string().min(1, "Loan type is required"),
+  loanType: z.enum(["mortgage", "car_loan", "personal_loan", "credit_card", "student_loan", "business_loan", "other"], {
+    errorMap: () => ({ message: "Loan type is required" }),
+  }),
   initialAmount: z.number().positive("Initial amount must be positive"),
   totalMonths: z.number().positive("Total months must be positive").nullable().optional(),
   paymentFrequency: z.enum(["monthly", "biweekly", "weekly", "semimonthly", "daily"], {
