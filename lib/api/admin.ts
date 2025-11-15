@@ -785,6 +785,7 @@ export async function getAllSystemCategories(): Promise<SystemCategory[]> {
         ? {
             id: cat.group.id,
             name: cat.group.name,
+            type: (cat.group as any).type ?? null,
             createdAt: new Date(cat.group.createdAt),
             updatedAt: new Date(cat.group.updatedAt),
             userId: null,
@@ -882,6 +883,7 @@ export async function createSystemCategory(data: { name: string; macroId: string
         ? {
             id: category.group.id,
             name: category.group.name,
+            type: (category.group as any).type ?? null,
             createdAt: new Date(category.group.createdAt),
             updatedAt: new Date(category.group.updatedAt),
             userId: null,
@@ -1010,6 +1012,7 @@ export async function updateSystemCategory(
         ? {
             id: category.group.id,
             name: category.group.name,
+            type: (category.group as any).type ?? null,
             createdAt: new Date(category.group.createdAt),
             updatedAt: new Date(category.group.updatedAt),
             userId: null,

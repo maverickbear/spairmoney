@@ -385,7 +385,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                   }}
                   required
                 >
-                  <SelectTrigger required>
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

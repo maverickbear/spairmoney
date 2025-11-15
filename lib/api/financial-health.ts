@@ -100,7 +100,7 @@ async function calculateFinancialHealthInternal(
   if (transactions.length === 0 || (monthlyIncome === 0 && monthlyExpenses === 0)) {
     return {
       score: 0,
-      classification: "Unknown" as const,
+      classification: "Critical" as const,
       monthlyIncome: 0,
       monthlyExpenses: 0,
       netAmount: 0,
@@ -312,7 +312,7 @@ async function calculateFinancialHealthInternal(
 
       // Calculate from PlaidLiabilities
       const liabilitiesTotal = liabilities.reduce((sum, liability) => {
-        const balance = liability.balance ?? liability.currentBalance ?? null;
+        const balance = (liability as any).balance ?? (liability as any).currentBalance ?? null;
         if (balance == null) return sum;
         const numValue = typeof balance === 'string' ? parseFloat(balance) : Number(balance);
         if (!isNaN(numValue) && isFinite(numValue)) {
@@ -406,7 +406,7 @@ export async function calculateFinancialHealth(selectedDate?: Date): Promise<Fin
     const date = selectedDate || new Date();
     return {
       score: 0,
-      classification: "Unknown" as const,
+      classification: "Critical" as const,
       monthlyIncome: 0,
       monthlyExpenses: 0,
       netAmount: 0,

@@ -36,17 +36,17 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Build update data
-    const updateData: { type?: string; categoryId?: string | null; subcategoryId?: string | null } = {};
-    if (type) {
+    const updateData: { type?: "income" | "expense" | "transfer"; categoryId?: string; subcategoryId?: string } = {};
+    if (type && (type === "expense" || type === "income" || type === "transfer")) {
       updateData.type = type;
     }
     if (categoryId !== undefined) {
-      updateData.categoryId = categoryId || null;
+      updateData.categoryId = categoryId || undefined;
       // If categoryId is being cleared, also clear subcategoryId
       if (!categoryId) {
-        updateData.subcategoryId = null;
+        updateData.subcategoryId = undefined;
       } else if (subcategoryId !== undefined) {
-        updateData.subcategoryId = subcategoryId || null;
+        updateData.subcategoryId = subcategoryId || undefined;
       }
     }
 

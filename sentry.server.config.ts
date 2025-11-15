@@ -29,7 +29,7 @@ Sentry.init({
       if (event.request.headers) {
         const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'x-forwarded-for'];
         sensitiveHeaders.forEach(header => {
-          if (event.request.headers?.[header]) {
+          if (event.request?.headers?.[header]) {
             delete event.request.headers[header];
           }
         });

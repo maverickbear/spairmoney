@@ -33,7 +33,7 @@ Sentry.init({
       if (event.request.headers) {
         const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key'];
         sensitiveHeaders.forEach(header => {
-          if (event.request.headers?.[header]) {
+          if (event.request?.headers?.[header]) {
             delete event.request.headers[header];
           }
         });

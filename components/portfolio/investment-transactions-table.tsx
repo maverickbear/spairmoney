@@ -140,11 +140,16 @@ export function InvestmentTransactionsTable({
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (tx) =>
-          tx.security?.symbol?.toLowerCase().includes(query) ||
-          tx.security?.name?.toLowerCase().includes(query) ||
-          tx.account?.name?.toLowerCase().includes(query) ||
-          tx.notes?.toLowerCase().includes(query)
+        (tx) => {
+          const security = Array.isArray(tx.security) ? tx.security[0] : tx.security;
+          const account = Array.isArray(tx.account) ? tx.account[0] : tx.account;
+          return (
+            security?.symbol?.toLowerCase().includes(query) ||
+            security?.name?.toLowerCase().includes(query) ||
+            account?.name?.toLowerCase().includes(query) ||
+            tx.notes?.toLowerCase().includes(query)
+          );
+        }
       );
     }
 
@@ -304,7 +309,7 @@ export function InvestmentTransactionsTable({
                     onClick={handleAddNew}
                     variant="outline"
                     className="mt-4"
-                    size="sm"
+                    size="small"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Your First Transaction
@@ -474,7 +479,18 @@ export function InvestmentTransactionsTable({
           }
         }}
         onSuccess={handleFormSuccess}
-        transaction={editingTransaction}
+        transaction={editingTransaction ? {
+          id: editingTransaction.id,
+          accountId: editingTransaction.accountId,
+          securityId: editingTransaction.securityId,
+          date: editingTransaction.date,
+          type: editingTransaction.type,
+          quantity: editingTransaction.quantity,
+          price: editingTransaction.price,
+          fees: editingTransaction.fees,
+          notes: editingTransaction.notes,
+          security: Array.isArray(editingTransaction.security) ? editingTransaction.security[0] : editingTransaction.security,
+        } : null}
       />
     </>
   );

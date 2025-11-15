@@ -187,7 +187,7 @@ function AIChatContent() {
           <Button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            size="default"
+            size="medium"
             className="h-[60px] px-4"
           >
             {isLoading ? (

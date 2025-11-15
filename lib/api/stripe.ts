@@ -973,9 +973,11 @@ async function handleSubscriptionChange(
   });
 
   // Invalidate subscription cache to ensure UI reflects changes immediately
-  const { invalidateSubscriptionCache } = await import("@/lib/api/plans");
-  await invalidateSubscriptionCache(userId);
-  console.log("[WEBHOOK:SUBSCRIPTION] Subscription cache invalidated for user:", userId);
+  if (userId) {
+    const { invalidateSubscriptionCache } = await import("@/lib/api/plans");
+    await invalidateSubscriptionCache(userId);
+    console.log("[WEBHOOK:SUBSCRIPTION] Subscription cache invalidated for user:", userId);
+  }
 }
 
 async function handleSubscriptionDeletion(

@@ -13,6 +13,9 @@ const mockFinancialHealth = {
   netAmount: 4500,
   savingsRate: 56.25,
   message: "Your financial health is excellent! Keep up the great work.",
+  spendingDiscipline: "Excellent" as const,
+  debtExposure: "Low" as const,
+  emergencyFundMonths: 6,
   alerts: [
     {
       id: "1",

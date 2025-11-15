@@ -10,9 +10,12 @@ import { getDebtsClient } from "@/lib/api/debts-client";
 import { getGoalsClient } from "@/lib/api/goals-client";
 import { getAccountsClient } from "@/lib/api/accounts-client";
 import type { Transaction } from "@/lib/api/transactions-client";
-import type { Budget } from "@/lib/api/budgets-client";
+import type { Budget as BudgetClient } from "@/lib/api/budgets-client";
+import type { Budget } from "@/lib/api/budgets";
 import type { Debt } from "@/lib/api/debts-client";
+import type { DebtWithCalculations } from "@/lib/api/debts";
 import type { Goal } from "@/lib/api/goals-client";
+import type { GoalWithCalculations } from "@/lib/api/goals";
 import type { Account } from "@/lib/api/accounts-client";
 import type { FinancialHealthData } from "@/lib/api/financial-health";
 import type { PortfolioSummary, HistoricalDataPoint } from "@/lib/api/portfolio";
@@ -27,8 +30,8 @@ export default function ReportsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<Transaction[]>([]);
   const [historicalTransactions, setHistoricalTransactions] = useState<Transaction[]>([]);
-  const [debts, setDebts] = useState<Debt[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [debts, setDebts] = useState<DebtWithCalculations[]>([]);
+  const [goals, setGoals] = useState<GoalWithCalculations[]>([]);
   const [financialHealth, setFinancialHealth] = useState<FinancialHealthData | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
@@ -143,9 +146,43 @@ export default function ReportsPage() {
           getGoalsClient().catch(() => []),
           getAccountsClient().catch(() => []),
         ]);
-        setBudgets(budgetsData);
-        setDebts(debtsData);
-        setGoals(goalsData);
+        
+        // Convert BudgetClient[] to Budget[] by mapping budgetCategories structure
+        const convertedBudgets: Budget[] = budgetsData.map((budget: BudgetClient) => ({
+          ...budget,
+          budgetCategories: budget.budgetCategories?.map((bc: { category: { id: string; name: string } }) => ({
+            id: '', // Will be set if needed
+            budgetId: budget.id,
+            categoryId: bc.category.id,
+            category: bc.category,
+          })) || [],
+        }));
+        
+        setBudgets(convertedBudgets);
+        
+        // Convert Debt[] to DebtWithCalculations[] by ensuring required fields
+        const convertedDebts: DebtWithCalculations[] = debtsData.map((debt: Debt) => ({
+          ...debt,
+          totalMonths: debt.totalMonths ?? null,
+          remainingBalance: debt.remainingBalance ?? debt.currentBalance,
+          remainingPrincipal: debt.remainingPrincipal ?? (debt.currentBalance - (debt.initialAmount - debt.downPayment - debt.principalPaid)),
+          monthsRemaining: debt.monthsRemaining ?? null,
+          totalInterestPaid: debt.totalInterestPaid ?? debt.interestPaid,
+          totalInterestRemaining: debt.totalInterestRemaining ?? 0,
+          progressPct: debt.progressPct ?? 0,
+        }));
+        setDebts(convertedDebts);
+        
+        // Convert Goal[] to GoalWithCalculations[] by ensuring required fields
+        const convertedGoals = goalsData.map((goal: Goal) => ({
+          ...goal,
+          monthlyContribution: goal.monthlyContribution ?? 0,
+          monthsToGoal: goal.monthsToGoal ?? null,
+          progressPct: goal.progressPct ?? (goal.targetAmount > 0 ? (goal.currentBalance / goal.targetAmount) * 100 : 0),
+          incomeBasis: goal.incomeBasis ?? 0,
+        }));
+        setGoals(convertedGoals);
+        
         setAccounts(accountsData);
 
         // Load financial health (always use current month for financial health)

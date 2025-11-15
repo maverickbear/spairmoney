@@ -170,7 +170,7 @@ export function ContactFormsTable({ contactForms, loading, onUpdate }: ContactFo
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="small"
                       onClick={() => handleView(contact)}
                     >
                       <Eye className="h-4 w-4 mr-1" />

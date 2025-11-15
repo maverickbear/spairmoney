@@ -121,9 +121,9 @@ export default async function ProtectedLayout({
       reason = "no_subscription";
     } else {
       // Check if subscription status allows access
-      // Accept both "trialing" and "trial" (in case of inconsistency in database)
+      // Accept "trialing" status (note: "trial" is not a valid status in the type, but may exist in DB)
       const isActiveStatus = subscription.status === "active";
-      const isTrialingStatus = subscription.status === "trialing" || subscription.status === "trial";
+      const isTrialingStatus = subscription.status === "trialing";
       
       log.debug("Subscription status check:", {
         status: subscription.status,

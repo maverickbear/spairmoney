@@ -187,8 +187,8 @@ export async function performHealthCheck(): Promise<HealthCheckResult> {
 
   // Check database
   try {
-    const { createClient } = await import('@/lib/supabase-server');
-    const supabase = createClient();
+    const { createServerClient } = await import('@/lib/supabase-server');
+    const supabase = await createServerClient();
     const { error } = await supabase.from('User').select('id').limit(1);
     checks.database = !error;
   } catch (error) {

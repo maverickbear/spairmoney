@@ -1,6 +1,9 @@
 import Papa from "papaparse";
 import { parseCSV, CSVRow } from "./import";
 
+// Re-export CSVRow for use in components
+export type { CSVRow };
+
 export interface InvestmentCSVRow extends CSVRow {
   [key: string]: string | undefined;
 }

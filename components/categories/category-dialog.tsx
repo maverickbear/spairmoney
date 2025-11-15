@@ -151,6 +151,7 @@ export function CategoryDialog({
         document.removeEventListener("mousedown", handleClickOutside);
       };
     }
+    return undefined;
   }, [searchOpen]);
 
   // Reset form and subcategories when dialog opens/closes or category changes

@@ -22,7 +22,7 @@ export interface Debt {
   downPayment: number;
   currentBalance: number;
   interestRate: number;
-  totalMonths: number;
+  totalMonths: number | null;
   firstPaymentDate: string;
   monthlyPayment: number;
   paymentFrequency?: string; // "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"

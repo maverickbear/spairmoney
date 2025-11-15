@@ -210,6 +210,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
+    return undefined;
   }, [categoryComboboxOpen, subcategoryComboboxOpen]);
 
   async function checkAccountsAndShowForm() {
@@ -340,13 +341,13 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
     try {
       const subcategories = subcategoriesMap.get(categoryId);
       if (subcategories && subcategories.length > 0) {
-        setSubcategories(subcategories);
+        setSubcategories(subcategories.map(sc => ({ ...sc, categoryId: (sc as any).categoryId || categoryId })));
       } else {
         // Fetch if not in map
         const res = await fetch(`/api/categories?categoryId=${categoryId}`);
         if (res.ok) {
           const subcats = await res.json().catch(() => []);
-          setSubcategories(subcats);
+          setSubcategories(subcats.map((sc: any) => ({ ...sc, categoryId: sc.categoryId || categoryId })));
           // Update map
           if (subcats && subcats.length > 0) {
             setSubcategoriesMap(prev => new Map(prev).set(categoryId, subcats));

@@ -22,12 +22,14 @@ export async function GET(request: Request) {
     // Use a more efficient approach: get max timestamp from each table
     const checks = await Promise.all([
       // Check transactions - get max of updatedAt and createdAt
-      supabase
-        .from("Transaction")
-        .select("updatedAt, createdAt")
-        .order("updatedAt", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      Promise.resolve(
+        supabase
+          .from("Transaction")
+          .select("updatedAt, createdAt")
+          .order("updatedAt", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      )
         .then(({ data, error }) => {
           if (error || !data) return null;
           const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
@@ -37,12 +39,14 @@ export async function GET(request: Request) {
         .catch(() => null),
 
       // Check accounts
-      supabase
-        .from("Account")
-        .select("updatedAt, createdAt")
-        .order("updatedAt", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      Promise.resolve(
+        supabase
+          .from("Account")
+          .select("updatedAt, createdAt")
+          .order("updatedAt", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      )
         .then(({ data, error }) => {
           if (error || !data) return null;
           const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
@@ -52,12 +56,14 @@ export async function GET(request: Request) {
         .catch(() => null),
 
       // Check budgets
-      supabase
-        .from("Budget")
-        .select("updatedAt, createdAt")
-        .order("updatedAt", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      Promise.resolve(
+        supabase
+          .from("Budget")
+          .select("updatedAt, createdAt")
+          .order("updatedAt", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      )
         .then(({ data, error }) => {
           if (error || !data) return null;
           const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
@@ -67,12 +73,14 @@ export async function GET(request: Request) {
         .catch(() => null),
 
       // Check goals
-      supabase
-        .from("Goal")
-        .select("updatedAt, createdAt")
-        .order("updatedAt", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      Promise.resolve(
+        supabase
+          .from("Goal")
+          .select("updatedAt, createdAt")
+          .order("updatedAt", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      )
         .then(({ data, error }) => {
           if (error || !data) return null;
           const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
@@ -82,12 +90,14 @@ export async function GET(request: Request) {
         .catch(() => null),
 
       // Check debts
-      supabase
-        .from("Debt")
-        .select("updatedAt, createdAt")
-        .order("updatedAt", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      Promise.resolve(
+        supabase
+          .from("Debt")
+          .select("updatedAt, createdAt")
+          .order("updatedAt", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      )
         .then(({ data, error }) => {
           if (error || !data) return null;
           const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
@@ -97,12 +107,14 @@ export async function GET(request: Request) {
         .catch(() => null),
 
       // Check investment entries (SimpleInvestmentEntry)
-      supabase
-        .from("SimpleInvestmentEntry")
-        .select("updatedAt, createdAt")
-        .order("updatedAt", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      Promise.resolve(
+        supabase
+          .from("SimpleInvestmentEntry")
+          .select("updatedAt, createdAt")
+          .order("updatedAt", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      )
         .then(({ data, error }) => {
           if (error || !data) return null;
           const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
@@ -113,7 +125,7 @@ export async function GET(request: Request) {
     ]);
 
     // Get the maximum timestamp from all checks
-    const maxTimestamp = Math.max(...checks.filter((t): t is number => t !== null), 0);
+    const maxTimestamp = Math.max(...checks.filter((t: number | null): t is number => t !== null), 0);
     const currentHash = maxTimestamp.toString();
 
     // If client provided a lastCheck timestamp, compare

@@ -117,8 +117,8 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
     const yesterday = subDays(new Date(), 1);
     const yesterdayKey = yesterday.toISOString().split("T")[0];
     
-    // Get security IDs from holdings (Holding.id is the securityId)
-    const securityIds = Array.from(new Set(holdings.map(h => h.id)));
+    // Get security IDs from holdings (Holding.securityId is the securityId)
+    const securityIds = Array.from(new Set(holdings.map(h => h.securityId)));
     
     if (securityIds.length > 0) {
       // Get yesterday's prices directly from SecurityPrice table
@@ -135,7 +135,7 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
         let yesterdayValue = 0;
         
         for (const holding of holdings) {
-          const price = priceMap.get(holding.id); // Holding.id is the securityId (from convertSupabaseHoldingToHolding)
+          const price = priceMap.get(holding.securityId); // Holding.securityId is the securityId
           if (price !== undefined) {
             yesterdayValue += holding.quantity * price;
           } else {

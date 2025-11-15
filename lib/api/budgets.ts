@@ -294,7 +294,7 @@ export async function createBudget(data: {
     const categoryId = data.categoryId || data.categoryIds?.[0];
     existingBudgetsQuery = existingBudgetsQuery.eq("categoryId", categoryId);
     if (data.subcategoryId || (data.subcategoryIds && data.subcategoryIds.length > 0)) {
-      const subcategoryId = data.subcategoryId || data.subcategoryIds[0];
+      const subcategoryId = data.subcategoryId || (data.subcategoryIds?.[0]);
       existingBudgetsQuery = existingBudgetsQuery.eq("subcategoryId", subcategoryId);
     } else {
       existingBudgetsQuery = existingBudgetsQuery.is("subcategoryId", null);

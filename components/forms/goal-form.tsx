@@ -265,8 +265,8 @@ export function GoalForm({
           description: goal.description || "",
           expectedIncome: goal.expectedIncome ?? undefined,
           targetMonths: goal.targetMonths ?? undefined,
-          accountId: goal.accountId ?? undefined,
-          holdingId: goal.holdingId ?? undefined,
+          accountId: (goal as any).accountId ?? undefined,
+          holdingId: (goal as any).holdingId ?? undefined,
         });
       } else {
         // If creating a new goal, check if there are accounts
@@ -281,13 +281,13 @@ export function GoalForm({
 
   // Load holdings when editing a goal with investment account
   useEffect(() => {
-    if (open && goal?.accountId && accounts.length > 0) {
-      const selectedAccount = accounts.find(acc => acc.id === goal.accountId);
+    if (open && (goal as any)?.accountId && accounts.length > 0) {
+      const selectedAccount = accounts.find(acc => acc.id === (goal as any).accountId);
       if (selectedAccount?.type === "investment") {
-        loadHoldings(goal.accountId);
+        loadHoldings((goal as any).accountId);
       }
     }
-  }, [open, goal?.accountId, accounts]);
+  }, [open, (goal as any)?.accountId, accounts]);
 
   async function loadAccounts() {
     try {

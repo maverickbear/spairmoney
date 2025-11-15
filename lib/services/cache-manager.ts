@@ -134,7 +134,7 @@ export function createCachedFunction<TArgs extends any[], TResult>(
  */
 export function invalidateCache(...tags: string[]): void {
   tags.forEach(tag => {
-    revalidateTag(tag);
+    revalidateTag(tag, "default");
   });
 }
 

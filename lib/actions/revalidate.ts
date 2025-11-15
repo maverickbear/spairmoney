@@ -10,11 +10,11 @@ export async function revalidateDashboard() {
   try {
     // Invalidate all dashboard-related cache tags
     // This will invalidate the cache for dashboard data without affecting the page route
-    revalidateTag("dashboard");
-    revalidateTag("transactions");
-    revalidateTag("budgets");
-    revalidateTag("goals");
-    revalidateTag("accounts");
+    revalidateTag("dashboard", "default");
+    revalidateTag("transactions", "default");
+    revalidateTag("budgets", "default");
+    revalidateTag("goals", "default");
+    revalidateTag("accounts", "default");
     
     return { success: true };
   } catch (error) {

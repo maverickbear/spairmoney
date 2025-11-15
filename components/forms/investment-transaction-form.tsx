@@ -1187,7 +1187,7 @@ export function InvestmentTransactionForm({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="small"
                     onClick={extractInfoFromNotes}
                     disabled={isExtractingInfo || !form.watch("notes") || form.watch("notes")?.trim().length === 0}
                     className="h-7 text-xs"

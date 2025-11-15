@@ -177,8 +177,8 @@ export async function POST(request: NextRequest) {
         status: stripeSubscription.status === "active" ? "active" : 
                 stripeSubscription.status === "trialing" ? "trialing" :
                 stripeSubscription.status === "past_due" ? "past_due" : "cancelled",
-        currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+        currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+        currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
         cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
         trialStartDate: stripeSubscription.trial_start ? new Date(stripeSubscription.trial_start * 1000) : null,
         trialEndDate: stripeSubscription.trial_end ? new Date(stripeSubscription.trial_end * 1000) : null,

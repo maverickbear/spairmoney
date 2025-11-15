@@ -79,6 +79,9 @@ function getKey(silent: boolean = false): Buffer {
     );
   }
   // Use a simple key derivation (in production, consider using PBKDF2)
+  if (!crypto) {
+    throw new Error("Crypto is not available in this environment");
+  }
   return crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
 }
 
@@ -88,6 +91,10 @@ function getKey(silent: boolean = false): Buffer {
 export function encrypt(text: string): string {
   if (!text) {
     return text;
+  }
+
+  if (!crypto) {
+    throw new Error("Crypto is not available in this environment");
   }
 
   try {
@@ -117,6 +124,10 @@ export function encrypt(text: string): string {
 export function decrypt(encryptedText: string, silent: boolean = false): string {
   if (!encryptedText) {
     return encryptedText;
+  }
+  
+  if (!crypto) {
+    throw new Error("Crypto is not available in this environment");
   }
   
   try {

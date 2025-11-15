@@ -357,7 +357,7 @@ export function InvestmentCsvImportDialog({
       toast({
         title: "Import completed",
         description: `Successfully imported ${result.imported} transactions. ${result.errors > 0 ? `${result.errors} errors occurred.` : ""}`,
-        variant: result.errors > 0 ? "destructive" : "success",
+        variant: result.errors > 0 ? "destructive" : ("success" as any),
       });
 
       if (result.imported > 0) {
@@ -459,7 +459,7 @@ export function InvestmentCsvImportDialog({
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="small"
                         onClick={() => removeFile(index)}
                       >
                         <X className="h-4 w-4" />

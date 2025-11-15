@@ -154,10 +154,16 @@ export function BulkImportDialog({
 
             const newGroup = await groupRes.json();
             groupId = newGroup.id;
-            groupMap.set(line.group, groupId);
+            if (groupId) {
+              groupMap.set(line.group, groupId);
+            }
             results.groupsCreated++;
           } else {
             results.groupsSkipped++;
+          }
+
+          if (!groupId) {
+            throw new Error(`Group ID not found for "${line.group}"`);
           }
 
           // Step 2: Get or create Category
@@ -181,10 +187,16 @@ export function BulkImportDialog({
 
             const newCategory = await categoryRes.json();
             categoryId = newCategory.id;
-            categoryMap.set(categoryKey, categoryId);
+            if (categoryId) {
+              categoryMap.set(categoryKey, categoryId);
+            }
             results.categoriesCreated++;
           } else {
             results.categoriesSkipped++;
+          }
+
+          if (!categoryId) {
+            throw new Error(`Category ID not found for "${line.category}"`);
           }
 
           // Step 3: Create Subcategory (check if exists first)

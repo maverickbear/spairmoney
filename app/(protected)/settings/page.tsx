@@ -794,9 +794,9 @@ function BillingModuleContent() {
       />
 
         <UsageChart
-          limits={limits}
-          transactionLimit={transactionLimit}
-          accountLimit={accountLimit}
+          limits={limits ?? undefined}
+          transactionLimit={transactionLimit ?? undefined}
+          accountLimit={accountLimit ?? undefined}
         />
       </div>
 

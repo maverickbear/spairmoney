@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
               
               // Check if security already exists
               if (securityMap.has(symbolUpper)) {
-                securityId = securityMap.get(symbolUpper);
+                securityId = securityMap.get(symbolUpper) || undefined;
               } else {
                 // Create new security
                 try {
@@ -74,8 +74,12 @@ export async function POST(request: NextRequest) {
                     name: tx.securityName || tx.securitySymbol,
                     class: tx.securityClass || "Stock",
                   });
-                  securityId = security.id;
-                  securityMap.set(symbolUpper, securityId);
+                  if (security && security.id) {
+                    securityId = security.id;
+                    if (securityId) {
+                      securityMap.set(symbolUpper, securityId);
+                    }
+                  }
                 } catch (error) {
                   console.error(`Error creating security ${tx.securitySymbol}:`, error);
                   // Continue without securityId for non-buy/sell transactions

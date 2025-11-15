@@ -1,22 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney } from "@/components/common/money";
-import { ArrowUpRight, ArrowDownRight, Wallet, LayoutDashboard, Receipt, FileText, FolderTree, Users, PiggyBank, CreditCard, TrendingUp, ChevronLeft, ChevronRight, User, Calendar, Target } from "lucide-react";
-import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
-import { BudgetExecutionChart } from "@/components/charts/budget-execution-chart";
-import { CategoryExpensesChart } from "@/components/charts/category-expenses-chart";
-import { GoalsOverview } from "@/components/dashboard/goals-overview";
-import { FinancialHealthWidget } from "@/components/dashboard/financial-health-widget";
-import { UpcomingTransactions } from "@/components/dashboard/upcoming-transactions";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { cn } from "@/lib/utils";
+import { 
+  LayoutDashboard, 
+  Receipt, 
+  FileText, 
+  FolderTree, 
+  Wallet, 
+  Users, 
+  PiggyBank, 
+  CreditCard, 
+  TrendingUp, 
+  ChevronLeft, 
+  ChevronRight, 
+  User, 
+  ArrowUp, 
+  ArrowDown 
+} from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Logo } from "@/components/common/logo";
+import { FinancialSummaryWidget } from "@/app/(protected)/dashboard/widgets/financial-summary-widget";
+import { FinancialHealthScoreWidget } from "@/app/(protected)/dashboard/widgets/financial-health-score-widget";
+import { ExpensesByCategoryWidget } from "@/app/(protected)/dashboard/widgets/expenses-by-category-widget";
+import { CashFlowTimelineWidget } from "@/app/(protected)/dashboard/widgets/cash-flow-timeline-widget";
+import { CashOnHandWidget } from "@/app/(protected)/dashboard/widgets/cash-on-hand-widget";
+import { BudgetStatusWidget } from "@/app/(protected)/dashboard/widgets/budget-status-widget";
+import { UpcomingBillsWidget } from "@/app/(protected)/dashboard/widgets/upcoming-bills-widget";
+import { SavingsGoalsWidget } from "@/app/(protected)/dashboard/widgets/savings-goals-widget";
+import { NetWorthWidget } from "@/app/(protected)/dashboard/widgets/net-worth-widget";
+import { InvestmentPortfolioWidget } from "@/app/(protected)/dashboard/widgets/investment-portfolio-widget";
+import { AlertsInsightsWidget } from "@/app/(protected)/dashboard/widgets/alerts-insights-widget";
 
 const navSections = [
   {
@@ -38,7 +59,7 @@ const navSections = [
   {
     title: "Planning",
     items: [
-      { href: "/planning/budgets", label: "Budgets", icon: Target },
+      { href: "/planning/budgets", label: "Budgets", icon: PiggyBank },
       { href: "/planning/goals", label: "Goals", icon: PiggyBank },
       { href: "/debts", label: "Debts", icon: CreditCard },
       { href: "/investments", label: "Investments", icon: TrendingUp },
@@ -46,50 +67,35 @@ const navSections = [
   },
 ];
 
-// Mock data
-const mockTransactions = [
-  { month: "Jul", income: 5000, expenses: 3200 },
-  { month: "Aug", income: 5500, expenses: 3500 },
-  { month: "Sep", income: 6000, expenses: 3800 },
-  { month: "Oct", income: 6500, expenses: 4000 },
-  { month: "Nov", income: 7000, expenses: 4200 },
-  { month: "Dec", income: 8000, expenses: 3500 },
+// Mock data for demo
+const mockSelectedMonthTransactions = [
+  { id: "1", type: "income", amount: 8000, category: { id: "1", name: "Salary" }, date: "2024-12-01" },
+  { id: "2", type: "expense", amount: -1200, category: { id: "2", name: "Food & Dining" }, date: "2024-12-05", expenseType: "variable" },
+  { id: "3", type: "expense", amount: -850, category: { id: "3", name: "Transportation" }, date: "2024-12-10", expenseType: "variable" },
+  { id: "4", type: "expense", amount: -450, category: { id: "4", name: "Entertainment" }, date: "2024-12-15", expenseType: "variable" },
+  { id: "5", type: "expense", amount: -380, category: { id: "5", name: "Utilities" }, date: "2024-12-20", expenseType: "fixed" },
+  { id: "6", type: "expense", amount: -320, category: { id: "6", name: "Shopping" }, date: "2024-12-22", expenseType: "variable" },
+  { id: "7", type: "expense", amount: -220, category: { id: "7", name: "Healthcare" }, date: "2024-12-25", expenseType: "variable" },
 ];
 
-const mockBudgets = [
-  { category: "Food & Dining", percentage: 75 },
-  { category: "Transportation", percentage: 84 },
-  { category: "Shopping", percentage: 118.75 },
-  { category: "Entertainment", percentage: 90 },
+const mockLastMonthTransactions = [
+  { id: "1", type: "income", amount: 7500, category: { id: "1", name: "Salary" }, date: "2024-11-01" },
+  { id: "2", type: "expense", amount: -3700, category: { id: "2", name: "Food & Dining" }, date: "2024-11-05" },
 ];
 
-const mockGoals = [
-  {
-    id: "1",
-    name: "Emergency Fund",
-    targetAmount: 10000,
-    currentBalance: 6500,
-    incomePercentage: 20,
-    priority: "High" as const,
-    isCompleted: false,
-    progressPct: 65,
-    monthsToGoal: 8,
-    monthlyContribution: 500,
-    incomeBasis: 5000,
-  },
-  {
-    id: "2",
-    name: "Vacation",
-    targetAmount: 5000,
-    currentBalance: 2500,
-    incomePercentage: 10,
-    priority: "Medium" as const,
-    isCompleted: false,
-    progressPct: 50,
-    monthsToGoal: 5,
-    monthlyContribution: 500,
-    incomeBasis: 5000,
-  },
+const mockChartTransactions = [
+  { id: "1", type: "income", amount: 5000, date: "2024-07-01" },
+  { id: "2", type: "expense", amount: -3200, date: "2024-07-15" },
+  { id: "3", type: "income", amount: 5500, date: "2024-08-01" },
+  { id: "4", type: "expense", amount: -3500, date: "2024-08-15" },
+  { id: "5", type: "income", amount: 6000, date: "2024-09-01" },
+  { id: "6", type: "expense", amount: -3800, date: "2024-09-15" },
+  { id: "7", type: "income", amount: 6500, date: "2024-10-01" },
+  { id: "8", type: "expense", amount: -4000, date: "2024-10-15" },
+  { id: "9", type: "income", amount: 7000, date: "2024-11-01" },
+  { id: "10", type: "expense", amount: -4200, date: "2024-11-15" },
+  { id: "11", type: "income", amount: 8000, date: "2024-12-01" },
+  { id: "12", type: "expense", amount: -3500, date: "2024-12-15" },
 ];
 
 const mockFinancialHealth = {
@@ -100,31 +106,59 @@ const mockFinancialHealth = {
   netAmount: 4500,
   savingsRate: 56.25,
   message: "Your financial health is excellent! Keep up the great work.",
-  alerts: [
-    {
-      id: "1",
-      title: "High spending in Shopping category",
-      description: "You've exceeded your budget by 18.75%",
-      severity: "warning" as const,
-      action: "Review your shopping expenses",
-    },
-  ],
-  suggestions: [
-    {
-      id: "1",
-      title: "Increase savings rate",
-      description: "Consider saving 20% of your income",
-      impact: "high" as const,
-    },
-  ],
+  spendingDiscipline: "Excellent" as const,
+  debtExposure: "Low" as const,
+  emergencyFundMonths: 8.5,
+  lastMonthScore: 82,
+  alerts: [],
+  suggestions: [],
 };
+
+const mockBudgets = [
+  {
+    id: "1",
+    category: { id: "2", name: "Food & Dining" },
+    amount: 1600,
+    actualSpend: 1200,
+    percentage: 75,
+    status: "ok",
+    displayName: "Food & Dining",
+  },
+  {
+    id: "2",
+    category: { id: "3", name: "Transportation" },
+    amount: 800,
+    actualSpend: 672,
+    percentage: 84,
+    status: "warning",
+    displayName: "Transportation",
+  },
+  {
+    id: "3",
+    category: { id: "6", name: "Shopping" },
+    amount: 400,
+    actualSpend: 475,
+    percentage: 118.75,
+    status: "over",
+    displayName: "Shopping",
+  },
+  {
+    id: "4",
+    category: { id: "4", name: "Entertainment" },
+    amount: 500,
+    actualSpend: 450,
+    percentage: 90,
+    status: "ok",
+    displayName: "Entertainment",
+  },
+];
 
 const mockUpcomingTransactions = [
   {
     id: "1",
     date: new Date(2024, 11, 15),
     type: "expense",
-    amount: 1200,
+    amount: -1200,
     description: "Rent Payment",
     account: { id: "1", name: "Checking Account" },
     category: { id: "1", name: "Housing" },
@@ -134,10 +168,10 @@ const mockUpcomingTransactions = [
     id: "2",
     date: new Date(2024, 11, 20),
     type: "expense",
-    amount: 350,
+    amount: -350,
     description: "Electricity Bill",
     account: { id: "1", name: "Checking Account" },
-    category: { id: "2", name: "Utilities" },
+    category: { id: "5", name: "Utilities" },
     originalDate: new Date(2024, 11, 20),
   },
   {
@@ -147,267 +181,290 @@ const mockUpcomingTransactions = [
     amount: 5000,
     description: "Salary",
     account: { id: "1", name: "Checking Account" },
-    category: { id: "3", name: "Salary" },
+    category: { id: "1", name: "Salary" },
     originalDate: new Date(2024, 11, 25),
   },
 ];
 
-const mockCategoryExpenses = [
-  { name: "Food & Dining", value: 850, categoryId: "1" },
-  { name: "Transportation", value: 650, categoryId: "2" },
-  { name: "Entertainment", value: 450, categoryId: "3" },
-  { name: "Utilities", value: 380, categoryId: "4" },
-  { name: "Shopping", value: 320, categoryId: "5" },
-  { name: "Healthcare", value: 220, categoryId: "6" },
+const mockGoals = [
+  {
+    id: "1",
+    name: "Emergency Fund",
+    type: "savings",
+    targetAmount: 10000,
+    currentAmount: 6500,
+    savedAmount: 6500,
+  },
+  {
+    id: "2",
+    name: "Vacation",
+    type: "savings",
+    targetAmount: 5000,
+    currentAmount: 2500,
+    savedAmount: 2500,
+  },
+  {
+    id: "3",
+    name: "New Car",
+    type: "savings",
+    targetAmount: 20000,
+    currentAmount: 8000,
+    savedAmount: 8000,
+  },
+];
+
+const mockAccounts = [
+  { id: "1", name: "Checking Account", balance: 12500, type: "checking" },
+  { id: "2", name: "Savings Account", balance: 18000, type: "savings" },
 ];
 
 export function DashboardDemo() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  // Calculate demo values
+  const totalBalance = mockAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  const checkingBalance = mockAccounts
+    .filter((acc) => acc.type === "checking" || acc.type === "depository")
+    .reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  const savingsBalance = mockAccounts
+    .filter((acc) => acc.type === "savings")
+    .reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  const savings = 25000; // Investment portfolio
+  const currentIncome = 8000;
+  const currentExpenses = 3500;
+  const lastMonthIncome = 7500;
+  const lastMonthExpenses = 3700;
+  const totalAssets = totalBalance + savings;
+  const totalDebts = 5000;
+  const netWorth = totalAssets - totalDebts;
+  const emergencyFundMonths = totalBalance > 0 ? totalBalance / currentExpenses : 0;
 
   return (
     <>
       {/* Desktop Version */}
-      <div className="hidden md:flex h-[700px] bg-gray-100 dark:bg-background overflow-hidden pointer-events-none">
+      <div className="hidden md:flex h-[700px] bg-background overflow-hidden pointer-events-none min-w-0">
         {/* Side Menu */}
         <TooltipProvider>
           <aside
             className={cn(
               "border-r bg-card transition-all duration-300 flex-shrink-0",
-              isCollapsed ? "w-16" : "w-64"
+              isCollapsed ? "w-16" : "md:w-56 lg:w-64"
             )}
           >
-          <div className="flex h-full flex-col">
-            <div
-              className={cn(
-                "flex h-16 items-center border-b px-4 relative",
-                isCollapsed ? "justify-center" : "justify-between"
-              )}
-            >
-              {!isCollapsed && (
-                <div className="text-xl font-bold">Spare Finance</div>
-              )}
-            </div>
-
-            <nav className={cn(
-              "flex-1 space-y-6 px-3 py-4 overflow-hidden",
-              isCollapsed && "overflow-visible"
-            )}>
-              {navSections.map((section) => (
-                <div key={section.title} className="space-y-1">
-                  {!isCollapsed && (
-                    <h3 className="px-3 pb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {section.title}
-                    </h3>
-                  )}
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = item.href === "/dashboard";
-                    const linkElement = (
-                      <div
-                        className={cn(
-                          "flex items-center rounded-[12px] text-sm font-medium transition-all duration-200 ease-in-out cursor-pointer",
-                          isActive
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                          isCollapsed
-                            ? "justify-center px-3 py-2"
-                            : "space-x-3 px-3 py-2"
-                        )}
-                        style={{ pointerEvents: "none" }}
-                      >
-                        <Icon className="h-5 w-5 flex-shrink-0" />
-                        {!isCollapsed && <span>{item.label}</span>}
-                      </div>
-                    );
-
-                    if (isCollapsed) {
-                      return (
-                        <Tooltip key={item.href}>
-                          <TooltipTrigger asChild>
-                            <div className="relative">
-                              {linkElement}
-                              <TooltipContent side="right">
-                                {item.label}
-                              </TooltipContent>
-                            </div>
-                          </TooltipTrigger>
-                        </Tooltip>
-                      );
-                    }
-
-                    return <div key={item.href}>{linkElement}</div>;
-                  })}
-                </div>
-              ))}
-            </nav>
-
-            <div className="border-t p-3">
+            <div className="flex h-full flex-col">
               <div
                 className={cn(
-                  "flex items-center",
-                  isCollapsed ? "justify-center" : "space-x-3 px-3 py-2"
+                  "flex h-16 items-center border-b px-4 relative",
+                  isCollapsed ? "justify-center" : "justify-between"
                 )}
               >
-                <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border">
-                  <User className="h-6 w-6" />
-                </div>
-                {!isCollapsed && (
-                  <div className="flex-1 min-w-0 text-left">
-                    <div className="text-sm font-medium truncate">
-                      Demo User
-                    </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground truncate">
-                      demo@sparefinance.com
-                    </div>
-                  </div>
+                {isCollapsed ? (
+                  <Logo variant="icon" color="auto" width={32} height={32} />
+                ) : (
+                  <Logo variant="wordmark" color="auto" height={32} />
                 )}
               </div>
-            </div>
-          </div>
-        </aside>
-        {/* Toggle button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className={cn(
-                "absolute top-4 h-5 w-5 z-50 bg-card border border-border shadow-sm flex items-center justify-center",
-                isCollapsed ? "left-16" : "left-64"
-              )}
-              style={{ transform: 'translateX(-50%)', pointerEvents: 'none' }}
-              onClick={() => {}}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronLeft className="h-3.5 w-3.5" />
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side={isCollapsed ? "right" : "bottom"}>
-            {isCollapsed ? "Expand menu" : "Collapse menu"}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
 
-      {/* Dashboard Content */}
-      <div className="flex-1 overflow-hidden p-6">
-        <div className="h-full flex flex-col space-y-4">
-          {/* Header */}
-          <div className="flex items-start justify-between flex-shrink-0">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
-              <p className="text-sm md:text-base text-muted-foreground">Overview of your finances</p>
-            </div>
-          </div>
+              <nav className={cn(
+                "flex-1 space-y-6 px-3 py-4 overflow-hidden",
+                isCollapsed && "overflow-visible"
+              )}>
+                {navSections.map((section) => (
+                  <div key={section.title} className="space-y-1">
+                    {!isCollapsed && (
+                      <h3 className="px-3 pb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {section.title}
+                      </h3>
+                    )}
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = item.href === "/dashboard";
+                      const linkElement = (
+                        <div
+                          className={cn(
+                            "flex items-center rounded-[12px] text-sm font-medium transition-all duration-200 ease-in-out cursor-pointer",
+                            isActive
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                            isCollapsed
+                              ? "justify-center px-3 py-2"
+                              : "space-x-3 px-3 py-2"
+                          )}
+                          style={{ pointerEvents: "none" }}
+                        >
+                          <Icon className="h-5 w-5 flex-shrink-0" />
+                          {!isCollapsed && <span>{item.label}</span>}
+                        </div>
+                      );
 
-          {/* Summary Cards */}
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-4 flex-shrink-0">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm text-muted-foreground font-normal">Total Balance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-500" />
-                <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-                  {formatMoney(45230)}
+                      if (isCollapsed) {
+                        return (
+                          <Tooltip key={item.href}>
+                            <TooltipTrigger asChild>
+                              <div className="relative">
+                                {linkElement}
+                                <TooltipContent side="right">
+                                  {item.label}
+                                </TooltipContent>
+                              </div>
+                            </TooltipTrigger>
+                          </Tooltip>
+                        );
+                      }
+
+                      return <div key={item.href}>{linkElement}</div>;
+                    })}
+                  </div>
+                ))}
+              </nav>
+
+              <div className="border-t p-3">
+                <div
+                  className={cn(
+                    "flex items-center",
+                    isCollapsed ? "justify-center" : "space-x-3 px-3 py-2"
+                  )}
+                >
+                  <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border">
+                    <User className="h-6 w-6" />
+                  </div>
+                  {!isCollapsed && (
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="text-sm font-medium truncate">
+                        Demo User
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground truncate">
+                        demo@sparefinance.com
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="text-xs mt-1 text-green-600 dark:text-green-400">
-                +$2,450 (+5.7%)
+            </div>
+          </aside>
+          {/* Toggle button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className={cn(
+                  "absolute top-4 h-5 w-5 z-50 bg-card border border-border shadow-sm flex items-center justify-center",
+                  isCollapsed ? "left-16" : "md:left-56 lg:left-64"
+                )}
+                style={{ transform: 'translateX(-50%)', pointerEvents: 'none' }}
+                onClick={() => {}}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side={isCollapsed ? "right" : "bottom"}>
+              {isCollapsed ? "Expand menu" : "Collapse menu"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Dashboard Content */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-5 lg:p-6">
+          <div className="h-full flex flex-col space-y-4 md:space-y-5 lg:space-y-6 min-w-0">
+            {/* Header */}
+            <div className="flex items-start justify-between flex-shrink-0">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold">Financial Overview</h1>
+                <p className="text-sm md:text-base text-muted-foreground">
+                  Track your financial health: cash flow, spending, bills, buffers, risk and long-term planning.
+                </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm text-muted-foreground font-normal">Monthly Income</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-500" />
-                <div className="text-lg font-semibold text-foreground">{formatMoney(8000)}</div>
+            {/* Financial Summary - Full Width */}
+            <div className="flex-shrink-0 min-w-0 w-full">
+              <FinancialSummaryWidget
+                totalBalance={totalBalance}
+                monthlyIncome={currentIncome}
+                monthlyExpense={currentExpenses}
+                totalSavings={savings}
+                lastMonthIncome={lastMonthIncome}
+                lastMonthExpense={lastMonthExpenses}
+              />
+            </div>
+
+            {/* Top Widgets - Financial Health Score and Expenses by Category side by side */}
+            <div className="grid gap-4 md:gap-5 lg:gap-6 grid-cols-1 lg:grid-cols-2 flex-shrink-0 min-w-0">
+              <div className="min-w-0">
+                <FinancialHealthScoreWidget
+                financialHealth={mockFinancialHealth}
+                selectedMonthTransactions={mockSelectedMonthTransactions}
+                lastMonthTransactions={mockLastMonthTransactions}
+              />
               </div>
-              <div className="text-xs mt-1 text-green-600 dark:text-green-400">
-                +12.5% vs last month
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm text-muted-foreground font-normal">Monthly Expenses</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-500" />
-                <div className="text-lg font-semibold text-foreground">{formatMoney(3500)}</div>
-              </div>
-              <div className="text-xs mt-1 text-red-600 dark:text-red-400">
-                -5.2% vs last month
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm text-muted-foreground font-normal">Savings/Investments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg font-semibold text-foreground">{formatMoney(4500)}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-          {/* Cash Flow and Financial Health */}
-          <div className="grid gap-4 md:grid-cols-2 flex-shrink-0">
-            <IncomeExpensesChart data={mockTransactions} />
-
-            <FinancialHealthWidget 
-              data={mockFinancialHealth}
-              lastMonthIncome={7500}
-              lastMonthExpenses={3700}
-            />
-          </div>
-
-          {/* Upcoming Transactions and Budget Execution */}
-          <div className="grid gap-4 md:grid-cols-2 flex-shrink-0">
-          <UpcomingTransactions transactions={mockUpcomingTransactions} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Budget Execution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <BudgetExecutionChart data={mockBudgets} />
-            </CardContent>
-          </Card>
-        </div>
-
-          {/* Goals and Category Expenses */}
-          <div className="grid gap-4 md:grid-cols-2 flex-1 min-h-0">
-            <GoalsOverview goals={mockGoals} />
-            <Card>
-              <CardHeader>
-                <CardTitle>Category Expenses</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CategoryExpensesChart 
-                  data={mockCategoryExpenses} 
-                  totalIncome={8000} 
+              <div className="min-w-0">
+                <ExpensesByCategoryWidget
+                  selectedMonthTransactions={mockSelectedMonthTransactions}
+                  selectedMonthDate={new Date()}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+
+            {/* Cash Flow and Cash on Hand - Same Row */}
+            <div className="grid gap-4 md:gap-5 lg:gap-6 grid-cols-1 lg:grid-cols-2 flex-shrink-0 min-w-0">
+              <div className="min-w-0">
+                <CashFlowTimelineWidget
+                chartTransactions={mockChartTransactions}
+                selectedMonthDate={new Date()}
+              />
+              </div>
+              <div className="min-w-0">
+                <CashOnHandWidget
+                  totalBalance={totalBalance}
+                  checkingBalance={checkingBalance}
+                  savingsBalance={savingsBalance}
+                />
+              </div>
+            </div>
+
+            {/* Budget Status and Upcoming Transactions - Same Row */}
+            <div className="grid gap-4 md:gap-5 lg:gap-6 grid-cols-1 lg:grid-cols-2 flex-shrink-0 min-w-0">
+              <div className="min-w-0">
+                <BudgetStatusWidget budgets={mockBudgets} />
+              </div>
+              <div className="min-w-0">
+                <UpcomingBillsWidget upcomingTransactions={mockUpcomingTransactions} />
+              </div>
+            </div>
+
+            {/* Dashboard Grid */}
+            <div className="grid gap-4 md:gap-5 lg:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 flex-1 min-h-0 min-w-0">
+              <SavingsGoalsWidget goals={mockGoals} />
+              <NetWorthWidget
+                netWorth={netWorth}
+                totalAssets={totalAssets}
+                totalDebts={totalDebts}
+              />
+              <InvestmentPortfolioWidget savings={savings} />
+              <div className="col-span-full">
+                <AlertsInsightsWidget
+                  financialHealth={mockFinancialHealth}
+                  currentIncome={currentIncome}
+                  currentExpenses={currentExpenses}
+                  emergencyFundMonths={emergencyFundMonths}
+                  selectedMonthTransactions={mockSelectedMonthTransactions}
+                  lastMonthTransactions={mockLastMonthTransactions}
+                />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       {/* Mobile Version */}
-      <div className="md:hidden h-[600px] bg-gray-100 dark:bg-background overflow-hidden pointer-events-none flex flex-col">
+      <div className="md:hidden h-[600px] bg-background overflow-hidden pointer-events-none flex flex-col">
         {/* Mobile Header */}
         <div className="flex-shrink-0 border-b bg-card px-4 py-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-bold">Dashboard</h1>
+            <h1 className="text-lg font-bold">Financial Overview</h1>
             <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border">
               <User className="h-4 w-4" />
             </div>
@@ -416,81 +473,47 @@ export function DashboardDemo() {
 
         {/* Mobile Dashboard Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
-          {/* Summary Cards */}
-          <div className="grid gap-3 grid-cols-2">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs text-muted-foreground font-normal">Total Balance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1">
-                  <Wallet className="h-3 w-3 text-blue-600 dark:text-blue-500" />
-                  <div className="text-sm font-semibold text-green-600 dark:text-green-400">
-                    {formatMoney(45230)}
-                  </div>
-                </div>
-                <div className="text-[10px] mt-0.5 text-green-600 dark:text-green-400">
-                  +$2,450 (+5.7%)
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs text-muted-foreground font-normal">Monthly Income</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1">
-                  <ArrowUpRight className="h-3 w-3 text-green-600 dark:text-green-500" />
-                  <div className="text-sm font-semibold text-foreground">{formatMoney(8000)}</div>
-                </div>
-                <div className="text-[10px] mt-0.5 text-green-600 dark:text-green-400">
-                  +12.5%
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs text-muted-foreground font-normal">Monthly Expenses</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1">
-                  <ArrowDownRight className="h-3 w-3 text-red-600 dark:text-red-500" />
-                  <div className="text-sm font-semibold text-foreground">{formatMoney(3500)}</div>
-                </div>
-                <div className="text-[10px] mt-0.5 text-red-600 dark:text-red-400">
-                  -5.2%
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs text-muted-foreground font-normal">Savings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm font-semibold text-foreground">{formatMoney(4500)}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Cash Flow Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Cash Flow</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <IncomeExpensesChart data={mockTransactions} />
-            </CardContent>
-          </Card>
-
-          {/* Financial Health Widget */}
-          <FinancialHealthWidget 
-            data={mockFinancialHealth}
-            lastMonthIncome={7500}
-            lastMonthExpenses={3700}
+          {/* Financial Summary */}
+          <FinancialSummaryWidget
+            totalBalance={totalBalance}
+            monthlyIncome={currentIncome}
+            monthlyExpense={currentExpenses}
+            totalSavings={savings}
+            lastMonthIncome={lastMonthIncome}
+            lastMonthExpense={lastMonthExpenses}
           />
+
+          {/* Financial Health Score */}
+          <FinancialHealthScoreWidget
+            financialHealth={mockFinancialHealth}
+            selectedMonthTransactions={mockSelectedMonthTransactions}
+            lastMonthTransactions={mockLastMonthTransactions}
+          />
+
+          {/* Expenses by Category */}
+          <ExpensesByCategoryWidget
+            selectedMonthTransactions={mockSelectedMonthTransactions}
+            selectedMonthDate={new Date()}
+          />
+
+          {/* Cash Flow Timeline */}
+          <CashFlowTimelineWidget
+            chartTransactions={mockChartTransactions}
+            selectedMonthDate={new Date()}
+          />
+
+          {/* Cash on Hand */}
+          <CashOnHandWidget
+            totalBalance={totalBalance}
+            checkingBalance={checkingBalance}
+            savingsBalance={savingsBalance}
+          />
+
+          {/* Budget Status */}
+          <BudgetStatusWidget budgets={mockBudgets} />
+
+          {/* Upcoming Bills */}
+          <UpcomingBillsWidget upcomingTransactions={mockUpcomingTransactions} />
 
           {/* Bottom Navigation */}
           <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card">

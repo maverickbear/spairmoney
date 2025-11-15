@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatTransactionDate, formatShortDate, parseDateWithoutTimezone, parseDateInput, formatDateInput } from "@/lib/utils/timestamp";
+import { format } from "date-fns";
 import { getAccounts } from "@/lib/api/accounts";
 import { getAllCategories } from "@/lib/api/categories";
 import { exportTransactionsToCSV, downloadCSV } from "@/lib/csv/export";
@@ -590,7 +591,7 @@ export default function TransactionsPage() {
       // Generate suggestions for existing transactions without category (only once per page load)
       if (!suggestionsGenerated) {
         const transactionsToCheck = Array.isArray(data) ? data : (data.transactions || []);
-        const hasUncategorizedTransactions = transactionsToCheck.some(tx => !tx.categoryId && !tx.suggestedCategoryId);
+        const hasUncategorizedTransactions = transactionsToCheck.some((tx: Transaction) => !tx.categoryId && !tx.suggestedCategoryId);
         if (hasUncategorizedTransactions) {
           setSuggestionsGenerated(true);
           // Generate suggestions in the background (don't wait for it)
@@ -1998,7 +1999,7 @@ export default function TransactionsPage() {
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1 || loading}
               className="h-9"
@@ -2024,7 +2025,7 @@ export default function TransactionsPage() {
                   <Button
                     key={pageNum}
                     variant={currentPage === pageNum ? "default" : "outline"}
-                    size="sm"
+                    size="small"
                     onClick={() => setCurrentPage(pageNum)}
                     disabled={loading}
                     className="h-9 w-9"
@@ -2037,7 +2038,7 @@ export default function TransactionsPage() {
             
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages || loading}
               className="h-9"
@@ -2082,7 +2083,7 @@ export default function TransactionsPage() {
           <div className="flex items-center justify-between">
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1 || loading}
               className="h-9"
@@ -2097,7 +2098,7 @@ export default function TransactionsPage() {
             
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages || loading}
               className="h-9"

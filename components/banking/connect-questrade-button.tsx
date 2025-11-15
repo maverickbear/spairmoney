@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/toast-provider";
 import { Loader2, ExternalLink } from "lucide-react";
 import { FeatureGuard } from "@/components/common/feature-guard";
+import { useWriteGuard } from "@/hooks/use-write-guard";
 
 interface ConnectQuestradeButtonProps {
   onSuccess?: () => void;

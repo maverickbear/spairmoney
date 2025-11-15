@@ -169,7 +169,7 @@ export function CategoryDialog({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: category.id,
+          id: category?.id,
           name: data.name,
           macroId: data.macroId,
         }),

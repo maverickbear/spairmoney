@@ -132,7 +132,7 @@ export function DebtForm({
     resolver: zodResolver(debtSchema),
     defaultValues: {
       name: "",
-      loanType: "",
+      loanType: undefined,
       initialAmount: 0,
       downPayment: 0,
       currentBalance: 0,
@@ -759,7 +759,7 @@ export function DebtForm({
         // New debt - reset to defaults
         form.reset({
           name: "",
-          loanType: "",
+          loanType: undefined,
           initialAmount: 0,
           downPayment: 0,
           currentBalance: 0,
@@ -921,7 +921,7 @@ export function DebtForm({
         </DialogHeader>
 
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={form.handleSubmit(onSubmit as (data: DebtFormData) => Promise<void>)}
           className="flex flex-col flex-1 overflow-hidden"
         >
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">

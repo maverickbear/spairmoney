@@ -235,8 +235,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
           ...navUserDataCache.data.user,
           name: updatedProfile.name,
           avatarUrl: updatedProfile.avatarUrl,
-          phoneNumber: updatedProfile.phoneNumber,
-          dateOfBirth: updatedProfile.dateOfBirth,
         };
         navUserDataCache.timestamp = Date.now();
         // Update state immediately

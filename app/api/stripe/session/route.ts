@@ -47,8 +47,12 @@ export async function GET(request: NextRequest) {
       } else {
         // Customer is already expanded
         customerId = session.customer.id;
-        customerEmail = session.customer.email || null;
-        customerName = session.customer.name || null;
+        if ('email' in session.customer) {
+          customerEmail = session.customer.email || null;
+        }
+        if ('name' in session.customer) {
+          customerName = session.customer.name || null;
+        }
       }
     } else if (session.customer_email) {
       // Fallback to customer_email from session

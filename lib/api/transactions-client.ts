@@ -1,7 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
+import { formatDateStart, formatDateEnd, formatDateOnly } from "@/lib/utils/timestamp";
 import { TransactionFormData } from "@/lib/validations/transaction";
 import { formatTimestamp } from "@/lib/utils/timestamp";
 import { encryptDescription, decryptDescription } from "@/lib/utils/transaction-encryption";

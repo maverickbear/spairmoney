@@ -145,6 +145,9 @@ const fakeFinancialHealth = {
   monthlyExpenses: 3750,
   netAmount: 1450,
   savingsRate: 27.9,
+  spendingDiscipline: "Good" as const,
+  debtExposure: "Low" as const,
+  emergencyFundMonths: 4,
   alerts: [
     {
       id: "1",

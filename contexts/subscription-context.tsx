@@ -296,7 +296,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     // If we have valid cache and checked recently, skip verification
     if (hasValidCache && timeSinceLastCheck < MIN_CHECK_INTERVAL && !checkingRef.current) {
       log.log("Using cached data, skipping check (checked recently)");
-      setSubscriptionData(globalSubscriptionCache.data);
+      setSubscriptionData(globalSubscriptionCache.data ?? { hasSubscription: false });
       setChecking(false);
       initializedRef.current = true;
       return;
@@ -305,7 +305,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     // If cache is valid but we haven't checked in a while, still use cache but don't block
     if (hasValidCache && timeSinceLastCheck >= MIN_CHECK_INTERVAL && !checkingRef.current) {
       log.log("Using cached data (stale but valid), will refresh in background");
-      setSubscriptionData(globalSubscriptionCache.data);
+      setSubscriptionData(globalSubscriptionCache.data ?? { hasSubscription: false });
       setChecking(false);
       initializedRef.current = true;
       // Refresh in background without blocking
@@ -338,7 +338,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         initializedRef.current = true;
       } else if (hasValidCache) {
         log.log("Using valid cache, skipping check");
-        setSubscriptionData(globalSubscriptionCache.data);
+        setSubscriptionData(globalSubscriptionCache.data ?? { hasSubscription: false });
         setChecking(false);
         initializedRef.current = true;
       } else {
@@ -355,7 +355,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         initializedRef.current = true;
       } else if (hasValidCache) {
         log.log("Using valid cache, skipping check");
-        setSubscriptionData(globalSubscriptionCache.data);
+        setSubscriptionData(globalSubscriptionCache.data ?? { hasSubscription: false });
         setChecking(false);
         initializedRef.current = true;
       } else {

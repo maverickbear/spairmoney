@@ -18,6 +18,7 @@
     "import:logos": "tsx scripts/import-subcategory-logos.ts",
     "import:categories": "tsx scripts/import-categories.ts",
     "sync:stripe-features": "tsx scripts/sync-features-to-stripe.ts",
+    "update:stripe-ids": "tsx scripts/update-stripe-production-ids.ts",
     "test:create-users": "tsx scripts/create-test-users.ts",
     "test": "jest",
     "test:watch": "jest --watch",

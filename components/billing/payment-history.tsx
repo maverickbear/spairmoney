@@ -163,7 +163,7 @@ export function PaymentHistory({ className }: PaymentHistoryProps) {
                   {invoice.invoice_pdf && (
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="small"
                       onClick={() => {
                         window.open(invoice.invoice_pdf!, "_blank");
                       }}
