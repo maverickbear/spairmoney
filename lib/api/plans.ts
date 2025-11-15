@@ -5,6 +5,9 @@ import { Plan, PlanFeatures, Subscription } from "@/lib/validations/plan";
 import { getOwnerIdForMember, isHouseholdMember } from "./members";
 import { logger } from "@/lib/utils/logger";
 
+// Re-export types for convenience
+export type { Subscription, Plan, PlanFeatures };
+
 export interface PlanWithSubscription extends Plan {
   subscription?: Subscription;
 }
