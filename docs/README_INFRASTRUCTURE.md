@@ -22,9 +22,9 @@
 - ✅ Source maps
 
 **Arquivos criados:**
-- `sentry.client.config.ts`
-- `sentry.server.config.ts`
-- `sentry.edge.config.ts`
+- `config/sentry.client.config.ts`
+- `config/sentry.server.config.ts`
+- `config/sentry.edge.config.ts`
 - `lib/services/error-handler-enhanced.ts` - Integração Sentry
 
 ### 3. 📊 Monitoring & Observability

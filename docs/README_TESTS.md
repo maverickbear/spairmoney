@@ -21,8 +21,8 @@ Sistema completo de testes para validar todos os cenários de subscription usand
 
 ## 📁 Arquivos Criados
 
-- `jest.config.js` - Configuração do Jest
-- `jest.setup.js` - Setup dos testes (mocks, env vars)
+- `config/jest.config.js` - Configuração do Jest
+- `config/jest.setup.js` - Setup dos testes (mocks, env vars)
 - `tests/subscription-scenarios.test.ts` - Testes de integração com usuários reais
 - `tests/subscription-helpers.test.ts` - Testes unitários de funções auxiliares
 - `docs/TESTING.md` - Documentação completa dos testes

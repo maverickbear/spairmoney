@@ -7,10 +7,14 @@
 
 # testing
 /coverage
+/.nyc_output
+*.lcov
+.jest-cache/
 
 # next.js
 /.next/
 /out/
+/.swc/
 
 # production
 /build
@@ -34,6 +38,9 @@ lerna-debug.log*
 .env.production
 .env.production.backup
 .env.local.backup
+# Allow .env.example to be versioned
+!.env.example
+!.env.template
 
 # vercel
 .vercel
@@ -41,6 +48,7 @@ lerna-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.tsbuildinfo
 
 # Supabase local
 supabase/.branches
@@ -75,6 +83,56 @@ schema_only.sql
 
 # Docker
 docker-compose.override.yml
+*.dockerignore
+.docker/
 
 # Email templates (not versioned)
 /email-templates/
+
+# Sentry
+.sentryclirc
+.sentry/
+*.map
+sourcemaps/
+
+# Cache and temporary files
+.cache/
+.turbo/
+*.cache
+.temp/
+tmp/
+
+# Lock files (keep package-lock.json, ignore others)
+yarn.lock
+pnpm-lock.yaml
+package-lock.json.backup
+
+# Symbolic links (created during organization)
+.eslintrc.json
+.prettierrc
+sentry.client.config.ts
+sentry.server.config.ts
+sentry.edge.config.ts
+docker-compose.yml
+
+# IDE / Editor (additional)
+*.sublime-*
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS (additional)
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
