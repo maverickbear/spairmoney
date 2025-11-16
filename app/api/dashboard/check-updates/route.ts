@@ -86,102 +86,46 @@ export async function GET(request: Request) {
 
     // Fallback: queries individuais se RPC não funcionou
     if (updates.length === 0) {
+      // Helper function to safely check a table
+      const checkTable = async (
+        tableName: string
+      ): Promise<{ table_name: string; last_update: number } | null> => {
+        try {
+          const { data, error } = await supabase
+            .from(tableName)
+            .select("updatedAt, createdAt")
+            .eq("userId", userId)
+            .order("updatedAt", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (error || !data) return null;
+          const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+          const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+          return { table_name: tableName, last_update: Math.max(updated, created) };
+        } catch {
+          return null;
+        }
+      };
+
       const checks = await Promise.all([
         // Check transactions - filter by userId for better performance
-        supabase
-          .from("Transaction")
-          .select("updatedAt, createdAt")
-          .eq("userId", userId)
-          .order("updatedAt", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data, error }) => {
-            if (error || !data) return null;
-            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-            return { table_name: "Transaction", last_update: Math.max(updated, created) };
-          })
-          .catch(() => null),
+        checkTable("Transaction"),
 
         // Check accounts - filter by userId
-        supabase
-          .from("Account")
-          .select("updatedAt, createdAt")
-          .eq("userId", userId)
-          .order("updatedAt", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data, error }) => {
-            if (error || !data) return null;
-            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-            return { table_name: "Account", last_update: Math.max(updated, created) };
-          })
-          .catch(() => null),
+        checkTable("Account"),
 
         // Check budgets - filter by userId
-        supabase
-          .from("Budget")
-          .select("updatedAt, createdAt")
-          .eq("userId", userId)
-          .order("updatedAt", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data, error }) => {
-            if (error || !data) return null;
-            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-            return { table_name: "Budget", last_update: Math.max(updated, created) };
-          })
-          .catch(() => null),
+        checkTable("Budget"),
 
         // Check goals - filter by userId
-        supabase
-          .from("Goal")
-          .select("updatedAt, createdAt")
-          .eq("userId", userId)
-          .order("updatedAt", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data, error }) => {
-            if (error || !data) return null;
-            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-            return { table_name: "Goal", last_update: Math.max(updated, created) };
-          })
-          .catch(() => null),
+        checkTable("Goal"),
 
         // Check debts - filter by userId
-        supabase
-          .from("Debt")
-          .select("updatedAt, createdAt")
-          .eq("userId", userId)
-          .order("updatedAt", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data, error }) => {
-            if (error || !data) return null;
-            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-            return { table_name: "Debt", last_update: Math.max(updated, created) };
-          })
-          .catch(() => null),
+        checkTable("Debt"),
 
         // Check investment entries (SimpleInvestmentEntry) - filter by userId
-        supabase
-          .from("SimpleInvestmentEntry")
-          .select("updatedAt, createdAt")
-          .eq("userId", userId)
-          .order("updatedAt", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data, error }) => {
-            if (error || !data) return null;
-            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-            return { table_name: "SimpleInvestmentEntry", last_update: Math.max(updated, created) };
-          })
-          .catch(() => null),
+        checkTable("SimpleInvestmentEntry"),
       ]);
 
       updates = checks.filter((item): item is { table_name: string; last_update: number } => item !== null);
