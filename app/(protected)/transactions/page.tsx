@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { logger } from "@/lib/utils/logger";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -164,6 +165,7 @@ function CategoryMenuItem({
 }
 
 export default function TransactionsPage() {
+  const perf = usePagePerformance("Transactions");
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -589,6 +591,9 @@ export default function TransactionsPage() {
         setTransactions([]);
         setTotalTransactions(0);
       }
+      
+      // Mark data as loaded for performance tracking
+      perf.markDataLoaded();
 
       // Generate suggestions for existing transactions without category (only once per page load)
       // Defer this to avoid blocking initial page load

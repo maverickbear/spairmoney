@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { FeatureGuard } from "@/components/common/feature-guard";
 import { PortfolioSummaryCards } from "@/components/portfolio/portfolio-summary-cards";
 import { Loader2 } from "lucide-react";
@@ -45,6 +46,7 @@ interface PortfolioSummary {
 }
 
 export default function InvestmentsPage() {
+  const perf = usePagePerformance("Investments");
   const { checkWriteAccess } = useWriteGuard();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -98,6 +100,8 @@ export default function InvestmentsPage() {
       );
       setAccounts(accountsData && Array.isArray(accountsData) ? accountsData : []);
             setHistoricalData(historical && Array.isArray(historical) ? historical : []);
+      
+      perf.markDataLoaded();
     } catch (error) {
       console.error("Error loading portfolio data:", error);
       // On error, use zero values to show empty dashboard

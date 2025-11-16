@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { ReportsContent } from "./reports-content";
 import { ReportFilters, type ReportPeriod } from "@/components/reports/report-filters";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
@@ -24,6 +25,7 @@ import type { PlanFeatures } from "@/lib/validations/plan";
 import { Loader2 } from "lucide-react";
 
 export default function ReportsPage() {
+  const perf = usePagePerformance("Reports");
   const [period, setPeriod] = useState<ReportPeriod>("last-12-months");
   const [loading, setLoading] = useState(true);
   const [limits, setLimits] = useState<PlanFeatures | null>(null);
@@ -209,8 +211,11 @@ export default function ReportsPage() {
         } catch (error) {
           console.error("Error loading portfolio data:", error);
         }
+        
+        perf.markDataLoaded();
       } catch (error) {
         console.error("Error loading reports data:", error);
+        perf.markDataLoaded();
       } finally {
         setLoading(false);
       }

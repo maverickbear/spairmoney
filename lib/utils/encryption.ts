@@ -33,9 +33,8 @@ if (process.env.NODE_ENV === "development") {
 
 const ENCRYPTION_KEY = ENCRYPTION_KEY_ENV || NEXT_PUBLIC_ENCRYPTION_KEY_ENV || '';
 
-if (!ENCRYPTION_KEY) {
-  logger.warn('[Encryption] ⚠️  No encryption key found in environment variables');
-}
+// Only warn when encryption is actually needed, not on module load
+// The warning will be shown in getKey() when encryption/decryption is attempted
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // For AES, this is always 16
@@ -71,7 +70,12 @@ function getKey(silent: boolean = false): Buffer {
   }
   
   if (!ENCRYPTION_KEY) {
-    logger.error('[Encryption] ❌ ENCRYPTION_KEY is missing!');
+    // Only warn in development, error in production
+    if (process.env.NODE_ENV === 'development') {
+      logger.warn('[Encryption] ⚠️  No encryption key found in environment variables. Encryption/decryption will fail.');
+    } else {
+      logger.error('[Encryption] ❌ ENCRYPTION_KEY is missing!');
+    }
     throw new Error(
       'ENCRYPTION_KEY environment variable is not set. ' +
       'Please add it to your .env.local file and restart your development server. ' +

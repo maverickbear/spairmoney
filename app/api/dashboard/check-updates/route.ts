@@ -1,155 +1,233 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { getCurrentUserId } from "@/lib/api/feature-guard";
+import { cache } from "@/lib/services/redis";
 
 /**
  * API route to silently check if there are new data updates
  * Returns a hash/timestamp that changes when any relevant data is updated
  * This allows the frontend to poll silently without fetching all data
+ * 
+ * OPTIMIZED: Uses Redis cache (5s TTL) + RPC function for better performance
  */
+interface UpdateCheckResult {
+  hasUpdates: boolean;
+  currentHash: string;
+  timestamp: string | null;
+  source?: "cache" | "database";
+  executionTime?: number;
+}
+
+const CACHE_TTL = 5; // 5 segundos
+const CACHE_KEY_PREFIX = "updates:";
+
 export async function GET(request: Request) {
+  const startTime = Date.now();
+
   try {
     const userId = await getCurrentUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await createServerClient();
     const { searchParams } = new URL(request.url);
     const lastCheck = searchParams.get("lastCheck"); // ISO timestamp from client
 
-    // Get the most recent update timestamps from all relevant tables
-    // Use a more efficient approach: get max timestamp from each table
-    const checks = await Promise.all([
-      // Check transactions - get max of updatedAt and createdAt
-      Promise.resolve(
+    // 1. Tentar cache primeiro
+    const cacheKey = `${CACHE_KEY_PREFIX}${userId}`;
+    const cached = await cache.get<UpdateCheckResult>(cacheKey);
+    
+    if (cached) {
+      // Verificar se há updates comparando com lastCheck
+      let hasUpdates = cached.hasUpdates;
+      if (lastCheck) {
+        const lastCheckTime = new Date(lastCheck).getTime();
+        const cachedTimestamp = cached.timestamp ? new Date(cached.timestamp).getTime() : 0;
+        hasUpdates = cachedTimestamp > lastCheckTime;
+      }
+
+      const result: UpdateCheckResult = {
+        ...cached,
+        hasUpdates,
+        source: "cache",
+        executionTime: Date.now() - startTime,
+      };
+
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `[Check Updates] User ${userId.slice(0, 8)}... - ${result.executionTime}ms - ${result.source}`
+        );
+      }
+
+      return NextResponse.json(result);
+    }
+
+    // 2. Buscar do banco (cache miss)
+    const supabase = await createServerClient();
+
+    // Tentar usar RPC function otimizada primeiro
+    let updates: Array<{ table_name: string; last_update: number }> = [];
+    
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc("get_latest_updates", {
+        p_user_id: userId,
+      });
+
+      if (!rpcError && rpcData) {
+        updates = rpcData.map((item: any) => ({
+          table_name: item.table_name,
+          last_update: item.last_update,
+        }));
+      }
+    } catch (rpcError) {
+      // RPC não existe ou falhou, usar fallback
+      console.warn("[Check Updates] RPC function not available, using fallback");
+    }
+
+    // Fallback: queries individuais se RPC não funcionou
+    if (updates.length === 0) {
+      const checks = await Promise.all([
+        // Check transactions - filter by userId for better performance
         supabase
           .from("Transaction")
           .select("updatedAt, createdAt")
+          .eq("userId", userId)
           .order("updatedAt", { ascending: false })
           .limit(1)
           .maybeSingle()
-      )
-        .then(({ data, error }) => {
-          if (error || !data) return null;
-          const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-          const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-          return Math.max(updated, created);
-        })
-        .catch(() => null),
+          .then(({ data, error }) => {
+            if (error || !data) return null;
+            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+            return { table_name: "Transaction", last_update: Math.max(updated, created) };
+          })
+          .catch(() => null),
 
-      // Check accounts
-      Promise.resolve(
+        // Check accounts - filter by userId
         supabase
           .from("Account")
           .select("updatedAt, createdAt")
+          .eq("userId", userId)
           .order("updatedAt", { ascending: false })
           .limit(1)
           .maybeSingle()
-      )
-        .then(({ data, error }) => {
-          if (error || !data) return null;
-          const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-          const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-          return Math.max(updated, created);
-        })
-        .catch(() => null),
+          .then(({ data, error }) => {
+            if (error || !data) return null;
+            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+            return { table_name: "Account", last_update: Math.max(updated, created) };
+          })
+          .catch(() => null),
 
-      // Check budgets
-      Promise.resolve(
+        // Check budgets - filter by userId
         supabase
           .from("Budget")
           .select("updatedAt, createdAt")
+          .eq("userId", userId)
           .order("updatedAt", { ascending: false })
           .limit(1)
           .maybeSingle()
-      )
-        .then(({ data, error }) => {
-          if (error || !data) return null;
-          const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-          const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-          return Math.max(updated, created);
-        })
-        .catch(() => null),
+          .then(({ data, error }) => {
+            if (error || !data) return null;
+            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+            return { table_name: "Budget", last_update: Math.max(updated, created) };
+          })
+          .catch(() => null),
 
-      // Check goals
-      Promise.resolve(
+        // Check goals - filter by userId
         supabase
           .from("Goal")
           .select("updatedAt, createdAt")
+          .eq("userId", userId)
           .order("updatedAt", { ascending: false })
           .limit(1)
           .maybeSingle()
-      )
-        .then(({ data, error }) => {
-          if (error || !data) return null;
-          const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-          const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-          return Math.max(updated, created);
-        })
-        .catch(() => null),
+          .then(({ data, error }) => {
+            if (error || !data) return null;
+            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+            return { table_name: "Goal", last_update: Math.max(updated, created) };
+          })
+          .catch(() => null),
 
-      // Check debts
-      Promise.resolve(
+        // Check debts - filter by userId
         supabase
           .from("Debt")
           .select("updatedAt, createdAt")
+          .eq("userId", userId)
           .order("updatedAt", { ascending: false })
           .limit(1)
           .maybeSingle()
-      )
-        .then(({ data, error }) => {
-          if (error || !data) return null;
-          const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-          const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-          return Math.max(updated, created);
-        })
-        .catch(() => null),
+          .then(({ data, error }) => {
+            if (error || !data) return null;
+            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+            return { table_name: "Debt", last_update: Math.max(updated, created) };
+          })
+          .catch(() => null),
 
-      // Check investment entries (SimpleInvestmentEntry)
-      Promise.resolve(
+        // Check investment entries (SimpleInvestmentEntry) - filter by userId
         supabase
           .from("SimpleInvestmentEntry")
           .select("updatedAt, createdAt")
+          .eq("userId", userId)
           .order("updatedAt", { ascending: false })
           .limit(1)
           .maybeSingle()
-      )
-        .then(({ data, error }) => {
-          if (error || !data) return null;
-          const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-          const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
-          return Math.max(updated, created);
-        })
-        .catch(() => null),
-    ]);
+          .then(({ data, error }) => {
+            if (error || !data) return null;
+            const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+            const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
+            return { table_name: "SimpleInvestmentEntry", last_update: Math.max(updated, created) };
+          })
+          .catch(() => null),
+      ]);
 
-    // Get the maximum timestamp from all checks
-    const maxTimestamp = Math.max(...checks.filter((t: number | null): t is number => t !== null), 0);
-    const currentHash = maxTimestamp.toString();
-
-    // If client provided a lastCheck timestamp, compare
-    if (lastCheck) {
-      const lastCheckTime = new Date(lastCheck).getTime();
-      const hasUpdates = maxTimestamp > lastCheckTime;
-
-      return NextResponse.json({
-        hasUpdates,
-        currentHash,
-        timestamp: maxTimestamp > 0 ? new Date(maxTimestamp).toISOString() : null,
-      });
+      updates = checks.filter((item): item is { table_name: string; last_update: number } => item !== null);
     }
 
-    // First check - just return the current hash
-    return NextResponse.json({
-      hasUpdates: false,
+    // 3. Calcular hash baseado na última atualização
+    const timestamps = updates.map((u) => u.last_update).filter((t) => t > 0);
+    const maxTimestamp = timestamps.length > 0 ? Math.max(...timestamps) : 0;
+    const currentHash = maxTimestamp.toString();
+
+    // 4. Verificar se há atualizações
+    let hasUpdates = false;
+    if (lastCheck) {
+      const lastCheckTime = new Date(lastCheck).getTime();
+      hasUpdates = maxTimestamp > lastCheckTime;
+    }
+
+    // 5. Preparar resposta
+    const result: UpdateCheckResult = {
+      hasUpdates,
       currentHash,
       timestamp: maxTimestamp > 0 ? new Date(maxTimestamp).toISOString() : null,
-    });
+      source: "database",
+      executionTime: Date.now() - startTime,
+    };
+
+    // 6. Salvar no cache
+    await cache.set(cacheKey, result, CACHE_TTL);
+
+    // 7. Log de performance (apenas em desenvolvimento)
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `[Check Updates] User ${userId.slice(0, 8)}... - ${result.executionTime}ms - ${result.source}`
+      );
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error("[Dashboard Check Updates] Error:", error);
+    const executionTime = Date.now() - startTime;
+    console.error(`[Check Updates] Error after ${executionTime}ms:`, error);
+
     return NextResponse.json(
-      { error: "Failed to check updates" },
+      {
+        error: "Failed to check updates",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

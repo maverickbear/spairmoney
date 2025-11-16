@@ -54,91 +54,74 @@ async function loadDashboardDataInternal(
   const { getProfile } = await import('@/lib/api/profile');
 
   // Helper function to get accounts with tokens
+  // OPTIMIZED: Uses getAccounts() which already has optimized balance calculation
+  // and proper RLS filtering by userId
   async function getAccountsWithTokens(accessToken?: string, refreshToken?: string) {
+    // Use the existing optimized getAccounts function which:
+    // 1. Properly filters by userId via RLS
+    // 2. Has optimized balance calculation
+    // 3. Handles investment accounts correctly
+    // Pass tokens to ensure proper authentication
+    const accounts = await getAccounts(accessToken, refreshToken);
+    
+    // Still need to fetch AccountOwner relationships and owner names
     const supabase = await createServerClient(accessToken, refreshToken);
-    const { data: accounts, error } = await supabase
-      .from("Account")
-      .select("*")
-      .order("name", { ascending: true });
-
-    if (error || !accounts) {
+    
+    const accountIds = accounts.map(acc => acc.id);
+    if (accountIds.length === 0) {
       return [];
     }
 
-    // Fetch all transactions up to today
-    const now = new Date();
-    const todayYear = now.getFullYear();
-    const todayMonth = now.getMonth();
-    const todayDay = now.getDate();
-    const todayEnd = new Date(todayYear, todayMonth, todayDay, 23, 59, 59, 999);
-    
-    const { data: transactions } = await supabase
-      .from("Transaction")
-      .select("accountId, type, amount, date")
-      .lte("date", todayEnd.toISOString());
-
-    // Calculate balances
-    const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
-    const { calculateAccountBalances } = await import("@/lib/services/balance-calculator");
-    
-    const decryptedTransactions = decryptTransactionsBatch(transactions || []);
-    const accountsWithInitialBalance = accounts.map(account => ({
-      ...account,
-      initialBalance: (account as any).initialBalance ?? 0,
-      balance: 0,
-    }));
-    
-    const balances = calculateAccountBalances(
-      accountsWithInitialBalance,
-      decryptedTransactions as any,
-      todayEnd
-    );
-
-    // Fetch AccountOwner relationships
+    // Fetch AccountOwner relationships and collect all owner IDs
     const { data: accountOwners } = await supabase
       .from("AccountOwner")
-      .select("accountId, ownerId");
+      .select("accountId, ownerId")
+      .in("accountId", accountIds);
+
+    // Collect all owner IDs from both AccountOwner and accounts
+    const allOwnerIds = new Set<string>();
+    accounts.forEach((acc: any) => {
+      if (acc.userId) {
+        allOwnerIds.add(acc.userId);
+      }
+    });
+    accountOwners?.forEach((ao) => {
+      allOwnerIds.add(ao.ownerId);
+    });
+
+    // Fetch owner names in parallel (only if we have owner IDs)
+    const ownersResult = allOwnerIds.size > 0
+      ? await supabase
+          .from("User")
+          .select("id, name")
+          .in("id", Array.from(allOwnerIds))
+      : { data: null, error: null };
+
+    const owners = ownersResult.data || [];
 
     const accountOwnersMap = new Map<string, string[]>();
-    accountOwners?.forEach((ao) => {
+    (accountOwners || []).forEach((ao) => {
       if (!accountOwnersMap.has(ao.accountId)) {
         accountOwnersMap.set(ao.accountId, []);
       }
       accountOwnersMap.get(ao.accountId)!.push(ao.ownerId);
     });
 
-    const allOwnerIds = new Set<string>();
-    accountOwners?.forEach((ao) => {
-      allOwnerIds.add(ao.ownerId);
-    });
-    accounts.forEach((acc) => {
-      if (acc.userId) {
-        allOwnerIds.add(acc.userId);
-      }
-    });
-
-    const { data: owners } = await supabase
-      .from("User")
-      .select("id, name")
-      .in("id", Array.from(allOwnerIds));
-
     const ownerNameMap = new Map<string, string>();
-    owners?.forEach((owner) => {
+    owners.forEach((owner) => {
       if (owner.id && owner.name) {
         const firstName = owner.name.split(' ')[0];
         ownerNameMap.set(owner.id, firstName);
       }
     });
 
-    // Combine accounts with balances and owner info
+    // Combine accounts with owner info (balances already calculated by getAccounts)
     return accounts.map((account: any) => {
-      const balance = balances.get(account.id) || 0;
       const ownerIds = accountOwnersMap.get(account.id) || (account.userId ? [account.userId] : []);
       const ownerNames = ownerIds.map(id => ownerNameMap.get(id) || 'Unknown').filter(Boolean);
       
       return {
         ...account,
-        balance,
         ownerIds,
         ownerNames,
       };
@@ -198,9 +181,13 @@ async function loadDashboardDataInternal(
   }
 
   // Helper function to check onboarding status with tokens
-  async function checkOnboardingStatusWithTokens(accessToken?: string, refreshToken?: string) {
+  // OPTIMIZED: Reuses accounts from Promise.all to avoid duplicate query
+  async function checkOnboardingStatusWithTokens(
+    accounts: any[],
+    accessToken?: string, 
+    refreshToken?: string
+  ) {
     try {
-      const accounts = await getAccountsWithTokens(accessToken, refreshToken);
       const hasAccount = accounts.length > 0;
       const totalBalance = accounts.reduce((sum: number, acc: any) => sum + (acc.balance || 0), 0);
 
@@ -264,6 +251,7 @@ async function loadDashboardDataInternal(
   }
 
   // Fetch all data in parallel, using tokens when available
+  // OPTIMIZED: Get accounts first, then use it for onboarding status to avoid duplicate query
   const [
     selectedMonthTransactionsResult,
     lastMonthTransactionsResult,
@@ -275,7 +263,6 @@ async function loadDashboardDataInternal(
     accounts,
     liabilities,
     debts,
-    onboardingStatus,
   ] = await Promise.all([
     getTransactionsInternal({ startDate: selectedMonth, endDate: selectedMonthEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching selected month transactions:", error);
@@ -293,7 +280,7 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching upcoming transactions:", error);
       return [];
     }),
-    calculateFinancialHealth(selectedMonth).catch((error) => {
+    calculateFinancialHealth(selectedMonth, userId, accessToken, refreshToken).catch((error) => {
       logger.error("Error calculating financial health:", error);
       // Return a valid FinancialHealthData object instead of null
       // This ensures the widget can still render with an error message
@@ -332,16 +319,18 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching debts:", error);
       return [];
     }),
-    checkOnboardingStatusWithTokens(accessToken, refreshToken).catch((error) => {
-      logger.error("Error checking onboarding status:", error);
-      return {
-        hasAccount: false,
-        hasCompleteProfile: false,
-        completedCount: 0,
-        totalCount: 2,
-      };
-    }),
   ]);
+
+  // Calculate onboarding status using already-fetched accounts (avoid duplicate query)
+  const onboardingStatus = await checkOnboardingStatusWithTokens(accounts, accessToken, refreshToken).catch((error) => {
+    logger.error("Error checking onboarding status:", error);
+    return {
+      hasAccount: false,
+      hasCompleteProfile: false,
+      completedCount: 0,
+      totalCount: 2,
+    };
+  });
 
   // Extract transactions arrays from the results
   const selectedMonthTransactions = Array.isArray(selectedMonthTransactionsResult) 
@@ -403,11 +392,16 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
   try {
     const { createServerClient } = await import('@/lib/supabase-server');
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (session) {
-      accessToken = session.access_token;
-      refreshToken = session.refresh_token;
+    if (user) {
+      // Only get session tokens if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        accessToken = session.access_token;
+        refreshToken = session.refresh_token;
+      }
     }
   } catch (error: any) {
     logger.warn('[Dashboard] Could not get session tokens:', error?.message);

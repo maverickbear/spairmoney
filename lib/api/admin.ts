@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerClient } from "@/lib/supabase-server";
+import { createServerClient, createServiceRoleClient } from "@/lib/supabase-server";
 import { invalidateAllCategoriesCache } from "@/lib/api/categories";
 import Stripe from "stripe";
 
@@ -80,7 +80,8 @@ export async function getAllUsers(): Promise<AdminUser[]> {
   }
 
   try {
-    const supabase = await createServerClient();
+    // Use service role client to bypass RLS and get all users
+    const supabase = createServiceRoleClient();
 
     // Get all users
     const { data: users, error: usersError } = await supabase
@@ -89,21 +90,24 @@ export async function getAllUsers(): Promise<AdminUser[]> {
       .order("createdAt", { ascending: false });
 
     if (usersError) {
+      console.error("[getAllUsers] Error fetching users:", usersError);
       throw usersError;
     }
 
     if (!users || users.length === 0) {
+      console.log("[getAllUsers] No users found");
       return [];
     }
 
+    console.log(`[getAllUsers] Found ${users.length} users`);
+
     const userIds = users.map((u) => u.id);
 
-    // Get all subscriptions
+    // Get all subscriptions (not just active ones, to show all subscription statuses)
     const { data: subscriptions, error: subsError } = await supabase
       .from("Subscription")
       .select("id, userId, planId, status")
       .in("userId", userIds)
-      .eq("status", "active")
       .order("createdAt", { ascending: false });
 
     if (subsError) {
@@ -120,9 +124,15 @@ export async function getAllUsers(): Promise<AdminUser[]> {
     }
 
     const planMap = new Map((plans || []).map((p) => [p.id, p]));
-    const subscriptionMap = new Map(
-      (subscriptions || []).map((s) => [s.userId, s])
-    );
+    
+    // Create a map of userId to most recent subscription
+    // Since subscriptions are already ordered by createdAt DESC, we just need the first one per user
+    const subscriptionMap = new Map<string, { id: string; userId: string; planId: string; status: string }>();
+    (subscriptions || []).forEach((s) => {
+      if (!subscriptionMap.has(s.userId)) {
+        subscriptionMap.set(s.userId, s);
+      }
+    });
 
     // Get household information for all users
     // First get all household members where user is owner or member

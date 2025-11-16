@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -21,8 +22,13 @@ import { contactFormSchema, ContactFormData } from "@/lib/validations/contact";
 import { Loader2 } from "lucide-react";
 
 export default function HelpSupportPage() {
+  const perf = usePagePerformance("HelpSupport");
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  useEffect(() => {
+    perf.markComplete();
+  }, [perf]);
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactFormSchema),

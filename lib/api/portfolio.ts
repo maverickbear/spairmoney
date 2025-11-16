@@ -4,6 +4,9 @@ import { getHoldings, getInvestmentAccounts, getInvestmentTransactions } from "@
 import { Holding as SupabaseHolding } from "@/lib/api/investments";
 import { formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 import { subDays, startOfDay, endOfDay } from "date-fns";
+import { unstable_cache } from "next/cache";
+import { getCurrentUserId } from "@/lib/api/feature-guard";
+import { cache } from "@/lib/services/redis";
 
 // Portfolio types - exported for use across the application
 export interface Holding {
@@ -78,17 +81,18 @@ export async function convertSupabaseHoldingToHolding(supabaseHolding: SupabaseH
   };
 }
 
-// Get portfolio summary
-export async function getPortfolioSummary(): Promise<PortfolioSummary> {
+// Internal function to calculate portfolio summary (without cache)
+async function getPortfolioSummaryInternal(): Promise<PortfolioSummary> {
   const { createServerClient } = await import("@/lib/supabase-server");
   const supabase = await createServerClient();
 
   const holdings = await getHoldings();
   
   // Try to get total value from Questrade accounts first (more accurate)
+  // Optimized: Single query with only needed fields
   const { data: questradeAccounts } = await supabase
     .from("InvestmentAccount")
-    .select("*")
+    .select("totalEquity, marketValue, cash")
     .eq("isQuestradeConnected", true);
 
   let totalValue: number;
@@ -115,19 +119,18 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
   
   try {
     const yesterday = subDays(new Date(), 1);
-    const yesterdayKey = yesterday.toISOString().split("T")[0];
     
     // Get security IDs from holdings (Holding.securityId is the securityId)
     const securityIds = Array.from(new Set(holdings.map(h => h.securityId)));
     
     if (securityIds.length > 0) {
       // Get yesterday's prices directly from SecurityPrice table
+      // Optimized: Only select needed fields
       const { data: yesterdayPrices } = await supabase
         .from("SecurityPrice")
         .select("securityId, price")
         .in("securityId", securityIds)
-        .eq("date", formatDateStart(yesterday))
-        .order("securityId", { ascending: true });
+        .eq("date", formatDateStart(yesterday));
       
       if (yesterdayPrices && yesterdayPrices.length > 0) {
         // Calculate yesterday's portfolio value
@@ -165,6 +168,36 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
     totalCost,
     holdingsCount: holdings.length,
   };
+}
+
+// Get portfolio summary with caching
+export async function getPortfolioSummary(): Promise<PortfolioSummary> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  // OPTIMIZED: Try Redis cache first (5 minutes TTL for portfolio data)
+  const cacheKey = `portfolio:summary:${userId}`;
+  const cached = await cache.get<PortfolioSummary>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  // Fallback to Next.js cache if Redis not available
+  const result = await unstable_cache(
+    async () => getPortfolioSummaryInternal(),
+    [`portfolio-summary-${userId}`],
+    {
+      tags: ['investments', 'portfolio'],
+      revalidate: 30, // 30 seconds
+    }
+  )();
+
+  // Store in Redis cache (5 minutes TTL)
+  await cache.set(cacheKey, result, 300);
+
+  return result;
 }
 
 // Get portfolio holdings (convert from Supabase format)
@@ -226,8 +259,8 @@ export async function getPortfolioAccounts(): Promise<Account[]> {
   });
 }
 
-// Get portfolio historical data
-export async function getPortfolioHistoricalData(days: number = 365): Promise<HistoricalDataPoint[]> {
+// Internal function to calculate portfolio historical data (without cache)
+async function getPortfolioHistoricalDataInternal(days: number = 365): Promise<HistoricalDataPoint[]> {
   const { createServerClient } = await import("@/lib/supabase-server");
   const supabase = await createServerClient();
   
@@ -247,6 +280,7 @@ export async function getPortfolioHistoricalData(days: number = 365): Promise<Hi
   }
   
   // Get historical prices for all securities
+  // Optimized: Only select needed fields and use efficient date range query
   const { data: historicalPrices } = await supabase
     .from("SecurityPrice")
     .select("securityId, price, date")
@@ -271,8 +305,9 @@ export async function getPortfolioHistoricalData(days: number = 365): Promise<Hi
   }
   
   // Get all transactions to track quantity changes over time
-  // We need transactions from before startDate too, to calculate initial holdings
-  const transactionsStartDate = subDays(startDate, 365 * 5); // Get transactions from up to 5 years ago
+  // OPTIMIZED: Only get transactions from 30 days before startDate (instead of 5 years)
+  // This dramatically reduces the amount of data processed
+  const transactionsStartDate = subDays(startDate, 30); // Only 30 days before (was 5 years!)
   const transactions = await getInvestmentTransactions({
     startDate: transactionsStartDate,
     endDate,
@@ -434,6 +469,36 @@ export async function getPortfolioHistoricalData(days: number = 365): Promise<Hi
   }
   
   return data;
+}
+
+// Get portfolio historical data with caching
+export async function getPortfolioHistoricalData(days: number = 365): Promise<HistoricalDataPoint[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  // OPTIMIZED: Try Redis cache first (5 minutes TTL for historical data)
+  const cacheKey = `portfolio:historical:${userId}:${days}`;
+  const cached = await cache.get<HistoricalDataPoint[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  // Fallback to Next.js cache if Redis not available
+  const result = await unstable_cache(
+    async () => getPortfolioHistoricalDataInternal(days),
+    [`portfolio-historical-${userId}-${days}`],
+    {
+      tags: ['investments', 'portfolio'],
+      revalidate: 60, // 60 seconds
+    }
+  )();
+
+  // Store in Redis cache (5 minutes TTL)
+  await cache.set(cacheKey, result, 300);
+
+  return result;
 }
 
 // Get recent portfolio transactions

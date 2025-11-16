@@ -25,6 +25,51 @@ export interface Holding {
 
 export async function getHoldings(accountId?: string): Promise<Holding[]> {
   const supabase = await createServerClient();
+  const log = logger.withPrefix("INVESTMENTS");
+
+  // OPTIMIZED: Try to use materialized view first (much faster)
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      let viewQuery = supabase
+        .from("holdings_view")
+        .select("*")
+        .eq("user_id", user.id)
+        .gt("quantity", 0)
+        .order("market_value", { ascending: false });
+
+      if (accountId) {
+        viewQuery = viewQuery.eq("account_id", accountId);
+      }
+
+      const { data: holdingsView, error: viewError } = await viewQuery;
+
+      if (!viewError && holdingsView && holdingsView.length > 0) {
+        // Convert view format to Holding format
+        const holdings: Holding[] = holdingsView.map((h: any) => ({
+          securityId: h.security_id,
+          symbol: h.symbol || "",
+          name: h.name || h.symbol || "",
+          assetType: h.asset_type || "Stock",
+          sector: h.sector || "Unknown",
+          quantity: h.quantity || 0,
+          avgPrice: h.avg_price || 0,
+          bookValue: h.book_value || 0,
+          lastPrice: h.last_price || 0,
+          marketValue: h.market_value || 0,
+          unrealizedPnL: h.unrealized_pnl || 0,
+          unrealizedPnLPercent: h.unrealized_pnl_percent || 0,
+          accountId: h.account_id,
+          accountName: h.account_name || "Unknown Account",
+        }));
+
+        return holdings;
+      }
+    }
+  } catch (viewError) {
+    // View not available or error - fallback to original logic
+    log.debug("Holdings view not available, using fallback:", viewError);
+  }
 
   // First, try to get holdings from Questrade positions (more accurate)
   const { data: questradePositions, error: positionsError } = await supabase
@@ -77,7 +122,7 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
   }
 
   // Fallback to calculating from transactions if no Questrade positions
-  const log = logger.withPrefix("INVESTMENTS");
+  // Note: This fallback is slower but necessary if views/positions are not available
 
   let query = supabase
     .from("InvestmentTransaction")
@@ -118,6 +163,9 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
         // Silently skip transfer transactions as they don't affect holdings
         continue;
       }
+      // NOTE: Transactions of type buy, sell, dividend, or interest should have a securityId
+      // If you see many skipped transactions, run the fix script:
+      // npx tsx scripts/fix-investment-transactions-security.ts
       // Track skipped transactions for summary log (only in development)
       if (process.env.NODE_ENV === "development") {
         skippedTransactions.push(`${tx.id} (${tx.type})`);

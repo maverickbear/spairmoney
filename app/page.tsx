@@ -2,6 +2,7 @@ import dynamic from "next/dynamic";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { getCurrentUser } from "@/lib/api/auth";
+import { startServerPagePerformance } from "@/lib/utils/performance";
 
 // Lazy load heavy landing page components for better initial load performance
 const HeroSection = dynamic(() => import("@/components/landing/hero-section").then(m => ({ default: m.HeroSection })), { ssr: true });
@@ -26,9 +27,13 @@ export const metadata = {
  * can always return to this landing page if they want to see the site.
  */
 export default async function LandingPage() {
+  const perf = startServerPagePerformance("Landing");
+  
   // Check authentication status on server to show correct buttons immediately
   const user = await getCurrentUser();
   const isAuthenticated = !!user;
+  
+  perf.end();
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -109,12 +109,17 @@ export default function PortalManagementPage() {
       setLoading(true);
       const response = await fetch("/api/admin/users");
       if (!response.ok) {
-        throw new Error("Failed to load users");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Failed to load users";
+        console.error("Error loading users:", errorMessage);
+        setUsers([]);
+        return;
       }
       const data = await response.json();
-      setUsers(data.users || []);
+      setUsers(Array.isArray(data.users) ? data.users : []);
     } catch (error) {
       console.error("Error loading users:", error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -124,12 +129,17 @@ export default function PortalManagementPage() {
     try {
       const response = await fetch("/api/admin/promo-codes");
       if (!response.ok) {
-        throw new Error("Failed to load promo codes");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Failed to load promo codes";
+        console.error("Error loading promo codes:", errorMessage);
+        setPromoCodes([]);
+        return;
       }
       const data = await response.json();
-      setPromoCodes(data.promoCodes || []);
+      setPromoCodes(Array.isArray(data.promoCodes) ? data.promoCodes : []);
     } catch (error) {
       console.error("Error loading promo codes:", error);
+      setPromoCodes([]);
     }
   }
 
@@ -155,12 +165,17 @@ export default function PortalManagementPage() {
       setLoadingDashboard(true);
       const response = await fetch("/api/admin/dashboard");
       if (!response.ok) {
-        throw new Error("Failed to load dashboard data");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Failed to load dashboard data";
+        console.error("Error loading dashboard:", errorMessage);
+        setDashboardData(null);
+        return;
       }
       const data = await response.json();
       setDashboardData(data);
     } catch (error) {
       console.error("Error loading dashboard:", error);
+      setDashboardData(null);
     } finally {
       setLoadingDashboard(false);
     }
@@ -171,12 +186,17 @@ export default function PortalManagementPage() {
       setLoadingContactForms(true);
       const response = await fetch("/api/admin/contact-forms");
       if (!response.ok) {
-        throw new Error("Failed to load contact forms");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Failed to load contact forms";
+        console.error("Error loading contact forms:", errorMessage);
+        setContactForms([]);
+        return;
       }
       const data = await response.json();
-      setContactForms(data.contactForms || []);
+      setContactForms(Array.isArray(data.contactForms) ? data.contactForms : []);
     } catch (error) {
       console.error("Error loading contact forms:", error);
+      setContactForms([]);
     } finally {
       setLoadingContactForms(false);
     }
@@ -187,13 +207,20 @@ export default function PortalManagementPage() {
       setLoadingFeedbacks(true);
       const response = await fetch("/api/admin/feedback");
       if (!response.ok) {
-        throw new Error("Failed to load feedbacks");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Failed to load feedbacks";
+        console.error("Error loading feedbacks:", errorMessage);
+        setFeedbacks([]);
+        setFeedbackMetrics(null);
+        return;
       }
       const data = await response.json();
-      setFeedbacks(data.feedbacks || []);
+      setFeedbacks(Array.isArray(data.feedbacks) ? data.feedbacks : []);
       setFeedbackMetrics(data.metrics || null);
     } catch (error) {
       console.error("Error loading feedbacks:", error);
+      setFeedbacks([]);
+      setFeedbackMetrics(null);
     } finally {
       setLoadingFeedbacks(false);
     }
@@ -252,17 +279,26 @@ export default function PortalManagementPage() {
 
       if (groupsRes.ok) {
         const groupsData = await groupsRes.json();
-        setGroups(groupsData || []);
+        setGroups(Array.isArray(groupsData) ? groupsData : []);
+      } else {
+        const errorData = await groupsRes.json().catch(() => ({}));
+        console.error("Error loading groups:", errorData.error || "Failed to load groups");
       }
 
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
-        setCategories(categoriesData || []);
+        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      } else {
+        const errorData = await categoriesRes.json().catch(() => ({}));
+        console.error("Error loading categories:", errorData.error || "Failed to load categories");
       }
 
       if (subcategoriesRes.ok) {
         const subcategoriesData = await subcategoriesRes.json();
-        setSubcategories(subcategoriesData || []);
+        setSubcategories(Array.isArray(subcategoriesData) ? subcategoriesData : []);
+      } else {
+        const errorData = await subcategoriesRes.json().catch(() => ({}));
+        console.error("Error loading subcategories:", errorData.error || "Failed to load subcategories");
       }
     } catch (error) {
       console.error("Error loading system entities:", error);

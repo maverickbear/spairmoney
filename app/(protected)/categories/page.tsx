@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { logger } from "@/lib/utils/logger";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,7 @@ interface GroupedData {
 }
 
 export default function CategoriesPage() {
+  const perf = usePagePerformance("Categories");
   const { toast } = useToast();
   const { checkWriteAccess } = useWriteGuard();
   const { openDialog: openDeleteCategoryDialog, ConfirmDialog: DeleteCategoryConfirmDialog } = useConfirmDialog();
@@ -83,8 +85,10 @@ export default function CategoriesPage() {
       
       setCategories(allCategories);
       setMacros(macrosData);
+      perf.markDataLoaded();
     } catch (error) {
       logger.error("Error loading data:", error);
+      perf.markDataLoaded();
     }
   }
 

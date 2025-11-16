@@ -40,14 +40,14 @@ export function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
             <Button
               asChild
-              className="bg-white text-[#1A1A8F] hover:bg-white/90 text-lg font-medium px-8 py-7 h-auto rounded-full transition-all"
+              className="bg-white text-[#1A1A8F] hover:bg-white/90 text-lg font-medium px-8 h-12 rounded-full transition-all"
             >
               <Link href="#pricing">Get Started</Link>
             </Button>
             <Button
               asChild
               variant="outline"
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20 text-lg font-medium px-8 py-7 h-auto rounded-full backdrop-blur-sm"
+              className="bg-white/10 border-white/30 text-white hover:bg-white/20 text-lg font-medium px-8 h-12 rounded-full backdrop-blur-sm"
             >
               <Link href="#features">
                 Learn More

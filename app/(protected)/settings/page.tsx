@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, Suspense, lazy } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -743,6 +744,13 @@ function BillingModuleContent() {
       setLoading(false);
     }
   }, [hasLoaded, syncing]);
+  
+  // Mark billing as loaded when data is ready
+  useEffect(() => {
+    if (!loading && hasLoaded) {
+      // Billing data is loaded
+    }
+  }, [loading, hasLoaded]);
 
   // Check if user is returning from Stripe Portal
   useEffect(() => {
@@ -851,6 +859,7 @@ function useBillingPreload() {
 
 // Main My Account Page
 export default function MyAccountPage() {
+  const perf = usePagePerformance("Settings");
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(() => {
@@ -860,6 +869,15 @@ export default function MyAccountPage() {
 
   // Preload billing data in background
   useBillingPreload();
+  
+  // Mark as loaded when component mounts (page structure is ready)
+  useEffect(() => {
+    // Small delay to ensure all modules have initialized
+    const timer = setTimeout(() => {
+      perf.markComplete();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [perf]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");

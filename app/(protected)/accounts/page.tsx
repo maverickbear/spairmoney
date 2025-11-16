@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Edit, Trash2, CreditCard, Loader2, RefreshCw, Unlink } from "lucide-react";
@@ -46,6 +47,7 @@ interface Account {
 }
 
 export default function AccountsPage() {
+  const perf = usePagePerformance("Accounts");
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess } = useWriteGuard();
@@ -74,9 +76,11 @@ export default function AccountsPage() {
       const data = await getAccountsClient();
       setAccounts(data);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } catch (error) {
       console.error("Error loading accounts:", error);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } finally {
       setLoading(false);
     }

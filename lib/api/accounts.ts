@@ -7,16 +7,33 @@ import { getCurrentTimestamp, formatTimestamp } from "@/lib/utils/timestamp";
 import { getAccountBalance } from "./transactions";
 import { guardAccountLimit, throwIfNotAllowed } from "@/lib/api/feature-guard";
 import { requireAccountOwnership } from "@/lib/utils/security";
+import { logger } from "@/lib/utils/logger";
 
-export async function getAccounts() {
-    const supabase = await createServerClient();
+export async function getAccounts(accessToken?: string, refreshToken?: string) {
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    logger.error("[getAccounts] User not authenticated:", authError?.message);
+    return [];
+  }
+
+  logger.debug("[getAccounts] Fetching accounts for user:", user.id);
 
   const { data: accounts, error } = await supabase
     .from("Account")
     .select("*")
     .order("name", { ascending: true });
 
-  if (error || !accounts) {
+  if (error) {
+    logger.error("[getAccounts] Error fetching accounts:", error);
+    return [];
+  }
+
+  logger.debug("[getAccounts] Found accounts:", accounts?.length || 0);
+
+  if (!accounts) {
     return [];
   }
 

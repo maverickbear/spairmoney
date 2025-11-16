@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Wallet } from "lucide-react";
@@ -62,6 +63,7 @@ interface Category {
 }
 
 export default function BudgetsPage() {
+  const perf = usePagePerformance("Budgets");
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess } = useWriteGuard();
@@ -100,9 +102,11 @@ export default function BudgetsPage() {
       setCategories(categoriesData as Category[]);
       setMacros(macrosData as Macro[]);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } catch (error) {
       console.error("Error loading data:", error);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } finally {
       setLoading(false);
     }

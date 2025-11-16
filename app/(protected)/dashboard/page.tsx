@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { getProfile } from "@/lib/api/profile";
 import { DashboardRealtime } from "@/components/dashboard/dashboard-realtime";
 import { DashboardUpdateChecker } from "@/components/dashboard/dashboard-update-checker";
+import { startServerPagePerformance } from "@/lib/utils/performance";
 
 // Lazy load the new Financial Overview page
 const FinancialOverviewPage = dynamic(() => import("./financial-overview-page").then(m => ({ default: m.FinancialOverviewPage })), { ssr: true });
@@ -45,6 +46,8 @@ async function DashboardContent({ selectedMonthDate }: { selectedMonthDate: Date
 }
 
 export default async function Dashboard({ searchParams }: DashboardProps) {
+  const perf = startServerPagePerformance("Dashboard");
+  
   // Get selected month from URL or use current month
   const params = await Promise.resolve(searchParams);
   const selectedMonthParam = params?.month;
@@ -63,7 +66,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   const profile = await getProfile();
   const firstName = profile?.name?.split(' ')[0] || 'there';
   
-  // Log removed for production performance
+  perf.end();
 
   return (
     <div className="space-y-4 md:space-y-6 max-w-full overflow-x-hidden">

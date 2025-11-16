@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase-server";
+import { createServerClient, createServiceRoleClient } from "@/lib/supabase-server";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerClient();
+    // Use service role client to bypass RLS and get all data
+    const supabase = createServiceRoleClient();
 
     // Get all users count
     const { count: totalUsers, error: usersError } = await supabase
@@ -80,6 +81,8 @@ export async function GET(request: NextRequest) {
 
     if (subsError) {
       console.error("Error fetching subscriptions:", subsError);
+    } else {
+      console.log(`[dashboard] Found ${subscriptions?.length || 0} subscriptions`);
     }
 
     // Get all plans
@@ -95,6 +98,8 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const subscriptionsList = subscriptions || [];
 
+    console.log(`[dashboard] Processing ${subscriptionsList.length} subscriptions`);
+
     // Calculate metrics
     const activeSubscriptions = subscriptionsList.filter(
       (sub) => sub.status === "active"
@@ -108,6 +113,14 @@ export async function GET(request: NextRequest) {
     const pastDueSubscriptions = subscriptionsList.filter(
       (sub) => sub.status === "past_due"
     );
+
+    console.log(`[dashboard] Metrics:`, {
+      total: subscriptionsList.length,
+      active: activeSubscriptions.length,
+      trialing: trialingSubscriptions.length,
+      cancelled: cancelledSubscriptions.length,
+      pastDue: pastDueSubscriptions.length,
+    });
 
     // Calculate MRR (Monthly Recurring Revenue)
     // For active subscriptions, we need to determine if they're monthly or yearly

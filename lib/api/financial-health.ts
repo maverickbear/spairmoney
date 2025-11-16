@@ -8,6 +8,7 @@ import { getAccounts } from "./accounts";
 import { getDebts } from "./debts";
 import { getUserLiabilities } from "./plaid/liabilities";
 import { logger } from "@/lib/utils/logger";
+import { getCurrentUserId } from "@/lib/api/feature-guard";
 
 export interface FinancialHealthData {
   score: number;
@@ -292,8 +293,8 @@ async function calculateFinancialHealthInternal(
   try {
     const { createServerClient } = await import("@/lib/supabase-server");
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
 
     if (userId) {
       // Get total debts
@@ -376,34 +377,67 @@ async function calculateFinancialHealthInternal(
   return result;
 }
 
-export async function calculateFinancialHealth(selectedDate?: Date): Promise<FinancialHealthData> {
+export async function calculateFinancialHealth(
+  selectedDate?: Date,
+  userId?: string | null,
+  accessToken?: string,
+  refreshToken?: string
+): Promise<FinancialHealthData> {
   const log = logger.withPrefix("calculateFinancialHealth");
   
-  // Get tokens from Supabase client directly (not from cookies)
-  // This is more reliable because Supabase SSR manages cookies automatically
-  let accessToken: string | undefined;
-  let refreshToken: string | undefined;
-  
-  try {
-    const { createServerClient } = await import("@/lib/supabase-server");
-    const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session) {
-      accessToken = session.access_token;
-      refreshToken = session.refresh_token;
+  // Get userId if not provided (for direct calls outside cache)
+  let finalUserId = userId;
+  if (!finalUserId) {
+    try {
+      finalUserId = await getCurrentUserId();
+    } catch (error: any) {
+      // If we can't get userId (e.g., inside unstable_cache), continue without it
+      // The cache key will be less specific but still functional
+      log.warn("Could not get userId:", error?.message);
     }
-    
-  } catch (error: any) {
-    // If we can't get tokens (e.g., inside unstable_cache), continue without them
-    log.warn("Could not get tokens:", error?.message);
   }
   
-  // Call directly without cache to avoid authentication issues
-  // The cache was causing problems with token refresh and RLS
-  // TODO: Re-enable cache once we have a better solution for token management
+  // Get tokens if not provided (for direct calls outside cache)
+  let finalAccessToken = accessToken;
+  let finalRefreshToken = refreshToken;
+  
+  if (!finalAccessToken || !finalRefreshToken) {
+    try {
+      const { createServerClient } = await import("@/lib/supabase-server");
+      const supabase = await createServerClient();
+      // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Only get session tokens if user is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          finalAccessToken = finalAccessToken || session.access_token;
+          finalRefreshToken = finalRefreshToken || session.refresh_token;
+        }
+      }
+    } catch (error: any) {
+      // If we can't get tokens (e.g., inside unstable_cache), continue without them
+      log.warn("Could not get tokens:", error?.message);
+    }
+  }
+  
+  // Use cache with userId in key to ensure proper isolation (if available)
+  // Cache for 60 seconds to reduce load while keeping data relatively fresh
+  const date = selectedDate || new Date();
+  const cacheKey = finalUserId 
+    ? `financial-health-${finalUserId}-${date.getFullYear()}-${date.getMonth()}`
+    : `financial-health-${date.getFullYear()}-${date.getMonth()}`;
+  
   try {
-    const result = await calculateFinancialHealthInternal(selectedDate, accessToken, refreshToken);
+    const result = await unstable_cache(
+      async () => calculateFinancialHealthInternal(selectedDate, finalAccessToken, finalRefreshToken),
+      [cacheKey],
+      { 
+        revalidate: 60, // 60 seconds
+        tags: ['financial-health', 'transactions', 'dashboard'] 
+      }
+    )();
     
     // Validate result before returning
     if (result.score === undefined || isNaN(result.score) || !isFinite(result.score)) {
@@ -411,8 +445,11 @@ export async function calculateFinancialHealth(selectedDate?: Date): Promise<Fin
       throw new Error("Invalid score calculated");
     }
     
-    if (!result.spendingDiscipline || result.spendingDiscipline === "Unknown") {
-      log.warn("Spending discipline is Unknown, this may indicate a calculation issue");
+    // Only warn if spendingDiscipline is Unknown AND we have data (indicates a calculation issue)
+    // If there's no data (monthlyIncome === 0 and monthlyExpenses === 0), Unknown is expected
+    if ((!result.spendingDiscipline || result.spendingDiscipline === "Unknown") && 
+        (result.monthlyIncome > 0 || result.monthlyExpenses > 0)) {
+      log.warn("Spending discipline is Unknown despite having transaction data, this may indicate a calculation issue");
     }
     
     return result;
@@ -435,15 +472,6 @@ export async function calculateFinancialHealth(selectedDate?: Date): Promise<Fin
       suggestions: [],
     };
   }
-  
-  // Future implementation with cache (disabled for now):
-  // const date = selectedDate || new Date();
-  // const cacheKey = `financial-health-${date.getFullYear()}-${date.getMonth()}`;
-  // return unstable_cache(
-  //   async () => calculateFinancialHealthInternal(selectedDate, accessToken, refreshToken),
-  //   [cacheKey],
-  //   { revalidate: 60, tags: ['financial-health', 'transactions'] }
-  // )();
 }
 
 

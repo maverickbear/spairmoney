@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { GoalCard } from "@/components/goals/goal-card";
 import { GoalForm } from "@/components/forms/goal-form";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ interface Goal {
 }
 
 export default function GoalsPage() {
+  const perf = usePagePerformance("Goals");
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess } = useWriteGuard();
@@ -83,9 +85,11 @@ export default function GoalsPage() {
       console.log("Goals loaded:", data);
       setGoals(data || []);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } catch (error) {
       console.error("Error loading goals:", error);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } finally {
       setLoading(false);
     }

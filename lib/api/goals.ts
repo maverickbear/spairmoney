@@ -216,11 +216,16 @@ export async function getGoals(): Promise<GoalWithCalculations[]> {
   try {
     const { createServerClient } = await import("@/lib/supabase-server");
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (session) {
-      accessToken = session.access_token;
-      refreshToken = session.refresh_token;
+    if (user) {
+      // Only get session tokens if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        accessToken = session.access_token;
+        refreshToken = session.refresh_token;
+      }
     }
     
   } catch (error: any) {

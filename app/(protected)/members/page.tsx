@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,6 +41,7 @@ function getInitials(name: string | null | undefined): string {
 }
 
 export default function MembersPage() {
+  const perf = usePagePerformance("Members");
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess } = useWriteGuard();
   const [members, setMembers] = useState<HouseholdMember[]>([]);
@@ -77,8 +79,10 @@ export default function MembersPage() {
       const { getHouseholdMembersClient } = await import("@/lib/api/members-client");
       const data = await getHouseholdMembersClient();
       setMembers(data);
+      perf.markDataLoaded();
     } catch (error) {
       console.error("Error loading members:", error);
+      perf.markDataLoaded();
     } finally {
       setLoading(false);
     }

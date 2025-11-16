@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
     const dateParam = searchParams.get("date");
     const selectedDate = dateParam ? new Date(dateParam) : new Date();
 
-    const financialHealth = await calculateFinancialHealth(selectedDate);
+    // Pass userId for cache key, but let function get tokens itself (not in cache context)
+    const financialHealth = await calculateFinancialHealth(selectedDate, userId);
     return NextResponse.json(financialHealth);
   } catch (error: any) {
     console.error("Error calculating financial health:", error);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -21,9 +22,14 @@ import { cn } from "@/lib/utils";
 
 
 export default function FeedbackPage() {
+  const perf = usePagePerformance("Feedback");
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
+  
+  useEffect(() => {
+    perf.markComplete();
+  }, [perf]);
 
   const form = useForm<FeedbackData>({
     resolver: zodResolver(feedbackSchema),

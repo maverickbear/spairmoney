@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePagePerformance } from "@/hooks/use-page-performance";
 import { DebtCard } from "@/components/debts/debt-card";
 import { DebtForm } from "@/components/forms/debt-form";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ interface Debt {
 }
 
 export default function DebtsPage() {
+  const perf = usePagePerformance("Debts");
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess } = useWriteGuard();
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -87,9 +89,11 @@ export default function DebtsPage() {
       const data = await getDebtsClient();
       setDebts(data);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } catch (error) {
       console.error("Error loading debts:", error);
       setHasLoaded(true);
+      perf.markDataLoaded();
     } finally {
       setLoading(false);
     }
