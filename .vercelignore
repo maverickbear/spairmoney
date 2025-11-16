@@ -1,0 +1,24 @@
+# Docker files (not needed for Vercel builds)
+docker-compose.yml
+infrastructure/docker-compose.yml
+
+# Local development files
+*.local
+.env.local
+
+# Documentation (not needed for builds)
+docs/
+
+# Scripts (not needed for builds)
+scripts/
+
+# Test files
+tests/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Infrastructure files
+infrastructure/
+
