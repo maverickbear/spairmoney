@@ -5,8 +5,7 @@ import { format } from "date-fns";
 import { startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from "date-fns";
 import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { parseTransactionAmount } from "../utils/transaction-helpers";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type PeriodOption = "1M" | "3M" | "6M" | "12M";
 
@@ -80,24 +79,17 @@ export function CashFlowTimelineWidget({
 
   // Period Selector Component
   const periodSelector = (
-    <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-      {(["1M", "3M", "6M", "12M"] as PeriodOption[]).map((period) => (
-        <Button
-          key={period}
-          variant="ghost"
-          size="small"
-          onClick={() => setSelectedPeriod(period)}
-          className={cn(
-            "h-7 px-3 text-xs font-medium transition-all",
-            selectedPeriod === period
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {period}
-        </Button>
-      ))}
-    </div>
+    <Select value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as PeriodOption)}>
+      <SelectTrigger size="small" className="w-fit h-7 text-xs px-2.5">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="1M">1M</SelectItem>
+        <SelectItem value="3M">3M</SelectItem>
+        <SelectItem value="6M">6M</SelectItem>
+        <SelectItem value="12M">12M</SelectItem>
+      </SelectContent>
+    </Select>
   );
 
   return (

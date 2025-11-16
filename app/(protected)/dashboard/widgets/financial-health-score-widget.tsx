@@ -114,13 +114,11 @@ export function FinancialHealthScoreWidget({
         <CardDescription>Combined view of spending, savings and debt</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6">
           {/* Donut Chart */}
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 w-[140px] h-[140px] md:w-[180px] md:h-[180px]">
             <svg
-              className="transform -rotate-90"
-              width={svgSize}
-              height={svgSize}
+              className="transform -rotate-90 w-full h-full"
               viewBox={`0 0 ${svgSize} ${svgSize}`}
             >
               {/* Background circle */}
@@ -147,7 +145,7 @@ export function FinancialHealthScoreWidget({
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className={cn("text-3xl font-bold", getScoreColor(score))}>
+              <div className={cn("text-2xl md:text-3xl font-bold", getScoreColor(score))}>
                 {score}
               </div>
               <div className="text-xs text-muted-foreground">of 100</div>
@@ -155,11 +153,11 @@ export function FinancialHealthScoreWidget({
           </div>
 
           {/* Metrics List */}
-          <div className="flex-1 space-y-3 min-w-0">
-            <div className="flex items-center justify-between py-2 border-b border-border">
-              <span className="text-sm text-muted-foreground">Change vs last month</span>
+          <div className="flex-1 space-y-2 md:space-y-3 min-w-0 w-full">
+            <div className="flex items-center justify-between py-1.5 md:py-2 border-b border-border">
+              <span className="text-xs md:text-sm text-muted-foreground">Change vs last month</span>
               <span className={cn(
-                "text-sm font-semibold",
+                "text-xs md:text-sm font-semibold",
                 scoreChange !== null
                   ? scoreChange >= 0 ? "text-green-500" : "text-red-500"
                   : "text-muted-foreground"
@@ -167,25 +165,25 @@ export function FinancialHealthScoreWidget({
                 {scoreChangeText}
               </span>
             </div>
-            <div className="flex items-center justify-between py-2 border-b border-border">
-              <span className="text-sm text-muted-foreground">Spending discipline</span>
-              <span className={cn("text-sm font-semibold", getSpendingDisciplineColor(spendingDiscipline))}>
+            <div className="flex items-center justify-between py-1.5 md:py-2 border-b border-border">
+              <span className="text-xs md:text-sm text-muted-foreground">Spending discipline</span>
+              <span className={cn("text-xs md:text-sm font-semibold", getSpendingDisciplineColor(spendingDiscipline))}>
                 {spendingDiscipline}
               </span>
             </div>
-            <div className="flex items-center justify-between py-2 border-b border-border">
-              <span className="text-sm text-muted-foreground">Debt exposure</span>
+            <div className="flex items-center justify-between py-1.5 md:py-2 border-b border-border">
+              <span className="text-xs md:text-sm text-muted-foreground">Debt exposure</span>
               <span className={cn(
-                "text-sm font-semibold",
+                "text-xs md:text-sm font-semibold",
                 debtExposure === "Low" ? "text-green-500" :
                 debtExposure === "Moderate" ? "text-yellow-500" : "text-red-500"
               )}>
                 {debtExposure}
               </span>
             </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-muted-foreground">Emergency fund</span>
-              <span className="text-sm font-semibold text-foreground">
+            <div className="flex items-center justify-between py-1.5 md:py-2">
+              <span className="text-xs md:text-sm text-muted-foreground">Emergency fund</span>
+              <span className="text-xs md:text-sm font-semibold text-foreground">
                 {emergencyFundMonths.toFixed(1)} months
               </span>
             </div>

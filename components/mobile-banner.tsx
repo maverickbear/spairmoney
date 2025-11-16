@@ -16,7 +16,7 @@ export function MobileBanner({ hasSubscription = true }: MobileBannerProps) {
     <div 
       className="fixed left-0 right-0 lg:hidden"
       style={{
-        top: 'calc(var(--mobile-header-height, 4rem) + var(--page-header-height, 0px))',
+        top: 'calc(var(--mobile-header-height, 3rem) + var(--page-header-height, 0px))',
       }}
       id="mobile-banner"
     >

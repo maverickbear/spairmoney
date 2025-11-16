@@ -100,7 +100,7 @@ export function PageHeader({ title, description, children, className }: PageHead
         } as React.CSSProperties : {}}
         className={cn(
           "fixed left-0 right-0 z-30 bg-card border-b transition-all duration-300",
-          "top-[var(--mobile-header-height,4rem)]",
+          "hidden lg:block",
           "lg:top-0",
           isMounted && isCollapsed ? "lg:left-16" : "lg:left-64",
           className

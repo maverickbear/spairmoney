@@ -1,12 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/components/common/money";
 import { formatTransactionDate, formatShortDate } from "@/lib/utils/timestamp";
-import { Edit, Trash2, Loader2, Repeat, Clock, Check, X } from "lucide-react";
+import { Loader2, Repeat, Clock, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/lib/api/transactions-client";
 
@@ -23,6 +23,28 @@ interface TransactionsMobileCardProps {
   processingSuggestion?: boolean;
 }
 
+// Helper function to get initial from description
+function getInitial(description: string | null | undefined): string {
+  if (!description) return "T";
+  const words = description.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return description[0].toUpperCase();
+}
+
+// Helper function to get color for avatar based on description
+function getAvatarColor(description: string | null | undefined): string {
+  if (!description) return "bg-gray-500";
+  const colors = [
+    "bg-green-500", "bg-blue-500", "bg-purple-500", "bg-pink-500",
+    "bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-indigo-500",
+    "bg-teal-500", "bg-cyan-500"
+  ];
+  const hash = description.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+}
+
 export function TransactionsMobileCard({
   transaction,
   isSelected,
@@ -35,141 +57,75 @@ export function TransactionsMobileCard({
   onRejectSuggestion,
   processingSuggestion,
 }: TransactionsMobileCardProps) {
+  const [logoError, setLogoError] = useState(false);
   const plaidMeta = transaction.plaidMetadata as any;
-  const isPending = plaidMeta?.pending;
-  const authorizedDate = plaidMeta?.authorized_date || plaidMeta?.authorized_datetime;
-  const currencyCode = plaidMeta?.iso_currency_code || plaidMeta?.unofficial_currency_code;
+  const subcategory = transaction.subcategory as { id: string; name: string; logo?: string | null } | null | undefined;
+  const logoUrl = (subcategory as any)?.logo;
+  const description = transaction.description || "Transaction";
+  const displayName = transaction.description || transaction.category?.name || "Transaction";
+  const date = formatTransactionDate(transaction.date);
+  const isIncome = transaction.type === "income";
+  const isExpense = transaction.type === "expense";
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4">
-        <div className="space-y-4">
-          {/* Header with checkbox and amount */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={onSelect}
-                className="h-4 w-4 mt-0.5 flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={cn(
-                    "text-lg font-semibold",
-                    transaction.type === "income" ? "text-green-600 dark:text-green-400" :
-                    transaction.type === "expense" ? "text-red-600 dark:text-red-400" : ""
-                  )}>
-                    {transaction.type === "expense" ? "-" : ""}{formatMoney(transaction.amount)}
-                  </span>
-                  {currencyCode && currencyCode !== "USD" && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
-                      {currencyCode}
-                    </Badge>
-                  )}
-                </div>
-                {transaction.description && (
-                  <p className="text-sm text-foreground mt-1 line-clamp-2">
-                    {transaction.description}
-                  </p>
-                )}
+    <Card 
+      className="overflow-hidden cursor-pointer transition-colors hover:bg-accent/50 active:bg-accent border-0 border-b border-border rounded-none shadow-none"
+      onClick={onEdit}
+    >
+      <CardContent className="px-0 py-4">
+        <div className="flex items-center gap-3">
+          {/* Avatar/Logo */}
+          <div className="flex-shrink-0">
+            {logoUrl && !logoError ? (
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                <img
+                  src={logoUrl}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                  onError={() => setLogoError(true)}
+                />
               </div>
+            ) : (
+              <div className={cn(
+                "w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-sm",
+                getAvatarColor(description)
+              )}>
+                {getInitial(description)}
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 text-destructive hover:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
                 )}
-              </Button>
             </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-foreground truncate">{displayName}</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">{date}</p>
           </div>
 
-          {/* Date and Type */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date</span>
-              <span className="text-sm font-medium">{formatTransactionDate(transaction.date)}</span>
-              {authorizedDate && (
-                <span className="text-[10px] text-muted-foreground mt-0.5">
-                  Auth: {formatShortDate(authorizedDate)}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</span>
-              <div className="flex items-center gap-1.5">
+          {/* Amount */}
+          <div className="flex-shrink-0">
                 <span className={cn(
-                  "rounded-[12px] px-2 py-1 text-xs",
-                  transaction.type === "income" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" :
-                  transaction.type === "expense" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" :
-                  "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+              "text-base font-medium",
+              isIncome ? "text-green-600 dark:text-green-400" : 
+              isExpense ? "text-red-600 dark:text-red-400" : 
+              "text-foreground"
                 )}>
-                  {transaction.type}
-                </span>
-                {transaction.recurring && (
-                  <span title="Recurring transaction">
-                    <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+              {formatMoney(transaction.amount)}
                   </span>
-                )}
-              </div>
-            </div>
           </div>
-
-          {/* Account */}
-          {transaction.account?.name && (
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account</span>
-              <span className="text-sm font-medium">{transaction.account.name}</span>
             </div>
-          )}
 
-          {/* Category */}
-          <div className="flex flex-col">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Category</span>
-            {transaction.category?.name ? (
-              <span 
-                className="text-sm font-medium text-blue-600 dark:text-blue-400 underline decoration-dashed underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCategoryClick();
-                }}
-              >
-                {transaction.category.name}
-                {transaction.subcategory && ` / ${transaction.subcategory.name}`}
+        {/* Category actions - shown on long press or swipe */}
+        {transaction.suggestedCategoryId && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+            <span className="text-xs text-muted-foreground italic flex-1">
+              Suggested: {transaction.suggestedCategory?.name || "category"}
               </span>
-            ) : transaction.suggestedCategoryId ? (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-sm text-muted-foreground italic flex-1">
-                  {transaction.suggestedCategory?.name || "Suggested category"}
-                  {transaction.suggestedSubcategory && ` / ${transaction.suggestedSubcategory.name}`}
-                </span>
-                <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
                   {onRejectSuggestion && (
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-10 w-10 rounded-[8px] border-red-300 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="h-8 w-8 rounded-[8px] border-red-300 text-red-600 hover:text-red-700 hover:bg-red-50"
                       onClick={(e) => {
                         e.stopPropagation();
                         onRejectSuggestion();
@@ -177,9 +133,9 @@ export function TransactionsMobileCard({
                       disabled={processingSuggestion}
                     >
                       {processingSuggestion ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <X className="h-4 w-4" />
+                    <X className="h-3 w-3" />
                       )}
                     </Button>
                   )}
@@ -187,7 +143,7 @@ export function TransactionsMobileCard({
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-10 w-10 rounded-[8px] border-green-300 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  className="h-8 w-8 rounded-[8px] border-green-300 text-green-600 hover:text-green-700 hover:bg-green-50"
                       onClick={(e) => {
                         e.stopPropagation();
                         onApplySuggestion();
@@ -195,39 +151,15 @@ export function TransactionsMobileCard({
                       disabled={processingSuggestion}
                     >
                       {processingSuggestion ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        <Check className="h-4 w-4" />
+                    <Check className="h-3 w-3" />
                       )}
                     </Button>
                   )}
                 </div>
-              </div>
-            ) : (
-              <span 
-                className="text-sm font-medium text-blue-600 dark:text-blue-400 underline decoration-dashed underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCategoryClick();
-                }}
-              >
-                Add Category
-              </span>
-            )}
-          </div>
-
-          {/* Status */}
-          {(isPending || (currencyCode && currencyCode !== "USD")) && (
-            <div className="flex flex-wrap gap-2">
-              {isPending && (
-                <Badge variant="outline" className="text-[10px] px-2 py-1 bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400">
-                  <Clock className="h-3 w-3 mr-1" />
-                  Pending
-                </Badge>
-              )}
             </div>
           )}
-        </div>
       </CardContent>
     </Card>
   );

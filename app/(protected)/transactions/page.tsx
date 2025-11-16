@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { logger } from "@/lib/utils/logger";
 import { usePagePerformance } from "@/hooks/use-page-performance";
@@ -20,7 +20,7 @@ const TransactionForm = dynamic(() => import("@/components/forms/transaction-for
 const CsvImportDialog = dynamic(() => import("@/components/forms/csv-import-dialog").then(m => ({ default: m.CsvImportDialog })), { ssr: false });
 const CategorySelectionModal = dynamic(() => import("@/components/transactions/category-selection-modal").then(m => ({ default: m.CategorySelectionModal })), { ssr: false });
 import { formatMoney } from "@/components/common/money";
-import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import { TransactionsMobileCard } from "@/components/transactions/transactions-mobile-card";
 import {
   Select,
@@ -47,6 +47,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  SimpleTabs,
+  SimpleTabsList,
+  SimpleTabsTrigger,
+} from "@/components/ui/simple-tabs";
 import { Input } from "@/components/ui/input";
 import { formatTransactionDate, formatShortDate, parseDateWithoutTimezone, parseDateInput, formatDateInput } from "@/lib/utils/timestamp";
 import { format } from "date-fns";
@@ -178,6 +183,7 @@ export default function TransactionsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [transactionForCategory, setTransactionForCategory] = useState<Transaction | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -218,10 +224,20 @@ export default function TransactionsPage() {
   const loadTransactionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dateInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const descriptionInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const pullToRefreshRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number>(0);
+  const touchCurrentY = useRef<number>(0);
+  const isPulling = useRef<boolean>(false);
+  const currentPullDistance = useRef<number>(0);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]); // Accumulated transactions for mobile
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Focus date input when editing starts
   useEffect(() => {
@@ -304,7 +320,113 @@ export default function TransactionsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
+    setAllTransactions([]); // Clear accumulated transactions when filters change
   }, [filters]);
+
+  // Calculate totalPages using useMemo to avoid reference errors
+  const totalPages = useMemo(() => {
+    return Math.ceil(totalTransactions / itemsPerPage);
+  }, [totalTransactions, itemsPerPage]);
+
+  // Infinite scroll for mobile - always loads 10 items at a time
+  useEffect(() => {
+    // Only enable infinite scroll on mobile
+    if (typeof window === 'undefined') return;
+    const isMobile = window.innerWidth < 1024; // lg breakpoint
+    if (!isMobile) return;
+
+    // Don't load more if we're already loading, at the last page, or have no more transactions
+    if (loading || loadingMore || currentPage >= totalPages || transactions.length === 0 || totalPages === 0) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && currentPage < totalPages) {
+          setLoadingMore(true);
+          setCurrentPage(prev => prev + 1);
+        }
+      },
+      { rootMargin: "200px" } // Start loading 200px before reaching the end
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [loading, loadingMore, currentPage, totalPages, transactions.length]);
+
+  // Reset loadingMore when transactions are loaded
+  useEffect(() => {
+    if (!loading) {
+      setLoadingMore(false);
+    }
+  }, [loading]);
+
+  // Pull to refresh for mobile
+  useEffect(() => {
+    const container = pullToRefreshRef.current;
+    if (!container) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (window.scrollY === 0) {
+        touchStartY.current = e.touches[0].clientY;
+        isPulling.current = true;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isPulling.current) return;
+      
+      touchCurrentY.current = e.touches[0].clientY;
+      const distance = touchCurrentY.current - touchStartY.current;
+      
+      if (distance > 0 && window.scrollY === 0) {
+        e.preventDefault();
+        const pullDistance = Math.min(distance, 100);
+        currentPullDistance.current = pullDistance;
+        setPullDistance(pullDistance);
+      } else {
+        isPulling.current = false;
+        currentPullDistance.current = 0;
+        setPullDistance(0);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (currentPullDistance.current >= 60 && !loading && !isRefreshing) {
+        setIsRefreshing(true);
+        setCurrentPage(1);
+        setAllTransactions([]);
+        // Trigger reload
+        setTimeout(() => {
+          loadTransactions().finally(() => {
+            setIsRefreshing(false);
+            setPullDistance(0);
+            currentPullDistance.current = 0;
+          });
+        }, 100);
+      } else {
+        setPullDistance(0);
+        currentPullDistance.current = 0;
+      }
+      isPulling.current = false;
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pullDistance, loading, isRefreshing]);
 
   // Debounced transaction loading - consolidates all transaction fetching
   // This handles both filter changes and pagination changes
@@ -534,8 +656,11 @@ export default function TransactionsPage() {
       if (filters.recurring && filters.recurring !== "all") params.append("recurring", filters.recurring);
 
       // Add pagination parameters
+      // For mobile infinite scroll, always use 10 items per page
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+      const limit = isMobile ? 10 : itemsPerPage;
       params.append("page", currentPage.toString());
-      params.append("limit", itemsPerPage.toString());
+      params.append("limit", limit.toString());
 
       // Use API route to get transactions (descriptions are decrypted on server)
       // Add cache busting timestamp to force fresh data after deletions
@@ -579,18 +704,37 @@ export default function TransactionsPage() {
       const data = await response.json();
       
       // Handle both old format (array) and new format (object with transactions and total)
+      let newTransactions: Transaction[] = [];
       if (Array.isArray(data)) {
         // Backward compatibility: if API returns array, use it directly
-        setTransactions(data);
+        newTransactions = data;
         setTotalTransactions(data.length);
       } else if (data.transactions && typeof data.total === 'number') {
         // New format with pagination
-        setTransactions(data.transactions);
+        newTransactions = data.transactions;
         setTotalTransactions(data.total);
       } else {
         logger.error("[TransactionsPage] Unexpected response format:", data);
         setTransactions([]);
         setTotalTransactions(0);
+        return;
+      }
+      
+      // For mobile infinite scroll: accumulate transactions
+      // For desktop: replace transactions (normal pagination)
+      if (currentPage === 1) {
+        // First page: replace all
+        setTransactions(newTransactions);
+        setAllTransactions(newTransactions);
+      } else {
+        // Subsequent pages: add to accumulated list for mobile
+        setTransactions(newTransactions);
+        setAllTransactions(prev => {
+          // Avoid duplicates by checking IDs
+          const existingIds = new Set(prev.map(t => t.id));
+          const uniqueNew = newTransactions.filter(t => !existingIds.has(t.id));
+          return [...prev, ...uniqueNew];
+        });
       }
       
       // Mark data as loaded for performance tracking
@@ -1103,10 +1247,12 @@ export default function TransactionsPage() {
   }
 
   // Pagination calculations - now using server-side pagination
-  const totalPages = Math.ceil(totalTransactions / itemsPerPage);
+  // totalPages is calculated earlier to avoid reference errors
   
-  // Transactions are already paginated from the server
+  // For desktop: use paginated transactions from server
+  // For mobile: use accumulated transactions for infinite scroll
   const paginatedTransactions = transactions;
+  const mobileTransactions = allTransactions.length > 0 ? allTransactions : transactions;
   
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalTransactions);
@@ -1489,6 +1635,19 @@ export default function TransactionsPage() {
             <Download className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
             <span className="hidden md:inline">Export CSV</span>
           </Button>
+          <Button 
+            variant="outline"
+            onClick={() => setIsFiltersModalOpen(true)} 
+            className="text-xs md:text-sm hidden lg:flex"
+          >
+            <Filter className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden md:inline">Filters</span>
+            {(filters.accountId !== "all" || filters.search || filters.recurring !== "all" || dateRange !== "all-dates" || customDateRange || filters.categoryId !== "all") && (
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                Active
+              </Badge>
+            )}
+          </Button>
           <Button onClick={() => {
             // Check if user can perform write operations
             if (!checkWriteAccess()) {
@@ -1503,147 +1662,74 @@ export default function TransactionsPage() {
         </div>
       </PageHeader>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <DateRangePicker
-          value={dateRange}
-          dateRange={customDateRange}
-          onValueChange={handleDateRangeChange}
-        />
-        <Select
-          value={filters.accountId}
-          onValueChange={(value) => setFilters({ ...filters, accountId: value })}
-        >
-          <SelectTrigger className="h-9 w-auto min-w-[100px] text-xs">
-            <SelectValue placeholder="Account" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Accounts</SelectItem>
-            {accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.type}
+      {/* Type Tabs - Fixed at top, attached to header */}
+      <div className="sticky top-[var(--mobile-header-height,3rem)] lg:top-0 z-30 bg-card border-b -mx-4 px-4 lg:mx-0 lg:px-0">
+        <SimpleTabs 
+          value={filters.type === "all" ? "all" : filters.type} 
           onValueChange={(value) => setFilters({ ...filters, type: value })}
+          className="w-full"
         >
-          <SelectTrigger className="h-9 w-auto min-w-[90px] text-xs">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-            <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="expense">Expense</SelectItem>
-            <SelectItem value="income">Income</SelectItem>
-            <SelectItem value="transfer">Transfer</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="relative flex-1 max-w-[200px]">
-          <Input
-            placeholder="Search..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="h-9 w-auto min-w-[120px] flex-1 max-w-[200px] text-xs pr-8"
-          />
-          {searchLoading && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
-          )}
-        </div>
-        {(filters.accountId !== "all" || filters.type !== "all" || filters.search || filters.recurring !== "all" || dateRange !== "all-dates" || customDateRange) && (
-          <Button 
-            variant="ghost" 
-            onClick={() => {
-              setDateRange("all-dates");
-              setCustomDateRange(undefined);
-              setFilters({
-                startDate: "",
-                endDate: "",
-                accountId: "all",
-                categoryId: "all",
-                type: "all",
-                search: "",
-                recurring: "all",
-              });
-            }} 
-            className="h-9 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </Button>
-        )}
+          <SimpleTabsList className="w-full">
+            <SimpleTabsTrigger value="all" className="text-xs">All</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="expense" className="text-xs">Expense</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="income" className="text-xs">Income</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="transfer" className="text-xs">Transfer</SimpleTabsTrigger>
+          </SimpleTabsList>
+        </SimpleTabs>
       </div>
 
-      {/* Category Pills Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
+      {/* Floating Filter Button - Mobile only */}
+      <div className="lg:hidden fixed bottom-24 right-4 z-[60]">
         <Button
-          variant={filters.categoryId === "all" ? "default" : "outline"}
-          onClick={() => setFilters({ ...filters, categoryId: "all" })}
-          className="rounded-full"
+          onClick={() => setIsFiltersModalOpen(true)}
+          className="h-14 w-14 rounded-full shadow-lg"
+          size="icon"
         >
-          All
+          <Filter className="h-5 w-5" />
+          {(filters.accountId !== "all" || filters.search || filters.recurring !== "all" || dateRange !== "all-dates" || customDateRange || filters.categoryId !== "all") && (
+            <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+              !
+            </Badge>
+          )}
         </Button>
-        {categories
-          .filter((category) => activeCategoryIds.has(category.id))
-          .map((category) => (
-            <Button
-              key={category.id}
-              variant={filters.categoryId === category.id ? "default" : "outline"}
-              onClick={() => setFilters({ ...filters, categoryId: category.id })}
-              className="rounded-full"
-            >
-              {category.name}
-            </Button>
-          ))}
-        <Select
-          value={selectValue}
-          onValueChange={(value) => {
-            if (value) {
-              if (activeCategoryIds.has(value)) {
-                removeCategoryFromFilters(value);
-              } else {
-                addCategoryToFilters(value);
-              }
-              setSelectValue(""); // Reset after adding/removing
-            }
-          }}
-        >
-          <SelectTrigger className="h-9 w-9 rounded-full border-dashed p-0 [&>svg:last-child]:hidden flex items-center justify-center">
-            <Plus className="h-4 w-4" />
-            <SelectValue className="hidden" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((category) => {
-              const isActive = activeCategoryIds.has(category.id);
-              return (
-                <SelectItem key={category.id} value={category.id}>
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="flex-1">{category.name}</span>
-                    {isActive && (
-                      <Check className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
       </div>
+
 
       {/* Mobile Card View */}
-      <div className="lg:hidden space-y-4">
-        {loading && !searchLoading ? (
+      <div className="lg:hidden" ref={pullToRefreshRef}>
+        {/* Pull to refresh indicator */}
+        {pullDistance > 0 && (
+          <div 
+            className="flex items-center justify-center py-4 transition-opacity"
+            style={{ 
+              opacity: Math.min(pullDistance / 60, 1),
+              transform: `translateY(${Math.min(pullDistance, 60)}px)`
+            }}
+          >
+            {isRefreshing ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Refreshing...</span>
+              </div>
+            ) : pullDistance >= 60 ? (
+              <div className="text-sm text-muted-foreground">Release to refresh</div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Pull to refresh</div>
+            )}
+          </div>
+        )}
+        
+        {loading && !searchLoading && currentPage === 1 && !isRefreshing ? (
           <div className="text-center py-8 text-muted-foreground">
             Loading transactions...
           </div>
-        ) : transactions.length === 0 ? (
+        ) : mobileTransactions.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No transactions found
           </div>
         ) : (
-          paginatedTransactions.map((tx) => {
+          <>
+            {mobileTransactions.map((tx) => {
             const plaidMeta = tx.plaidMetadata as any;
             return (
               <TransactionsMobileCard
@@ -1672,7 +1758,16 @@ export default function TransactionsPage() {
                 processingSuggestion={processingSuggestionId === tx.id}
               />
             );
-          })
+            })}
+            {/* Infinite scroll sentinel */}
+            {currentPage < totalPages && (
+              <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+                {loadingMore && (
+                  <div className="text-sm text-muted-foreground">Loading more...</div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -1971,9 +2066,9 @@ export default function TransactionsPage() {
         </Table>
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination Controls - Desktop only */}
       {transactions.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+        <div className="hidden lg:flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Items per page:</span>
             <Select
@@ -2055,65 +2150,6 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Mobile Pagination Controls */}
-      {transactions.length > 0 && (
-        <div className="lg:hidden flex flex-col gap-4 px-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Items per page:</span>
-              <Select
-                value={itemsPerPage.toString()}
-                onValueChange={(value) => {
-                  setItemsPerPage(Number(value));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="h-9 w-[80px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="text-sm text-muted-foreground">
-              {startIndex + 1}-{Math.min(endIndex, totalTransactions)} of {totalTransactions}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1 || loading}
-              className="h-9"
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            
-            <div className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </div>
-            
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages || loading}
-              className="h-9"
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      )}
 
       <TransactionForm
         open={isFormOpen}
@@ -2138,6 +2174,169 @@ export default function TransactionsPage() {
         accounts={accounts}
         categories={categories}
       />
+
+      {/* Filters Modal */}
+      <Dialog open={isFiltersModalOpen} onOpenChange={setIsFiltersModalOpen}>
+        <DialogContent className="max-w-md flex flex-col p-0">
+          <DialogHeader className="px-4 pt-4 pb-3 flex-shrink-0 text-left">
+            <DialogTitle>Filters</DialogTitle>
+            <DialogDescription>
+              Filter your transactions by date, account, type, and search terms
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 px-4 overflow-y-auto flex-1">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date Range</label>
+              <DateRangePicker
+                value={dateRange}
+                dateRange={customDateRange}
+                onValueChange={handleDateRangeChange}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Account</label>
+              <Select
+                value={filters.accountId}
+                onValueChange={(value) => setFilters({ ...filters, accountId: value })}
+              >
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue placeholder="Account" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Accounts</SelectItem>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Type</label>
+              <Select
+                value={filters.type}
+                onValueChange={(value) => setFilters({ ...filters, type: value })}
+              >
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Search</label>
+              <div className="relative">
+                <Input
+                  placeholder="Search transactions..."
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  className="h-9 w-full pr-8"
+                />
+                {searchLoading && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category</label>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={filters.categoryId === "all" ? "default" : "outline"}
+                    onClick={() => setFilters({ ...filters, categoryId: "all" })}
+                    className="rounded-full h-8 text-xs"
+                    size="small"
+                  >
+                    All
+                  </Button>
+                  {categories
+                    .filter((category) => activeCategoryIds.has(category.id))
+                    .map((category) => (
+                      <Button
+                        key={category.id}
+                        type="button"
+                        variant={filters.categoryId === category.id ? "default" : "outline"}
+                        onClick={() => setFilters({ ...filters, categoryId: category.id })}
+                        className="rounded-full h-8 text-xs"
+                        size="small"
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                </div>
+                <Select
+                  value={selectValue}
+                  onValueChange={(value) => {
+                    if (value) {
+                      if (activeCategoryIds.has(value)) {
+                        removeCategoryFromFilters(value);
+                      } else {
+                        addCategoryToFilters(value);
+                      }
+                      setSelectValue(""); // Reset after adding/removing
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-full border-dashed">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <SelectValue placeholder="Add category to filter" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => {
+                      const isActive = activeCategoryIds.has(category.id);
+                      return (
+                        <SelectItem key={category.id} value={category.id}>
+                          <div className="flex items-center gap-2 w-full">
+                            <span className="flex-1">{category.name}</span>
+                            {isActive && (
+                              <Check className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="px-4 pb-4 pt-3 border-t flex-shrink-0 sticky bottom-0 bg-background flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDateRange("all-dates");
+                setCustomDateRange(undefined);
+                setFilters({
+                  startDate: "",
+                  endDate: "",
+                  accountId: "all",
+                  categoryId: "all",
+                  type: "all",
+                  search: "",
+                  recurring: "all",
+                });
+              }}
+              className="flex-1"
+            >
+              Clear All
+            </Button>
+            <Button onClick={() => setIsFiltersModalOpen(false)} className="flex-1">
+              Apply Filters
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Category Selection Modal */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
