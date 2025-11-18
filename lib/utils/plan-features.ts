@@ -10,11 +10,24 @@ export function getDefaultFeatures(): PlanFeatures {
     hasInvestments: false,
     hasAdvancedReports: false,
     hasCsvExport: false,
+    hasCsvImport: false,
     hasDebts: true,
     hasGoals: true,
     hasBankIntegration: false,
     hasHousehold: false,
+    hasBudgets: false,
   };
+}
+
+/**
+ * Merge plan features with defaults to ensure all features are present
+ * This handles cases where new features are added to the schema but don't exist in the database yet
+ */
+export function mergeFeaturesWithDefaults(
+  dbFeatures: Partial<PlanFeatures>
+): PlanFeatures {
+  const defaults = getDefaultFeatures();
+  return { ...defaults, ...dbFeatures };
 }
 
 /**
@@ -28,5 +41,14 @@ export function resolvePlanFeatures(plan: Plan | null): PlanFeatures {
   }
   // Merge plan features with defaults to ensure all fields are defined
   return { ...getDefaultFeatures(), ...plan.features };
+}
+
+/**
+ * Normalize a feature value to a boolean
+ * Handles cases where values come as strings "true"/"false" from JSONB
+ * This is a safety function to ensure consistent boolean checks throughout the app
+ */
+export function normalizeFeatureValue(value: any): boolean {
+  return value === true || value === "true";
 }
 

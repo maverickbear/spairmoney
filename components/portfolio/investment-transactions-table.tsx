@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Edit, Trash2, Plus, Search } from "lucide-react";
 import { formatMoney } from "@/components/common/money";
 import { format } from "date-fns";
@@ -90,8 +91,12 @@ export function InvestmentTransactionsTable({
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<InvestmentTransaction | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingMultiple, setDeletingMultiple] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDeleteMultipleDialog, setShowDeleteMultipleDialog] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
+  const selectAllCheckboxRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -156,6 +161,53 @@ export function InvestmentTransactionsTable({
     return filtered;
   }, [transactions, selectedAccount, selectedType, searchQuery]);
 
+  // Clear selection when transactions change (filters applied)
+  useEffect(() => {
+    setSelectedTransactionIds(prev => {
+      const currentIds = new Set(transactions.map(tx => tx.id));
+      const filtered = new Set([...prev].filter(id => currentIds.has(id)));
+      return filtered;
+    });
+  }, [transactions]);
+
+  const allSelected = filteredTransactions.length > 0 && filteredTransactions.every(tx => selectedTransactionIds.has(tx.id));
+  const someSelected = filteredTransactions.some(tx => selectedTransactionIds.has(tx.id)) && !allSelected;
+
+  // Update indeterminate state of select all checkbox
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedTransactionIds(prev => {
+        const newSet = new Set(prev);
+        filteredTransactions.forEach(tx => newSet.add(tx.id));
+        return newSet;
+      });
+    } else {
+      setSelectedTransactionIds(prev => {
+        const newSet = new Set(prev);
+        filteredTransactions.forEach(tx => newSet.delete(tx.id));
+        return newSet;
+      });
+    }
+  }
+
+  function handleSelectTransaction(transactionId: string, checked: boolean) {
+    setSelectedTransactionIds(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(transactionId);
+      } else {
+        newSet.delete(transactionId);
+      }
+      return newSet;
+    });
+  }
+
   function handleEdit(transaction: InvestmentTransaction) {
     if (!checkWriteAccess()) return;
     setEditingTransaction(transaction);
@@ -188,6 +240,11 @@ export function InvestmentTransactionsTable({
 
       setShowDeleteDialog(false);
       setTransactionToDelete(null);
+      setSelectedTransactionIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(transactionToDelete);
+        return newSet;
+      });
       loadData();
       onTransactionChange?.();
     } catch (error) {
@@ -199,6 +256,64 @@ export function InvestmentTransactionsTable({
       });
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleDeleteMultiple() {
+    const idsToDelete = Array.from(selectedTransactionIds);
+    if (idsToDelete.length === 0) return;
+
+    const count = idsToDelete.length;
+    const transactionsToDelete = transactions.filter(t => idsToDelete.includes(t.id));
+
+    try {
+      setDeletingMultiple(true);
+      
+      // Delete transactions one by one via API route
+      const results = await Promise.allSettled(
+        idsToDelete.map(id => 
+          fetch(`/api/investments/transactions/${id}`, {
+            method: "DELETE",
+          })
+        )
+      );
+
+      // Check if any deletions failed
+      const failures = results.filter(result => result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.ok));
+      
+      if (failures.length > 0) {
+        const errorMessages = await Promise.all(
+          failures.map(async (failure) => {
+            if (failure.status === 'fulfilled') {
+              const error = await failure.value.json().catch(() => ({ error: 'Failed to delete transaction' }));
+              return error.error || 'Failed to delete transaction';
+            }
+            return failure.reason?.message || 'Failed to delete transaction';
+          })
+        );
+        
+        throw new Error(`Failed to delete ${failures.length} transaction(s): ${errorMessages.join(', ')}`);
+      }
+
+      toast({
+        title: "Success",
+        description: `${count} transaction${count > 1 ? 's' : ''} deleted successfully.`,
+        variant: "success",
+      });
+
+      setShowDeleteMultipleDialog(false);
+      setSelectedTransactionIds(new Set());
+      loadData();
+      onTransactionChange?.();
+    } catch (error) {
+      console.error("Error deleting transactions:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete transactions",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingMultiple(false);
     }
   }
 
@@ -279,19 +394,46 @@ export function InvestmentTransactionsTable({
             </Select>
           </div>
 
-          {/* Summary */}
+          {/* Summary and Bulk Actions */}
           {filteredTransactions.length > 0 && (
-            <div className="mb-4 p-3 bg-muted rounded-lg">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? "s" : ""}
-                </span>
-                {totalValue > 0 && (
-                  <span className="font-semibold">
-                    Total Value: {formatMoney(totalValue)}
+            <div className="mb-4 space-y-2">
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? "s" : ""}
                   </span>
-                )}
+                  {totalValue > 0 && (
+                    <span className="font-semibold">
+                      Total Value: {formatMoney(totalValue)}
+                    </span>
+                  )}
+                </div>
               </div>
+              {selectedTransactionIds.size > 0 && (
+                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                  <span className="text-sm font-medium">
+                    {selectedTransactionIds.size} transaction{selectedTransactionIds.size !== 1 ? "s" : ""} selected
+                  </span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowDeleteMultipleDialog(true)}
+                    disabled={deletingMultiple}
+                  >
+                    {deletingMultiple ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Selected
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -322,6 +464,14 @@ export function InvestmentTransactionsTable({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        ref={selectAllCheckboxRef}
+                        checked={allSelected}
+                        onCheckedChange={handleSelectAll}
+                        className="h-4 w-4"
+                      />
+                    </TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Account</TableHead>
                     <TableHead>Security</TableHead>
@@ -342,6 +492,13 @@ export function InvestmentTransactionsTable({
 
                     return (
                       <TableRow key={transaction.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedTransactionIds.has(transaction.id)}
+                            onCheckedChange={(checked) => handleSelectTransaction(transaction.id, checked as boolean)}
+                            className="h-4 w-4"
+                          />
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">
                           {format(new Date(transaction.date), "MMM dd, yyyy")}
                         </TableCell>
@@ -457,6 +614,42 @@ export function InvestmentTransactionsTable({
               disabled={deletingId !== null}
             >
               {deletingId ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Multiple Confirmation Dialog */}
+      <Dialog open={showDeleteMultipleDialog} onOpenChange={setShowDeleteMultipleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Transactions</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedTransactionIds.size} transaction{selectedTransactionIds.size > 1 ? 's' : ''}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteMultipleDialog(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteMultiple}
+              disabled={deletingMultiple}
+            >
+              {deletingMultiple ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Deleting...

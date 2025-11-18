@@ -65,22 +65,17 @@ export function SummaryCards({
   };
 
   // Filter transactions to only include those with date <= today
-  // Temporarily include ALL transactions from the selected month to debug
+  // Exclude future transactions as they haven't happened yet
   const pastTransactions = selectedMonthTransactions.filter((t) => {
     if (!t.date) return false;
-    // For now, include all transactions to see if date filtering is the issue
-    // TODO: Re-enable date filtering once we confirm transactions are being returned
-    return true;
-    
-    // Original date filtering code (commented out for debugging):
-    // try {
-    //   const txDate = parseTransactionDate(t.date);
-    //   txDate.setHours(0, 0, 0, 0);
-    //   return txDate <= today;
-    // } catch (error) {
-    //   console.error("Error parsing transaction date:", t.date, error);
-    //   return true;
-    // }
+    try {
+      const txDate = parseTransactionDate(t.date);
+      txDate.setHours(0, 0, 0, 0);
+      return txDate <= today;
+    } catch (error) {
+      logger.error("Error parsing transaction date:", t.date, error);
+      return false; // Exclude if date parsing fails
+    }
   });
 
   const pastLastMonthTransactions = lastMonthTransactions.filter((t) => {
@@ -91,7 +86,7 @@ export function SummaryCards({
       return txDate <= today;
     } catch (error) {
       logger.error("Error parsing transaction date:", t.date, error);
-      return true; // Include if date parsing fails
+      return false; // Exclude if date parsing fails
     }
   });
 

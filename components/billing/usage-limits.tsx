@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlanFeatures } from "@/lib/validations/plan";
-import { LimitCheckResult } from "@/lib/api/limits";
+import { LimitCheckResult } from "@/lib/api/subscription";
 import { ArrowRight, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
@@ -142,7 +142,7 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
           <div className="flex justify-between items-center">
             <span>Investments</span>
             <div className="flex items-center gap-2">
-              {limits.hasInvestments ? (
+              {(limits.hasInvestments === true || limits.hasInvestments === "true") ? (
                 <Badge variant="default" className="text-xs">Enabled</Badge>
               ) : (
                 <>
@@ -157,7 +157,7 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
           <div className="flex justify-between items-center">
             <span>Advanced Reports</span>
             <div className="flex items-center gap-2">
-              {limits.hasAdvancedReports ? (
+              {(limits.hasAdvancedReports === true || limits.hasAdvancedReports === "true") ? (
                 <Badge variant="default" className="text-xs">Enabled</Badge>
               ) : (
                 <>
@@ -172,7 +172,37 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
           <div className="flex justify-between items-center">
             <span>CSV Export</span>
             <div className="flex items-center gap-2">
-              {limits.hasCsvExport ? (
+              {(limits.hasCsvExport === true || limits.hasCsvExport === "true") ? (
+                <Badge variant="default" className="text-xs">Enabled</Badge>
+              ) : (
+                <>
+                  <Badge variant="secondary" className="text-xs">Disabled</Badge>
+                  <Button onClick={() => router.push("/pricing")} variant="default" size="small" className="text-xs">
+                      Upgrade
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span>CSV Import</span>
+            <div className="flex items-center gap-2">
+              {(limits.hasCsvImport === true || limits.hasCsvImport === "true") ? (
+                <Badge variant="default" className="text-xs">Enabled</Badge>
+              ) : (
+                <>
+                  <Badge variant="secondary" className="text-xs">Disabled</Badge>
+                  <Button onClick={() => router.push("/pricing")} variant="default" size="small" className="text-xs">
+                      Upgrade
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span>Budgets</span>
+            <div className="flex items-center gap-2">
+              {(limits.hasBudgets === true || limits.hasBudgets === "true") ? (
                 <Badge variant="default" className="text-xs">Enabled</Badge>
               ) : (
                 <>

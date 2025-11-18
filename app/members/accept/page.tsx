@@ -30,6 +30,7 @@ interface InvitationData {
     name: string;
     email: string;
   } | null;
+  hasAccount?: boolean; // Indicates if email already has an account
 }
 
 function AcceptInvitationForm() {
@@ -37,7 +38,7 @@ function AcceptInvitationForm() {
   const router = useRouter();
   const token = searchParams.get("token");
   
-  const [status, setStatus] = useState<"validating" | "password" | "processing" | "success" | "error">("validating");
+  const [status, setStatus] = useState<"validating" | "password" | "login-required" | "processing" | "success" | "error">("validating");
   const [message, setMessage] = useState<string>("");
   const [invitationData, setInvitationData] = useState<InvitationData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,8 +72,18 @@ function AcceptInvitationForm() {
 
       if (res.ok) {
         setInvitationData(data);
-        setStatus("password");
-        setMessage("");
+        // If email already has an account, redirect to login
+        if (data.hasAccount) {
+          setStatus("login-required");
+          setMessage("You already have an account. Please sign in to accept the invitation.");
+          // Redirect to login with token in query params
+          setTimeout(() => {
+            router.push(`/auth/login?invitation_token=${encodeURIComponent(token || "")}`);
+          }, 3000);
+        } else {
+          setStatus("password");
+          setMessage("");
+        }
       } else {
         setStatus("error");
         setMessage(data.error || "Invalid or expired invitation token");
@@ -210,6 +221,7 @@ function AcceptInvitationForm() {
             <h2 className="text-3xl font-bold">
               {status === "validating" && "Validating invitation..."}
               {status === "password" && "Create password"}
+              {status === "login-required" && "Account already exists"}
               {status === "processing" && "Processing..."}
               {status === "success" && "Invitation accepted!"}
               {status === "error" && "Error accepting invitation"}
@@ -219,6 +231,7 @@ function AcceptInvitationForm() {
               {status === "password" && invitationData && (
                 <>You were invited by <strong>{invitationData.owner?.name || invitationData.owner?.email}</strong>. Create a password to access your account.</>
               )}
+              {status === "login-required" && message}
               {status === "processing" && "Creating your account..."}
               {status === "success" && message}
               {status === "error" && message}
@@ -237,6 +250,27 @@ function AcceptInvitationForm() {
                   {status === "validating" && "Please wait while we validate your invitation..."}
                   {status === "processing" && "Creating your account..."}
                 </p>
+              </div>
+            )}
+
+            {/* Login Required State */}
+            {status === "login-required" && (
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
+                  <AlertCircle className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-medium">{message}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Redirecting to login page...
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => router.push(`/auth/login?invitation_token=${encodeURIComponent(token || "")}`)} 
+                  className="w-full"
+                >
+                  Go to Login
+                </Button>
               </div>
             )}
 

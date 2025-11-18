@@ -10,6 +10,7 @@ import {
   type DebtForCalculation,
 } from "@/lib/utils/debts";
 import { createTransaction } from "@/lib/api/transactions";
+import { createPlannedPayment, PLANNED_HORIZON_DAYS } from "@/lib/api/planned-payments";
 import { getDebtCategoryMapping } from "@/lib/utils/debt-categories";
 import { requireDebtOwnership } from "@/lib/utils/security";
 import { addMonths } from "date-fns";
@@ -182,7 +183,7 @@ export async function createDebt(data: {
   initialAmount: number;
   downPayment?: number;
   interestRate: number;
-  totalMonths: number;
+  totalMonths: number | null;
   firstPaymentDate: Date | string;
   startDate?: Date | string;
   monthlyPayment: number;
@@ -194,6 +195,8 @@ export async function createDebt(data: {
   description?: string;
   accountId?: string;
   isPaused?: boolean;
+  status?: string;
+  nextDueDate?: Date | string | null;
 }): Promise<Debt> {
     const supabase = await createServerClient();
 
@@ -237,6 +240,8 @@ export async function createDebt(data: {
     isPaidOff,
     isPaused: data.isPaused ?? false,
     paidOffAt: isPaidOff ? now : null,
+    status: data.status ?? "active",
+    nextDueDate: data.nextDueDate ? formatDateOnly(new Date(data.nextDueDate)) : null,
     createdAt: now,
     updatedAt: now,
   };
@@ -252,13 +257,13 @@ export async function createDebt(data: {
     throw new Error(`Failed to create debt: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Create all payment transactions for this debt
-  if (debt.accountId && !isPaidOff) {
+  // Create all planned payments for this debt (skip for credit cards - they're paid via transfers)
+  if (debt.accountId && !isPaidOff && debt.loanType !== "credit_card") {
     try {
-      await createDebtPaymentTransactions(debt);
-    } catch (transactionError) {
+      await createDebtPlannedPayments(debt);
+    } catch (error) {
       // Log error but don't fail debt creation
-      console.error("Error creating debt payment transactions:", transactionError);
+      console.error("Error creating debt planned payments:", error);
     }
   }
 
@@ -375,6 +380,54 @@ export async function updateDebt(
     throw new Error(`Failed to update debt: ${error.message || JSON.stringify(error)}`);
   }
 
+  // If debt payment details changed, update planned payments
+  // Check if any relevant fields changed
+  const paymentFieldsChanged = 
+    data.firstPaymentDate !== undefined ||
+    data.paymentFrequency !== undefined ||
+    data.paymentAmount !== undefined ||
+    data.monthlyPayment !== undefined ||
+    data.accountId !== undefined ||
+    data.isPaused !== undefined ||
+    isPaidOff !== currentDebt.isPaidOff;
+
+  if (paymentFieldsChanged && debt.accountId && !isPaidOff && !debt.isPaused && debt.loanType !== "credit_card") {
+    try {
+      // Delete existing scheduled planned payments for this debt
+      const { error: deleteError } = await supabase
+        .from("PlannedPayment")
+        .delete()
+        .eq("debtId", id)
+        .eq("status", "scheduled");
+
+      if (deleteError) {
+        console.error("Error deleting old planned payments:", deleteError);
+        // Continue anyway - we'll create new ones
+      }
+
+      // Create new planned payments with updated data
+      await createDebtPlannedPayments(debt);
+    } catch (error) {
+      // Log error but don't fail debt update
+      console.error("Error updating debt planned payments:", error);
+    }
+  } else if (isPaidOff || debt.isPaused) {
+    // If debt is paid off or paused, delete all scheduled planned payments
+    try {
+      const { error: deleteError } = await supabase
+        .from("PlannedPayment")
+        .delete()
+        .eq("debtId", id)
+        .eq("status", "scheduled");
+
+      if (deleteError) {
+        console.error("Error deleting planned payments for paid/paused debt:", deleteError);
+      }
+    } catch (error) {
+      console.error("Error cleaning up planned payments:", error);
+    }
+  }
+
   return debt;
 }
 
@@ -382,10 +435,13 @@ export async function updateDebt(
  * Delete a debt
  */
 /**
- * Create all payment transactions for a debt
- * Creates transactions for all months from first payment date to totalMonths
+ * Create all planned payments for a debt
+ * Creates PlannedPayments only for future dates starting from today
+ * Only creates PlannedPayments up to PLANNED_HORIZON_DAYS (90 days)
+ * Past payments are NOT created to avoid cluttering the system.
+ * PlannedPayments will appear in Upcoming Transactions and can be marked as paid by the user.
  */
-async function createDebtPaymentTransactions(debt: any): Promise<void> {
+async function createDebtPlannedPayments(debt: any): Promise<void> {
   if (!debt.accountId || debt.isPaidOff || debt.isPaused) {
     return;
   }
@@ -405,18 +461,8 @@ async function createDebtPaymentTransactions(debt: any): Promise<void> {
     return;
   }
 
-  // Calculate payment frequency multiplier
+  // Calculate payment frequency
   const paymentFrequency = debt.paymentFrequency || "monthly";
-  let monthsBetweenPayments = 1;
-  if (paymentFrequency === "biweekly") {
-    monthsBetweenPayments = 14 / 30; // Approximately 0.467 months
-  } else if (paymentFrequency === "weekly") {
-    monthsBetweenPayments = 7 / 30; // Approximately 0.233 months
-  } else if (paymentFrequency === "semimonthly") {
-    monthsBetweenPayments = 0.5; // Twice per month
-  } else if (paymentFrequency === "daily") {
-    monthsBetweenPayments = 1 / 30; // Approximately 0.033 months
-  }
 
   // Calculate number of payments based on frequency
   let numberOfPayments = totalMonths;
@@ -430,14 +476,98 @@ async function createDebtPaymentTransactions(debt: any): Promise<void> {
     numberOfPayments = Math.ceil(totalMonths * 30); // Approximately 30 payments per month
   }
 
-  // Limit to reasonable number of transactions (max 500)
-  numberOfPayments = Math.min(numberOfPayments, 500);
+  const plannedPayments = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Calculate horizon date (PLANNED_HORIZON_DAYS from today)
+  const horizonDate = new Date(today);
+  horizonDate.setDate(horizonDate.getDate() + PLANNED_HORIZON_DAYS);
+  horizonDate.setHours(23, 59, 59, 999);
 
-  const transactions = [];
+  // Find the first payment date that is on or after today
   let currentDate = new Date(firstPaymentDate);
   currentDate.setHours(0, 0, 0, 0);
+  
+  // If firstPaymentDate is in the past, calculate the next payment date
+  if (currentDate < today) {
+    // Calculate how many periods have passed since firstPaymentDate
+    let periodsPassed = 0;
+    if (paymentFrequency === "monthly") {
+      periodsPassed = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+    } else if (paymentFrequency === "biweekly") {
+      periodsPassed = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 14));
+    } else if (paymentFrequency === "weekly") {
+      periodsPassed = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    } else if (paymentFrequency === "semimonthly") {
+      periodsPassed = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 15));
+    } else if (paymentFrequency === "daily") {
+      periodsPassed = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    
+    // Advance to the next payment date after today
+    for (let i = 0; i <= periodsPassed; i++) {
+      if (paymentFrequency === "monthly") {
+        currentDate = addMonths(new Date(firstPaymentDate), i);
+      } else if (paymentFrequency === "biweekly") {
+        currentDate = new Date(firstPaymentDate);
+        currentDate.setDate(currentDate.getDate() + (i * 14));
+      } else if (paymentFrequency === "weekly") {
+        currentDate = new Date(firstPaymentDate);
+        currentDate.setDate(currentDate.getDate() + (i * 7));
+      } else if (paymentFrequency === "semimonthly") {
+        currentDate = addMonths(new Date(firstPaymentDate), Math.floor(i / 2));
+        if (i % 2 === 1) {
+          currentDate.setDate(15);
+        } else {
+          currentDate.setDate(1);
+        }
+      } else if (paymentFrequency === "daily") {
+        currentDate = new Date(firstPaymentDate);
+        currentDate.setDate(currentDate.getDate() + i);
+      }
+      currentDate.setHours(0, 0, 0, 0);
+    }
+    
+    // Ensure we're at or after today
+    while (currentDate < today) {
+      if (paymentFrequency === "monthly") {
+        currentDate = addMonths(currentDate, 1);
+      } else if (paymentFrequency === "biweekly") {
+        currentDate.setDate(currentDate.getDate() + 14);
+      } else if (paymentFrequency === "weekly") {
+        currentDate.setDate(currentDate.getDate() + 7);
+      } else if (paymentFrequency === "semimonthly") {
+        if (currentDate.getDate() <= 15) {
+          currentDate.setDate(15);
+        } else {
+          currentDate = addMonths(currentDate, 1);
+          currentDate.setDate(1);
+        }
+      } else if (paymentFrequency === "daily") {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      currentDate.setHours(0, 0, 0, 0);
+    }
+  }
 
-  for (let i = 0; i < numberOfPayments; i++) {
+  // Calculate the starting index based on how many payments have already passed
+  let startingIndex = 0;
+  if (paymentFrequency === "monthly") {
+    startingIndex = Math.floor((currentDate.getTime() - firstPaymentDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  } else if (paymentFrequency === "biweekly") {
+    startingIndex = Math.floor((currentDate.getTime() - firstPaymentDate.getTime()) / (1000 * 60 * 60 * 24 * 14));
+  } else if (paymentFrequency === "weekly") {
+    startingIndex = Math.floor((currentDate.getTime() - firstPaymentDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+  } else if (paymentFrequency === "semimonthly") {
+    startingIndex = Math.floor((currentDate.getTime() - firstPaymentDate.getTime()) / (1000 * 60 * 60 * 24 * 15));
+  } else if (paymentFrequency === "daily") {
+    startingIndex = Math.floor((currentDate.getTime() - firstPaymentDate.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  // Only create transactions for future dates (on or after today)
+  // These transactions will appear in Upcoming Transactions and can be marked as paid
+  for (let i = startingIndex; i < numberOfPayments; i++) {
     // Calculate next payment date based on frequency
     if (paymentFrequency === "monthly") {
       currentDate = addMonths(new Date(firstPaymentDate), i);
@@ -458,33 +588,50 @@ async function createDebtPaymentTransactions(debt: any): Promise<void> {
       currentDate = new Date(firstPaymentDate);
       currentDate.setDate(currentDate.getDate() + i);
     }
+    
+    currentDate.setHours(0, 0, 0, 0);
 
-    transactions.push({
-      date: currentDate,
-      type: "expense" as const,
-      amount: paymentAmount,
-      accountId: debt.accountId,
-      categoryId: categoryMapping.categoryId,
-      subcategoryId: categoryMapping.subcategoryId,
-      description: debt.name, // Use the debt name as provided by the user
-      recurring: true, // Mark as recurring so it appears in upcoming transactions
-    });
+    // Only create planned payments for dates on or after today and within horizon
+    if (currentDate >= today && currentDate <= horizonDate) {
+      plannedPayments.push({
+        date: currentDate,
+        type: "expense" as const,
+        amount: paymentAmount,
+        accountId: debt.accountId,
+        categoryId: categoryMapping.categoryId,
+        subcategoryId: categoryMapping.subcategoryId,
+        description: debt.name, // Use the debt name as provided by the user
+        source: "debt" as const,
+        debtId: debt.id,
+      });
+    }
+    
+    // Stop if we've exceeded the horizon
+    if (currentDate > horizonDate) {
+      break;
+    }
   }
 
-  // Create transactions in batches to avoid overwhelming the database
+  // Only create planned payments if there are any future payments to create
+  if (plannedPayments.length === 0) {
+    console.log(`No future planned payments to create for debt ${debt.id} (all payments are in the past or beyond horizon)`);
+    return;
+  }
+
+  // Create planned payments in batches to avoid overwhelming the database
   const batchSize = 50;
-  for (let i = 0; i < transactions.length; i += batchSize) {
-    const batch = transactions.slice(i, i + batchSize);
+  for (let i = 0; i < plannedPayments.length; i += batchSize) {
+    const batch = plannedPayments.slice(i, i + batchSize);
     await Promise.all(
-      batch.map((tx) =>
-        createTransaction(tx).catch((error) => {
-          console.error(`Error creating transaction for debt ${debt.id} on ${tx.date}:`, error);
+      batch.map((pp) =>
+        createPlannedPayment(pp).catch((error) => {
+          console.error(`Error creating planned payment for debt ${debt.id} on ${pp.date}:`, error);
         })
       )
     );
   }
 
-  console.log(`Created ${transactions.length} payment transactions for debt ${debt.id}`);
+  console.log(`Created ${plannedPayments.length} planned payments for debt ${debt.id} (starting from ${today.toISOString().split('T')[0]}, up to ${PLANNED_HORIZON_DAYS} days)`);
 }
 
 export async function deleteDebt(id: string): Promise<void> {
@@ -565,7 +712,13 @@ export async function addPayment(id: string, paymentAmount: number): Promise<Deb
     throw new Error(`Failed to add payment: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Create transaction automatically if accountId is set
+  // Credit card debts are paid via transfers to the credit card account, not through addPayment
+  if (debt.loanType === "credit_card") {
+    console.log("Credit card debts are paid via transfers to the credit card account, not through addPayment()");
+    return updatedDebt;
+  }
+
+  // Create transaction automatically if accountId is set (for non-credit-card debts)
   if (updatedDebt.accountId) {
     try {
       const categoryMapping = await getDebtCategoryMapping(debt.loanType);

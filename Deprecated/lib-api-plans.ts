@@ -1,5 +1,15 @@
 "use server";
 
+/**
+ * @deprecated This file is deprecated. Use @/lib/api/subscription instead.
+ * 
+ * This file is kept for backward compatibility during migration.
+ * All new code should use the unified subscription API in @/lib/api/subscription.
+ * 
+ * Functions in this file are still used internally by the unified API
+ * but should not be imported directly by other modules.
+ */
+
 import { createServerClient } from "@/lib/supabase-server";
 import { Plan, PlanFeatures, Subscription } from "@/lib/validations/plan";
 import { getOwnerIdForMember, isHouseholdMember } from "./members";
@@ -50,6 +60,17 @@ export async function invalidateSubscriptionCache(userId: string): Promise<void>
   log.debug("Invalidated subscription cache for user:", userId);
 }
 
+/**
+ * Invalidate plans cache
+ * Call this when plans are updated in the database
+ */
+export async function invalidatePlansCache(): Promise<void> {
+  plansCache.clear();
+  cacheTimestamp = 0; // Force refresh on next access
+  const log = logger.withPrefix("PLANS");
+  log.debug("Invalidated plans cache");
+}
+
 async function refreshPlansCache(): Promise<void> {
   try {
     const supabase = await createServerClient();
@@ -57,7 +78,6 @@ async function refreshPlansCache(): Promise<void> {
     const { data: plans, error } = await supabase
       .from("Plan")
       .select("*")
-      .neq("id", "free") // Exclude free plan
       .order("priceMonthly", { ascending: true });
 
     if (error || !plans) {
@@ -68,12 +88,10 @@ async function refreshPlansCache(): Promise<void> {
     // Clear existing cache
     plansCache.clear();
     
-    // Populate cache (excluding free plan)
+    // Populate cache
     plans.forEach(plan => {
-      if (plan.id !== "free") {
         const mappedPlan = mapPlan(plan);
         plansCache.set(mappedPlan.id, mappedPlan);
-      }
     });
     
     cacheTimestamp = Date.now();
@@ -100,19 +118,8 @@ export async function getPlans(): Promise<Plan[]> {
 
 export async function getPlanById(planId: string): Promise<Plan | null> {
   try {
-    // Check if cache is valid
-    const now = Date.now();
-    if (!plansCache.has(planId) || (now - cacheTimestamp) > CACHE_TTL) {
-      await refreshPlansCache();
-    }
-
-    // Return from cache
-    const cachedPlan = plansCache.get(planId);
-    if (cachedPlan) {
-      return cachedPlan;
-    }
-
-    // If not in cache, fetch directly (fallback)
+    // Always fetch fresh from database to ensure we get the latest features
+    // Cache is only used for performance, but we want to respect database changes
     const supabase = await createServerClient();
     
     const { data: plan, error } = await supabase
@@ -123,16 +130,29 @@ export async function getPlanById(planId: string): Promise<Plan | null> {
 
     if (error || !plan) {
       logger.error("Error fetching plan:", error);
+      // Try cache as fallback if database fetch fails
+      const cachedPlan = plansCache.get(planId);
+      if (cachedPlan) {
+        logger.warn("Using cached plan due to database error");
+        return cachedPlan;
+      }
       return null;
     }
 
     const mappedPlan = mapPlan(plan);
-    // Update cache
+    // Update cache with fresh data
     plansCache.set(planId, mappedPlan);
+    cacheTimestamp = Date.now();
     
     return mappedPlan;
   } catch (error) {
     logger.error("Error in getPlanById:", error);
+    // Try cache as fallback
+    const cachedPlan = plansCache.get(planId);
+    if (cachedPlan) {
+      logger.warn("Using cached plan due to error");
+      return cachedPlan;
+    }
     return null;
   }
 }
@@ -245,8 +265,7 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
  * Check if a trial subscription is still valid (not expired)
  */
 function isTrialValid(subscription: any): boolean {
-  // Accept both "trialing" and "trial" (in case of database inconsistency)
-  if (subscription.status !== "trialing" && subscription.status !== "trial") {
+  if (subscription.status !== "trialing") {
     return true; // Not a trial, so it's valid
   }
   
@@ -282,12 +301,11 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
     if (isMember && ownerId) {
       // User is a household member, inherit plan from owner
       // Get owner's subscription (active or trialing)
-      // Include "trial" as well in case of database inconsistency
       const { data: ownerSubscription, error: ownerError } = await supabase
         .from("Subscription")
         .select("*")
         .eq("userId", ownerId)
-        .in("status", ["active", "trialing", "trial"])
+        .in("status", ["active", "trialing"])
         .order("createdAt", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -299,10 +317,10 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
       if (ownerSubscription) {
         // Owner has a subscription, return it as shadow subscription for the member
         // Allow even if trial expired - user can still view the system
-        // Only inherit if owner has Basic or Premium plan
+        // Only inherit if owner has Essential or Pro plan
         const ownerPlanId = ownerSubscription.planId;
         
-        if (ownerPlanId === "basic" || ownerPlanId === "premium") {
+        if (ownerPlanId === "essential" || ownerPlanId === "pro") {
           const mapped = mapSubscription(ownerSubscription);
           return {
             ...mapped,
@@ -311,20 +329,40 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
         }
         // If owner has no valid plan, fall through to return null
       }
-      // If owner has no subscription or has Free, return Free for member
+      // If owner has no subscription, return null for member
     }
     
-    // User is not a member, or owner has Free/no subscription - check user's own subscription
-    // Include all statuses to handle cancelled/expired subscriptions properly
-    // Include "trial" as well in case of database inconsistency (should be "trialing")
-    const { data: subscription, error } = await supabase
+    // User is not a member, or owner has no subscription - check user's own subscription
+    // Prioritize active or trialing subscriptions, but also check for any subscription
+    // to handle edge cases where status might be different
+    // First try to get active or trialing subscription
+    let { data: subscription, error } = await supabase
       .from("Subscription")
       .select("*")
       .eq("userId", userId)
-      .in("status", ["active", "trialing", "trial", "cancelled", "past_due"])
+      .in("status", ["active", "trialing"])
       .order("createdAt", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // If no active/trialing subscription found, check for any subscription (including cancelled)
+    // This handles edge cases but we'll still check status in the layout
+    if (!subscription && !error) {
+      const { data: anySubscription, error: anyError } = await supabase
+        .from("Subscription")
+        .select("*")
+        .eq("userId", userId)
+        .order("createdAt", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (anySubscription) {
+        subscription = anySubscription;
+      }
+      if (anyError && anyError.code !== "PGRST116") {
+        error = anyError;
+      }
+    }
 
     // If error is PGRST116 (no rows returned), it's expected when no subscription exists
     // Other errors should be logged
@@ -336,10 +374,28 @@ async function fetchUserSubscription(userId: string): Promise<Subscription | nul
       // Return null if no subscription exists
       // User must select a plan on /select-plan page
       // This allows users to choose their plan before being redirected to dashboard
+      log.debug(`No subscription found for user ${userId}`);
       return null;
     }
 
-    return mapSubscription(subscription);
+    // Log subscription details for debugging
+    log.debug(`Found subscription for user ${userId}:`, {
+      id: subscription.id,
+      planId: subscription.planId,
+      status: subscription.status,
+      trialStartDate: subscription.trialStartDate,
+      trialEndDate: subscription.trialEndDate,
+    });
+
+    // Map and return subscription
+    const mappedSubscription = mapSubscription(subscription);
+    
+    // Additional validation: ensure trialing subscriptions are recognized
+    if (subscription.status === "trialing") {
+      log.debug(`Trialing subscription found for user ${userId}, allowing access`);
+    }
+    
+    return mappedSubscription;
 }
 
 export async function getCurrentUserSubscription(): Promise<Subscription | null> {
@@ -360,6 +416,20 @@ export async function getCurrentUserSubscription(): Promise<Subscription | null>
     logger.error("Error in getCurrentUserSubscription:", error);
     // Even on error, if we have a user, we should return a free subscription
     // But we can't access the user here, so return null
+    return null;
+  }
+}
+
+/**
+ * Get plan name by plan ID (server-side)
+ * Returns the dynamic name from the database
+ */
+export async function getPlanNameById(planId: string): Promise<string | null> {
+  try {
+    const plan = await getPlanById(planId);
+    return plan?.name || null;
+  } catch (error) {
+    logger.error("Error in getPlanNameById:", error);
     return null;
   }
 }
@@ -395,10 +465,17 @@ export async function checkPlanLimits(
       };
     }
 
+    // Use features directly from the database plan
+    // The database is the source of truth - if features are disabled in Supabase, they should be disabled here
+    // mapPlan already merges with defaults, so all features are guaranteed to be defined
+    // This ensures that new features (like hasCsvImport) are automatically added with default values
+    // if they don't exist in the database yet
+    let limits = plan.features;
+
     return {
       plan,
       subscription: userSubscription,
-      limits: plan.features,
+      limits,
     };
   } catch (error) {
     logger.error("Error in checkPlanLimits:", error);
@@ -413,9 +490,35 @@ export async function checkPlanLimits(
 function mapPlan(data: any): Plan {
   let features: PlanFeatures;
   try {
-    features = typeof data.features === "string" 
+    const parsedFeatures = typeof data.features === "string" 
       ? JSON.parse(data.features) 
       : data.features;
+    
+    // Merge with defaults to ensure all fields are defined (handles new features added later)
+    // This ensures that if a plan in the database doesn't have hasCsvImport (or any new feature),
+    // it will be added with the default value
+    const mergedFeatures = { ...getDefaultFeatures(), ...parsedFeatures };
+    
+    // CRITICAL FIX: Convert string booleans to actual booleans
+    // This handles cases where JSONB stores booleans as strings "true"/"false"
+    // or when values come from SQL queries that may return strings
+    features = {
+      maxTransactions: typeof mergedFeatures.maxTransactions === "string" 
+        ? parseInt(mergedFeatures.maxTransactions, 10) 
+        : mergedFeatures.maxTransactions,
+      maxAccounts: typeof mergedFeatures.maxAccounts === "string" 
+        ? parseInt(mergedFeatures.maxAccounts, 10) 
+        : mergedFeatures.maxAccounts,
+      hasInvestments: mergedFeatures.hasInvestments === true || mergedFeatures.hasInvestments === "true",
+      hasAdvancedReports: mergedFeatures.hasAdvancedReports === true || mergedFeatures.hasAdvancedReports === "true",
+      hasCsvExport: mergedFeatures.hasCsvExport === true || mergedFeatures.hasCsvExport === "true",
+      hasCsvImport: mergedFeatures.hasCsvImport === true || mergedFeatures.hasCsvImport === "true",
+      hasDebts: mergedFeatures.hasDebts === true || mergedFeatures.hasDebts === "true",
+      hasGoals: mergedFeatures.hasGoals === true || mergedFeatures.hasGoals === "true",
+      hasBankIntegration: mergedFeatures.hasBankIntegration === true || mergedFeatures.hasBankIntegration === "true",
+      hasHousehold: mergedFeatures.hasHousehold === true || mergedFeatures.hasHousehold === "true",
+      hasBudgets: mergedFeatures.hasBudgets === true || mergedFeatures.hasBudgets === "true",
+    };
   } catch {
     features = getDefaultFeatures();
   }
@@ -456,7 +559,7 @@ function mapSubscription(data: any): Subscription {
 // They are not re-exported here because "use server" files can only export async functions
 
 export interface UserPlanInfo {
-  name: "basic" | "premium";
+  name: "essential" | "pro";
   isShadow: boolean; // true se herdado do owner
   ownerId?: string; // se for shadow subscription
   ownerName?: string; // nome do owner (se for shadow)
@@ -510,12 +613,12 @@ export async function getUserPlanInfo(userId: string): Promise<UserPlanInfo | nu
       }
 
       if (ownerSubscription) {
-        // Owner has a subscription, check if it's Basic or Premium
+        // Owner has a subscription, check if it's Essential or Pro
         const ownerPlanId = ownerSubscription.planId;
         
-        if (ownerPlanId === "basic" || ownerPlanId === "premium") {
+        if (ownerPlanId === "essential" || ownerPlanId === "pro") {
           return {
-            name: ownerPlanId as "basic" | "premium",
+            name: ownerPlanId as "essential" | "pro",
             isShadow: true,
             ownerId,
             ownerName: owner?.name || owner?.email || undefined,
@@ -531,9 +634,9 @@ export async function getUserPlanInfo(userId: string): Promise<UserPlanInfo | nu
     
     if (subscription) {
       const planId = subscription.planId;
-      if (planId === "basic" || planId === "premium") {
+      if (planId === "essential" || planId === "pro") {
         return {
-          name: planId as "basic" | "premium",
+          name: planId as "essential" | "pro",
           isShadow: false,
         };
       }

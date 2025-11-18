@@ -10,13 +10,16 @@ export interface Budget {
   amount: number;
   categoryId?: string | null;
   subcategoryId?: string | null;
-  macroId?: string | null;
+  groupId?: string | null;
   isRecurring?: boolean;
   actualSpend?: number;
-  category?: { id: string; name: string; macro?: { id: string; name: string } } | null;
+  category?: { id: string; name: string; group?: { id: string; name: string } } | null;
   subcategory?: { id: string; name: string } | null;
-  macro?: { id: string; name: string } | null;
+  group?: { id: string; name: string } | null;
   budgetCategories?: Array<{ category: { id: string; name: string } }>;
+  // Deprecated: Use groupId and group instead
+  macroId?: string | null;
+  macro?: { id: string; name: string } | null;
 }
 
 /**
@@ -32,9 +35,9 @@ export async function getBudgetsClient(period: Date): Promise<Budget[]> {
       *,
       category:Category(
         *,
-        macro:Group(*)
+        group:Group(*)
       ),
-      macro:Group(*),
+      group:Group(*),
       subcategory:Subcategory(
         *
       ),
@@ -59,8 +62,8 @@ export async function getBudgetsClient(period: Date): Promise<Budget[]> {
   // Handle relations
   const processedBudgets = budgets.map((budget: any) => {
     const category = Array.isArray(budget.category) ? budget.category[0] : budget.category;
-    const categoryMacro = category && Array.isArray(category.macro) ? category.macro[0] : category?.macro;
-    const macro = Array.isArray(budget.macro) ? budget.macro[0] : budget.macro;
+    const categoryGroup = category && Array.isArray(category.group) ? category.group[0] : category?.group;
+    const group = Array.isArray(budget.group) ? budget.group[0] : budget.group;
     const subcategory = Array.isArray(budget.subcategory) ? budget.subcategory[0] : budget.subcategory;
     const budgetCategories = Array.isArray(budget.budgetCategories) ? budget.budgetCategories : [];
     
@@ -68,9 +71,12 @@ export async function getBudgetsClient(period: Date): Promise<Budget[]> {
       ...budget,
       category: category ? {
         ...category,
-        macro: categoryMacro || null,
+        group: categoryGroup || null,
       } : null,
-      macro: macro || null,
+      group: group || null,
+      // Backward compatibility
+      macro: categoryGroup || null,
+      macroId: budget.groupId || null,
       subcategory: subcategory || null,
       budgetCategories: budgetCategories.map((bc: any) => ({
         ...bc,
@@ -118,8 +124,8 @@ export async function getBudgetsClient(period: Date): Promise<Budget[]> {
   const budgetsWithActual = processedBudgets.map((budget) => {
     let actualSpend = 0;
     
-    if (budget.macroId && budget.budgetCategories && budget.budgetCategories.length > 0) {
-      // Budget grouped by macro: sum transactions from all related categories
+    if (budget.groupId && budget.budgetCategories && budget.budgetCategories.length > 0) {
+      // Budget grouped by group: sum transactions from all related categories
       // Note: Grouped budgets don't have subcategories, so we sum all transactions from those categories
       const categoryIds = budget.budgetCategories
         .map((bc: any) => bc.category?.id)
@@ -153,8 +159,8 @@ export async function getBudgetsClient(period: Date): Promise<Budget[]> {
       status = "warning";
     }
 
-    // For grouped budgets, use macro name; for single category, use category name
-    const displayName = budget.macro?.name || budget.category?.name || "Unknown";
+    // For grouped budgets, use group name; for single category, use category name
+    const displayName = budget.group?.name || budget.category?.name || "Unknown";
 
     return {
       ...budget,

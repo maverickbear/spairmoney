@@ -183,6 +183,10 @@ export function PlansGrid({ currentPlanId, subscription, onPlanChange }: PlansGr
       features.push("CSV export");
     }
     
+    if (plan.features.hasCsvImport) {
+      features.push("CSV import");
+    }
+    
     if (plan.features.hasDebts) {
       features.push("Debt tracking");
     }
@@ -191,7 +195,11 @@ export function PlansGrid({ currentPlanId, subscription, onPlanChange }: PlansGr
       features.push("Goals tracking");
     }
     
-    // Household Members (Premium only)
+    if (plan.features.hasBudgets) {
+      features.push("Budgets");
+    }
+    
+    // Household Members (Pro-only)
     if (plan.features.hasHousehold) {
       features.push("Household members");
     }
@@ -222,7 +230,7 @@ export function PlansGrid({ currentPlanId, subscription, onPlanChange }: PlansGr
   }
 
   const sortedPlans = [...plans].sort((a, b) => {
-    const order = { basic: 1, premium: 2 };
+    const order = { essential: 1, pro: 2 };
     return (order[a.name as keyof typeof order] || 0) - (order[b.name as keyof typeof order] || 0);
   });
 

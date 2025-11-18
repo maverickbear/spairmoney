@@ -61,7 +61,7 @@ import { exportTransactionsToCSV, downloadCSV } from "@/lib/csv/export";
 import { useToast } from "@/components/toast-provider";
 import type { Transaction } from "@/lib/api/transactions-client";
 import type { Category } from "@/lib/api/categories-client";
-import { usePlanLimits } from "@/hooks/use-plan-limits";
+import { useSubscription } from "@/hooks/use-subscription";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { Badge } from "@/components/ui/badge";
 import { useWriteGuard } from "@/hooks/use-write-guard";
@@ -202,7 +202,7 @@ export default function TransactionsPage() {
   });
   const [activeCategoryIds, setActiveCategoryIds] = useState<Set<string>>(new Set());
   const [selectValue, setSelectValue] = useState<string>("");
-  const { limits, loading: limitsLoading } = usePlanLimits();
+  const { limits, checking: limitsLoading } = useSubscription();
   const { checkWriteAccess } = useWriteGuard();
 
   const [loading, setLoading] = useState(false);
@@ -1129,10 +1129,14 @@ export default function TransactionsPage() {
 
   function handleExport() {
     // Check if user has access to CSV export
-    if (!limits.hasCsvExport) {
+    // The database is the source of truth - if a feature is disabled in Supabase, it should be disabled here
+    // Safety check: convert string "true" to boolean (defensive programming)
+    const hasAccess = limits.hasCsvExport === true || limits.hasCsvExport === "true";
+    
+    if (!hasAccess) {
       toast({
         title: "CSV Export Not Available",
-        description: "CSV export is not available in your current plan. Upgrade to Basic or Premium to export your transactions.",
+        description: "CSV export is not available in your current plan. Upgrade to Essential or Pro to export your transactions.",
         variant: "destructive",
       });
       return;

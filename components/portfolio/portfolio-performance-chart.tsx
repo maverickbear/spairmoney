@@ -80,7 +80,9 @@ export function PortfolioPerformanceChart({
   };
 
   const filteredData = getFilteredData();
-  const startValue = filteredData[0]?.value || currentValue;
+  // Ensure we have at least one data point (current value)
+  const chartData = filteredData.length > 0 ? filteredData : [{ date: new Date().toISOString().split("T")[0], value: currentValue }];
+  const startValue = chartData[0]?.value || currentValue;
   // Calculate performance, handling division by zero
   const performance = startValue !== 0 
     ? ((currentValue - startValue) / startValue) * 100 
@@ -210,7 +212,7 @@ export function PortfolioPerformanceChart({
         </div>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={filteredData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+        <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke="hsl(var(--border))"

@@ -9,7 +9,7 @@ interface TrialWidgetProps {
   trialStartDate?: string | null;
   trialEndDate?: string | null;
   onUpgrade?: () => void;
-  planName?: "free" | "basic" | "premium" | null;
+  planName?: string | null;
 }
 
 function calculateTrialDaysRemaining(trialEndDate: string | null | undefined): number {

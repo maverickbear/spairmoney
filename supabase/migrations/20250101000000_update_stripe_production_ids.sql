@@ -4,7 +4,7 @@
 -- Note: These are Live Mode IDs from Stripe Dashboard
 
 -- ============================================================================
--- UPDATE PREMIUM PLAN
+-- UPDATE PRO PLAN
 -- ============================================================================
 UPDATE "Plan"
 SET 
@@ -12,10 +12,10 @@ SET
   "stripePriceIdMonthly" = 'price_1SStrqEj1ttZtjC0bOlejqd7',
   "stripePriceIdYearly" = 'price_1SStrqEj1ttZtjC0JY2Il3XQ',
   "updatedAt" = NOW()
-WHERE "id" = 'premium';
+WHERE "id" = 'pro';
 
 -- ============================================================================
--- UPDATE BASIC PLAN
+-- UPDATE ESSENTIAL PLAN
 -- ============================================================================
 UPDATE "Plan"
 SET 
@@ -23,7 +23,7 @@ SET
   "stripePriceIdMonthly" = 'price_1SStrmEj1ttZtjC0zDCZVsnJ',
   "stripePriceIdYearly" = 'price_1SStrmEj1ttZtjC0UwcdYRBZ',
   "updatedAt" = NOW()
-WHERE "id" = 'basic';
+WHERE "id" = 'essential';
 
 -- ============================================================================
 -- VERIFICATION QUERIES (uncomment to verify after running)
@@ -35,5 +35,5 @@ WHERE "id" = 'basic';
 --   "stripePriceIdMonthly",
 --   "stripePriceIdYearly"
 -- FROM "Plan"
--- WHERE "id" IN ('basic', 'premium');
+-- WHERE "id" IN ('essential', 'pro');
 

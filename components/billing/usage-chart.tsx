@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlanFeatures } from "@/lib/validations/plan";
-import { LimitCheckResult } from "@/lib/api/limits";
+import { LimitCheckResult } from "@/lib/api/subscription";
 
 interface UsageChartProps {
   limits?: PlanFeatures;
@@ -20,14 +20,14 @@ export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChar
 
   // Calculate individual usage percentages
   const getTransactionUsagePercentage = () => {
-    if (txLimit.limit === -1) return 0;
-    if (txLimit.limit === 0) return 0;
+    if (txLimit.limit === -1) return 0; // Unlimited - show 0% filled
+    if (txLimit.limit === 0) return 0; // No limit set - show 0% filled
     return Math.min((txLimit.current / txLimit.limit) * 100, 100);
   };
 
   const getAccountUsagePercentage = () => {
-    if (accLimit.limit === -1) return 0;
-    if (accLimit.limit === 0) return 0;
+    if (accLimit.limit === -1) return 0; // Unlimited - show 0% filled
+    if (accLimit.limit === 0) return 0; // No limit set - show 0% filled
     return Math.min((accLimit.current / accLimit.limit) * 100, 100);
   };
 
@@ -54,14 +54,13 @@ export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChar
             </span>
           </div>
           
-          {txLimit.limit !== -1 && (
-            <div className="w-full h-4 bg-muted rounded-lg overflow-hidden relative">
-              <div 
-                className="bg-blue-500 h-full transition-all"
-                style={{ width: `${Math.min(transactionUsagePercentage, 100)}%` }}
-              />
-            </div>
-          )}
+          {/* Always show the bar, even if unlimited or 0 */}
+          <div className="w-full h-4 bg-muted rounded-lg overflow-hidden relative">
+            <div 
+              className="bg-blue-500 h-full transition-all"
+              style={{ width: `${Math.min(transactionUsagePercentage, 100)}%` }}
+            />
+          </div>
         </div>
 
         {/* Accounts Usage */}
@@ -73,14 +72,13 @@ export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChar
             </span>
           </div>
           
-          {accLimit.limit !== -1 && (
-            <div className="w-full h-4 bg-muted rounded-lg overflow-hidden relative">
-              <div 
-                className="bg-pink-500 h-full transition-all"
-                style={{ width: `${Math.min(accountUsagePercentage, 100)}%` }}
-              />
-            </div>
-          )}
+          {/* Always show the bar, even if unlimited or 0 */}
+          <div className="w-full h-4 bg-muted rounded-lg overflow-hidden relative">
+            <div 
+              className="bg-pink-500 h-full transition-all"
+              style={{ width: `${Math.min(accountUsagePercentage, 100)}%` }}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>

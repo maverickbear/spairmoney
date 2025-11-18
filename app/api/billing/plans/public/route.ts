@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlans } from "@/lib/api/plans";
+import { getPlans } from "@/lib/api/subscription";
 
 /**
  * Public endpoint to fetch plans without authentication

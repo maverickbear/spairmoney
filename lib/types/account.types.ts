@@ -20,6 +20,8 @@ export interface BaseAccount {
   plaidVerificationStatus?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  dueDayOfMonth?: number | null;
+  extraCredit?: number;
 }
 
 export interface AccountWithBalance extends BaseAccount {

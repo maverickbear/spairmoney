@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -49,23 +49,70 @@ export function CategoryDialog({
   onSuccess,
 }: CategoryDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fetchedCategory, setFetchedCategory] = useState<SystemCategory | null>(null);
   // For create mode: textarea text with comma-separated category names
   const [categoryNamesText, setCategoryNamesText] = useState<string>("");
   // For create mode: selected macroId (shared for all categories)
   const [selectedMacroId, setSelectedMacroId] = useState<string>("");
 
+  // Use fetched category if available, otherwise use prop category
+  const currentCategory = fetchedCategory || category;
+
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
-    defaultValues: category
+    defaultValues: currentCategory
       ? {
-          name: category.name,
-          macroId: category.macroId,
+          name: currentCategory.name,
+          macroId: currentCategory.macroId,
         }
       : {
           name: "",
           macroId: "",
         },
   });
+
+  // Update form when category changes
+  useEffect(() => {
+    if (currentCategory) {
+      form.reset({
+        name: currentCategory.name,
+        macroId: currentCategory.macroId,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCategory?.id]);
+
+  // Fetch category from Supabase only once when category ID changes (not every time modal opens)
+  // Use prop data immediately, fetch in background only if needed
+  useEffect(() => {
+    if (category?.id) {
+      // Only fetch if we don't have fetched data for this ID yet
+      const lastFetchedId = fetchedCategory?.id;
+      if (lastFetchedId !== category.id) {
+        // Fetch in background without showing loading (use prop data immediately)
+        fetch(`/api/admin/categories`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("Failed to fetch categories");
+            }
+            return res.json();
+          })
+          .then((categories: SystemCategory[]) => {
+            const foundCategory = categories.find((c) => c.id === category.id);
+            if (foundCategory) {
+              setFetchedCategory(foundCategory);
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching category:", error);
+          });
+      }
+    } else {
+      // Reset fetched category when category is cleared
+      setFetchedCategory(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category?.id]);
 
   // Reset state when dialog opens/closes
   const handleOpenChange = (newOpen: boolean) => {
@@ -169,7 +216,7 @@ export function CategoryDialog({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: category?.id,
+          id: currentCategory?.id,
           name: data.name,
           macroId: data.macroId,
         }),
@@ -208,11 +255,11 @@ export function CategoryDialog({
         </DialogHeader>
 
         <form 
-          onSubmit={category ? form.handleSubmit(onSubmit) : handleCreateSubmit} 
+          onSubmit={currentCategory ? form.handleSubmit(onSubmit) : handleCreateSubmit} 
           className="flex flex-col flex-1 overflow-hidden"
         >
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-            {category ? (
+            {currentCategory ? (
               // Edit mode: single category form
               <>
                 <div className="space-y-2">
@@ -317,11 +364,11 @@ export function CategoryDialog({
               type="submit" 
               disabled={
                 isSubmitting || 
-                (!category && (!selectedMacroId || parseCommaSeparated(categoryNamesText).length === 0))
+                (!currentCategory && (!selectedMacroId || parseCommaSeparated(categoryNamesText).length === 0))
               }
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {category ? "Update" : "Create"}
+              {currentCategory ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

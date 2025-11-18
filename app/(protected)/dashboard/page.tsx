@@ -39,6 +39,7 @@ async function DashboardContent({ selectedMonthDate }: { selectedMonthDate: Date
         chartTransactions={data.chartTransactions}
         liabilities={data.liabilities}
         debts={data.debts}
+        recurringPayments={data.recurringPayments}
         selectedMonthDate={selectedMonthDate}
       />
     </>

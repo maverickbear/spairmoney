@@ -44,29 +44,40 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
 
       // Verify the session was set correctly
       if (sessionError) {
-        logger.warn("[createServerClient] setSession error:", sessionError.message);
+        // Only log if it's not an expected token error
+        const isExpectedError = sessionError.message?.includes("refresh_token_not_found") ||
+          sessionError.message?.includes("Invalid refresh token") ||
+          sessionError.message?.includes("JWT expired");
+        if (!isExpectedError) {
+          logger.warn("[createServerClient] setSession error:", sessionError.message);
+        }
       }
 
       // Verify user is authenticated
       const { data: { user }, error: userError } = await client.auth.getUser();
       if (userError || !user) {
-        logger.warn("[createServerClient] getUser error after setSession:", {
-          userError: userError?.message,
-          hasUser: !!user,
-        });
+        // Only log if it's not an expected token error
+        const isExpectedError = userError?.message?.includes("refresh_token_not_found") ||
+          userError?.message?.includes("Invalid refresh token") ||
+          userError?.message?.includes("JWT expired");
+        if (!isExpectedError) {
+          logger.warn("[createServerClient] getUser error after setSession:", {
+            userError: userError?.message,
+            hasUser: !!user,
+          });
+        }
       } else {
         logger.debug("[createServerClient] Successfully authenticated:", user.id);
       }
     } catch (error: any) {
-      // Handle refresh token errors gracefully
-      if (error?.message?.includes("refresh_token_not_found") || 
+      // Handle refresh token errors gracefully - don't log expected errors
+      const isExpectedError = error?.message?.includes("refresh_token_not_found") || 
           error?.message?.includes("Invalid refresh token") ||
-          error?.message?.includes("JWT expired")) {
-        logger.warn("[createServerClient] Token error:", error?.message);
-        // Session will be invalid, but continue with unauthenticated client
-      } else {
+          error?.message?.includes("JWT expired");
+      if (!isExpectedError) {
         logger.warn("[createServerClient] Unexpected error:", error?.message);
       }
+      // Session will be invalid, but continue with unauthenticated client
     }
 
     return client;
@@ -95,9 +106,14 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
   }
   
   // Use @supabase/ssr for automatic cookie handling
+  // Disable auto-refresh to prevent errors when tokens are invalid
   let client;
   try {
     client = createSSRServerClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false, // Disable auto-refresh to avoid errors with invalid tokens
+        persistSession: false, // Session is managed via cookies
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -121,14 +137,14 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
     // Try to get user to check if session is valid
     const { data: { user }, error: authError } = await client.auth.getUser();
     
-    // If we get a refresh token error, clear invalid cookies
+    // If we get a refresh token error, clear invalid cookies silently
     if (authError && (
       authError.message?.includes("refresh_token_not_found") || 
       authError.message?.includes("Invalid refresh token") ||
       authError.message?.includes("JWT expired") ||
       authError.message?.includes("Auth session missing")
     )) {
-      // Clear all Supabase auth cookies
+      // Clear all Supabase auth cookies silently (expected error)
       const authCookieNames = [
         "sb-access-token",
         "sb-refresh-token",
@@ -143,6 +159,10 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
           // Ignore errors when clearing cookies
         }
       });
+      // Don't log - this is an expected error when user is not authenticated
+    } else if (authError) {
+      // Only log unexpected auth errors
+      logger.warn("[createServerClient] Unexpected auth error:", authError.message);
     }
   } catch (error: any) {
     // If there's an error, clear cookies and return unauthenticated client

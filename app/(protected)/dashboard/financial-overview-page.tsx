@@ -2,10 +2,8 @@
 
 import { useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChartSkeleton } from "@/components/ui/chart-skeleton";
 import { CardSkeleton } from "@/components/ui/card-skeleton";
-import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { FinancialSummaryWidget } from "./widgets/financial-summary-widget";
 import { FinancialHealthScoreWidget } from "./widgets/financial-health-score-widget";
 import { calculateTotalIncome, calculateTotalExpenses } from "./utils/transaction-helpers";
@@ -37,14 +35,6 @@ const BudgetStatusWidget = dynamic(
   }
 );
 
-const UpcomingBillsWidget = dynamic(
-  () => import("./widgets/upcoming-bills-widget").then(m => ({ default: m.UpcomingBillsWidget })),
-  { 
-    ssr: true,
-    loading: () => <ListSkeleton itemCount={5} />
-  }
-);
-
 const SavingsGoalsWidget = dynamic(
   () => import("./widgets/savings-goals-widget").then(m => ({ default: m.SavingsGoalsWidget })),
   { 
@@ -56,8 +46,8 @@ const SavingsGoalsWidget = dynamic(
 const NetWorthWidget = dynamic(
   () => import("./widgets/net-worth-widget").then(m => ({ default: m.NetWorthWidget })),
   { 
-    ssr: true,
-    loading: () => <CardSkeleton />
+    ssr: false, // recharts doesn't work well with SSR
+    loading: () => <ChartSkeleton height={300} />
   }
 );
 
@@ -69,7 +59,13 @@ const InvestmentPortfolioWidget = dynamic(
   }
 );
 
-
+const RecurringPaymentsWidget = dynamic(
+  () => import("./widgets/recurring-payments-widget").then(m => ({ default: m.RecurringPaymentsWidget })),
+  { 
+    ssr: true,
+    loading: () => <CardSkeleton />
+  }
+);
 
 interface FinancialOverviewPageProps {
   selectedMonthTransactions: any[];
@@ -85,6 +81,7 @@ interface FinancialOverviewPageProps {
   chartTransactions: any[];
   liabilities: any[];
   debts: any[];
+  recurringPayments: any[];
   selectedMonthDate: Date;
 }
 
@@ -102,25 +99,72 @@ export function FinancialOverviewPage({
   chartTransactions,
   liabilities,
   debts,
+  recurringPayments,
   selectedMonthDate,
 }: FinancialOverviewPageProps) {
+  // Helper function to parse date from Supabase format
+  const parseTransactionDate = (dateStr: string | Date): Date => {
+    if (dateStr instanceof Date) {
+      return dateStr;
+    }
+    // Handle both "YYYY-MM-DD HH:MM:SS" and "YYYY-MM-DDTHH:MM:SS" formats
+    const normalized = dateStr.replace(' ', 'T').split('.')[0]; // Remove milliseconds if present
+    return new Date(normalized);
+  };
+
+  // Get today's date (without time) to filter out future transactions
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
+
+  // Filter transactions to only include those with date <= today
+  // Exclude future transactions as they haven't happened yet
+  const pastSelectedMonthTransactions = useMemo(() => {
+    return selectedMonthTransactions.filter((t) => {
+      if (!t.date) return false;
+      try {
+        const txDate = parseTransactionDate(t.date);
+        txDate.setHours(0, 0, 0, 0);
+        return txDate <= today;
+      } catch (error) {
+        return false; // Exclude if date parsing fails
+      }
+    });
+  }, [selectedMonthTransactions, today]);
+
+  const pastLastMonthTransactions = useMemo(() => {
+    return lastMonthTransactions.filter((t) => {
+      if (!t.date) return false;
+      try {
+        const txDate = parseTransactionDate(t.date);
+        txDate.setHours(0, 0, 0, 0);
+        return txDate <= today;
+      } catch (error) {
+        return false; // Exclude if date parsing fails
+      }
+    });
+  }, [lastMonthTransactions, today]);
+
   // Calculate income and expenses using helper functions for consistency
+  // Only include past transactions (exclude future ones)
   const currentIncome = useMemo(() => {
-    return calculateTotalIncome(selectedMonthTransactions);
-  }, [selectedMonthTransactions]);
+    return calculateTotalIncome(pastSelectedMonthTransactions);
+  }, [pastSelectedMonthTransactions]);
 
   const currentExpenses = useMemo(() => {
-    return calculateTotalExpenses(selectedMonthTransactions);
-  }, [selectedMonthTransactions]);
+    return calculateTotalExpenses(pastSelectedMonthTransactions);
+  }, [pastSelectedMonthTransactions]);
 
   // Calculate last month income and expenses for comparison
   const lastMonthIncome = useMemo(() => {
-    return calculateTotalIncome(lastMonthTransactions);
-  }, [lastMonthTransactions]);
+    return calculateTotalIncome(pastLastMonthTransactions);
+  }, [pastLastMonthTransactions]);
 
   const lastMonthExpenses = useMemo(() => {
-    return calculateTotalExpenses(lastMonthTransactions);
-  }, [lastMonthTransactions]);
+    return calculateTotalExpenses(pastLastMonthTransactions);
+  }, [pastLastMonthTransactions]);
 
   // Calculate net worth (assets - debts)
   // 
@@ -246,33 +290,32 @@ export function FinancialOverviewPage({
         />
       </div>
 
-      {/* Cash Flow Timeline */}
-      <CashFlowTimelineWidget
-        chartTransactions={chartTransactions}
-        selectedMonthDate={selectedMonthDate}
-      />
-
-      {/* Budget Status and Upcoming Transactions - Same Row */}
+      {/* Cash Flow Timeline and Budget Status side by side */}
       <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
-        {/* Budget Status */}
+        <CashFlowTimelineWidget
+          chartTransactions={chartTransactions}
+          selectedMonthDate={selectedMonthDate}
+        />
         <BudgetStatusWidget
           budgets={budgets}
         />
+      </div>
 
-        {/* Upcoming Transactions */}
-        <UpcomingBillsWidget
-          upcomingTransactions={upcomingTransactions}
+      {/* Recurring Payments and Savings Goals side by side */}
+      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
+      <RecurringPaymentsWidget
+        recurringPayments={recurringPayments}
+      />
+        <SavingsGoalsWidget
+          goals={goals}
         />
       </div>
 
       {/* Dashboard Grid */}
       <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {/* Savings Goals, Net Worth Snapshot, and Investment Portfolio - side by side, full width */}
+        {/* Net Worth Snapshot and Investment Portfolio - side by side, full width */}
         <div className="col-span-full">
-          <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-3">
-            <SavingsGoalsWidget
-              goals={goals}
-            />
+          <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2">
             <NetWorthWidget
               netWorth={netWorth}
               totalAssets={totalAssets}

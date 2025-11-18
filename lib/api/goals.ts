@@ -49,6 +49,7 @@ export async function calculateIncomeBasis(
   refreshToken?: string
 ): Promise<number> {
   if (expectedIncome && expectedIncome > 0) {
+    console.log("[GOALS] Using expectedIncome:", expectedIncome);
     return expectedIncome;
   }
 
@@ -61,6 +62,8 @@ export async function calculateIncomeBasis(
     start: subMonths(currentMonth, 3),
     end: currentMonth,
   });
+
+  console.log("[GOALS] Calculating income basis from last 3 months:", months.length, "months");
 
   const monthlyIncomes = await Promise.all(
     months.map(async (month) => {
@@ -75,17 +78,21 @@ export async function calculateIncomeBasis(
         .lte("date", formatDateEnd(monthEnd));
 
       if (error) {
-        console.error("Error fetching income transactions:", error);
+        console.error("[GOALS] Error fetching income transactions:", error);
         return 0;
       }
 
-      return (transactions || []).reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+      const monthIncome = (transactions || []).reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+      console.log(`[GOALS] Month ${monthStart.toISOString().substring(0, 7)}: ${transactions?.length || 0} transactions, total: ${monthIncome}`);
+      return monthIncome;
     })
   );
 
   // Calculate rolling average
   const totalIncome = monthlyIncomes.reduce((sum, income) => sum + income, 0);
   const avgIncome = monthlyIncomes.length > 0 ? totalIncome / monthlyIncomes.length : 0;
+
+  console.log("[GOALS] Total income (3 months):", totalIncome, "Average monthly:", avgIncome);
 
   return avgIncome;
 }
@@ -175,34 +182,112 @@ export async function getGoalsInternal(accessToken?: string, refreshToken?: stri
   // For now, we'll calculate from transactions. Expected income can be stored per goal or globally
   const incomeBasis = await calculateIncomeBasis(undefined, accessToken, refreshToken);
 
-  // Calculate progress for each goal
-  const goalsWithCalculations: GoalWithCalculations[] = goals.map((goal: any) => {
-    // Check if goal is completed (currentBalance >= targetAmount)
-    const isCompleted = goal.currentBalance >= goal.targetAmount;
+  // Get accounts to sync balances for goals with accountId
+  const goalsWithAccount = goals.filter((g: any) => g.accountId);
+  let accountsMap = new Map<string, any>();
+  
+  if (goalsWithAccount.length > 0) {
+    const { getAccounts } = await import("./accounts");
+    const accounts = await getAccounts(accessToken, refreshToken);
+    accounts.forEach((acc: any) => {
+      accountsMap.set(acc.id, acc);
+    });
+  }
+
+  // Get holdings for investment accounts if needed
+  const goalsWithHolding = goals.filter((g: any) => g.accountId && g.holdingId);
+  let holdingsMap = new Map<string, any>();
+  
+  if (goalsWithHolding.length > 0) {
+    const { getHoldings } = await import("./investments");
+    const accountIds = Array.from(new Set(goalsWithHolding.map((g: any) => g.accountId)));
     
-    // Update isCompleted if needed
-    if (isCompleted && !goal.isCompleted) {
-      // We'll update this in the database, but for now just use it in calculations
-      goal.isCompleted = isCompleted;
-      if (!goal.completedAt) {
-        goal.completedAt = formatTimestamp(new Date());
+    for (const accountId of accountIds) {
+      try {
+        const holdings = await getHoldings(accountId);
+        holdings.forEach((holding) => {
+          holdingsMap.set(`${accountId}_${holding.securityId}`, holding);
+        });
+      } catch (error) {
+        console.error(`[GOALS] Error fetching holdings for account ${accountId}:`, error);
+      }
+    }
+  }
+
+  // Calculate progress for each goal and sync balances
+  const goalsWithCalculations: GoalWithCalculations[] = await Promise.all(goals.map(async (goal: any) => {
+    let currentBalance = goal.currentBalance;
+    let needsUpdate = false;
+
+    // If goal has accountId, sync balance from account
+    if (goal.accountId) {
+      const account = accountsMap.get(goal.accountId);
+      
+      if (account) {
+        if (goal.holdingId && account.type === "investment") {
+          // Get balance from specific holding
+          const holding = holdingsMap.get(`${goal.accountId}_${goal.holdingId}`);
+          if (holding) {
+            const newBalance = holding.marketValue || 0;
+            if (newBalance !== currentBalance) {
+              currentBalance = newBalance;
+              needsUpdate = true;
+            }
+          }
+        } else {
+          // Use account balance
+          const accountBalance = account.balance || 0;
+          if (accountBalance !== currentBalance) {
+            currentBalance = accountBalance;
+            needsUpdate = true;
+          }
+        }
       }
     }
 
+    // Update balance in database if it changed
+    if (needsUpdate) {
+      try {
+        const isCompleted = currentBalance >= goal.targetAmount;
+        await supabase
+          .from("Goal")
+          .update({
+            currentBalance,
+            isCompleted,
+            completedAt: isCompleted && !goal.completedAt ? formatTimestamp(new Date()) : goal.completedAt,
+            updatedAt: formatTimestamp(new Date()),
+          })
+          .eq("id", goal.id);
+        
+        // Update goal object with new balance
+        goal.currentBalance = currentBalance;
+        goal.isCompleted = isCompleted;
+        if (isCompleted && !goal.completedAt) {
+          goal.completedAt = formatTimestamp(new Date());
+        }
+      } catch (error) {
+        console.error(`[GOALS] Error updating balance for goal ${goal.id}:`, error);
+      }
+    }
+
+    // Check if goal is completed (currentBalance >= targetAmount)
+    const isCompleted = currentBalance >= goal.targetAmount;
+    
     // Use goal's expectedIncome if available, otherwise use calculated incomeBasis
     const goalIncomeBasis = goal.expectedIncome && goal.expectedIncome > 0
       ? goal.expectedIncome
       : incomeBasis;
 
-    const progress = calculateGoalProgress(goal, goalIncomeBasis);
+    const progress = calculateGoalProgress({ ...goal, currentBalance }, goalIncomeBasis);
 
     return {
       ...goal,
+      currentBalance,
       isCompleted,
       ...progress,
       incomeBasis: goalIncomeBasis,
     };
-  });
+  }));
 
   return goalsWithCalculations;
 }

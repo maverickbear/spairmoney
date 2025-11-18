@@ -9,7 +9,7 @@ import { getCurrentUserClient, User } from "./auth-client";
  */
 export async function getUserClient(): Promise<{ 
   user: User | null; 
-  plan: { name: "free" | "basic" | "premium" } | null;
+  plan: { id: string; name: string } | null;
   subscription?: {
     status: "active" | "trialing" | "cancelled" | "past_due";
     trialEndDate?: string | null;
@@ -33,7 +33,7 @@ export async function getUserClient(): Promise<{
       .from("Subscription")
       .select("planId, status, trialEndDate, trialStartDate")
       .eq("userId", authUser.id)
-      .in("status", ["active", "trialing", "trial", "cancelled", "past_due"])
+      .in("status", ["active", "trialing", "cancelled", "past_due"])
       .order("createdAt", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -69,13 +69,13 @@ export async function getUserClient(): Promise<{
   // Fetch plan in parallel if we have subscription
   const { data: planData } = await supabase
     .from("Plan")
-    .select("name")
+    .select("id, name")
     .eq("id", subscriptionResult.data.planId)
     .single();
 
   return {
     user,
-    plan: planData ? { name: planData.name as "free" | "basic" | "premium" } : null,
+    plan: planData ? { id: planData.id, name: planData.name } : null,
     subscription: {
       status: subscriptionResult.data.status as "active" | "trialing" | "cancelled" | "past_due",
       trialEndDate: subscriptionResult.data.trialEndDate,

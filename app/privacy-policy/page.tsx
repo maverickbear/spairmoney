@@ -7,13 +7,20 @@ import {
 } from "@/components/ui/card";
 import { SimpleFooter } from "@/components/common/simple-footer";
 import { Shield, ArrowLeft, Wallet } from "lucide-react";
+import { getPlans } from "@/lib/api/subscription";
 
 export const metadata = {
   title: "Privacy Policy - Spare Finance",
   description: "Privacy Policy for Spare Finance",
 };
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
+  // Fetch plans to get dynamic plan names
+  const plans = await getPlans();
+  const essentialPlan = plans.find(p => p.id === 'essential');
+  const proPlan = plans.find(p => p.id === 'pro');
+  const essentialPlanName = essentialPlan?.name || 'ESSENTIAL';
+  const proPlanName = proPlan?.name || 'PRO';
   return (
     <div className="min-h-screen bg-background">
       {/* Simple Header */}
@@ -131,9 +138,9 @@ export default function PrivacyPolicyPage() {
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-2 ml-4">
                 <li>Provide, maintain, and improve our services</li>
                 <li>Process transactions and manage your account</li>
-                <li>Sync bank account data through Plaid integration (BASIC and PREMIUM plans)</li>
+                <li>Sync bank account data through Plaid integration ({essentialPlanName} and {proPlanName} plans)</li>
                 <li>Provide AI-powered category suggestions based on your transaction history</li>
-                <li>Manage household member accounts and permissions (BASIC and PREMIUM plans)</li>
+                <li>Manage household member accounts and permissions ({essentialPlanName} and {proPlanName} plans)</li>
                 <li>Calculate budgets, goals, investments, and debt tracking</li>
                 <li>Generate reports and analytics</li>
                 <li>Send you important updates and notifications</li>
@@ -160,13 +167,13 @@ export default function PrivacyPolicyPage() {
                   <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
                     <li><strong>Stripe:</strong> For payment processing and subscription management. 
                     We do not store payment card information - all payment data is handled by Stripe.</li>
-                    <li><strong>Plaid:</strong> For secure bank account connections (BASIC and PREMIUM plans only). 
+                    <li><strong>Plaid:</strong> For secure bank account connections ({essentialPlanName} and {proPlanName} plans only). 
                     We only receive account information, transactions, and balances - we never access your bank credentials.</li>
                     <li>Cloud hosting and infrastructure providers</li>
                   </ul>
                 </li>
                 <li>
-                  <strong>Household Members:</strong> If you are part of a household account (BASIC and PREMIUM plans), 
+                  <strong>Household Members:</strong> If you are part of a household account ({essentialPlanName} and {proPlanName} plans), 
                   your financial data may be shared with other household members as configured. Each household member 
                   maintains separate financial data (transactions, accounts, budgets), but the account owner can view 
                   and manage all household members. You control which members have access to your household account.
@@ -220,7 +227,7 @@ export default function PrivacyPolicyPage() {
                 <div>
                   <h3 className="font-semibold mb-2">Plaid - Bank Account Connection</h3>
                   <p className="text-sm text-muted-foreground mb-2">
-                    We use Plaid to securely connect your bank accounts (available on BASIC and PREMIUM plans). 
+                    We use Plaid to securely connect your bank accounts (available on {essentialPlanName} and {proPlanName} plans). 
                     When you connect your bank account through Plaid:
                   </p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-2 ml-4">

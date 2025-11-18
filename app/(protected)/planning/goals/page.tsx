@@ -28,6 +28,7 @@ import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import { FeatureGuard } from "@/components/common/feature-guard";
 
 interface Goal {
   id: string;
@@ -282,11 +283,12 @@ export default function GoalsPage() {
   const totalAllocation = activeGoals.reduce((sum, g) => sum + (g.incomePercentage || 0), 0);
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <PageHeader
-        title="Goals"
-        description="Track your progress toward your financial goals"
-      >
+    <FeatureGuard feature="hasGoals" featureName="Goals Tracking" requiredPlan="essential">
+      <div className="space-y-4 md:space-y-6">
+        <PageHeader
+          title="Goals"
+          description="Track your progress toward your financial goals"
+        >
         {!(sortedGoals.length === 0 && filterBy === "all") && (
           <Button
             onClick={() => {
@@ -484,7 +486,8 @@ export default function GoalsPage() {
         </DialogContent>
       </Dialog>
       {ConfirmDialog}
-    </div>
+      </div>
+    </FeatureGuard>
   );
 }
 

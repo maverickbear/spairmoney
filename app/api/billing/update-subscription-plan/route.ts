@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
+import { createPortalSession } from "@/lib/api/stripe";
 
+/**
+ * DEPRECATED: This route should not be used for plan changes.
+ * All plan changes must be done through Stripe Customer Portal.
+ * The webhook will automatically update the Supabase database when changes are made in Stripe.
+ * 
+ * This route now redirects to Stripe Customer Portal for consistency.
+ */
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
@@ -14,85 +22,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { planId } = body;
+    // CRITICAL: All plan changes must be done through Stripe Customer Portal
+    // The webhook will automatically update Supabase when changes are made in Stripe
+    // Redirect to Stripe Customer Portal instead of making local changes
+    const portalResult = await createPortalSession(authUser.id);
 
-    if (!planId) {
+    if (portalResult.error || !portalResult.url) {
       return NextResponse.json(
-        { error: "Plan ID is required" },
-        { status: 400 }
-      );
-    }
-
-    // Verify plan exists
-    const { data: plan, error: planError } = await supabase
-      .from("Plan")
-      .select("id")
-      .eq("id", planId)
-      .single();
-
-    if (planError || !plan) {
-      return NextResponse.json(
-        { error: "Plan not found" },
-        { status: 404 }
-      );
-    }
-
-    // Get current active subscription
-    const { data: subscription, error: subError } = await supabase
-      .from("Subscription")
-      .select("id, planId, status")
-      .eq("userId", authUser.id)
-      .eq("status", "active")
-      .order("createdAt", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (subError) {
-      console.error("[UPDATE_SUBSCRIPTION_PLAN] Error fetching subscription:", subError);
-      return NextResponse.json(
-        { error: "Failed to fetch subscription" },
-        { status: 500 }
-      );
-    }
-
-    if (!subscription) {
-      return NextResponse.json(
-        { error: "No active subscription found" },
-        { status: 404 }
-      );
-    }
-
-    // If already on the target plan, return success
-    if (subscription.planId === planId) {
-      return NextResponse.json({
-        success: true,
-        message: "Already on this plan",
-      });
-    }
-
-    // Update subscription plan
-    const { error: updateError } = await supabase
-      .from("Subscription")
-      .update({ planId })
-      .eq("id", subscription.id);
-
-    if (updateError) {
-      console.error("[UPDATE_SUBSCRIPTION_PLAN] Error updating subscription:", updateError);
-      return NextResponse.json(
-        { error: "Failed to update subscription" },
+        { error: portalResult.error || "Failed to create portal session" },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: "Subscription plan updated successfully",
+      url: portalResult.url,
+      message: "Redirecting to Stripe Customer Portal to manage your subscription. All plan changes must be made through Stripe.",
     });
   } catch (error) {
     console.error("[UPDATE_SUBSCRIPTION_PLAN] Error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update subscription plan" },
+      { error: error instanceof Error ? error.message : "Failed to create portal session" },
       { status: 500 }
     );
   }

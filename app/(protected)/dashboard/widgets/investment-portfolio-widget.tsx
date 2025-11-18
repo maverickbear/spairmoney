@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { cn } from "@/lib/utils";
+import { useSubscription } from "@/hooks/use-subscription";
 
 interface InvestmentPortfolioWidgetProps {
   savings: number; // Fallback value if no portfolio data
-  demoMode?: boolean; // If true, skip API calls (for public landing page)
+  demoMode?: boolean; // If true, render static demo content (no hooks, no API calls)
 }
 
 interface PortfolioSummary {
@@ -25,17 +26,98 @@ interface HistoricalDataPoint {
   value: number;
 }
 
+// Static demo data for landing page
+const DEMO_PORTFOLIO_DATA = {
+  totalValue: 125000,
+  dayChange: 1250,
+  dayChangePercent: 1.01,
+  totalReturn: 25000,
+  totalReturnPercent: 25.0,
+  holdingsCount: 12,
+};
+
+// Static demo chart points (upward trend)
+const DEMO_CHART_POINTS = Array.from({ length: 12 }, (_, i) => {
+  const x = (i / 11) * 100;
+  const y = 100 - (i * 7);
+  return `${x},${y}`;
+}).join(" ");
+
 export function InvestmentPortfolioWidget({
   savings,
   demoMode = false,
 }: InvestmentPortfolioWidgetProps) {
+  // In demo mode, render completely static content (no hooks, no state, no logic)
+  if (demoMode) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>Investment Portfolio</CardTitle>
+          <CardDescription>High-level performance</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <div className="text-2xl font-bold text-foreground tabular-nums mb-1">
+                {formatMoneyCompact(DEMO_PORTFOLIO_DATA.totalValue)}
+              </div>
+              <div className="text-sm text-muted-foreground">Portfolio value</div>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border">
+              <span className="text-sm text-muted-foreground">Today</span>
+              <span className="text-sm font-semibold tabular-nums text-green-500">
+                +{formatMoneyCompact(Math.abs(DEMO_PORTFOLIO_DATA.dayChange))} (+{DEMO_PORTFOLIO_DATA.dayChangePercent.toFixed(1)}%)
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border">
+              <span className="text-sm text-muted-foreground">Total return</span>
+              <span className="text-sm font-semibold tabular-nums text-green-500">
+                +{formatMoneyCompact(Math.abs(DEMO_PORTFOLIO_DATA.totalReturn))} (+{DEMO_PORTFOLIO_DATA.totalReturnPercent.toFixed(1)}%)
+              </span>
+            </div>
+
+            <div className="bg-muted rounded-lg p-3 border border-border">
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                className="w-full h-20"
+                aria-label="Portfolio performance chart"
+              >
+                <polyline
+                  points={DEMO_CHART_POINTS}
+                  fill="none"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+
+            <div className="text-xs text-muted-foreground pt-2">
+              <span className="text-muted-foreground">Mix:</span> ETFs · Stocks · 401(k) · IRA
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Real component logic (only used in protected routes)
+  const { limits, checking: limitsLoading } = useSubscription();
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
   const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check if user has access to investments feature
+  // The database is the source of truth - if a feature is disabled in Supabase, it should be disabled here
+  const hasInvestmentsAccess = limits.hasInvestments === true;
+
   useEffect(() => {
-    // Skip API calls in demo mode (for public landing page)
-    if (demoMode) {
+    // Skip API calls if user doesn't have access to investments
+    if (!hasInvestmentsAccess) {
       setIsLoading(false);
       return;
     }
@@ -67,7 +149,7 @@ export function InvestmentPortfolioWidget({
     }
 
     loadPortfolioData();
-  }, [demoMode]);
+  }, [hasInvestmentsAccess]);
 
   // Use portfolio data if available, otherwise fallback to savings
   const portfolioValue = portfolioSummary?.totalValue ?? savings;
@@ -104,7 +186,8 @@ export function InvestmentPortfolioWidget({
   const hasHoldings = portfolioSummary?.holdingsCount ? portfolioSummary.holdingsCount > 0 : false;
   const assetMix = hasHoldings ? "ETFs · Stocks · 401(k) · IRA" : "No investments yet";
 
-  if (isLoading) {
+  // Show loading state while checking limits or loading data
+  if (limitsLoading || isLoading) {
     return (
       <Card className="h-full">
         <CardHeader>
@@ -114,6 +197,31 @@ export function InvestmentPortfolioWidget({
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <p className="text-sm text-muted-foreground">Loading portfolio data...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If user doesn't have access to investments, show savings only
+  if (!hasInvestmentsAccess) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>Investment Portfolio</CardTitle>
+          <CardDescription>High-level performance</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <div className="text-2xl font-bold text-foreground tabular-nums mb-1">
+                {formatMoneyCompact(savings)}
+              </div>
+              <div className="text-sm text-muted-foreground">Portfolio value</div>
+            </div>
+            <div className="text-xs text-muted-foreground pt-2">
+              <span className="text-muted-foreground">Investments feature not available in your plan</span>
+            </div>
           </div>
         </CardContent>
       </Card>

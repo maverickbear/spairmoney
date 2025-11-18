@@ -29,6 +29,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getFeaturePromotion } from "@/lib/utils/feature-promotions";
+import { useEffect, useState } from "react";
+import { getPlanNameById } from "@/lib/api/subscription";
 
 // Icon mapping
 const iconMap: Record<string, LucideIcon> = {
@@ -140,11 +142,13 @@ function FeaturePreview({ feature, planName }: { feature: string; planName: stri
     );
   }
 
-  if (feature === "CSV Export") {
+  if (feature === "CSV Export" || feature === "CSV Import") {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground/70 uppercase tracking-wider">Export Options</span>
+          <span className="text-xs text-muted-foreground/70 uppercase tracking-wider">
+            {feature === "CSV Import" ? "Import Options" : "Export Options"}
+          </span>
           <span className="text-xs text-primary/80">{planName}</span>
         </div>
         <div className="space-y-2">
@@ -219,21 +223,31 @@ function FeaturePreview({ feature, planName }: { feature: string; planName: stri
 interface UpgradePromptProps {
   feature: string;
   currentPlan?: string;
-  requiredPlan?: "basic" | "premium";
+  requiredPlan?: "essential" | "pro";
   message?: string;
   className?: string;
 }
 
 export function UpgradePrompt({
   feature,
-  currentPlan = "free",
-  requiredPlan = "basic",
+  currentPlan = "essential",
+  requiredPlan = "essential",
   message,
   className = "",
 }: UpgradePromptProps) {
   const router = useRouter();
-  const planName = requiredPlan === "premium" ? "Premium" : "Basic";
+  const [planName, setPlanName] = useState<string>("");
   const promotion = getFeaturePromotion(feature);
+
+  // Fetch plan name dynamically from database
+  useEffect(() => {
+    async function fetchPlanName() {
+      const name = await getPlanNameById(requiredPlan);
+      // Fallback to capitalized planId if name not found
+      setPlanName(name || requiredPlan.charAt(0).toUpperCase() + requiredPlan.slice(1));
+    }
+    fetchPlanName();
+  }, [requiredPlan]);
 
   return (
     <div className={`max-w-4xl mx-auto ${className}`}>
@@ -304,8 +318,8 @@ export function UpgradePrompt({
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-            <Button onClick={() => router.push("/pricing")} className="w-full sm:w-auto">
-                Upgrade to {planName}
+            <Button onClick={() => router.push("/pricing")} className="w-full sm:w-auto" disabled={!planName}>
+                {planName ? `Upgrade to ${planName}` : "Upgrade"}
                 <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
             <Button onClick={() => router.push("/pricing")} variant="ghost" className="w-full sm:w-auto">

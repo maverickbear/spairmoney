@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -17,6 +18,29 @@ import { SimpleFooter } from "@/components/common/simple-footer";
 import { HelpCircle, ArrowLeft, Wallet } from "lucide-react";
 
 export default function FAQPage() {
+  const [plans, setPlans] = useState<Array<{ id: string; name: string; priceMonthly: number; priceYearly: number }>>([]);
+
+  useEffect(() => {
+    // Fetch plans from public API
+    fetch("/api/billing/plans/public")
+      .then(res => res.json())
+      .then(data => {
+        if (data.plans) {
+          setPlans(data.plans);
+        }
+      })
+      .catch(err => console.error("Error fetching plans:", err));
+  }, []);
+
+  const essentialPlan = plans.find(p => p.id === 'essential');
+  const proPlan = plans.find(p => p.id === 'pro');
+  const essentialPlanName = essentialPlan?.name || 'ESSENTIAL';
+  const proPlanName = proPlan?.name || 'PRO';
+  const essentialPriceMonthly = essentialPlan?.priceMonthly || 7.99;
+  const essentialPriceYearly = essentialPlan?.priceYearly || 79.90;
+  const proPriceMonthly = proPlan?.priceMonthly || 14.99;
+  const proPriceYearly = proPlan?.priceYearly || 149.90;
+
   const faqCategories = [
     {
       title: "About Spare Finance",
@@ -44,23 +68,23 @@ export default function FAQPage() {
       questions: [
         {
           question: "What plans are available?",
-          answer: "We offer two plans: BASIC ($7.99/month or $79.90/year) and PREMIUM ($14.99/month or $149.90/year). Both plans include a 30-day free trial. The BASIC plan offers 500 transactions per month and 10 accounts, including all features. The PREMIUM plan offers unlimited resources.",
+          answer: `We offer two plans: ${essentialPlanName} ($${essentialPriceMonthly.toFixed(2)}/month or $${essentialPriceYearly.toFixed(2)}/year) and ${proPlanName} ($${proPriceMonthly.toFixed(2)}/month or $${proPriceYearly.toFixed(2)}/year). Both plans include a 30-day free trial. The ${essentialPlanName} plan offers 500 transactions per month and 10 accounts, including all features. The ${proPlanName} plan offers unlimited resources.`,
         },
         {
           question: "Do you offer a free trial?",
-          answer: "Yes! Both BASIC and PREMIUM plans include a 30-day free trial. You can try any plan risk-free for 30 days before being charged. During the trial, you have full access to all features of your selected plan. You can cancel anytime during the trial period without being charged. If you don't cancel before the trial ends, your subscription will automatically begin and you'll be charged.",
+          answer: `Yes! Both ${essentialPlanName} and ${proPlanName} plans include a 30-day free trial. You can try any plan risk-free for 30 days before being charged. During the trial, you have full access to all features of your selected plan. You can cancel anytime during the trial period without being charged. If you don't cancel before the trial ends, your subscription will automatically begin and you'll be charged.`,
         },
         {
           question: "What happens when my trial ends?",
           answer: "If you don't cancel before your 30-day trial ends, your subscription will automatically begin and you'll be charged according to your selected plan. You can cancel at any time, and cancellation will take effect at the end of your current billing period. You'll continue to have access until the end of the period you've paid for.",
         },
         {
-          question: "What features are available in the BASIC plan?",
-          answer: "The BASIC plan includes: complete investments, advanced reports, CSV import/export, bank integration via Plaid, family member management (household members), AI-powered intelligent categorization, and up to 500 transactions per month and 10 accounts.",
+          question: `What features are available in the ${essentialPlanName} plan?`,
+          answer: `The ${essentialPlanName} plan includes: complete investments, advanced reports, CSV import/export, bank integration via Plaid, family member management (household members), AI-powered intelligent categorization, and up to 500 transactions per month and 10 accounts.`,
         },
         {
-          question: "What's the difference between BASIC and PREMIUM?",
-          answer: "The PREMIUM plan offers everything the BASIC plan offers, but with unlimited resources: unlimited transactions per month and unlimited accounts. It's ideal for users with high transaction volume and multiple bank accounts.",
+          question: `What's the difference between ${essentialPlanName} and ${proPlanName}?`,
+          answer: `The ${proPlanName} plan offers everything the ${essentialPlanName} plan offers, but with unlimited resources: unlimited transactions per month and unlimited accounts. It's ideal for users with high transaction volume and multiple bank accounts.`,
         },
         {
           question: "Can I change plans at any time?",
@@ -68,7 +92,7 @@ export default function FAQPage() {
         },
         {
           question: "Is there a discount for annual payment?",
-          answer: "Yes! We offer a 17% discount when you choose annual payment. The BASIC plan costs $79.90/year (equivalent to $6.66/month) and the PREMIUM plan costs $149.90/year (equivalent to $12.49/month).",
+          answer: `Yes! We offer a 17% discount when you choose annual payment. The ${essentialPlanName} plan costs $${essentialPriceYearly.toFixed(2)}/year (equivalent to $${(essentialPriceYearly / 12).toFixed(2)}/month) and the ${proPlanName} plan costs $${proPriceYearly.toFixed(2)}/year (equivalent to $${(proPriceYearly / 12).toFixed(2)}/month).`,
         },
         {
           question: "Can I cancel my subscription?",
@@ -85,7 +109,7 @@ export default function FAQPage() {
       questions: [
         {
           question: "How does bank integration work?",
-          answer: "Bank integration is done through Plaid, a secure and reliable platform used by thousands of financial applications. You securely connect your bank accounts by authenticating through Plaid's secure interface. Spare Finance then automatically imports your account information, transactions, and balances. We never store your bank login credentials - all authentication is handled securely by Plaid. This feature is available on BASIC and PREMIUM plans.",
+          answer: `Bank integration is done through Plaid, a secure and reliable platform used by thousands of financial applications. You securely connect your bank accounts by authenticating through Plaid's secure interface. Spare Finance then automatically imports your account information, transactions, and balances. We never store your bank login credentials - all authentication is handled securely by Plaid. This feature is available on ${essentialPlanName} and ${proPlanName} plans.`,
         },
         {
           question: "Is my bank information secure?",
@@ -93,11 +117,11 @@ export default function FAQPage() {
         },
         {
           question: "Can I import transactions from a CSV file?",
-          answer: "Yes! On BASIC and PREMIUM plans, you can import transactions from CSV files. The system allows you to map your file columns to the correct fields (date, amount, description, category, etc.), making it easy to import historical data or data from other systems. You can preview the data before importing to ensure accuracy.",
+          answer: `Yes! On ${essentialPlanName} and ${proPlanName} plans, you can import transactions from CSV files. The system allows you to map your file columns to the correct fields (date, amount, description, category, etc.), making it easy to import historical data or data from other systems. You can preview the data before importing to ensure accuracy.`,
         },
         {
           question: "Can I export my data?",
-          answer: "Yes! On BASIC and PREMIUM plans, you can export all your transactions in CSV format at any time. This allows you to keep a backup of your data, use it in other tools, or for tax purposes. You can export filtered transactions or all transactions.",
+          answer: `Yes! On ${essentialPlanName} and ${proPlanName} plans, you can export all your transactions in CSV format at any time. This allows you to keep a backup of your data, use it in other tools, or for tax purposes. You can export filtered transactions or all transactions.`,
         },
         {
           question: "How do budgets work?",
@@ -105,7 +129,7 @@ export default function FAQPage() {
         },
         {
           question: "Can I manage investments in Spare Finance?",
-          answer: "Yes! On BASIC and PREMIUM plans, you can manage complete investments: create investment accounts (TFSA, RRSP, crypto wallet, etc.), manage securities (stocks, ETFs, crypto, bonds, REITs), record transactions (buy, sell, dividends, interest), calculate holdings with weighted average cost, and track portfolio value.",
+          answer: `Yes! On ${essentialPlanName} and ${proPlanName} plans, you can manage complete investments: create investment accounts (TFSA, RRSP, crypto wallet, etc.), manage securities (stocks, ETFs, crypto, bonds, REITs), record transactions (buy, sell, dividends, interest), calculate holdings with weighted average cost, and track portfolio value.`,
         },
         {
           question: "How do savings goals work?",
@@ -113,7 +137,7 @@ export default function FAQPage() {
         },
         {
           question: "Can I share my account with family members?",
-          answer: "Yes! On BASIC and PREMIUM plans, you can add household members to your account. You can invite family members by email, and each member maintains separate financial data (transactions, accounts, budgets). The account owner can view and manage all household members, while members can manage their own data. This is ideal for couples and families who want to track finances separately while staying organized in one place.",
+          answer: `Yes! On ${essentialPlanName} and ${proPlanName} plans, you can add household members to your account. You can invite family members by email, and each member maintains separate financial data (transactions, accounts, budgets). The account owner can view and manage all household members, while members can manage their own data. This is ideal for couples and families who want to track finances separately while staying organized in one place.`,
         },
         {
           question: "What data can household members see?",
@@ -129,7 +153,7 @@ export default function FAQPage() {
         },
         {
           question: "How do I manage household members?",
-          answer: "On BASIC and PREMIUM plans, you can invite family members by email from the 'Members' section in your account settings. Each member receives an invitation email and can accept to join your household. Each member maintains separate financial data (transactions, accounts, budgets), but you as the account owner can view and manage all members. You can remove members at any time.",
+          answer: `On ${essentialPlanName} and ${proPlanName} plans, you can invite family members by email from the 'Members' section in your account settings. Each member receives an invitation email and can accept to join your household. Each member maintains separate financial data (transactions, accounts, budgets), but you as the account owner can view and manage all members. You can remove members at any time.`,
         },
       ],
     },

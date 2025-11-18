@@ -22,7 +22,7 @@ interface PlanSelectorProps {
 export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, showComparison = false, isPublic = false, alreadyHadTrial = false, subscriptionStatus, trialEndDate }: PlanSelectorProps) {
   const [interval, setInterval] = useState<"month" | "year">("month");
   const sortedPlans = [...plans].sort((a, b) => {
-    const order = { free: 0, basic: 1, premium: 2 };
+    const order = { essential: 1, pro: 2 };
     return (order[a.name] || 0) - (order[b.name] || 0);
   });
 
@@ -94,7 +94,7 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
       return "Start 1-month trial";
     }
 
-    // For paid plans (Basic and Premium) when user has a plan, show "Subscribe"
+    // For paid plans (Essential and Pro) when user has a plan, show "Subscribe"
     if (plan.priceMonthly > 0) {
       return "Subscribe";
     }
@@ -251,6 +251,18 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                   ))}
                 </tr>
                 <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">CSV Import</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.features.hasCsvImport ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
                   <td className="px-6 py-4 text-sm text-foreground">Debts Tracking</td>
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
@@ -267,6 +279,18 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasGoals ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">Budgets</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.features.hasBudgets ? (
                         <Check className="h-5 w-5 text-primary mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -308,7 +332,7 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                       <td key={plan.id} className="px-6 py-4">
                         <Button
                           className="w-full"
-                          variant={plan.name === "premium" ? "default" : "outline"}
+                          variant={plan.id === "pro" ? "default" : "outline"}
                           disabled={isTrulyActive || loading}
                           onClick={() => onSelectPlan(plan.id, interval)}
                         >
@@ -372,6 +396,11 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
               allFeatures.push("CSV export");
             }
             
+            // CSV Import
+            if (plan.features.hasCsvImport) {
+              allFeatures.push("CSV import");
+            }
+            
             // Debts
             if (plan.features.hasDebts) {
               allFeatures.push("Debt tracking");
@@ -380,6 +409,11 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
             // Goals
             if (plan.features.hasGoals) {
               allFeatures.push("Goals tracking");
+            }
+            
+            // Budgets
+            if (plan.features.hasBudgets) {
+              allFeatures.push("Budgets");
             }
             
             // Household Members
@@ -392,14 +426,13 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
               allFeatures.push("Bank account integration");
             }
 
-            const isPremium = plan.name === "premium";
-            const isFree = plan.name === "free";
+            const isPro = plan.id === "pro";
             
             return (
               <Card 
                 key={plan.id} 
                 className={`relative transition-all border flex flex-col h-full w-full max-w-sm ${
-                  isFree || isCurrent
+                  isCurrent
                     ? "border-border" 
                     : "border-border"
                 } ${isCurrent ? "opacity-100" : "opacity-90 hover:opacity-100"}`}

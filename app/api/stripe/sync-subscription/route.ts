@@ -203,27 +203,6 @@ export async function POST(request: NextRequest) {
       stripeCustomerId: customerId
     });
 
-    // Cancel free subscriptions if creating paid one
-    if (plan.id !== "free") {
-      const { data: freeSubs } = await serviceSupabase
-        .from("Subscription")
-        .select("id")
-        .eq("userId", authUser.id)
-        .eq("planId", "free")
-        .eq("status", "active");
-
-      if (freeSubs && freeSubs.length > 0) {
-        const freeSubIds = freeSubs.map(sub => sub.id);
-        await serviceSupabase
-          .from("Subscription")
-          .update({
-            status: "cancelled",
-            updatedAt: new Date(),
-          })
-          .in("id", freeSubIds);
-        console.log("[SYNC] Cancelled free subscriptions:", freeSubIds);
-      }
-    }
 
     // Get existing subscription to check if trial should be finalized
     const { data: existingSubData } = await serviceSupabase
@@ -297,7 +276,7 @@ export async function POST(request: NextRequest) {
     console.log("[SYNC] Subscription synced successfully:", upsertedSub);
 
     // Invalidate subscription cache to ensure UI reflects changes immediately
-    const { invalidateSubscriptionCache } = await import("@/lib/api/plans");
+    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
     await invalidateSubscriptionCache(authUser.id);
     console.log("[SYNC] Subscription cache invalidated for user:", authUser.id);
 

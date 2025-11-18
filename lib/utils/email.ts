@@ -163,7 +163,7 @@ function getInvitationEmailTemplate(data: {
     
     // Replace template variables
     html = html.replace(/\{\{ \.MemberName \}\}/g, data.memberName || "there");
-    html = html.replace(/\{\{ \.OwnerName \}\}/g, data.ownerName || "Um usuário");
+    html = html.replace(/\{\{ \.OwnerName \}\}/g, data.ownerName || "A user");
     html = html.replace(/\{\{ \.OwnerEmail \}\}/g, data.ownerEmail || "");
     html = html.replace(/\{\{ \.InvitationLink \}\}/g, data.invitationLink);
     html = html.replace(/\{\{ \.MemberEmail \}\}/g, data.memberEmail || "");
@@ -400,7 +400,7 @@ function getCheckoutPendingEmailTemplate(data: {
                 <p style="margin: 0 0 10px; color: #1a1a1a; font-size: 14px; font-weight: 600;">What's next?</p>
                 <ul style="margin: 0; padding-left: 20px; color: #4a4a4a; font-size: 14px; line-height: 1.8;">
                   <li>Create your account password</li>
-                  <li>Access all premium features</li>
+                  <li>Access all pro features</li>
                   <li>Start tracking your finances</li>
                   <li>No credit card required during trial</li>
                 </ul>

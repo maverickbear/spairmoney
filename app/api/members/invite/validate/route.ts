@@ -37,6 +37,13 @@ export async function GET(request: Request) {
       .eq("id", invitation.ownerId)
       .single();
 
+    // Check if email already has an account (exists in User table)
+    const { data: existingUser } = await supabase
+      .from("User")
+      .select("id, email")
+      .eq("email", invitation.email.toLowerCase())
+      .maybeSingle();
+
     return NextResponse.json({
       invitation: {
         id: invitation.id,
@@ -48,6 +55,7 @@ export async function GET(request: Request) {
         name: owner.name || owner.email,
         email: owner.email,
       } : null,
+      hasAccount: !!existingUser, // Indicates if email already has an account
     });
   } catch (error) {
     console.error("Error validating invitation:", error);

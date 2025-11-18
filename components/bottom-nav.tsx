@@ -17,6 +17,8 @@ import {
   Settings,
   MoreHorizontal,
   Target,
+  Calendar,
+  Repeat,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,8 +38,10 @@ const mainNavItems = [
 
 // Additional navigation items (shown in "More" submenu)
 const moreNavItems = [
+  { href: "/planned-payment", label: "Planned Payment", icon: Calendar },
   { href: "/planning/goals", label: "Goals", icon: PiggyBank },
   { href: "/debts", label: "Debts", icon: CreditCard },
+  { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
   { href: "/investments", label: "Investments", icon: TrendingUp },
   { href: "/categories", label: "Categories", icon: FolderTree },
   { href: "/members", label: "Members", icon: Users },

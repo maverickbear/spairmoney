@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { logger } from "@/lib/utils/logger";
 import type { Subscription, Plan, PlanFeatures } from "@/lib/validations/plan";
-import { resolvePlanFeatures } from "@/lib/utils/plan-features";
+import { getDefaultFeatures } from "@/lib/utils/plan-features";
 
 interface SubscriptionContextValue {
   subscription: Subscription | null;
@@ -48,7 +48,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
   );
   const [plan, setPlan] = useState<Plan | null>(initialData?.plan ?? null);
   const [limits, setLimits] = useState<PlanFeatures>(
-    resolvePlanFeatures(initialData?.plan ?? null)
+    initialData?.plan?.features ?? getDefaultFeatures()
   );
   const [checking, setChecking] = useState(false);
   
@@ -59,8 +59,13 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update limits when plan changes
+  // Use plan.features directly from database - the database is the source of truth
   useEffect(() => {
-    setLimits(resolvePlanFeatures(plan));
+    if (plan?.features) {
+      setLimits(plan.features);
+    } else {
+      setLimits(getDefaultFeatures());
+    }
   }, [plan]);
 
   const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null }> => {
@@ -175,6 +180,26 @@ export function useSubscriptionContext() {
   const context = useContext(SubscriptionContext);
   if (context === undefined) {
     throw new Error("useSubscriptionContext must be used within SubscriptionProvider");
+  }
+  return context;
+}
+
+/**
+ * Safe version of useSubscriptionContext that returns null values when not within provider
+ * Useful for components that may be used on public pages (e.g., landing page demos)
+ */
+export function useSubscriptionSafe() {
+  const context = useContext(SubscriptionContext);
+  if (context === undefined) {
+    // Return safe defaults when not within provider
+    return {
+      subscription: null,
+      plan: null,
+      limits: getDefaultFeatures(),
+      checking: false,
+      refetch: async () => {},
+      invalidateCache: () => {},
+    };
   }
   return context;
 }

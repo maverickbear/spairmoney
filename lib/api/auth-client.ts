@@ -114,6 +114,23 @@ export async function signUpClient(data: SignUpFormData): Promise<{ user: User |
     if (!passwordValidation.isValid) {
       return { user: null, error: passwordValidation.error || "Invalid password" };
     }
+
+    // Check if email has a pending invitation
+    try {
+      const checkResponse = await fetch(`/api/members/invite/check-pending?email=${encodeURIComponent(data.email)}`);
+      if (checkResponse.ok) {
+        const checkData = await checkResponse.json();
+        if (checkData.hasPendingInvitation) {
+          return { 
+            user: null, 
+            error: "This email has a pending household invitation. Please accept the invitation from your email or use the invitation link to create your account." 
+          };
+        }
+      }
+    } catch (checkError) {
+      // If check fails, continue with signup (don't block)
+      console.error("Error checking pending invitation:", checkError);
+    }
     
     // Sign up user with Supabase Auth
     // Note: Supabase will automatically send OTP email if email confirmation is enabled
@@ -140,66 +157,10 @@ export async function signUpClient(data: SignUpFormData): Promise<{ user: User |
       return { user: null, error: errorMessage };
     }
 
-    // Wait a moment for the session to be established (needed for RLS policies)
-    // This ensures auth.uid() is available when we try to insert
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Check if user profile already exists
-    let { data: userData, error: fetchError } = await supabase
-      .from("User")
-      .select("*")
-      .eq("id", authData.user.id)
-      .maybeSingle();
-
-    if (fetchError) {
-      console.warn("[SIGNUP] Error checking existing user:", fetchError.message || fetchError);
-    }
-
-    // If user doesn't exist, create it
-    if (!userData) {
-      const { data: newUserData, error: userError } = await supabase
-        .from("User")
-        .insert({
-          id: authData.user.id,
-          email: authData.user.email!,
-          name: data.name || null,
-          role: "admin", // Owners who sign up directly are admins
-        })
-        .select()
-        .single();
-
-      if (userError) {
-        // Log detailed error information with better error handling
-        const errorDetails = {
-          message: userError.message || "Unknown error",
-          details: userError.details || null,
-          hint: userError.hint || null,
-          code: userError.code || null,
-          userId: authData.user.id,
-          email: authData.user.email,
-        };
-        
-        console.error("[SIGNUP] Error creating user profile:", JSON.stringify(errorDetails, null, 2));
-        
-        // Check for RLS error first (most common during signup)
-        const isRLSError = userError.code === "42501" || 
-                          userError.code === "PGRST301" ||
-                          (userError.message && (
-                            userError.message.toLowerCase().includes("row-level security") ||
-                            userError.message.toLowerCase().includes("policy") ||
-                            userError.message.toLowerCase().includes("violates")
-                          ));
-        
-        // Check for duplicate key error
-        const isDuplicateError = userError.code === "23505" || 
-                                 (userError.message && (
-                                   userError.message.includes("duplicate") || 
-                                   userError.message.includes("unique") ||
-                                   userError.message.includes("already exists")
-                                 ));
-        
-        if (isRLSError) {
-          console.log("[SIGNUP] RLS error detected (code:", userError.code, "), trying API route with service role...");
+    // During signup, the session might not be fully established yet, which can cause
+    // RLS policy violations when trying to insert directly. Always use the API route
+    // which uses service role and bypasses RLS for more reliable user creation.
+    let userData;
           
           try {
             const createResponse = await fetch("/api/auth/create-user-profile", {
@@ -220,96 +181,45 @@ export async function signUpClient(data: SignUpFormData): Promise<{ user: User |
               console.log("[SIGNUP] ✅ User profile created via API route");
               userData = createData.user;
             } else {
-              console.warn("[SIGNUP] ❌ API route failed:", createData.error || "Unknown error");
-              // User is created in auth but not in User table - this is OK, will be created on first login
-            }
-          } catch (apiError) {
-            console.error("[SIGNUP] ❌ Error calling create-user-profile API:", apiError);
+        // If API route fails, try to fetch existing user (might have been created by a trigger)
+        console.warn("[SIGNUP] API route failed, checking if user already exists:", createData.error || "Unknown error");
+        
+        const { data: existingUser, error: fetchError } = await supabase
+          .from("User")
+          .select("*")
+          .eq("id", authData.user.id)
+          .maybeSingle();
+        
+        if (existingUser) {
+          console.log("[SIGNUP] User profile already exists, using existing profile");
+          userData = existingUser;
+        } else if (fetchError) {
+          console.warn("[SIGNUP] Error fetching existing user:", fetchError.message || fetchError);
             // User is created in auth but not in User table - this is OK, will be created on first login
           }
         } 
-        // If it's a duplicate key error, try to fetch the existing user
-        else if (isDuplicateError) {
-          console.log("[SIGNUP] User already exists, fetching existing user...");
+    } catch (apiError) {
+      console.error("[SIGNUP] ❌ Error calling create-user-profile API:", apiError);
           
-          // Retry fetching the user (may have been created by a trigger or race condition)
-          const { data: existingUser, error: retryError } = await supabase
+      // Fallback: try to fetch existing user
+      const { data: existingUser, error: fetchError } = await supabase
             .from("User")
             .select("*")
             .eq("id", authData.user.id)
-            .single();
+        .maybeSingle();
           
           if (existingUser) {
-            console.log("[SIGNUP] Successfully fetched existing user");
+        console.log("[SIGNUP] User profile already exists (fallback), using existing profile");
             userData = existingUser;
-          } else if (retryError) {
-            console.warn("[SIGNUP] Error fetching existing user:", retryError.message || retryError);
-          }
-        } else {
-          console.warn("[SIGNUP] Unknown error type, not attempting fallback");
-        }
+      } else if (fetchError) {
+        console.warn("[SIGNUP] Error fetching existing user (fallback):", fetchError.message || fetchError);
         // User is created in auth but not in User table - this is OK, will be created on first login
-      } else {
-        userData = newUserData;
       }
     }
 
     // Create household member record for the owner (owner is also a household member of themselves)
+    // Use API route to avoid RLS issues during signup (session might not be fully established)
     if (userData) {
-      const invitationToken = crypto.randomUUID();
-      const now = new Date().toISOString();
-      
-      // Check if household member already exists (should not happen, but safety check)
-      const { data: existingMember } = await supabase
-        .from("HouseholdMember")
-        .select("id")
-        .eq("ownerId", userData.id)
-        .eq("memberId", userData.id)
-        .maybeSingle();
-
-      if (!existingMember) {
-        const { error: householdMemberError } = await supabase
-          .from("HouseholdMember")
-          .insert({
-            ownerId: userData.id,
-            memberId: userData.id,
-            email: authData.user.email!,
-            name: data.name || null,
-            role: "admin", // Owner is admin
-            status: "active", // Owner is immediately active
-            invitationToken: invitationToken,
-            invitedAt: now,
-            acceptedAt: now, // Owner accepts immediately
-            createdAt: now,
-            updatedAt: now,
-          });
-
-        if (householdMemberError) {
-          // Log detailed error information
-          const errorDetails = {
-            message: householdMemberError.message || "Unknown error",
-            details: householdMemberError.details || null,
-            hint: householdMemberError.hint || null,
-            code: householdMemberError.code || null,
-            ownerId: userData.id,
-            memberId: userData.id,
-            email: authData.user.email,
-          };
-          
-          console.error("[SIGNUP] Error creating household member record:", JSON.stringify(errorDetails, null, 2));
-          
-          // Check for RLS error
-          const isRLSError = householdMemberError.code === "42501" || 
-                            householdMemberError.code === "PGRST301" ||
-                            (householdMemberError.message && (
-                              householdMemberError.message.toLowerCase().includes("row-level security") ||
-                              householdMemberError.message.toLowerCase().includes("policy") ||
-                              householdMemberError.message.toLowerCase().includes("violates")
-                            ));
-          
-          if (isRLSError) {
-            console.log("[SIGNUP] RLS error detected for household member (code:", householdMemberError.code, "), trying API route...");
-            
             try {
               const createResponse = await fetch("/api/auth/create-household-member", {
                 method: "POST",
@@ -329,16 +239,12 @@ export async function signUpClient(data: SignUpFormData): Promise<{ user: User |
               if (createResponse.ok && createData.success) {
                 console.log("[SIGNUP] ✅ Household member created via API route");
               } else {
-                console.warn("[SIGNUP] ❌ API route failed for household member:", createData.error || "Unknown error");
-              }
-            } catch (apiError) {
-              console.error("[SIGNUP] ❌ Error calling create-household-member API:", apiError);
-            }
-          } else {
-            console.warn("[SIGNUP] Unknown error type for household member, not attempting fallback");
-          }
           // Don't fail signup if household member creation fails, but log it
+          console.warn("[SIGNUP] ❌ API route failed for household member:", createData.error || "Unknown error");
         }
+      } catch (apiError) {
+        // Don't fail signup if household member creation fails, but log it
+        console.error("[SIGNUP] ❌ Error calling create-household-member API:", apiError);
       }
     }
 

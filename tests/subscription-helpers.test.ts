@@ -42,10 +42,10 @@ function canWrite(subscription: any): boolean {
 }
 
 // Helper function to check if subscription should show upgrade banner
-// Note: Only "basic" and "premium" plans exist (no "free" plan)
+// Note: Only "essential" and "pro" plans exist (no "free" plan)
 function shouldShowUpgradeBanner(subscription: any, plan: any): boolean {
-  // Don't show if premium and active/trialing
-  if (plan?.name === "premium") {
+  // Don't show if pro and active/trialing
+  if (plan?.name === "pro") {
     // But show if cancelled or past_due (to reactivate)
     if (subscription?.status === "cancelled" || subscription?.status === "past_due") {
       return true;
@@ -53,8 +53,8 @@ function shouldShowUpgradeBanner(subscription: any, plan: any): boolean {
     return false;
   }
 
-  // For basic plan, show if not active and not valid trial
-  if (plan?.name === "basic") {
+  // For essential plan, show if not active and not valid trial
+  if (plan?.name === "essential") {
     // Show for cancelled or past_due
     if (subscription?.status === "cancelled" || subscription?.status === "past_due") {
       return true;
@@ -186,15 +186,15 @@ describe("Subscription Helpers", () => {
   });
 
   describe("shouldShowUpgradeBanner", () => {
-    it("should not show banner for premium plan", () => {
+    it("should not show banner for pro plan", () => {
       const subscription = { status: "active" };
-      const plan = { name: "premium" };
+      const plan = { name: "pro" };
       expect(shouldShowUpgradeBanner(subscription, plan)).toBe(false);
     });
 
     it("should not show banner for active subscription", () => {
       const subscription = { status: "active" };
-      const plan = { name: "basic" };
+      const plan = { name: "essential" };
       expect(shouldShowUpgradeBanner(subscription, plan)).toBe(false);
     });
 
@@ -203,7 +203,7 @@ describe("Subscription Helpers", () => {
         status: "trialing",
         trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       };
-      const plan = { name: "basic" };
+      const plan = { name: "essential" };
       expect(shouldShowUpgradeBanner(subscription, plan)).toBe(false);
     });
 
@@ -212,24 +212,24 @@ describe("Subscription Helpers", () => {
         status: "trialing",
         trialEndDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
       };
-      const plan = { name: "basic" };
+      const plan = { name: "essential" };
       expect(shouldShowUpgradeBanner(subscription, plan)).toBe(true);
     });
 
     it("should show banner for cancelled subscription", () => {
       const subscription = { status: "cancelled" };
-      const plan = { name: "basic" };
+      const plan = { name: "essential" };
       expect(shouldShowUpgradeBanner(subscription, plan)).toBe(true);
     });
 
     it("should show banner for past_due subscription", () => {
       const subscription = { status: "past_due" };
-      const plan = { name: "premium" };
+      const plan = { name: "pro" };
       expect(shouldShowUpgradeBanner(subscription, plan)).toBe(true);
     });
 
     it("should show banner when no subscription (user needs to select plan)", () => {
-      // No subscription means user needs to select a plan (basic or premium)
+      // No subscription means user needs to select a plan (essential or pro)
       expect(shouldShowUpgradeBanner(null, null)).toBe(true);
       expect(shouldShowUpgradeBanner(undefined, undefined)).toBe(true);
     });

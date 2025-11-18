@@ -66,7 +66,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const isTermsOfServicePage = pathname === "/terms-of-service";
   const isFAQPage = pathname === "/faq";
   const isSubscriptionSuccessPage = pathname === "/subscription/success";
-  const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPricingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage;
+  const isMaintenancePage = pathname === "/maintenance";
+  const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPricingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage || isMaintenancePage;
   const isDashboardRoute = !isPublicPage && !isApiRoute && !isSelectPlanPage && !isWelcomePage;
   
   const log = logger.withPrefix("LAYOUT-WRAPPER");

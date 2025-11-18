@@ -39,7 +39,7 @@ export function LimitWarning({ current, limit, type, className = "", onUpgradeSu
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
             {isAtLimit
               ? type === "accounts"
-                ? `You're using all ${limit} of your ${typeName} on the free plan. Upgrade to unlock unlimited ${typeName} and more powerful features!`
+                ? `You're using all ${limit} of your ${typeName}. Upgrade to unlock unlimited ${typeName} and more powerful features!`
                 : `You've used all ${limit} ${typeName} this month. Upgrade to unlock unlimited ${typeName} and keep tracking your finances without limits!`
               : `You've used ${current} of ${limit} ${typeName} this month. ${remaining} ${typeNameSingular}${remaining !== 1 ? "s" : ""} remaining.`}
           </p>

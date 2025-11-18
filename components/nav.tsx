@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, createContext, useContext, memo, useMemo, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/utils/logger";
-import { LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, User, Settings, LogOut, CreditCard, PiggyBank, Users, ChevronLeft, ChevronRight, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet } from "lucide-react";
+import { LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, User, Settings, LogOut, CreditCard, PiggyBank, Users, ChevronLeft, ChevronRight, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar, Repeat } from "lucide-react";
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 import { TrialWidget, calculateTrialDaysRemaining, calculateTrialProgress } from "@/components/billing/trial-widget";
@@ -37,6 +37,8 @@ const baseNavSections = [
     title: "Money Management",
     items: [
       { href: "/transactions", label: "Transactions", icon: Receipt },
+      { href: "/planned-payment", label: "Planned Payment", icon: Calendar },
+      { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
       { href: "/categories", label: "Categories", icon: FolderTree },
       { href: "/accounts", label: "Accounts", icon: Wallet },
       { href: "/members", label: "Households", icon: Users },
@@ -61,7 +63,8 @@ interface UserData {
     avatarUrl?: string;
   } | null;
   plan: {
-    name: "free" | "basic" | "premium";
+    id: string;
+    name: string;
   } | null;
   subscription?: {
     status: "active" | "trialing" | "cancelled" | "past_due";

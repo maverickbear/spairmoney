@@ -22,12 +22,12 @@ export async function GET() {
     }
 
     // Get plan limits once and reuse for both checks
-    const { limits } = await checkPlanLimits(authUser.id);
+    const { limits, plan } = await checkPlanLimits(authUser.id);
 
-    // Run both limit checks in parallel, but pass limits to avoid duplicate calls
+    // Run both limit checks in parallel, but pass limits and plan to avoid duplicate calls
     const [transactionLimit, accountLimit] = await Promise.all([
-      checkTransactionLimitWithLimits(authUser.id, limits),
-      checkAccountLimitWithLimits(authUser.id, limits),
+      checkTransactionLimitWithLimits(authUser.id, limits, plan),
+      checkAccountLimitWithLimits(authUser.id, limits, plan),
     ]);
 
     return NextResponse.json({
@@ -44,10 +44,10 @@ export async function GET() {
 }
 
 // Helper function to check transaction limit with pre-fetched limits
-async function checkTransactionLimitWithLimits(userId: string, limits: PlanFeatures) {
+async function checkTransactionLimitWithLimits(userId: string, limits: PlanFeatures, plan?: { id: string } | null) {
   try {
-    // Unlimited plan
-    if (limits.maxTransactions === -1) {
+    // Pro plan always has unlimited transactions
+    if (plan?.id === "pro" || limits.maxTransactions === -1) {
       return {
         allowed: true,
         limit: -1,
@@ -100,10 +100,10 @@ async function checkTransactionLimitWithLimits(userId: string, limits: PlanFeatu
 }
 
 // Helper function to check account limit with pre-fetched limits
-async function checkAccountLimitWithLimits(userId: string, limits: PlanFeatures) {
+async function checkAccountLimitWithLimits(userId: string, limits: PlanFeatures, plan?: { id: string } | null) {
   try {
-    // Unlimited plan
-    if (limits.maxAccounts === -1) {
+    // Pro plan always has unlimited accounts
+    if (plan?.id === "pro" || limits.maxAccounts === -1) {
       return {
         allowed: true,
         limit: -1,

@@ -20,15 +20,15 @@ interface PlanUpdate {
 
 const PRODUCTION_STRIPE_IDS: PlanUpdate[] = [
   {
-    id: "premium",
-    name: "Premium Plan",
+    id: "pro",
+    name: "Pro Plan",
     stripeProductId: "prod_TPjK1vCBWIGTa2",
     stripePriceIdMonthly: "price_1SStrqEj1ttZtjC0bOlejqd7",
     stripePriceIdYearly: "price_1SStrqEj1ttZtjC0JY2Il3XQ",
   },
   {
-    id: "basic",
-    name: "Basic Plan",
+    id: "essential",
+    name: "Essential Plan",
     stripeProductId: "prod_TPjKHNbEzYW73x",
     stripePriceIdMonthly: "price_1SStrmEj1ttZtjC0UwcdYRBZ",
     stripePriceIdYearly: "price_1SStrmEj1ttZtjC0UwcdYRBZ", // Note: Same ID for both - verify this is correct
@@ -92,7 +92,7 @@ async function updateStripeIds() {
   const { data: allPlans, error: verifyError } = await supabase
     .from("Plan")
     .select("id, name, stripeProductId, stripePriceIdMonthly, stripePriceIdYearly")
-    .in("id", ["basic", "premium"]);
+    .in("id", ["essential", "pro"]);
 
   if (verifyError) {
     console.error("❌ Error verifying updates:", verifyError);

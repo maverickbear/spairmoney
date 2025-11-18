@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createTransaction } from "@/lib/api/transactions";
 import { TransactionFormData, transactionSchema } from "@/lib/validations/transaction";
 import { ZodError } from "zod";
+import { getCurrentUserId, guardFeatureAccess } from "@/lib/api/feature-guard";
 
 interface ImportRequest {
   transactions: Array<{
@@ -22,6 +23,24 @@ interface ImportRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check if user has access to CSV import
+    const featureGuard = await guardFeatureAccess(userId, "hasCsvImport");
+    if (!featureGuard.allowed) {
+      return NextResponse.json(
+        { 
+          error: featureGuard.error?.message || "CSV import is not available in your current plan",
+          code: featureGuard.error?.code,
+          planError: featureGuard.error,
+        },
+        { status: 403 }
+      );
+    }
+
     const body: ImportRequest = await request.json();
     const { transactions } = body;
 

@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+// Recurring frequency options
+export const recurringFrequencyEnum = z.enum([
+  "daily",
+  "weekly",
+  "biweekly",
+  "monthly",
+  "semimonthly",
+  "quarterly",
+  "semiannual",
+  "annual",
+]);
+
+export type RecurringFrequency = z.infer<typeof recurringFrequencyEnum>;
+
 // Base schema object (without refinements)
 const transactionSchemaBase = z.object({
   date: z.date(),
@@ -11,6 +25,7 @@ const transactionSchemaBase = z.object({
   subcategoryId: z.string().optional(),
   description: z.string().optional(),
   recurring: z.boolean().default(false),
+  recurringFrequency: recurringFrequencyEnum.optional(), // Only required when recurring is true
   expenseType: z.union([z.enum(["fixed", "variable"]), z.null()]).optional().transform((val) => val === null ? undefined : val), // Only for expense transactions, transform null to undefined
 });
 
@@ -33,6 +48,15 @@ export const transactionSchema = transactionSchemaBase.refine((data) => {
 }, {
   message: "expenseType can only be set for expense transactions",
   path: ["expenseType"],
+}).refine((data) => {
+  // If recurring is true, recurringFrequency is required
+  if (data.recurring && !data.recurringFrequency) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Recurring frequency is required when recurring is enabled",
+  path: ["recurringFrequency"],
 });
 
 export type TransactionFormData = z.infer<typeof transactionSchema>;

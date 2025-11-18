@@ -6,6 +6,7 @@ export const accountSchema = z.object({
   creditLimit: z.number().positive("Credit limit must be positive").optional().nullable(),
   initialBalance: z.number().optional().nullable(),
   ownerIds: z.array(z.string().uuid()).optional(),
+  dueDayOfMonth: z.number().int().min(1).max(31).optional().nullable(),
 }).refine((data) => {
   // Credit limit is required for credit cards, optional for others
   if (data.type === "credit" && !data.creditLimit) {

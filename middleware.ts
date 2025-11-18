@@ -2,6 +2,33 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SecurityLogger } from "@/lib/utils/security-logging";
 import { rateLimit as redisRateLimit } from "@/lib/services/redis";
+import { createServiceRoleClient } from "@/lib/supabase-server";
+import { createServerClient as createSSRServerClient } from "@supabase/ssr";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+/**
+ * Create Supabase client for middleware using request cookies
+ * Configured to avoid automatic token refresh that can cause errors
+ */
+function createMiddlewareClient(request: NextRequest) {
+  return createSSRServerClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false, // Disable auto-refresh to avoid errors with invalid tokens
+      persistSession: false, // Don't persist session in middleware
+    },
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        // In middleware, we can't set cookies directly
+        // They will be set by the response
+      },
+    },
+  });
+}
 
 /**
  * Rate limiting configuration
@@ -147,6 +174,129 @@ function getRateLimitConfig(pathname: string): RateLimitConfig | null {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Check maintenance mode for all routes except:
+  // - API routes (handled separately)
+  // - Static files
+  // - The maintenance page itself
+  // - The landing page (/) - users can still view it
+  // - Public pages (auth, pricing, etc.)
+  const isMaintenancePage = pathname === "/maintenance";
+  const isLandingPage = pathname === "/";
+  const isPublicPage = pathname.startsWith("/auth") || 
+                       pathname === "/pricing" || 
+                       pathname === "/privacy-policy" || 
+                       pathname === "/terms-of-service" || 
+                       pathname === "/faq" ||
+                       pathname.startsWith("/members/accept");
+  const isStaticFile = pathname.startsWith("/_next") || 
+                       pathname.startsWith("/favicon") ||
+                       /\.(svg|png|jpg|jpeg|gif|webp|ico)$/.test(pathname);
+
+  // Check maintenance mode status
+  if (!isStaticFile && !pathname.startsWith("/api")) {
+    try {
+      // Check maintenance mode
+      const serviceSupabase = createServiceRoleClient();
+      const { data: settings } = await serviceSupabase
+        .from("SystemSettings")
+        .select("maintenanceMode")
+        .eq("id", "default")
+        .single();
+
+      const isMaintenanceMode = settings?.maintenanceMode || false;
+
+      // If user is on maintenance page but maintenance is disabled, redirect them away
+      if (isMaintenancePage && !isMaintenanceMode) {
+        try {
+          const supabase = createMiddlewareClient(request);
+          const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+          // Silently ignore expected auth errors (invalid refresh tokens, etc.)
+          if (authError && (
+            authError.message?.includes("refresh_token_not_found") ||
+            authError.message?.includes("Invalid refresh token") ||
+            authError.message?.includes("JWT expired") ||
+            authError.message?.includes("Auth session missing")
+          )) {
+            // Expected error - user is not authenticated
+            return NextResponse.redirect(new URL("/", request.url));
+          }
+
+          if (user) {
+            // User is authenticated - redirect to dashboard
+            return NextResponse.redirect(new URL("/dashboard", request.url));
+          } else {
+            // Not authenticated - redirect to landing page
+            return NextResponse.redirect(new URL("/", request.url));
+          }
+        } catch (authError: any) {
+          // Silently ignore expected auth errors
+          if (authError?.message?.includes("refresh_token_not_found") ||
+              authError?.message?.includes("Invalid refresh token") ||
+              authError?.message?.includes("JWT expired")) {
+            // Expected error - redirect to landing page
+            return NextResponse.redirect(new URL("/", request.url));
+          }
+          // Unexpected error - redirect to landing page
+          return NextResponse.redirect(new URL("/", request.url));
+        }
+      }
+
+      // If maintenance is active and user is trying to access protected routes
+      if (isMaintenanceMode && !isMaintenancePage && !isLandingPage && !isPublicPage) {
+        // Check if user is authenticated and is super_admin
+        try {
+          const supabase = createMiddlewareClient(request);
+          const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+          // Silently ignore expected auth errors (invalid refresh tokens, etc.)
+          if (authError && (
+            authError.message?.includes("refresh_token_not_found") ||
+            authError.message?.includes("Invalid refresh token") ||
+            authError.message?.includes("JWT expired") ||
+            authError.message?.includes("Auth session missing")
+          )) {
+            // Expected error - user is not authenticated, redirect to maintenance
+            return NextResponse.redirect(new URL("/maintenance", request.url));
+          }
+
+          if (user) {
+            // User is authenticated - check if super_admin
+            const { data: userData } = await supabase
+              .from("User")
+              .select("role")
+              .eq("id", user.id)
+              .single();
+
+            // If super_admin, allow access
+            if (userData?.role === "super_admin") {
+              // Continue to rate limiting check
+            } else {
+              // Not super_admin - redirect to maintenance
+              return NextResponse.redirect(new URL("/maintenance", request.url));
+            }
+          } else {
+            // Not authenticated - redirect to maintenance
+            return NextResponse.redirect(new URL("/maintenance", request.url));
+          }
+        } catch (authError: any) {
+          // Silently ignore expected auth errors
+          if (authError?.message?.includes("refresh_token_not_found") ||
+              authError?.message?.includes("Invalid refresh token") ||
+              authError?.message?.includes("JWT expired")) {
+            // Expected error - redirect to maintenance
+            return NextResponse.redirect(new URL("/maintenance", request.url));
+          }
+          // Unexpected error - redirect to maintenance to be safe
+          return NextResponse.redirect(new URL("/maintenance", request.url));
+        }
+      }
+    } catch (error) {
+      // If error checking maintenance mode, log but don't block access
+      console.error("[MIDDLEWARE] Error checking maintenance mode:", error);
+    }
+  }
 
   // Only apply rate limiting to API routes
   if (!pathname.startsWith("/api")) {

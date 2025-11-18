@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Menu, LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, Settings, LogOut, CreditCard, PiggyBank, Users, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet } from "lucide-react";
+import { Menu, LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, Settings, LogOut, CreditCard, PiggyBank, Users, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/common/logo";
@@ -37,6 +37,7 @@ const baseNavSections = [
     title: "Money Management",
     items: [
       { href: "/transactions", label: "Transactions", icon: Receipt },
+      { href: "/planned-payment", label: "Planned Payment", icon: Calendar },
       { href: "/categories", label: "Categories", icon: FolderTree },
       { href: "/accounts", label: "Accounts", icon: Wallet },
       { href: "/members", label: "Households", icon: Users },
@@ -61,7 +62,8 @@ interface UserData {
     avatarUrl?: string;
   } | null;
   plan: {
-    name: "free" | "basic" | "premium";
+    id: string;
+    name: string;
   } | null;
   subscription?: {
     status: "active" | "trialing" | "cancelled" | "past_due";
@@ -275,6 +277,7 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
     const routeMap: Record<string, string> = {
       "/dashboard": "Dashboard",
       "/transactions": "Transactions",
+      "/planned-payment": "Planned Payment",
       "/accounts": "Accounts",
       "/categories": "Categories",
       "/members": "Households",

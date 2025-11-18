@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import type { SystemGroup } from "@/lib/api/admin";
 
@@ -47,22 +47,69 @@ export function GroupDialog({
   onSuccess,
 }: GroupDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fetchedGroup, setFetchedGroup] = useState<SystemGroup | null>(null);
   const [groupNamesText, setGroupNamesText] = useState("");
   // For create mode: selected type (shared for all groups)
   const [selectedType, setSelectedType] = useState<"income" | "expense">("expense");
 
+  // Use fetched group if available, otherwise use prop group
+  const currentGroup = fetchedGroup || group;
+
   const form = useForm<GroupFormData>({
     resolver: zodResolver(groupSchema),
-    defaultValues: group
+    defaultValues: currentGroup
       ? {
-          name: group.name,
-          type: group.type || "expense",
+          name: currentGroup.name,
+          type: currentGroup.type || "expense",
         }
       : {
           name: "",
           type: "expense",
         },
   });
+
+  // Update form when group changes
+  useEffect(() => {
+    if (currentGroup) {
+      form.reset({
+        name: currentGroup.name,
+        type: currentGroup.type || "expense",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentGroup?.id]);
+
+  // Fetch group from Supabase only once when group ID changes (not every time modal opens)
+  // Use prop data immediately, fetch in background only if needed
+  useEffect(() => {
+    if (group?.id) {
+      // Only fetch if we don't have fetched data for this ID yet
+      const lastFetchedId = fetchedGroup?.id;
+      if (lastFetchedId !== group.id) {
+        // Fetch in background without showing loading (use prop data immediately)
+        fetch(`/api/admin/groups`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("Failed to fetch groups");
+            }
+            return res.json();
+          })
+          .then((groups: SystemGroup[]) => {
+            const foundGroup = groups.find((g) => g.id === group.id);
+            if (foundGroup) {
+              setFetchedGroup(foundGroup);
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching group:", error);
+          });
+      }
+    } else {
+      // Reset fetched group when group is cleared
+      setFetchedGroup(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group?.id]);
 
   // Reset textarea when dialog opens/closes
   const handleOpenChange = (newOpen: boolean) => {
@@ -159,9 +206,9 @@ export function GroupDialog({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            id: group!.id,
+            id: currentGroup!.id,
             name: data.name,
-            type: form.watch("type") || group!.type || "expense",
+            type: form.watch("type") || currentGroup!.type || "expense",
           }),
         });
 
@@ -198,11 +245,11 @@ export function GroupDialog({
         </DialogHeader>
 
         <form 
-          onSubmit={group ? form.handleSubmit(onSubmit) : handleCreateSubmit} 
+          onSubmit={currentGroup ? form.handleSubmit(onSubmit) : handleCreateSubmit} 
           className="flex flex-col flex-1 overflow-hidden"
         >
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-          {group ? (
+          {currentGroup ? (
             // Edit mode: single input
             <>
           <div className="space-y-2">
@@ -222,7 +269,7 @@ export function GroupDialog({
               <div className="space-y-2">
                 <Label htmlFor="type">Type</Label>
                 <Select
-                  value={form.watch("type") || group.type || "expense"}
+                  value={form.watch("type") || currentGroup.type || "expense"}
                   onValueChange={(value) => form.setValue("type", value as "income" | "expense")}
                 >
                   <SelectTrigger>
@@ -284,11 +331,11 @@ export function GroupDialog({
               type="submit" 
               disabled={
                 isSubmitting || 
-                (!group && parseCommaSeparated(groupNamesText).length === 0)
+                (!currentGroup && parseCommaSeparated(groupNamesText).length === 0)
               }
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {group ? "Update" : "Create"}
+              {currentGroup ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

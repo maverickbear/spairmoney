@@ -29,6 +29,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import { FeatureGuard } from "@/components/common/feature-guard";
 
 interface Debt {
   id: string;
@@ -56,6 +57,8 @@ interface Debt {
   paidOffAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  status?: string;
+  nextDueDate?: string | null;
   monthsRemaining?: number | null;
   totalInterestRemaining?: number;
   progressPct?: number;
@@ -196,11 +199,12 @@ export default function DebtsPage() {
 
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <PageHeader
-        title="Debts"
-        description="Track your loans and debt payments"
-      >
+    <FeatureGuard feature="hasDebts" featureName="Debt Tracking" requiredPlan="essential">
+      <div className="space-y-4 md:space-y-6">
+        <PageHeader
+          title="Debts"
+          description="Track your loans and debt payments"
+        >
         {!(sortedDebts.length === 0 && filterBy === "all") && (
           <Button
             onClick={() => {
@@ -409,7 +413,8 @@ export default function DebtsPage() {
         </DialogContent>
       </Dialog>
       {ConfirmDialog}
-    </div>
+      </div>
+    </FeatureGuard>
   );
 }
 

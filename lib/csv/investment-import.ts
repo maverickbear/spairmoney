@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import { parseCSV, CSVRow } from "./import";
+import { normalizeAssetType } from "@/lib/utils/portfolio-utils";
 
 // Re-export CSVRow for use in components
 export type { CSVRow };
@@ -337,6 +338,15 @@ function inferSecurityClass(symbol: string | undefined): string {
 }
 
 /**
+ * Normalize security class from CSV or other sources
+ * Handles case variations like "Stock", "stock", "STOCK", etc.
+ */
+function normalizeSecurityClass(securityClass: string | undefined): string {
+  if (!securityClass) return "Stock";
+  return normalizeAssetType(securityClass);
+}
+
+/**
  * Map CSV rows to investment transactions
  */
 export function mapCSVToInvestmentTransactions(
@@ -366,6 +376,7 @@ export function mapCSVToInvestmentTransactions(
       
       // Get account - try column first, then filename, then defaultAccountId, then accountMapping fallback
       let accountName = mapping.account ? row[mapping.account]?.trim() : "";
+      let accountNameFromFilename = false;
       
       // If no account in column, try to extract from filename (Wealthsimple format)
       // Example: "RRSP-monthly-statement-transactions-..." -> "RRSP"
@@ -373,29 +384,59 @@ export function mapCSVToInvestmentTransactions(
         const filenameMatch = fileName.match(/^([A-Z]+)-/i);
         if (filenameMatch && filenameMatch[1]) {
           accountName = filenameMatch[1].toUpperCase();
+          accountNameFromFilename = true;
         }
       }
       
       let accountId: string | undefined;
       
-      // Try defaultAccountId first if no account name found
-      if (!accountName && defaultAccountId && defaultAccountId !== "__none__") {
-        accountId = defaultAccountId;
-      } else if (accountMapping && accountName && accountMapping[accountName]) {
-        accountId = accountMapping[accountName];
-      } else if (accountName) {
-        const account = accounts.find(
-          (a) => a.name.toUpperCase() === accountName.toUpperCase()
-        );
-        accountId = account?.id;
+      // Try to find account by name first (from column or filename)
+      if (accountName) {
+        if (accountMapping && accountMapping[accountName]) {
+          accountId = accountMapping[accountName];
+        } else {
+          const account = accounts.find(
+            (a) => a.name.toUpperCase() === accountName.toUpperCase()
+          );
+          accountId = account?.id;
+        }
+      }
+      
+      // If account not found and we have a defaultAccountId, use it as fallback
+      // This handles cases where filename extraction doesn't match any account
+      if (!accountId && defaultAccountId && defaultAccountId !== "__none__") {
+        const defaultAccount = accounts.find((a) => a.id === defaultAccountId);
+        if (defaultAccount) {
+          accountId = defaultAccountId;
+        }
       }
       
       if (!accountId) {
+        const errorParts: string[] = [];
+        if (accountName) {
+          errorParts.push(`Account not found: "${accountName}"`);
+        } else {
+          errorParts.push(`No account specified`);
+        }
+        errorParts.push(`Available accounts: ${accounts.map(a => a.name).join(", ")}`);
+        if (fileName && accountNameFromFilename) {
+          errorParts.push(`Tried to extract from filename "${fileName}" but no match found.`);
+        }
+        if (defaultAccountId && defaultAccountId !== "__none__") {
+          const defaultAccount = accounts.find((a) => a.id === defaultAccountId);
+          if (!defaultAccount) {
+            errorParts.push(`Default account ID "${defaultAccountId}" was set but not found in available accounts.`);
+          }
+        }
+        if (!defaultAccountId || defaultAccountId === "__none__") {
+          errorParts.push(`Please set a default account or ensure account column is mapped.`);
+        }
+        
         return {
           rowIndex: index + 1,
           fileIndex,
           fileName,
-          error: `Account not found: "${accountName || "(empty)"}". Available accounts: ${accounts.map(a => a.name).join(", ")}. ${fileName ? `Tried to extract from filename "${fileName}" but no match found.` : ""} ${defaultAccountId && defaultAccountId !== "__none__" ? `Default account was set but not found.` : "Please set a default account or ensure account column is mapped."}`,
+          error: errorParts.join(" "),
         };
       }
       
@@ -504,7 +545,7 @@ export function mapCSVToInvestmentTransactions(
             notes,
             securitySymbol: symbol,
             securityName,
-            securityClass: inferSecurityClass(symbol),
+            securityClass: normalizeSecurityClass(inferSecurityClass(symbol)),
           },
         };
       }
@@ -547,7 +588,7 @@ export function mapCSVToInvestmentTransactions(
             notes,
             securitySymbol: symbol,
             securityName: mapping.securityName ? row[mapping.securityName] : symbol || "Unknown",
-            securityClass: symbol ? inferSecurityClass(symbol) : "Stock",
+            securityClass: normalizeSecurityClass(symbol ? inferSecurityClass(symbol) : "Stock"),
           },
         };
       }

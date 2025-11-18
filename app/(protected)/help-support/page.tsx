@@ -107,7 +107,7 @@ export default function HelpSupportPage() {
           <div className="space-y-2">
             <h3 className="font-semibold text-lg">Can I share my account with family members?</h3>
             <p className="text-sm text-muted-foreground">
-              Yes! With Basic or Premium plans, you can invite household members to 
+              Yes! With paid plans, you can invite household members to 
               share access to your financial data. Go to Settings &gt; Members to invite 
               family members.
             </p>

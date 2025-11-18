@@ -37,24 +37,70 @@ export function SavingsDistributionWidget({
   const [distributionAmounts, setDistributionAmounts] = useState<Record<string, number>>({});
   const [isDistributing, setIsDistributing] = useState(false);
 
+  // Helper function to parse date from Supabase format
+  const parseTransactionDate = (dateStr: string | Date): Date => {
+    if (dateStr instanceof Date) {
+      return dateStr;
+    }
+    // Handle both "YYYY-MM-DD HH:MM:SS" and "YYYY-MM-DDTHH:MM:SS" formats
+    const normalized = dateStr.replace(' ', 'T').split('.')[0]; // Remove milliseconds if present
+    return new Date(normalized);
+  };
+
+  // Get today's date (without time) to filter out future transactions
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
+
+  // Filter transactions to only include those with date <= today
+  // Exclude future transactions as they haven't happened yet
+  const pastSelectedMonthTransactions = useMemo(() => {
+    return selectedMonthTransactions.filter((t) => {
+      if (!t.date) return false;
+      try {
+        const txDate = parseTransactionDate(t.date);
+        txDate.setHours(0, 0, 0, 0);
+        return txDate <= today;
+      } catch (error) {
+        return false; // Exclude if date parsing fails
+      }
+    });
+  }, [selectedMonthTransactions, today]);
+
+  const pastLastMonthTransactions = useMemo(() => {
+    return lastMonthTransactions.filter((t) => {
+      if (!t.date) return false;
+      try {
+        const txDate = parseTransactionDate(t.date);
+        txDate.setHours(0, 0, 0, 0);
+        return txDate <= today;
+      } catch (error) {
+        return false; // Exclude if date parsing fails
+      }
+    });
+  }, [lastMonthTransactions, today]);
+
   // Calculate expenses for current month and last month
+  // Only include past transactions (exclude future ones)
   const currentMonthExpenses = useMemo(() => {
-    return selectedMonthTransactions
+    return pastSelectedMonthTransactions
       .filter((t) => t && t.type === "expense")
       .reduce((sum, t) => {
         const amount = t.amount != null ? (typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount)) : 0;
         return sum + (isNaN(amount) ? 0 : amount);
       }, 0);
-  }, [selectedMonthTransactions]);
+  }, [pastSelectedMonthTransactions]);
 
   const lastMonthExpenses = useMemo(() => {
-    return lastMonthTransactions
+    return pastLastMonthTransactions
       .filter((t) => t && t.type === "expense")
       .reduce((sum, t) => {
         const amount = t.amount != null ? (typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount)) : 0;
         return sum + (isNaN(amount) ? 0 : amount);
       }, 0);
-  }, [lastMonthTransactions]);
+  }, [pastLastMonthTransactions]);
 
   // Calculate savings (positive when current expenses < last month expenses)
   const savings = useMemo(() => {

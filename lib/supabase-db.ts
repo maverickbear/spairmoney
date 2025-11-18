@@ -21,6 +21,8 @@ export interface Database {
     plaidMask: string | null;
     plaidOfficialName: string | null;
     plaidVerificationStatus: string | null;
+    dueDayOfMonth: number | null;
+    extraCredit: number;
   };
   AccountInvestmentValue: {
     id: string;
@@ -44,7 +46,7 @@ export interface Database {
     note: string | null;
     createdAt: string;
     updatedAt: string;
-    macroId: string | null;
+    groupId: string | null;
     userId: string; // NOT NULL após migração 20241201000000_fix_database_issues.sql
     subcategoryId: string | null;
     isRecurring: boolean;
@@ -58,7 +60,7 @@ export interface Database {
   Category: {
     id: string;
     name: string;
-    macroId: string;
+    groupId: string;
     createdAt: string;
     updatedAt: string;
     userId: string | null;
@@ -89,6 +91,8 @@ export interface Database {
     paymentAmount: number | null;
     accountId: string | null;
     userId: string; // NOT NULL após migração 20241201000000_fix_database_issues.sql
+    status: string;
+    nextDueDate: string | null;
   };
   Goal: {
     id: string;

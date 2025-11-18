@@ -68,17 +68,55 @@ export default function InvestmentsPage() {
       
       // Fetch all portfolio data in parallel
       const [summaryRes, holdingsRes, accountsRes, historicalRes] = await Promise.all([
-        fetch("/api/portfolio/summary").catch(() => null),
-        fetch("/api/portfolio/holdings").catch(() => null),
-        fetch("/api/portfolio/accounts").catch(() => null),
-        fetch("/api/portfolio/historical?days=365").catch(() => null),
+        fetch("/api/portfolio/summary", { cache: 'no-store' }).catch((err) => {
+          console.error("[Investments Page] Error fetching summary:", err);
+          return null;
+        }),
+        fetch("/api/portfolio/holdings", { cache: 'no-store' }).catch((err) => {
+          console.error("[Investments Page] Error fetching holdings:", err);
+          return null;
+        }),
+        fetch("/api/portfolio/accounts", { cache: 'no-store' }).catch((err) => {
+          console.error("[Investments Page] Error fetching accounts:", err);
+          return null;
+        }),
+        fetch("/api/portfolio/historical?days=365", { cache: 'no-store' }).catch((err) => {
+          console.error("[Investments Page] Error fetching historical:", err);
+          return null;
+        }),
       ]);
+
+      // Check for errors in responses
+      if (!summaryRes) {
+        console.error("[Investments Page] Summary request failed");
+      } else if (!summaryRes.ok) {
+        const errorText = await summaryRes.text();
+        console.error("[Investments Page] Summary response error:", summaryRes.status, errorText);
+      }
+
+      if (!holdingsRes) {
+        console.error("[Investments Page] Holdings request failed");
+      } else if (!holdingsRes.ok) {
+        const errorText = await holdingsRes.text();
+        console.error("[Investments Page] Holdings response error:", holdingsRes.status, errorText);
+      }
 
       // Get data from API responses
       const summary = summaryRes?.ok ? await summaryRes.json() : null;
       const holdingsData: SupabaseHolding[] = holdingsRes?.ok ? await holdingsRes.json() : null;
       const accountsData = accountsRes?.ok ? await accountsRes.json() : null;
       const historical = historicalRes?.ok ? await historicalRes.json() : null;
+      
+      // Debug logging
+      console.log("[Investments Page] Summary:", summary);
+      console.log("[Investments Page] Holdings count:", holdingsData?.length || 0);
+      console.log("[Investments Page] Accounts count:", accountsData?.length || 0);
+      console.log("[Investments Page] Historical data points:", historical?.length || 0);
+      
+      // Log if we're getting zero values
+      if (summary && summary.totalValue === 0 && summary.holdingsCount === 0) {
+        console.warn("[Investments Page] WARNING: Summary shows zero values. This might indicate a problem.");
+      }
 
       // Always show dashboard, use zero values if no data
       const defaultSummary: PortfolioSummary = {
@@ -148,7 +186,7 @@ export default function InvestmentsPage() {
   };
 
   return (
-    <FeatureGuard feature="hasInvestments" featureName="Investments" requiredPlan="premium">
+    <FeatureGuard feature="hasInvestments" featureName="Investments" requiredPlan="pro">
       <div className="space-y-4 md:space-y-6">
       <PageHeader
         title="Portfolio Management"

@@ -1,6 +1,6 @@
 "use server";
 
-import { getAllCategories, getSubcategoriesByCategory, createCategory, createSubcategory, getMacros } from "@/lib/api/categories";
+import { getAllCategories, getSubcategoriesByCategory, createCategory, createSubcategory, getGroups } from "@/lib/api/categories";
 
 export interface DebtCategoryMapping {
   categoryId: string;
@@ -12,11 +12,11 @@ export interface DebtCategoryMapping {
  */
 export async function getDebtCategoryMapping(loanType: string): Promise<DebtCategoryMapping | null> {
   const allCategories = await getAllCategories();
-  const macros = await getMacros();
+  const groups = await getGroups();
 
-  // Find macro IDs
-  const macroMap = macros.reduce((acc, macro) => {
-    acc[macro.name] = macro.id;
+  // Find group IDs
+  const groupMap = groups.reduce((acc, group) => {
+    acc[group.name] = group.id;
     return acc;
   }, {} as Record<string, string>);
 
@@ -38,15 +38,15 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
   };
 
   // Helper function to create category if it doesn't exist
-  const getOrCreateCategory = async (name: string, macroName: string) => {
+  const getOrCreateCategory = async (name: string, groupName: string) => {
     let category = findCategory(name);
     if (!category) {
-      const macroId = macroMap[macroName];
-      if (!macroId) {
-        console.error(`Macro ${macroName} not found`);
+      const groupId = groupMap[groupName];
+      if (!groupId) {
+        console.error(`Group ${groupName} not found`);
         return null;
       }
-      category = await createCategory({ name, macroId });
+      category = await createCategory({ name, groupId });
     }
     return category;
   };
@@ -88,9 +88,9 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
         };
       }
       // If Rent doesn't exist, try to create Mortgage Payment subcategory under Housing
-      const housingMacro = macroMap["Housing"];
-      if (!housingMacro) {
-        console.error("Housing macro not found");
+      const housingGroup = groupMap["Housing"];
+      if (!housingGroup) {
+        console.error("Housing group not found");
         return null;
       }
       const housingCategory = findCategory("Utilities") || await getOrCreateCategory("Housing", "Housing");
@@ -106,9 +106,9 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
 
     case "personal_loan": {
       // Create "Personal Loan" category in Misc
-      const miscMacro = macroMap["Misc"];
-      if (!miscMacro) {
-        console.error("Misc macro not found");
+      const miscGroup = groupMap["Misc"];
+      if (!miscGroup) {
+        console.error("Misc group not found");
         return null;
       }
       const personalLoanCategory = await getOrCreateCategory("Personal Loan", "Misc");
@@ -122,9 +122,9 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
 
     case "credit_card": {
       // Create "Credit Card Payment" category in Misc
-      const miscMacro = macroMap["Misc"];
-      if (!miscMacro) {
-        console.error("Misc macro not found");
+      const miscGroup = groupMap["Misc"];
+      if (!miscGroup) {
+        console.error("Misc group not found");
         return null;
       }
       const creditCardCategory = await getOrCreateCategory("Credit Card Payment", "Misc");
@@ -138,9 +138,9 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
 
     case "student_loan": {
       // Create "Student Loan" category in Education or Misc
-      const educationMacro = macroMap["Family"]; // Education is typically under Family
-      const miscMacro = macroMap["Misc"];
-      if (educationMacro) {
+      const educationGroup = groupMap["Family"]; // Education is typically under Family
+      const miscGroup = groupMap["Misc"];
+      if (educationGroup) {
         const educationCategory = findCategory("Education");
         if (educationCategory) {
           const studentLoanSub = await getOrCreateSubcategory("Student Loan", educationCategory.id);
@@ -151,8 +151,8 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
         }
       }
       // Fallback to Misc
-      if (!miscMacro) {
-        console.error("Misc macro not found");
+      if (!miscGroup) {
+        console.error("Misc group not found");
         return null;
       }
       const studentLoanCategory = await getOrCreateCategory("Student Loan", "Misc");
@@ -166,9 +166,9 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
 
     case "business_loan": {
       // Create "Business Loan" category in Business
-      const businessMacro = macroMap["Business"];
-      if (!businessMacro) {
-        console.error("Business macro not found");
+      const businessGroup = groupMap["Business"];
+      if (!businessGroup) {
+        console.error("Business group not found");
         return null;
       }
       const businessLoanCategory = await getOrCreateCategory("Business Loan", "Business");
@@ -189,9 +189,9 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
         };
       }
       // If Misc doesn't exist, create it
-      const miscMacro = macroMap["Misc"];
-      if (!miscMacro) {
-        console.error("Misc macro not found");
+      const miscGroup = groupMap["Misc"];
+      if (!miscGroup) {
+        console.error("Misc group not found");
         return null;
       }
       const miscCategoryCreated = await getOrCreateCategory("Misc", "Misc");

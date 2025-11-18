@@ -3,21 +3,19 @@
 import { Badge } from "@/components/ui/badge";
 
 interface PlanBadgeProps {
-  plan: "free" | "basic" | "premium";
+  plan: "essential" | "pro";
   className?: string;
 }
 
 export function PlanBadge({ plan, className }: PlanBadgeProps) {
   const variants = {
-    free: "secondary",
-    basic: "default",
-    premium: "default",
+    essential: "default",
+    pro: "default",
   } as const;
 
   const labels = {
-    free: "Free",
-    basic: "Basic",
-    premium: "Premium",
+    essential: "Essential",
+    pro: "Pro",
   };
 
   return (

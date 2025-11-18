@@ -106,7 +106,7 @@ When answering questions:
 - Be empathetic about financial challenges
 - Celebrate financial wins
 
-Current date: ${currentDate.toLocaleDateString("pt-BR")}`,
+Current date: ${currentDate.toLocaleDateString("en-US")}`,
       },
       ...conversationHistory.map((msg: Message) => ({
         role: msg.role,
@@ -244,7 +244,7 @@ function formatFinancialContext(data: {
       .filter((tx) => tx.type === "expense")
       .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
-    lines.push(`## Current Month (${currentMonthStart.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })})`);
+    lines.push(`## Current Month (${currentMonthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" })})`);
     lines.push(`Income: $${monthIncome.toFixed(2)}`);
     lines.push(`Expenses: $${monthExpenses.toFixed(2)}`);
     lines.push(`Net: $${(monthIncome - monthExpenses).toFixed(2)}`);
@@ -256,7 +256,7 @@ function formatFinancialContext(data: {
   if (transactions && transactions.length > 0) {
     lines.push(`## Recent Transactions (last ${Math.min(transactions.length, 20)} of ${transactions.length} total)`);
     transactions.slice(0, 20).forEach((tx) => {
-      const date = new Date(tx.date).toLocaleDateString("pt-BR");
+      const date = new Date(tx.date).toLocaleDateString("en-US");
       const category = tx.category?.name || tx.subcategory?.name || "Uncategorized";
       const account = tx.account?.name || "Unknown Account";
       lines.push(`- ${date}: ${tx.type === "income" ? "+" : "-"}$${Number(tx.amount).toFixed(2)} - ${tx.description || "No description"} (${category}, ${account})`);

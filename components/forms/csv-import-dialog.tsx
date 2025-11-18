@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { parseCSV, parseCSVs, mapCSVToTransactions, ColumnMapping, CSVRow, extractUniqueAccountNames, AccountMapping } from "@/lib/csv/import";
-import { usePlanLimits } from "@/hooks/use-plan-limits";
+import { useSubscription } from "@/hooks/use-subscription";
 import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import { Loader2, AlertCircle, CheckCircle2, X, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -72,7 +72,7 @@ export function CsvImportDialog({
   const [isImporting, setIsImporting] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importSuccess, setImportSuccess] = useState<{ success: number; errors: number } | null>(null);
-  const { limits, loading: limitsLoading } = usePlanLimits();
+  const { limits, checking: limitsLoading } = useSubscription();
   const { toast } = useToast();
 
   // Helper function to format account type for display
@@ -386,9 +386,10 @@ export function CsvImportDialog({
     }
   };
 
-  // Check if user has access to CSV import/export
-  // Note: CSV import doesn't require hasCsvExport, but we show a note about transaction limits
-  const hasCsvAccess = limits.hasCsvExport;
+  // Check if user has access to CSV import
+  // The database is the source of truth - if a feature is disabled in Supabase, it should be disabled here
+  // Safety check: convert string "true" to boolean (defensive programming)
+  const hasCsvAccess = limits.hasCsvImport === true || limits.hasCsvImport === "true";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -405,10 +406,10 @@ export function CsvImportDialog({
             {!hasCsvAccess && !limitsLoading && (
               <div>
                 <UpgradePrompt
-                  feature="CSV Import/Export"
-                  currentPlan="free"
-                  requiredPlan="basic"
-                  message="CSV import and export are not available in the Free plan. Upgrade to Basic or Premium to import and export your transactions."
+                  feature="CSV Import"
+                  currentPlan="essential"
+                  requiredPlan="essential"
+                  message="CSV import is not available. Please upgrade to Essential or Pro to import your transactions."
                 />
               </div>
             )}

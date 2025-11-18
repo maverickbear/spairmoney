@@ -6,13 +6,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const expectedIncome = searchParams.get("expectedIncome");
     
+    console.log("[API/GOALS/INCOME-BASIS] Calculating income basis, expectedIncome:", expectedIncome);
+    
     const incomeBasis = await calculateIncomeBasis(
       expectedIncome ? parseFloat(expectedIncome) : undefined
     );
     
+    console.log("[API/GOALS/INCOME-BASIS] Result:", incomeBasis);
+    
     return NextResponse.json({ incomeBasis }, { status: 200 });
   } catch (error) {
-    console.error("Error calculating income basis:", error);
+    console.error("[API/GOALS/INCOME-BASIS] Error calculating income basis:", error);
     
     const errorMessage = error instanceof Error ? error.message : "Failed to calculate income basis";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 500;

@@ -25,13 +25,9 @@ export async function GET(request: NextRequest) {
     }
     if (searchParams.get("endDate")) {
       filters.endDate = new Date(searchParams.get("endDate")!);
-    } else {
-      // Por padrão, mostrar apenas transações até a data atual
-      // Isso evita mostrar transações futuras
-      const today = new Date();
-      today.setHours(23, 59, 59, 999); // Fim do dia atual
-      filters.endDate = today;
     }
+    // Se endDate não for fornecido, não aplicamos filtro de data final
+    // Isso permite mostrar todas as transações, incluindo as futuras
     if (searchParams.get("categoryId")) {
       filters.categoryId = searchParams.get("categoryId")!;
     }

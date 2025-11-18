@@ -13,8 +13,8 @@ import {
 import { Plus, Edit as EditIcon, Trash2, Crown, Mail, Users, Loader2 } from "lucide-react";
 import { MemberForm } from "@/components/members/member-form";
 import type { HouseholdMember } from "@/lib/api/members-client";
-import { usePlanLimits } from "@/hooks/use-plan-limits";
-import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
+import { useSubscription } from "@/hooks/use-subscription";
+import { FeatureGuard } from "@/components/common/feature-guard";
 import { EmptyState } from "@/components/common/empty-state";
 import {
   Table,
@@ -50,9 +50,7 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<"admin" | "member" | "super_admin" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const { limits, loading: limitsLoading } = usePlanLimits();
-
-  const hasHouseholdMembersAccess = limits.hasHousehold;
+  const { limits, checking: limitsLoading } = useSubscription();
 
   useEffect(() => {
     if (!limitsLoading) {
@@ -148,30 +146,14 @@ export default function MembersPage() {
     handleFormClose();
   }
 
-  if (!limitsLoading && !hasHouseholdMembersAccess) {
-    return (
-      <div className="space-y-4 md:space-y-6">
-        <PageHeader
-          title="Household Members"
-          description="Manage household members and invitations"
-        />
-        <UpgradePrompt
-          feature="Household Members"
-          currentPlan="free"
-          requiredPlan="premium"
-          message="Household members are only available in the Premium plan. Upgrade to Premium to add family members."
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4 md:space-y-6">
+    <FeatureGuard feature="hasHousehold" featureName="Household Members" requiredPlan="pro">
+      <div className="space-y-4 md:space-y-6">
       <PageHeader
         title="Household Members"
         description="Manage household members and invitations"
       >
-        {(currentUserRole === "admin" || currentUserRole === null) && members.length > 0 && (
+        {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && members.length > 0 && (
           <Button
             onClick={() => {
               if (!checkWriteAccess()) return;
@@ -294,7 +276,7 @@ export default function MembersPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {!member.isOwner && (currentUserRole === "admin" || currentUserRole === null) && (
+                    {!member.isOwner && (currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && (
                       <div className="flex space-x-1 md:space-x-2">
                         {member.status === "pending" && (
                           <Button
@@ -345,6 +327,7 @@ export default function MembersPage() {
         onSuccess={handleFormSuccess}
       />
       {ConfirmDialog}
-    </div>
+      </div>
+    </FeatureGuard>
   );
 }

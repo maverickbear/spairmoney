@@ -8,12 +8,20 @@ import { formatTimestamp, formatDateStart, formatDateEnd, formatDateOnly, getCur
 import { getDebts } from "@/lib/api/debts";
 import { calculateNextPaymentDates, type DebtForCalculation } from "@/lib/utils/debts";
 import { getDebtCategoryMapping } from "@/lib/utils/debt-categories";
+import { getPlannedPayments, PLANNED_HORIZON_DAYS, generatePlannedPaymentsFromRecurringTransaction } from "@/lib/api/planned-payments";
 import { guardTransactionLimit, getCurrentUserId, throwIfNotAllowed } from "@/lib/api/feature-guard";
 import { requireTransactionOwnership } from "@/lib/utils/security";
 import { suggestCategory, updateCategoryLearning } from "@/lib/api/category-learning";
 import { logger } from "@/lib/utils/logger";
 import { encryptDescription, decryptDescription, encryptAmount, decryptAmount, normalizeDescription } from "@/lib/utils/transaction-encryption";
-import { checkPlanLimits } from "@/lib/api/plans";
+import { getUserSubscriptionData } from "@/lib/api/subscription";
+import { 
+  getActiveCreditCardDebt, 
+  calculateNextDueDate, 
+  isCreditCardAccount,
+  getCreditCardAccount 
+} from "@/lib/utils/credit-card-debt";
+import { createDebt } from "@/lib/api/debts";
 
 export async function createTransaction(data: TransactionFormData) {
     const supabase = await createServerClient();
@@ -30,8 +38,8 @@ export async function createTransaction(data: TransactionFormData) {
   const limitGuard = await guardTransactionLimit(userId, data.date instanceof Date ? data.date : new Date(data.date));
   await throwIfNotAllowed(limitGuard);
 
-  // Get plan limits for SQL function
-  const { limits } = await checkPlanLimits(userId);
+  // Get plan limits for SQL function using unified API
+  const { limits } = await getUserSubscriptionData(userId);
 
   // Ensure date is a Date object
   const date = data.date instanceof Date ? data.date : new Date(data.date);
@@ -132,6 +140,78 @@ export async function createTransaction(data: TransactionFormData) {
       await updateCategoryLearning(userId, descriptionSearch, data.type, finalCategoryId, finalSubcategoryId, data.amount);
     }
 
+    // Handle credit card payment via transfer
+    try {
+      const toAccount = await getCreditCardAccount(data.toAccountId);
+      if (toAccount && toAccount.type === "credit") {
+        const paymentAmount = amountNumeric;
+        const activeDebt = await getActiveCreditCardDebt(data.toAccountId);
+
+        if (activeDebt) {
+          // Debt exists - handle payment scenarios
+          const remainingDebt = activeDebt.currentBalance;
+          let newBalance = remainingDebt - paymentAmount;
+          let newStatus = "active";
+          let newExtraCredit = toAccount.extraCredit || 0;
+
+          if (paymentAmount < remainingDebt) {
+            // Partial payment
+            newBalance = Math.max(0, newBalance);
+            newStatus = "active";
+          } else if (paymentAmount === remainingDebt) {
+            // Exact payment
+            newBalance = 0;
+            newStatus = "closed";
+          } else {
+            // Overpayment
+            const overPayment = paymentAmount - remainingDebt;
+            newBalance = 0;
+            newStatus = "closed";
+            newExtraCredit = (toAccount.extraCredit || 0) + overPayment;
+          }
+
+          // Update debt
+          const updateData: Record<string, unknown> = {
+            currentBalance: newBalance,
+            status: newStatus,
+            updatedAt: formatTimestamp(new Date()),
+          };
+
+          if (newStatus === "closed") {
+            updateData.isPaidOff = true;
+            if (!activeDebt.paidOffAt) {
+              updateData.paidOffAt = formatTimestamp(new Date());
+            }
+          }
+
+          await supabase
+            .from("Debt")
+            .update(updateData)
+            .eq("id", activeDebt.id);
+
+          // Update account extraCredit if there was overpayment
+          if (newExtraCredit !== (toAccount.extraCredit || 0)) {
+            await supabase
+              .from("Account")
+              .update({ extraCredit: newExtraCredit })
+              .eq("id", data.toAccountId);
+          }
+        } else {
+          // No active debt - all payment becomes extraCredit
+          const currentExtraCredit = toAccount.extraCredit || 0;
+          const newExtraCredit = currentExtraCredit + paymentAmount;
+
+          await supabase
+            .from("Account")
+            .update({ extraCredit: newExtraCredit })
+            .eq("id", data.toAccountId);
+        }
+      }
+    } catch (error) {
+      // Log error but don't fail transfer creation
+      logger.error("Error handling credit card payment via transfer:", error);
+    }
+
     // Return the outgoing transaction as the main one
     return outgoingTransaction;
   }
@@ -208,6 +288,134 @@ export async function createTransaction(data: TransactionFormData) {
   const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
   invalidateTransactionCaches();
 
+  // If transaction is recurring, generate PlannedPayments for future occurrences
+  if (data.recurring) {
+    try {
+      await generatePlannedPaymentsFromRecurringTransaction(transaction.id);
+      logger.info(`Generated planned payments for recurring transaction ${transaction.id}`);
+    } catch (error) {
+      logger.error(`Error generating planned payments for recurring transaction ${transaction.id}:`, error);
+      // Don't fail the transaction creation if planned payment generation fails
+    }
+  }
+
+  // Handle credit card expense: create or update debt automatically
+  if (data.type === "expense") {
+    try {
+      const isCredit = await isCreditCardAccount(data.accountId);
+      if (isCredit) {
+        logger.log("Processing expense for credit card account:", {
+          accountId: data.accountId,
+          amount: data.amount,
+        });
+        
+        const account = await getCreditCardAccount(data.accountId);
+        if (account) {
+          logger.log("Credit card account found:", {
+            accountId: account.id,
+            accountName: account.name,
+            type: account.type,
+            dueDayOfMonth: account.dueDayOfMonth,
+            extraCredit: account.extraCredit,
+          });
+          const extraCredit = account.extraCredit || 0;
+          let amountForDebt = data.amount;
+          let newExtraCredit = extraCredit;
+
+          // Always consider extraCredit first
+          if (extraCredit > 0) {
+            if (data.amount <= extraCredit) {
+              // Consume entirely from extraCredit, no debt created/updated
+              newExtraCredit = extraCredit - data.amount;
+              amountForDebt = 0;
+            } else {
+              // Consume extraCredit completely, rest becomes debt
+              amountForDebt = data.amount - extraCredit;
+              newExtraCredit = 0;
+            }
+
+            // Update account extraCredit
+            if (newExtraCredit !== extraCredit) {
+              const { error: updateError } = await supabase
+                .from("Account")
+                .update({ extraCredit: newExtraCredit })
+                .eq("id", data.accountId);
+              
+              if (updateError) {
+                logger.error("Error updating account extraCredit:", updateError);
+              }
+            }
+          }
+
+          // For the amount that becomes debt
+          if (amountForDebt > 0 && account.dueDayOfMonth !== null && account.dueDayOfMonth !== undefined) {
+            const activeDebt = await getActiveCreditCardDebt(data.accountId);
+
+            if (!activeDebt) {
+              // Create new debt
+              const nextDueDate = calculateNextDueDate(account.dueDayOfMonth);
+              
+              logger.log("Creating credit card debt:", {
+                accountId: data.accountId,
+                accountName: account.name,
+                amountForDebt,
+                nextDueDate: formatDateOnly(nextDueDate),
+              });
+              
+              const newDebt = await createDebt({
+                name: `${account.name} – Current Bill`,
+                loanType: "credit_card",
+                initialAmount: amountForDebt,
+                downPayment: 0,
+                interestRate: 0,
+                totalMonths: null,
+                firstPaymentDate: formatDateOnly(nextDueDate),
+                monthlyPayment: 0,
+                accountId: data.accountId,
+                priority: "Medium",
+                status: "active",
+                nextDueDate: nextDueDate,
+              });
+              
+              logger.log("Credit card debt created successfully:", {
+                debtId: newDebt.id,
+                name: newDebt.name,
+                currentBalance: newDebt.currentBalance,
+                status: newDebt.status,
+              });
+            } else {
+              // Update existing debt
+              const newBalance = activeDebt.currentBalance + amountForDebt;
+              logger.log("Updating credit card debt:", {
+                debtId: activeDebt.id,
+                oldBalance: activeDebt.currentBalance,
+                amountForDebt,
+                newBalance,
+              });
+              
+              await supabase
+                .from("Debt")
+                .update({
+                  currentBalance: newBalance,
+                  updatedAt: formatTimestamp(new Date()),
+                })
+                .eq("id", activeDebt.id);
+            }
+          } else if (amountForDebt > 0) {
+            logger.log("Skipping debt creation - dueDayOfMonth not set:", {
+              accountId: data.accountId,
+              accountName: account.name,
+              dueDayOfMonth: account.dueDayOfMonth,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      // Log error but don't fail transaction creation
+      logger.error("Error handling credit card debt for expense:", error);
+    }
+  }
+
   return transaction;
 }
 
@@ -217,15 +425,23 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   // Verify ownership before updating
   await requireTransactionOwnership(id);
 
+  // Get current user for planned payment operations
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Get current transaction BEFORE update to check if recurring status changed
+  const { data: transactionBeforeUpdate } = await supabase
+    .from("Transaction")
+    .select("recurring, accountId, type, amount_numeric, amount")
+    .eq("id", id)
+    .single();
+
   // Get current transaction type if we need to validate expenseType
   let currentType: string | undefined = data.type;
   if (data.expenseType !== undefined && !currentType) {
-    const { data: currentTransaction } = await supabase
-      .from("Transaction")
-      .select("type")
-      .eq("id", id)
-      .single();
-    currentType = currentTransaction?.type;
+    currentType = transactionBeforeUpdate?.type;
   }
 
   const updateData: Record<string, unknown> = {};
@@ -306,6 +522,58 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   // Invalidate cache to ensure dashboard shows updated data
   const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
   invalidateTransactionCaches();
+
+  const wasRecurring = transactionBeforeUpdate?.recurring ?? false;
+  const isNowRecurring = transaction.recurring;
+
+  // If transaction was updated to be recurring or is already recurring and details changed
+  if (data.recurring !== undefined && isNowRecurring) {
+    try {
+      // Delete existing planned payments that match this transaction's characteristics
+      // (we'll regenerate them with updated data)
+      const amount = transaction.amount_numeric ?? decryptAmount(transaction.amount);
+      const { error: deleteError } = await supabase
+        .from("PlannedPayment")
+        .delete()
+        .eq("userId", user.id)
+        .eq("accountId", transaction.accountId)
+        .eq("type", transaction.type)
+        .eq("source", "recurring")
+        .eq("status", "scheduled")
+        .eq("amount", amount);
+      
+      if (deleteError) {
+        logger.error("Error deleting existing planned payments:", deleteError);
+      }
+
+      // Generate new planned payments
+      await generatePlannedPaymentsFromRecurringTransaction(transaction.id);
+      logger.info(`Regenerated planned payments for recurring transaction ${transaction.id}`);
+    } catch (error) {
+      logger.error(`Error generating planned payments for recurring transaction ${transaction.id}:`, error);
+      // Don't fail the transaction update if planned payment generation fails
+    }
+  } else if (wasRecurring && !isNowRecurring) {
+    // If transaction was changed from recurring to non-recurring, delete related planned payments
+    try {
+      const amount = transactionBeforeUpdate?.amount_numeric ?? decryptAmount(transactionBeforeUpdate?.amount ?? transaction.amount);
+      const { error: deleteError } = await supabase
+        .from("PlannedPayment")
+        .delete()
+        .eq("userId", user.id)
+        .eq("accountId", transaction.accountId)
+        .eq("type", transaction.type)
+        .eq("source", "recurring")
+        .eq("status", "scheduled")
+        .eq("amount", amount);
+      
+      if (deleteError) {
+        logger.error("Error deleting planned payments for non-recurring transaction:", deleteError);
+      }
+    } catch (error) {
+      logger.error("Error cleaning up planned payments:", error);
+    }
+  }
 
   // Return transaction with decrypted fields
   // Prefer amount_numeric if available, otherwise decrypt amount
@@ -626,14 +894,41 @@ export async function getTransactions(filters?: {
 }
 
 export async function getUpcomingTransactions(limit: number = 5) {
-    const supabase = await createServerClient();
   const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
   const endDate = new Date(now);
   endDate.setDate(endDate.getDate() + 15); // Look ahead 15 days
-  endDate.setHours(23, 59, 59, 999); // Set to end of day to include all transactions on that day
+  endDate.setHours(23, 59, 59, 999);
 
-  // Get all recurring transactions (both expenses and incomes)
-  const { data: recurringTransactions, error } = await supabase
+  // Get all scheduled planned payments (from all sources: recurring, debt, manual)
+  const plannedPayments = await getPlannedPayments({
+    startDate: today,
+    endDate: endDate,
+    status: "scheduled",
+  });
+
+  // Convert PlannedPayments to the expected format
+  const upcoming = plannedPayments.map((pp) => {
+    const ppDate = pp.date instanceof Date ? pp.date : new Date(pp.date);
+    return {
+      id: pp.id,
+      date: ppDate,
+      type: pp.type,
+      amount: pp.amount,
+      description: pp.description || undefined,
+      account: pp.account,
+      category: pp.category,
+      subcategory: pp.subcategory,
+      originalDate: ppDate,
+      isDebtPayment: pp.source === "debt",
+    };
+  });
+
+  // Also get recurring transactions and generate planned payments for them
+  // This is a temporary solution until we fully migrate to PlannedPayments
+  const supabase = await createServerClient();
+  const { data: recurringTransactions, error: recurringError } = await supabase
     .from("Transaction")
     .select(`
       *,
@@ -644,233 +939,80 @@ export async function getUpcomingTransactions(limit: number = 5) {
     .eq("recurring", true)
     .order("date", { ascending: true });
 
-  if (error) {
-    logger.error("Supabase error fetching recurring transactions:", error);
-    // Return empty array if there's an error
-    return [];
+  if (recurringError) {
+    logger.error("Supabase error fetching recurring transactions:", recurringError);
   }
 
-  if (!recurringTransactions || recurringTransactions.length === 0) {
-    return [];
-  }
-
-  // Handle relations for recurring transactions and decrypt descriptions
-  const transactions = (recurringTransactions || []).map((tx: any) => {
-    let account = null;
-    if (tx.account) {
-      account = Array.isArray(tx.account) ? (tx.account.length > 0 ? tx.account[0] : null) : tx.account;
-    }
-
-    let category = null;
-    if (tx.category) {
-      category = Array.isArray(tx.category) ? (tx.category.length > 0 ? tx.category[0] : null) : tx.category;
-    }
-
-    let subcategory = null;
-    if (tx.subcategory) {
-      subcategory = Array.isArray(tx.subcategory) ? (tx.subcategory.length > 0 ? tx.subcategory[0] : null) : tx.subcategory;
-    }
-    
-    return {
-      ...tx,
-      description: decryptDescription(tx.description),
-      amount: decryptAmount(tx.amount),
-      account: account || null,
-      category: category || null,
-      subcategory: subcategory || null,
-    };
-  });
-
-  // Calculate upcoming occurrences for recurring transactions
-  const upcoming: Array<{
-    id: string;
-    date: Date;
-    type: string;
-    amount: number;
-    description?: string;
-    account?: { id: string; name: string } | null;
-    category?: { id: string; name: string } | null;
-    subcategory?: { id: string; name: string } | null;
-    originalDate: Date;
-    isDebtPayment?: boolean;
-  }> = [];
-
-  for (const tx of transactions) {
+  // Generate planned payments for recurring transactions (if not already created)
+  for (const tx of recurringTransactions || []) {
     const originalDate = new Date(tx.date);
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-
-    // Calculate the next occurrence date based on the original date's day of month
     const originalDay = originalDate.getDate();
     
-    // Start with this month, same day
+    // Calculate next occurrence
     let nextDate = new Date(today.getFullYear(), today.getMonth(), originalDay);
-    nextDate.setHours(0, 0, 0, 0); // Normalize to start of day
+    nextDate.setHours(0, 0, 0, 0);
     
-    // Handle edge case: if the original day doesn't exist in current month (e.g., Jan 31 -> Feb)
-    // Use the last day of the current month
     if (nextDate.getDate() !== originalDay) {
       nextDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       nextDate.setHours(0, 0, 0, 0);
     }
 
-    // If the next occurrence is in the past, move to next month
     if (nextDate < today) {
       nextDate = new Date(today.getFullYear(), today.getMonth() + 1, originalDay);
       nextDate.setHours(0, 0, 0, 0);
-      // Handle edge case again for next month
       if (nextDate.getDate() !== originalDay) {
         nextDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
         nextDate.setHours(0, 0, 0, 0);
       }
     }
 
-    // Only include if it's within the next 15 days
-    // Compare dates properly - endDate is already normalized to end of day
+    // Only include if within the next 15 days and not already in planned payments
     if (nextDate <= endDate) {
-      upcoming.push({
-        id: tx.id,
-        date: nextDate,
-        type: tx.type,
-        amount: tx.amount,
-        description: tx.description,
-        account: tx.account,
-        category: tx.category,
-        subcategory: tx.subcategory,
-        originalDate: originalDate,
-        isDebtPayment: false,
-      });
-    }
-  }
-
-  // Get debts and calculate upcoming debt payments
-  try {
-    const debts = await getDebts();
-    console.log(`[getUpcomingTransactions] Found ${debts.length} debts, endDate: ${endDate.toISOString()}, now: ${now.toISOString()}`);
-    
-    for (const debt of debts) {
-      // Skip if debt is paid off or paused
-      if (debt.isPaidOff || debt.isPaused || debt.currentBalance <= 0) {
-        console.log(`[getUpcomingTransactions] Skipping debt ${debt.name}: isPaidOff=${debt.isPaidOff}, isPaused=${debt.isPaused}, currentBalance=${debt.currentBalance}`);
-        continue;
-      }
-
-      // Convert debt to DebtForCalculation format
-      const debtForCalculation: DebtForCalculation = {
-        id: debt.id,
-        name: debt.name,
-        initialAmount: debt.initialAmount,
-        downPayment: debt.downPayment,
-        currentBalance: debt.currentBalance,
-        interestRate: debt.interestRate,
-        totalMonths: debt.totalMonths,
-        firstPaymentDate: debt.firstPaymentDate,
-        monthlyPayment: debt.monthlyPayment,
-        paymentFrequency: debt.paymentFrequency,
-        paymentAmount: debt.paymentAmount,
-        principalPaid: debt.principalPaid,
-        interestPaid: debt.interestPaid,
-        additionalContributions: debt.additionalContributions,
-        additionalContributionAmount: debt.additionalContributionAmount,
-        priority: debt.priority,
-        isPaused: debt.isPaused,
-        isPaidOff: debt.isPaidOff,
-        description: debt.description,
-      };
-
-      // Calculate next payment dates for this debt
-      const debtPayments = calculateNextPaymentDates(
-        debtForCalculation,
-        now,
-        endDate
+      const alreadyExists = plannedPayments.some(
+        (pp) => pp.source === "recurring" && 
+        new Date(pp.date).getTime() === nextDate.getTime() &&
+        pp.accountId === tx.accountId &&
+        pp.amount === decryptAmount(tx.amount)
       );
-      console.log(`[getUpcomingTransactions] Debt ${debt.name} (firstPaymentDate: ${debt.firstPaymentDate}, frequency: ${debt.paymentFrequency}) has ${debtPayments.length} payments in next 15 days`);
 
-      // Get account information if accountId is set
-      let account = null;
-      if (debt.accountId) {
-        const { data: accountData } = await supabase
-          .from("Account")
-          .select("id, name")
-          .eq("id", debt.accountId)
-          .single();
-        
-        if (accountData) {
-          account = {
-            id: accountData.id,
-            name: accountData.name,
-          };
+      if (!alreadyExists) {
+        let account = null;
+        if (tx.account) {
+          account = Array.isArray(tx.account) ? (tx.account.length > 0 ? tx.account[0] : null) : tx.account;
         }
-      }
 
-      // Get category mapping for the debt
-      let category = null;
-      let subcategory = null;
-      try {
-        const categoryMapping = await getDebtCategoryMapping(debt.loanType);
-        if (categoryMapping) {
-          const { data: categoryData } = await supabase
-            .from("Category")
-            .select("id, name")
-            .eq("id", categoryMapping.categoryId)
-            .single();
-          
-          if (categoryData) {
-            category = {
-              id: categoryData.id,
-              name: categoryData.name,
-            };
-          }
-
-          if (categoryMapping.subcategoryId) {
-            const { data: subcategoryData } = await supabase
-              .from("Subcategory")
-              .select("id, name")
-              .eq("id", categoryMapping.subcategoryId)
-              .single();
-            
-            if (subcategoryData) {
-              subcategory = {
-                id: subcategoryData.id,
-                name: subcategoryData.name,
-              };
-            }
-          }
-        } else {
-          // If category mapping is null, log a warning but continue without category
-          logger.warn(`No category mapping found for debt ${debt.id} with loan type ${debt.loanType}`);
+        let category = null;
+        if (tx.category) {
+          category = Array.isArray(tx.category) ? (tx.category.length > 0 ? tx.category[0] : null) : tx.category;
         }
-      } catch (error) {
-        // Log error but don't break the function - continue without category
-        logger.error(`Error fetching category mapping for debt ${debt.id}:`, error);
-      }
 
-      // Add debt payments to upcoming list
-      for (const payment of debtPayments) {
+        let subcategory = null;
+        if (tx.subcategory) {
+          subcategory = Array.isArray(tx.subcategory) ? (tx.subcategory.length > 0 ? tx.subcategory[0] : null) : tx.subcategory;
+        }
+
         upcoming.push({
-          id: `debt-${debt.id}-${payment.date.toISOString()}`,
-          date: payment.date,
-          type: "expense",
-          amount: payment.amount,
-          description: `Payment for ${debt.name}`,
-          account: account,
-          category: category,
-          subcategory: subcategory,
-          originalDate: payment.date,
-          isDebtPayment: true,
+          id: `recurring-${tx.id}-${nextDate.toISOString()}`,
+          date: nextDate,
+          type: tx.type,
+          amount: decryptAmount(tx.amount),
+          description: decryptDescription(tx.description),
+          account: account || null,
+          category: category || null,
+          subcategory: subcategory || null,
+          originalDate: originalDate,
+          isDebtPayment: false,
         });
       }
     }
-  } catch (error) {
-    logger.error("Error fetching debt payments:", error);
-    // Continue even if debt payments fail
   }
 
   // Sort by date and limit
   upcoming.sort((a, b) => a.date.getTime() - b.date.getTime());
-  console.log(`[getUpcomingTransactions] Returning ${upcoming.length} upcoming transactions (recurring: ${upcoming.filter(t => !t.isDebtPayment).length}, debts: ${upcoming.filter(t => t.isDebtPayment).length})`);
-  // Return all transactions within the 15-day window, not just the limit
-  // The limit is applied by the caller if needed
+  const debtCount = upcoming.filter(t => t.isDebtPayment).length;
+  const nonDebtCount = upcoming.length - debtCount;
+  console.log(`[getUpcomingTransactions] Returning ${upcoming.length} upcoming items (planned payments: ${plannedPayments.length}, recurring: ${upcoming.length - plannedPayments.length}, debts: ${debtCount})`);
+  
   return upcoming;
 }
 

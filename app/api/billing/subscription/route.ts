@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUserSubscription, getPlanById } from "@/lib/api/plans";
-import { resolvePlanFeatures } from "@/lib/utils/plan-features";
+import { getCurrentUserSubscriptionData } from "@/lib/api/subscription";
 import { createServerClient } from "@/lib/supabase-server";
 import Stripe from "stripe";
 
@@ -13,6 +12,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   typescript: true,
 });
 
+/**
+ * GET /api/billing/subscription
+ * 
+ * Returns current user's subscription data (subscription + plan + limits)
+ * Uses unified subscription API as single source of truth
+ */
 export async function GET(request: Request) {
   try {
     const supabase = await createServerClient();
@@ -26,19 +31,14 @@ export async function GET(request: Request) {
       );
     }
 
+    // Use unified API - single source of truth
+    const { subscription, plan, limits } = await getCurrentUserSubscriptionData();
+    
+    // Determine subscription interval (monthly/yearly) from Stripe
     // Check if we should skip Stripe API call (for faster preload during login)
     const { searchParams } = new URL(request.url);
     const skipStripe = searchParams.get("skipStripe") === "true";
-
-    // Fetch subscription once and reuse it (already has internal caching)
-    const subscription = await getCurrentUserSubscription();
-    // Get plan if subscription exists
-    const plan = subscription ? await getPlanById(subscription.planId) : null;
-    // Resolve limits from plan (ensures all fields are defined)
-    const limits = resolvePlanFeatures(plan);
-
-    // Determine subscription interval (monthly/yearly)
-    // Optimized: Skip Stripe API call during preload for faster loading
+    
     let interval: "month" | "year" | null = null;
     if (!skipStripe && subscription?.stripeSubscriptionId && plan) {
       try {

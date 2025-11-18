@@ -9,9 +9,10 @@ import { Check, Zap, Crown, ArrowRight } from "lucide-react";
 function WelcomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const plan = searchParams.get("plan") || "free";
+  const plan = searchParams.get("plan") || "essential";
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [planName, setPlanName] = useState<string>("Essential");
 
   const syncSubscription = useCallback(async () => {
     try {
@@ -51,6 +52,19 @@ function WelcomeContent() {
   }, []);
 
   useEffect(() => {
+    // Fetch plan name from database
+    fetch("/api/billing/plans/public")
+      .then(res => res.json())
+      .then(data => {
+        if (data.plans) {
+          const currentPlan = data.plans.find((p: { id: string }) => p.id === plan);
+          if (currentPlan) {
+            setPlanName(currentPlan.name);
+          }
+        }
+      })
+      .catch(err => console.error("Error fetching plan name:", err));
+
     // If plan is "paid", try to sync subscription from Stripe
     if (plan === "paid") {
       syncSubscription();
@@ -75,14 +89,14 @@ function WelcomeContent() {
     );
   }
 
-  if (plan === "free") {
+  if (plan === "essential") {
     return (
       <div className="container mx-auto py-8 max-w-2xl">
         <div className="space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-4xl font-bold">Welcome! 🎉</h1>
             <p className="text-lg text-muted-foreground">
-              You're all set with the Free plan
+              You're all set with the {planName} plan
             </p>
           </div>
 
@@ -90,10 +104,10 @@ function WelcomeContent() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-primary" />
-                Free Plan Activated
+                {planName} Plan Activated
               </CardTitle>
               <CardDescription>
-                Start managing your finances with our free plan
+                Start managing your finances with your plan
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -165,12 +179,12 @@ function WelcomeContent() {
               Subscription Confirmed
             </CardTitle>
             <CardDescription>
-              Thank you for subscribing! You now have access to all premium features.
+              Thank you for subscribing! You now have access to all pro features.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm font-medium mb-2">Premium benefits:</p>
+              <p className="text-sm font-medium mb-2">Pro benefits:</p>
               <ul className="space-y-2">
                 <li className="flex items-center gap-2 text-sm">
                   <Check className="w-4 h-4 text-primary" />
@@ -204,7 +218,7 @@ function WelcomeContent() {
                 onClick={handleGoToDashboard}
                 className="w-full"
               >
-                Start Using Premium Features
+                Start Using Pro Features
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>

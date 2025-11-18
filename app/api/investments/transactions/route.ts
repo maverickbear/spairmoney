@@ -11,6 +11,7 @@ import { InvestmentTransactionFormData } from "@/lib/validations/investment";
 import { ZodError } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/lib/api/feature-guard";
 import { isPlanError } from "@/lib/utils/plan-errors";
+import { invalidatePortfolioCache } from "@/lib/api/portfolio";
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,6 +129,14 @@ export async function POST(request: NextRequest) {
         console.error("Error creating security price:", error);
         // Don't fail the transaction if price creation fails
       }
+    }
+
+    // Invalidate portfolio cache to ensure fresh data
+    try {
+      await invalidatePortfolioCache();
+    } catch (error) {
+      console.error("Error invalidating portfolio cache:", error);
+      // Don't fail the transaction if cache invalidation fails
     }
 
     return NextResponse.json(transaction, { status: 201 });

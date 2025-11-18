@@ -86,26 +86,86 @@ async function getPortfolioSummaryInternal(): Promise<PortfolioSummary> {
   const { createServerClient } = await import("@/lib/supabase-server");
   const supabase = await createServerClient();
 
+  console.log("[Portfolio Summary Internal] Starting calculation...");
   const holdings = await getHoldings();
+  console.log("[Portfolio Summary Internal] getHoldings() returned", holdings.length, "holdings");
+  
+  // Debug: Log holdings count and values
+  console.log("[Portfolio Summary] Holdings count:", holdings.length);
+  if (holdings.length > 0) {
+    const totalMarketValue = holdings.reduce((sum, h) => sum + (h.marketValue || 0), 0);
+    const totalBookValue = holdings.reduce((sum, h) => sum + (h.bookValue || 0), 0);
+    console.log("[Portfolio Summary] Total market value from holdings:", totalMarketValue);
+    console.log("[Portfolio Summary] Total book value from holdings:", totalBookValue);
+    console.log("[Portfolio Summary] Sample holdings (first 5):", holdings.slice(0, 5).map(h => ({
+      symbol: h.symbol,
+      quantity: h.quantity,
+      marketValue: h.marketValue,
+      bookValue: h.bookValue,
+      lastPrice: h.lastPrice,
+      avgPrice: h.avgPrice,
+      accountId: h.accountId,
+    })));
+    
+    // Check for holdings with zero marketValue
+    const zeroValueHoldings = holdings.filter(h => !h.marketValue || h.marketValue === 0);
+    if (zeroValueHoldings.length > 0) {
+      console.warn("[Portfolio Summary] WARNING: Found", zeroValueHoldings.length, "holdings with zero marketValue:", 
+        zeroValueHoldings.map(h => ({ symbol: h.symbol, quantity: h.quantity, lastPrice: h.lastPrice, avgPrice: h.avgPrice }))
+      );
+    }
+  } else {
+    console.warn("[Portfolio Summary] WARNING: No holdings found!");
+  }
   
   // Try to get total value from Questrade accounts first (more accurate)
   // Optimized: Single query with only needed fields
   const { data: questradeAccounts } = await supabase
     .from("InvestmentAccount")
-    .select("totalEquity, marketValue, cash")
+    .select("totalEquity, marketValue, cash, id")
     .eq("isQuestradeConnected", true);
 
+  // Also get all investment accounts to calculate total value
+  const allAccounts = await getInvestmentAccounts();
+  
+  // Debug: Log accounts
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Portfolio Summary] Questrade accounts:", questradeAccounts?.length || 0);
+    console.log("[Portfolio Summary] All investment accounts:", allAccounts.length);
+  }
+  
   let totalValue: number;
   if (questradeAccounts && questradeAccounts.length > 0) {
     // Sum totalEquity from all Questrade accounts
-    totalValue = questradeAccounts.reduce((sum, account) => {
+    const questradeValue = questradeAccounts.reduce((sum, account) => {
       const accountValue = account.totalEquity ?? 
         ((account.marketValue || 0) + (account.cash || 0));
       return sum + accountValue;
     }, 0);
+    
+    // Also calculate value from holdings for non-Questrade accounts
+    const questradeAccountIds = new Set(questradeAccounts.map(qa => qa.id));
+    const nonQuestradeHoldingsValue = holdings
+      .filter(h => !questradeAccountIds.has(h.accountId))
+      .reduce((sum, h) => sum + h.marketValue, 0);
+    
+    totalValue = questradeValue + nonQuestradeHoldingsValue;
+    
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Portfolio Summary] Questrade value:", questradeValue);
+      console.log("[Portfolio Summary] Non-Questrade holdings value:", nonQuestradeHoldingsValue);
+    }
   } else {
-    // Fallback to calculating from holdings
-    totalValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
+    // Fallback to calculating from holdings for all accounts
+    totalValue = holdings.reduce((sum, h) => sum + (h.marketValue || 0), 0);
+    
+    console.log("[Portfolio Summary] No Questrade accounts, calculating from holdings");
+    console.log("[Portfolio Summary] Total value from holdings:", totalValue);
+    console.log("[Portfolio Summary] Holdings breakdown:", holdings.map(h => ({
+      symbol: h.symbol,
+      marketValue: h.marketValue,
+      accountId: h.accountId,
+    })));
   }
 
   const totalCost = holdings.reduce((sum, h) => sum + h.bookValue, 0);
@@ -119,18 +179,45 @@ async function getPortfolioSummaryInternal(): Promise<PortfolioSummary> {
   
   try {
     const yesterday = subDays(new Date(), 1);
+    const yesterdayDateStr = formatDateStart(yesterday);
     
     // Get security IDs from holdings (Holding.securityId is the securityId)
     const securityIds = Array.from(new Set(holdings.map(h => h.securityId)));
     
     if (securityIds.length > 0) {
       // Get yesterday's prices directly from SecurityPrice table
-      // Optimized: Only select needed fields
-      const { data: yesterdayPrices } = await supabase
+      // Try exact date match first, then try to get the most recent price before yesterday
+      let { data: yesterdayPrices } = await supabase
         .from("SecurityPrice")
-        .select("securityId, price")
+        .select("securityId, price, date")
         .in("securityId", securityIds)
-        .eq("date", formatDateStart(yesterday));
+        .eq("date", yesterdayDateStr);
+      
+      // If no prices found for yesterday, try to get the most recent prices before yesterday
+      if (!yesterdayPrices || yesterdayPrices.length === 0) {
+        // Get the most recent price for each security before or on yesterday
+        const { data: recentPrices } = await supabase
+          .from("SecurityPrice")
+          .select("securityId, price, date")
+          .in("securityId", securityIds)
+          .lte("date", yesterdayDateStr)
+          .order("date", { ascending: false });
+        
+        if (recentPrices && recentPrices.length > 0) {
+          // Group by securityId and take the most recent price for each
+          const priceMap = new Map<string, number>();
+          for (const price of recentPrices) {
+            if (!priceMap.has(price.securityId)) {
+              priceMap.set(price.securityId, price.price);
+            }
+          }
+          yesterdayPrices = Array.from(priceMap.entries()).map(([securityId, price]) => ({
+            securityId,
+            price,
+            date: yesterdayDateStr,
+          }));
+        }
+      }
       
       if (yesterdayPrices && yesterdayPrices.length > 0) {
         // Calculate yesterday's portfolio value
@@ -138,12 +225,12 @@ async function getPortfolioSummaryInternal(): Promise<PortfolioSummary> {
         let yesterdayValue = 0;
         
         for (const holding of holdings) {
-          const price = priceMap.get(holding.securityId); // Holding.securityId is the securityId
-          if (price !== undefined) {
+          const price = priceMap.get(holding.securityId);
+          if (price !== undefined && price > 0) {
             yesterdayValue += holding.quantity * price;
           } else {
-            // Use average price if no price available
-            yesterdayValue += holding.quantity * holding.avgPrice;
+            // Use current price if no historical price available (fallback)
+            yesterdayValue += holding.quantity * holding.lastPrice;
           }
         }
         
@@ -151,6 +238,10 @@ async function getPortfolioSummaryInternal(): Promise<PortfolioSummary> {
           dayChange = totalValue - yesterdayValue;
           dayChangePercent = (dayChange / yesterdayValue) * 100;
         }
+      } else {
+        // If no historical prices found, try to estimate from current prices
+        // This is a fallback - dayChange will be 0 but at least we won't error
+        console.warn("No historical prices found for day change calculation");
       }
     }
   } catch (error) {
@@ -181,7 +272,26 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
   const cacheKey = `portfolio:summary:${userId}`;
   const cached = await cache.get<PortfolioSummary>(cacheKey);
   if (cached) {
-    return cached;
+    // CRITICAL FIX: If cached data shows zero values but we have holdings, recalculate
+    // This prevents stale cache from showing zeros when there are actual holdings
+    if (cached.totalValue === 0 && cached.holdingsCount === 0) {
+      // Check if we actually have holdings - if yes, cache is stale, recalculate
+      const holdings = await getHoldings();
+      if (holdings.length > 0) {
+        console.warn("[Portfolio Summary] Cache shows zero but we have", holdings.length, "holdings. Recalculating...");
+        // Delete stale cache and recalculate
+        await cache.delete(cacheKey);
+        // Continue to calculation below
+      } else {
+        // No holdings, cache is correct
+        console.log("[Portfolio Summary] Using cached data (no holdings):", cached);
+        return cached;
+      }
+    } else {
+      // Cache has valid data
+      console.log("[Portfolio Summary] Using cached data:", cached);
+      return cached;
+    }
   }
 
   // Fallback to Next.js cache if Redis not available
@@ -194,10 +304,37 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
     }
   )();
 
+  // Log result for debugging
+  console.log("[Portfolio Summary] Calculated result:", result);
+  if (result.totalValue === 0 && result.holdingsCount > 0) {
+    console.error("[Portfolio Summary] ERROR: Total value is 0 but there are", result.holdingsCount, "holdings!");
+    console.error("[Portfolio Summary] This indicates holdings have zero marketValue. Check price data.");
+  }
+
   // Store in Redis cache (5 minutes TTL)
   await cache.set(cacheKey, result, 300);
 
   return result;
+}
+
+// Invalidate portfolio cache (useful after transactions are created/updated)
+export async function invalidatePortfolioCache(userId?: string): Promise<void> {
+  const targetUserId = userId || await getCurrentUserId();
+  if (!targetUserId) {
+    return;
+  }
+
+  const cacheKey = `portfolio:summary:${targetUserId}`;
+  await cache.delete(cacheKey);
+  
+  // Also invalidate Next.js cache
+  const { revalidateTag } = await import("next/cache");
+  revalidateTag('investments');
+  revalidateTag('portfolio');
+  
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Portfolio Cache] Invalidated cache for user:", targetUserId);
+  }
 }
 
 // Get portfolio holdings (convert from Supabase format)
@@ -264,18 +401,34 @@ async function getPortfolioHistoricalDataInternal(days: number = 365): Promise<H
   const { createServerClient } = await import("@/lib/supabase-server");
   const supabase = await createServerClient();
   
+  // Get current portfolio value using the same logic as getPortfolioSummaryInternal
+  // This includes Questrade account values, not just holdings
+  const summary = await getPortfolioSummaryInternal();
+  const currentValue = summary.totalValue;
+  
   const portfolioHoldings = await getPortfolioHoldings();
-  const currentValue = portfolioHoldings.reduce((sum, h) => sum + h.marketValue, 0);
   
   // Try to get historical data from SecurityPrice table
   const endDate = new Date();
   const startDate = subDays(endDate, days);
   
-  // Get all unique security IDs from current holdings (Holding.id is the securityId)
+  // Get all unique security IDs from current holdings
+  // Note: portfolioHoldings is converted from SupabaseHolding, where id = securityId
   const securityIds = Array.from(new Set(portfolioHoldings.map(h => h.id)));
   
-  if (securityIds.length === 0) {
-    // No holdings, return empty array
+  // Get all investment accounts to check for Questrade accounts
+  const allAccounts = await getInvestmentAccounts();
+  const { data: questradeAccounts } = await supabase
+    .from("InvestmentAccount")
+    .select("id, totalEquity, marketValue, cash, isQuestradeConnected")
+    .eq("isQuestradeConnected", true);
+  
+  // If we have Questrade accounts, we should use their values
+  // For historical data, we'll calculate from holdings but ensure today's value is accurate
+  const hasQuestradeAccounts = questradeAccounts && questradeAccounts.length > 0;
+  
+  if (securityIds.length === 0 && !hasQuestradeAccounts) {
+    // No holdings and no Questrade accounts, return empty array
     return [];
   }
   
@@ -305,9 +458,43 @@ async function getPortfolioHistoricalDataInternal(days: number = 365): Promise<H
   }
   
   // Get all transactions to track quantity changes over time
-  // OPTIMIZED: Only get transactions from 30 days before startDate (instead of 5 years)
-  // This dramatically reduces the amount of data processed
-  const transactionsStartDate = subDays(startDate, 30); // Only 30 days before (was 5 years!)
+  // FIXED: Search from first transaction to ensure we capture initial holdings
+  // This ensures historical data is accurate even for long-term holdings
+  let transactionsStartDate: Date;
+  
+  try {
+    // Get user's investment accounts
+    const accountIds = allAccounts.map(a => a.id);
+    
+    if (accountIds.length > 0) {
+      // Find first transaction to ensure we capture all holdings
+      const { data: firstTx } = await supabase
+        .from("InvestmentTransaction")
+        .select("date")
+        .in("accountId", accountIds)
+        .order("date", { ascending: true })
+        .limit(1);
+      
+      if (firstTx && firstTx.length > 0 && firstTx[0].date) {
+        // Use first transaction date, but don't go before startDate
+        const firstTxDate = firstTx[0].date instanceof Date 
+          ? firstTx[0].date 
+          : new Date(firstTx[0].date);
+        transactionsStartDate = firstTxDate < startDate ? firstTxDate : startDate;
+      } else {
+        // No transactions found, use startDate
+        transactionsStartDate = startDate;
+      }
+    } else {
+      // No accounts, use startDate
+      transactionsStartDate = startDate;
+    }
+  } catch (error) {
+    // Fallback: use startDate if error finding first transaction
+    console.warn("Error finding first transaction, using startDate:", error);
+    transactionsStartDate = startDate;
+  }
+  
   const transactions = await getInvestmentTransactions({
     startDate: transactionsStartDate,
     endDate,
@@ -451,7 +638,7 @@ async function getPortfolioHistoricalDataInternal(days: number = 365): Promise<H
         }
       }
     } else if (i === days) {
-      // Today - use current value
+      // Today - use current value from summary (includes Questrade accounts)
       portfolioValue = currentValue;
     } else {
       // No historical prices available - use book value (cost basis) as fallback
@@ -467,6 +654,40 @@ async function getPortfolioHistoricalDataInternal(days: number = 365): Promise<H
       value: Math.max(0, portfolioValue),
     });
   }
+  
+  // Always ensure today's value is included and accurate (from summary, includes all accounts)
+  if (data.length > 0) {
+    const todayKey = today.toISOString().split("T")[0];
+    const todayIndex = data.findIndex(d => d.date === todayKey);
+    if (todayIndex >= 0) {
+      // Override with accurate current value from summary (includes Questrade accounts)
+      data[todayIndex].value = currentValue;
+    } else {
+      // Add today's value if not already in the data
+      data.push({
+        date: todayKey,
+        value: currentValue,
+      });
+    }
+  } else {
+    // If no historical data, at least show today's value from summary
+    data.push({
+      date: today.toISOString().split("T")[0],
+      value: currentValue,
+    });
+  }
+  
+  // If we have Questrade accounts but no historical data, add a point for today
+  // This ensures the chart shows at least the current value
+  if (hasQuestradeAccounts && data.length === 1 && data[0].date === today.toISOString().split("T")[0]) {
+    // We already have today's value, which is good
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Portfolio Historical] Using Questrade account values, current value:", currentValue);
+    }
+  }
+  
+  // Sort by date to ensure chronological order
+  data.sort((a, b) => a.date.localeCompare(b.date));
   
   return data;
 }

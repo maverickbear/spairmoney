@@ -26,6 +26,21 @@ export async function signUp(data: SignUpFormData): Promise<{ user: User | null;
     }
     
     const supabase = await createServerClient();
+
+    // Check if email has a pending invitation
+    const { data: pendingInvitation } = await supabase
+      .from("HouseholdMember")
+      .select("id, ownerId, email")
+      .eq("email", data.email.toLowerCase())
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (pendingInvitation) {
+      return { 
+        user: null, 
+        error: "This email has a pending household invitation. Please accept the invitation from your email or use the invitation link to create your account." 
+      };
+    }
     
     // Sign up user with Supabase Auth
     // Use both 'name' and 'full_name' for compatibility with Supabase Auth Display name
@@ -216,7 +231,22 @@ export async function getCurrentUser(): Promise<User | null> {
     
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-    if (authError || !authUser) {
+    // Silently handle expected auth errors (invalid refresh tokens, etc.)
+    // These are normal when user is not authenticated
+    if (authError) {
+      const isExpectedError = authError.message?.includes("refresh_token_not_found") ||
+        authError.message?.includes("Invalid refresh token") ||
+        authError.message?.includes("JWT expired") ||
+        authError.message?.includes("Auth session missing");
+      
+      // Don't log expected errors - they're normal for unauthenticated users
+      if (!isExpectedError) {
+        console.warn("[getCurrentUser] Unexpected auth error:", authError.message);
+      }
+      return null;
+    }
+
+    if (!authUser) {
       return null;
     }
 
@@ -241,8 +271,17 @@ export async function getCurrentUser(): Promise<User | null> {
     }
 
     return mapUser(userData);
-  } catch (error) {
-    console.error("Error in getCurrentUser:", error);
+  } catch (error: any) {
+    // Silently handle expected auth errors
+    const isExpectedError = error?.message?.includes("refresh_token_not_found") ||
+      error?.message?.includes("Invalid refresh token") ||
+      error?.message?.includes("JWT expired") ||
+      error?.message?.includes("Auth session missing");
+    
+    // Only log unexpected errors
+    if (!isExpectedError) {
+      console.error("Error in getCurrentUser:", error);
+    }
     return null;
   }
 }

@@ -6,17 +6,19 @@ export const planFeaturesSchema = z.object({
   hasInvestments: z.boolean(),
   hasAdvancedReports: z.boolean(),
   hasCsvExport: z.boolean(),
+  hasCsvImport: z.boolean(),
   hasDebts: z.boolean(),
   hasGoals: z.boolean(),
   hasBankIntegration: z.boolean(),
   hasHousehold: z.boolean(),
+  hasBudgets: z.boolean(),
 });
 
 export type PlanFeatures = z.infer<typeof planFeaturesSchema>;
 
 export const planSchema = z.object({
   id: z.string(),
-  name: z.enum(["free", "basic", "premium"]),
+  name: z.enum(["essential", "pro"]),
   priceMonthly: z.number(),
   priceYearly: z.number(),
   features: planFeaturesSchema,

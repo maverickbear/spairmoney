@@ -29,6 +29,8 @@ export interface Debt {
   paidOffAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  status?: string;
+  nextDueDate?: string | null;
   remainingBalance?: number;
   remainingPrincipal?: number;
   monthsRemaining?: number | null;

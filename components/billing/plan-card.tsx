@@ -31,8 +31,8 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Free Plan</p>
-              <p className="text-xs text-muted-foreground">No active subscription</p>
+              <p className="text-sm font-medium">No Active Plan</p>
+              <p className="text-xs text-muted-foreground">Please select a plan</p>
             </div>
             <Button
               variant="ghost"
@@ -48,14 +48,13 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
     );
   }
 
-  const isFree = plan.name === "free";
   const price = subscription.currentPeriodStart && subscription.currentPeriodEnd
     ? plan.priceMonthly
     : 0;
 
   const billingText = price > 0 
     ? `$${price.toFixed(2)} Billed Monthly`
-    : "Free";
+    : "No active subscription";
 
   return (
     <>
@@ -74,7 +73,6 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
               </div>
               <p className="text-xs text-muted-foreground">{billingText}</p>
             </div>
-            {!isFree && (
               <Button
                 variant="ghost"
                 onClick={handleManage}
@@ -83,7 +81,6 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
-            )}
           </div>
         </CardContent>
       </Card>

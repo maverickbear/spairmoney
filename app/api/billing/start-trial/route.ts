@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { invalidateSubscriptionCache } from "@/lib/api/plans";
+import { invalidateSubscriptionCache } from "@/lib/api/subscription";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -230,13 +230,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Invalidate subscription cache
+    // Invalidate subscription cache to ensure fresh data on next check
     await invalidateSubscriptionCache(authUser.id);
+    
+    // Small delay to ensure cache invalidation is processed and database is consistent
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     console.log("[START-TRIAL] Trial started successfully:", {
       subscriptionId: newSubscription.id,
       stripeSubscriptionId: stripeSubscription.id,
       planId: planId,
+      status: newSubscription.status,
       trialEndDate: trialEndDate.toISOString(),
     });
 

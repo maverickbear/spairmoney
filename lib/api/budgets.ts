@@ -12,7 +12,7 @@ export interface Budget {
   amount: number;
   categoryId?: string | null;
   subcategoryId?: string | null;
-  macroId?: string | null;
+  groupId?: string | null;
   userId?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -25,11 +25,11 @@ export interface Budget {
   category?: {
     id: string;
     name: string;
-    macroId?: string;
-    macro?: { id: string; name: string } | null;
+    groupId?: string;
+    group?: { id: string; name: string } | null;
   } | null;
   subcategory?: { id: string; name: string } | null;
-  macro?: { id: string; name: string } | null;
+  group?: { id: string; name: string } | null;
   budgetCategories?: Array<{
     id: string;
     budgetId: string;
@@ -44,6 +44,9 @@ export interface Budget {
     createdAt?: string;
     subcategory?: { id: string; name: string } | null;
   }>;
+  // Deprecated: Use groupId and group instead
+  macroId?: string | null;
+  macro?: { id: string; name: string } | null;
 }
 
 export async function getBudgetsInternal(period: Date, accessToken?: string, refreshToken?: string) {
@@ -58,9 +61,9 @@ export async function getBudgetsInternal(period: Date, accessToken?: string, ref
       *,
       category:Category(
         *,
-        macro:Group(*)
+        group:Group(*)
       ),
-      macro:Group(*),
+      group:Group(*),
       subcategory:Subcategory(
         *
       ),
@@ -95,8 +98,8 @@ export async function getBudgetsInternal(period: Date, accessToken?: string, ref
   // Supabase returns relations as arrays, so we need to handle that
   const processedBudgets = budgets.map((budget: any) => {
     const category = Array.isArray(budget.category) ? budget.category[0] : budget.category;
-    const categoryMacro = category && Array.isArray(category.macro) ? category.macro[0] : category?.macro;
-    const macro = Array.isArray(budget.macro) ? budget.macro[0] : budget.macro;
+    const categoryGroup = category && Array.isArray(category.group) ? category.group[0] : category?.group;
+    const group = Array.isArray(budget.group) ? budget.group[0] : budget.group;
     const subcategory = Array.isArray(budget.subcategory) ? budget.subcategory[0] : budget.subcategory;
     const budgetCategories = Array.isArray(budget.budgetCategories) ? budget.budgetCategories : [];
     
@@ -104,9 +107,12 @@ export async function getBudgetsInternal(period: Date, accessToken?: string, ref
       ...budget,
       category: category ? {
         ...category,
-        macro: categoryMacro || null,
+        group: categoryGroup || null,
       } : null,
-      macro: macro || null,
+      group: group || null,
+      // Backward compatibility
+      macro: categoryGroup || null,
+      macroId: budget.groupId || null,
       subcategory: subcategory || null,
       budgetCategories: budgetCategories.map((bc: any) => ({
         ...bc,
@@ -154,8 +160,8 @@ export async function getBudgetsInternal(period: Date, accessToken?: string, ref
   const budgetsWithActual = processedBudgets.map((budget) => {
     let actualSpend = 0;
     
-    if (budget.macroId && budget.budgetCategories && budget.budgetCategories.length > 0) {
-      // Budget grouped by macro: sum transactions from all related categories
+    if (budget.groupId && budget.budgetCategories && budget.budgetCategories.length > 0) {
+      // Budget grouped by group: sum transactions from all related categories
       // Note: Grouped budgets don't have subcategories, so we sum all transactions from those categories
       const categoryIds = budget.budgetCategories
         .map((bc: any) => bc.category?.id)
@@ -189,14 +195,14 @@ export async function getBudgetsInternal(period: Date, accessToken?: string, ref
         status = "warning";
       }
 
-      // For grouped budgets, use macro name; for single category, use category name
-      const displayName = budget.macro?.name || budget.category?.name || "Unknown";
-      const displayCategory = budget.macro ? {
-        id: budget.macroId,
-        name: budget.macro.name,
-        macroId: budget.macro.id,
-        macro: budget.macro,
-      } : (budget.category || { id: budget.categoryId, name: "Unknown", macroId: "", macro: null });
+      // For grouped budgets, use group name; for single category, use category name
+      const displayName = budget.group?.name || budget.category?.name || "Unknown";
+      const displayCategory = budget.group ? {
+        id: budget.groupId,
+        name: budget.group.name,
+        groupId: budget.group.id,
+        group: budget.group,
+      } : (budget.category || { id: budget.categoryId, name: "Unknown", groupId: "", group: null });
 
     return {
       ...budget,
@@ -205,7 +211,10 @@ export async function getBudgetsInternal(period: Date, accessToken?: string, ref
       status,
       category: displayCategory,
       displayName,
-      macro: budget.macro || null,
+      group: budget.group || null,
+      // Backward compatibility
+      macro: budget.group || null,
+      macroId: budget.groupId || null,
       budgetCategories: budget.budgetCategories || [],
     };
   });
@@ -251,10 +260,12 @@ export async function createBudget(data: {
   period: Date;
   categoryId?: string;
   subcategoryId?: string;
-  macroId?: string;
+  groupId?: string;
   categoryIds?: string[];
   subcategoryIds?: string[];
   amount: number;
+  // Deprecated: Use groupId instead
+  macroId?: string;
 }) {
     const supabase = await createServerClient();
 
@@ -269,11 +280,14 @@ export async function createBudget(data: {
   const periodDate = formatTimestamp(startOfMonth);
   const now = formatTimestamp(new Date());
 
-  // If multiple categories are provided, create a grouped budget with macroId
+  // If multiple categories are provided, create a grouped budget with groupId
   const isGrouped = data.categoryIds && data.categoryIds.length > 1;
   
-  if (isGrouped && !data.macroId) {
-    throw new Error("macroId is required when creating a grouped budget");
+  // Support both groupId and deprecated macroId for backward compatibility
+  const groupId = data.groupId || data.macroId;
+  
+  if (isGrouped && !groupId) {
+    throw new Error("groupId is required when creating a grouped budget");
   }
 
   // Budgets are automatically set as recurring monthly
@@ -294,7 +308,7 @@ export async function createBudget(data: {
     .in("period", periodDates);
 
   if (isGrouped) {
-    existingBudgetsQuery = existingBudgetsQuery.eq("macroId", data.macroId).is("categoryId", null);
+    existingBudgetsQuery = existingBudgetsQuery.eq("groupId", groupId).is("categoryId", null);
   } else {
     const categoryId = data.categoryId || data.categoryIds?.[0];
     existingBudgetsQuery = existingBudgetsQuery.eq("categoryId", categoryId);
@@ -346,16 +360,16 @@ export async function createBudget(data: {
     };
 
     if (isGrouped) {
-      // Grouped budget: use macroId, categoryId is null
-      budgetData.macroId = data.macroId;
+      // Grouped budget: use groupId, categoryId is null
+      budgetData.groupId = groupId;
       budgetData.categoryId = null;
       budgetData.subcategoryId = null; // Grouped budgets don't have subcategories
     } else {
       // Single category budget: use categoryId
-      // For single category budgets, we DON'T save macroId to avoid conflicts with Budget_period_macroId_key constraint
-      // The macroId is only used for grouped budgets
+      // For single category budgets, we DON'T save groupId to avoid conflicts with Budget_period_groupId_key constraint
+      // The groupId is only used for grouped budgets
       budgetData.categoryId = data.categoryId || data.categoryIds?.[0];
-      budgetData.macroId = null; // Don't save macroId for single category budgets
+      budgetData.groupId = null; // Don't save groupId for single category budgets
       // Use subcategoryId if provided (now we only support single subcategory)
       budgetData.subcategoryId = data.subcategoryId || (data.subcategoryIds && data.subcategoryIds.length > 0 ? data.subcategoryIds[0] : null);
     }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { SimpleTabs, SimpleTabsContent, SimpleTabsList, SimpleTabsTrigger } from "@/components/ui/simple-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { UsersTable } from "@/components/admin/users-table";
 import { PromoCodesTable } from "@/components/admin/promo-codes-table";
 import { PromoCodeDialog } from "@/components/admin/promo-code-dialog";
@@ -13,7 +14,7 @@ import { GroupDialog } from "@/components/admin/group-dialog";
 import { CategoryDialog } from "@/components/admin/category-dialog";
 import { SubcategoryDialog } from "@/components/admin/subcategory-dialog";
 import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
-import { Plus, Loader2, Users, Tag, FolderTree, BarChart3, Mail, MessageSquare, Star, Upload, ChevronDown } from "lucide-react";
+import { Plus, Loader2, Users, Tag, FolderTree, BarChart3, Mail, MessageSquare, Star, Upload, ChevronDown, Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,10 @@ import { DashboardOverview } from "@/components/admin/dashboard-overview";
 import { FinancialOverview } from "@/components/admin/financial-overview";
 import { ContactFormsTable, ContactForm } from "@/components/admin/contact-forms-table";
 import { FeedbackTable, Feedback } from "@/components/admin/feedback-table";
+import { PlansTable } from "@/components/admin/plans-table";
+import { PlanDialog } from "@/components/admin/plan-dialog";
+import type { Plan } from "@/lib/validations/plan";
+import { CreditCard } from "lucide-react";
 
 export default function PortalManagementPage() {
   const router = useRouter();
@@ -42,6 +47,7 @@ export default function PortalManagementPage() {
   const [categories, setCategories] = useState<SystemCategory[]>([]);
   const [subcategories, setSubcategories] = useState<SystemSubcategory[]>([]);
   const [loadingSystemEntities, setLoadingSystemEntities] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   
   // Contact forms state
   const [contactForms, setContactForms] = useState<ContactForm[]>([]);
@@ -55,6 +61,12 @@ export default function PortalManagementPage() {
     averageRating: number;
     ratingDistribution: { [key: number]: number };
   } | null>(null);
+  
+  // Plans state
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   
   // Dashboard state
   const [dashboardData, setDashboardData] = useState<{
@@ -77,17 +89,36 @@ export default function PortalManagementPage() {
     checkSuperAdmin();
   }, []);
 
+  const [activeTab, setActiveTab] = useState<string>("dashboard");
+
   useEffect(() => {
     if (isSuperAdmin) {
-      loadUsers();
-      loadPromoCodes();
-      loadPlans();
-      loadSystemEntities();
+      // Load initial data (dashboard is default tab)
       loadDashboard();
-      loadContactForms();
-      loadFeedbacks();
+      
+      // Load other data that's always needed
+      Promise.all([
+        loadUsers(),
+        loadPromoCodes(),
+        loadPlans(),
+        loadSystemEntities(),
+        loadContactForms(),
+        loadFeedbacks(),
+      ]).catch((error) => {
+        console.error("Error loading portal data:", error);
+      });
     }
   }, [isSuperAdmin]);
+
+  // Lazy load data when tab changes
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    
+    if (activeTab === "plans" && plans.length === 0 && !loadingPlans) {
+      loadAdminPlans();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isSuperAdmin]);
 
   async function checkSuperAdmin() {
     try {
@@ -158,6 +189,32 @@ export default function PortalManagementPage() {
     } catch (error) {
       console.error("Error loading plans:", error);
     }
+  }
+
+  async function loadAdminPlans() {
+    try {
+      setLoadingPlans(true);
+      const response = await fetch("/api/admin/plans");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Failed to load plans";
+        console.error("Error loading plans:", errorMessage);
+        setPlans([]);
+        return;
+      }
+      const data = await response.json();
+      setPlans(Array.isArray(data.plans) ? data.plans : []);
+    } catch (error) {
+      console.error("Error loading plans:", error);
+      setPlans([]);
+    } finally {
+      setLoadingPlans(false);
+    }
+  }
+
+  function handleEditPlan(plan: Plan) {
+    setEditingPlan(plan);
+    setIsPlanDialogOpen(true);
   }
 
   async function loadDashboard() {
@@ -376,6 +433,68 @@ export default function PortalManagementPage() {
     await loadSystemEntities();
   }
 
+  // Filter system entities based on search term
+  const filteredEntities = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return { groups, categories, subcategories };
+    }
+
+    const searchLower = searchTerm.toLowerCase().trim();
+
+    // Find matching subcategories
+    const matchingSubcategoryIds = new Set<string>();
+    const matchingCategoryIds = new Set<string>();
+    const matchingGroupIds = new Set<string>();
+
+    subcategories.forEach((subcategory) => {
+      if (subcategory.name.toLowerCase().includes(searchLower)) {
+        matchingSubcategoryIds.add(subcategory.id);
+        matchingCategoryIds.add(subcategory.categoryId);
+      }
+    });
+
+    // Find matching categories
+    categories.forEach((category) => {
+      if (category.name.toLowerCase().includes(searchLower)) {
+        matchingCategoryIds.add(category.id);
+        matchingGroupIds.add(category.macroId);
+      }
+    });
+
+    // Find matching groups
+    groups.forEach((group) => {
+      if (group.name.toLowerCase().includes(searchLower)) {
+        matchingGroupIds.add(group.id);
+      }
+    });
+
+    // If a category matches, include its group
+    categories.forEach((category) => {
+      if (matchingCategoryIds.has(category.id)) {
+        matchingGroupIds.add(category.macroId);
+      }
+    });
+
+    // Filter groups
+    const filteredGroups = groups.filter((group) => matchingGroupIds.has(group.id));
+
+    // Filter categories (include if group matches or category matches)
+    const filteredCategories = categories.filter(
+      (category) => matchingGroupIds.has(category.macroId) || matchingCategoryIds.has(category.id)
+    );
+
+    // Filter subcategories (include if category matches or subcategory matches)
+    const filteredSubcategories = subcategories.filter(
+      (subcategory) => matchingCategoryIds.has(subcategory.categoryId) || matchingSubcategoryIds.has(subcategory.id)
+    );
+
+    return {
+      groups: filteredGroups,
+      categories: filteredCategories,
+      subcategories: filteredSubcategories,
+    };
+  }, [searchTerm, groups, categories, subcategories]);
+
   if (isSuperAdmin === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -395,7 +514,7 @@ export default function PortalManagementPage() {
         description="Manage users, promotional codes, and system entities (groups, categories, subcategories) for the platform."
       />
 
-      <SimpleTabs defaultValue="dashboard" className="space-y-4">
+      <SimpleTabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <SimpleTabsList>
           <SimpleTabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -420,6 +539,10 @@ export default function PortalManagementPage() {
           <SimpleTabsTrigger value="feedback" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
             Feedback
+          </SimpleTabsTrigger>
+          <SimpleTabsTrigger value="plans" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Plans
           </SimpleTabsTrigger>
         </SimpleTabsList>
 
@@ -538,10 +661,22 @@ export default function PortalManagementPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search groups, categories, or subcategories..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
               <UnifiedEntitiesTable
-                    groups={groups}
-                    categories={categories}
-                subcategories={subcategories}
+                    groups={filteredEntities.groups}
+                    categories={filteredEntities.categories}
+                subcategories={filteredEntities.subcategories}
                     loading={loadingSystemEntities}
                 onEditGroup={handleEditGroup}
                 onDeleteGroup={handleDeleteGroup}
@@ -570,6 +705,20 @@ export default function PortalManagementPage() {
               />
             </CardContent>
           </Card>
+        </SimpleTabsContent>
+
+        <SimpleTabsContent value="plans" className="space-y-4">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold tracking-tight">Subscription Plans</h2>
+            <p className="text-sm text-muted-foreground">
+              Manage plan features, limits, and pricing. Changes will be synced to Stripe if configured.
+            </p>
+          </div>
+          <PlansTable
+            plans={plans}
+            loading={loadingPlans}
+            onEdit={handleEditPlan}
+          />
         </SimpleTabsContent>
 
         <SimpleTabsContent value="feedback" className="space-y-4">
@@ -756,7 +905,11 @@ export default function PortalManagementPage() {
           }
         }}
         subcategory={editingSubcategory}
-        availableCategories={categories.map((c) => ({ id: c.id, name: c.name }))}
+        availableCategories={categories.map((c) => ({ 
+          id: c.id, 
+          name: c.name,
+          group: c.group ? { id: c.group.id, name: c.group.name } : null
+        }))}
         onSuccess={() => {
           loadSystemEntities();
         }}
@@ -767,6 +920,21 @@ export default function PortalManagementPage() {
         onOpenChange={setIsBulkImportDialogOpen}
         onSuccess={() => {
           loadSystemEntities();
+        }}
+      />
+
+      <PlanDialog
+        open={isPlanDialogOpen}
+        onOpenChange={(open) => {
+          setIsPlanDialogOpen(open);
+          if (!open) {
+            setEditingPlan(null);
+          }
+        }}
+        plan={editingPlan}
+        onSuccess={async () => {
+          // Reload plans to show updated data
+          await loadAdminPlans();
         }}
       />
     </div>

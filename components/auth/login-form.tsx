@@ -5,8 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signInSchema, SignInFormData } from "@/lib/validations/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 
@@ -68,11 +68,33 @@ async function preloadUserData() {
   }
 }
 
-export function LoginForm() {
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const invitationToken = searchParams.get("invitation_token");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [invitationInfo, setInvitationInfo] = useState<{ email: string; ownerName: string } | null>(null);
+
+  // Load invitation info if token is present
+  useEffect(() => {
+    if (invitationToken) {
+      fetch(`/api/members/invite/validate?token=${encodeURIComponent(invitationToken)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.invitation && data.owner) {
+            setInvitationInfo({
+              email: data.invitation.email,
+              ownerName: data.owner.name || data.owner.email,
+            });
+          }
+        })
+        .catch(err => {
+          console.error("Error loading invitation info:", err);
+        });
+    }
+  }, [invitationToken]);
 
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -87,6 +109,20 @@ export function LoginForm() {
       setLoading(true);
       setError(null);
 
+      // Check maintenance mode before attempting login
+      let isMaintenanceMode = false;
+      try {
+        const maintenanceResponse = await fetch("/api/system-settings/public");
+        if (maintenanceResponse.ok) {
+          const maintenanceData = await maintenanceResponse.json();
+          isMaintenanceMode = maintenanceData.maintenanceMode || false;
+        }
+      } catch (maintenanceError) {
+        // If error checking maintenance, continue with normal login flow
+        console.error("Error checking maintenance mode:", maintenanceError);
+      }
+
+      // Attempt login
       const { signInClient } = await import("@/lib/api/auth-client");
       const result = await signInClient(data);
 
@@ -100,6 +136,42 @@ export function LoginForm() {
         setError("Failed to sign in");
         setLoading(false);
         return;
+      }
+
+      // If maintenance mode is active, check if user is super_admin
+      if (isMaintenanceMode) {
+        const { getUserRoleClient } = await import("@/lib/api/members-client");
+        const role = await getUserRoleClient();
+
+        if (role !== "super_admin") {
+          // Not super_admin - redirect to maintenance page
+          router.push("/maintenance");
+          return;
+        }
+        // super_admin can continue with login
+      }
+
+      // If there's an invitation token, accept the invitation after login
+      if (invitationToken && result.user) {
+        try {
+          const acceptResponse = await fetch("/api/members/invite/accept", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: invitationToken }),
+          });
+
+          if (acceptResponse.ok) {
+            // Invitation accepted successfully
+            console.log("Invitation accepted after login");
+          } else {
+            const acceptError = await acceptResponse.json();
+            console.error("Error accepting invitation:", acceptError);
+            // Don't block login if invitation acceptance fails
+          }
+        } catch (acceptError) {
+          console.error("Error accepting invitation:", acceptError);
+          // Don't block login if invitation acceptance fails
+        }
       }
 
       // Preload user and plan data while showing loading
@@ -118,6 +190,14 @@ export function LoginForm() {
 
   return (
     <div className="space-y-6">
+      {invitationInfo && (
+        <div className="rounded-[12px] bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>{invitationInfo.ownerName}</strong> invited you to join their household. 
+            Sign in to accept the invitation.
+          </p>
+        </div>
+      )}
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {error && (
           <div className="rounded-[12px] bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
@@ -224,6 +304,23 @@ export function LoginForm() {
         </Link>
       </p>
     </div>
+  );
+}
+
+// Export LoginForm with Suspense wrapper for useSearchParams
+export function LoginForm() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="space-y-5">
+          <div className="h-10 bg-muted animate-pulse rounded-[12px]" />
+          <div className="h-10 bg-muted animate-pulse rounded-[12px]" />
+          <div className="h-10 bg-muted animate-pulse rounded-[12px]" />
+        </div>
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getUserClient } from "@/lib/api/user-client";
@@ -14,7 +15,8 @@ interface UserData {
     avatarUrl?: string;
   } | null;
   plan: {
-    name: "free" | "basic" | "premium";
+    id: string;
+    name: string;
   } | null;
   subscription?: {
     status: "active" | "trialing" | "cancelled" | "past_due";
@@ -24,9 +26,13 @@ interface UserData {
 }
 
 export function UpgradeBanner() {
+  const pathname = usePathname();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [bannerHeight, setBannerHeight] = useState(88);
+  
+  // Don't show banner on billing/settings page (it has its own upgrade card)
+  const isBillingPage = pathname?.includes("/settings") || pathname?.includes("/billing");
 
   useEffect(() => {
     async function fetchUserData() {
@@ -59,7 +65,10 @@ export function UpgradeBanner() {
 
   // Calculate banner height and update CSS variable
   useEffect(() => {
-    if (loading || !userData || userData.plan?.name === "premium" || userData.subscription?.status === "trialing" || userData.subscription?.status === "active") {
+    const hasActiveSubscription = userData?.subscription?.status === "active" || userData?.subscription?.status === "trialing";
+    const isProPlan = userData?.plan?.id === "pro";
+    
+    if (loading || !userData || isProPlan || hasActiveSubscription || isBillingPage) {
       // Banner is not visible, dispatch event to notify
       window.dispatchEvent(new CustomEvent('banner-visibility-changed', { detail: { visible: false } }));
       return;
@@ -102,14 +111,26 @@ export function UpgradeBanner() {
     return () => {
       window.removeEventListener('resize', updateBannerHeight);
     };
-  }, [loading, userData]);
+  }, [loading, userData, isBillingPage]);
 
   // Only show banner if not premium, not in trial, not active, and has subscription data
   if (loading) {
     return null;
   }
   
-  if (!userData || userData.plan?.name === "premium" || userData.subscription?.status === "trialing" || userData.subscription?.status === "active") {
+  // Don't show banner on billing/settings page
+  if (isBillingPage) {
+    return null;
+  }
+  
+  // Don't show banner if:
+  // 1. No user data
+  // 2. Plan is pro (highest plan)
+  // 3. Subscription is active or trialing (user has active subscription)
+  const hasActiveSubscription = userData?.subscription?.status === "active" || userData?.subscription?.status === "trialing";
+  const isProPlan = userData?.plan?.id === "pro";
+  
+  if (!userData || isProPlan || hasActiveSubscription) {
     return null;
   }
 
@@ -123,16 +144,12 @@ export function UpgradeBanner() {
               <div className="text-sm font-semibold text-primary-foreground mb-1">
                 {isSubscriptionInactive
                   ? "Reactivate Your Subscription"
-                  : userData?.plan?.name === "free" 
-                  ? "Free to Basic"
-                  : "Basic to Premium"}
+                  : `${userData?.plan?.name || "Essential"} to Pro`}
               </div>
               <p className="text-sm text-primary-foreground leading-relaxed">
                 {isSubscriptionInactive
                   ? "Choose a plan and regain full access to all features and bank integrations."
-                  : userData?.plan?.name === "free" 
-                  ? "Upgrade to Basic and enjoy smarter tools and deeper insights."
-                  : "Upgrade to Premium and unlock advanced features and priority support."}
+                  : `Upgrade to Pro and unlock advanced features and priority support.`}
               </p>
             </div>
           </div>

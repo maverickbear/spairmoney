@@ -9,6 +9,7 @@ import { InvestmentTransactionFormData } from "@/lib/validations/investment";
 import { ZodError } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/lib/api/feature-guard";
 import { isPlanError } from "@/lib/utils/plan-errors";
+import { invalidatePortfolioCache } from "@/lib/api/portfolio";
 
 export async function PUT(
   request: NextRequest,
@@ -77,6 +78,14 @@ export async function PUT(
       }
     }
 
+    // Invalidate portfolio cache to ensure fresh data
+    try {
+      await invalidatePortfolioCache();
+    } catch (error) {
+      console.error("Error invalidating portfolio cache:", error);
+      // Don't fail the transaction if cache invalidation fails
+    }
+
     return NextResponse.json(transaction);
   } catch (error) {
     console.error("Error updating investment transaction:", error);
@@ -134,6 +143,14 @@ export async function DELETE(
 
     const { id: transactionId } = await params;
     await deleteInvestmentTransaction(transactionId);
+
+    // Invalidate portfolio cache to ensure fresh data
+    try {
+      await invalidatePortfolioCache();
+    } catch (error) {
+      console.error("Error invalidating portfolio cache:", error);
+      // Don't fail the transaction if cache invalidation fails
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

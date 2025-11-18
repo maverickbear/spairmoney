@@ -62,6 +62,11 @@ export function DowngradeConfirmationModal({
       lostFeatures.push("CSV export");
     }
 
+    // Check CSV import
+    if (current.features.hasCsvImport && !target.features.hasCsvImport) {
+      lostFeatures.push("CSV import");
+    }
+
     // Check debts (usually all plans have this, but check anyway)
     if (current.features.hasDebts && !target.features.hasDebts) {
       lostFeatures.push("Debt tracking");
@@ -72,8 +77,13 @@ export function DowngradeConfirmationModal({
       lostFeatures.push("Goals tracking");
     }
 
+    // Check budgets
+    if (current.features.hasBudgets && !target.features.hasBudgets) {
+      lostFeatures.push("Budgets");
+    }
+
     // Check household members
-    if (current.name !== "free" && target.name === "free") {
+    if (current.features.hasHousehold && !target.features.hasHousehold) {
       lostFeatures.push("Household members");
     }
 
@@ -86,7 +96,6 @@ export function DowngradeConfirmationModal({
   }
 
   const lostFeatures = getLostFeatures(currentPlan, targetPlan);
-  const isDowngradeToFree = targetPlan.name === "free";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,21 +133,12 @@ export function DowngradeConfirmationModal({
             </p>
           )}
 
-          {isDowngradeToFree ? (
-            <Alert>
-              <AlertDescription>
-                <strong>Note:</strong> Your subscription will be cancelled at the end of the current billing period. 
-                You will be redirected to Stripe to complete the cancellation, and then your account will be converted to the Free plan.
-              </AlertDescription>
-            </Alert>
-          ) : (
             <Alert>
               <AlertDescription>
                 <strong>Note:</strong> Your current subscription will be cancelled and you will be redirected to Stripe 
                 to subscribe to the {targetPlan.name.charAt(0).toUpperCase() + targetPlan.name.slice(1)} plan.
               </AlertDescription>
             </Alert>
-          )}
 
           <div className="flex gap-2 pt-4">
             <Button

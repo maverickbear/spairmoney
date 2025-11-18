@@ -1,8 +1,12 @@
 "use server";
 
 import { createServerClient } from "@/lib/supabase-server";
-import { checkPlanLimits } from "./plans";
-import { checkTransactionLimit, checkAccountLimit, checkFeatureAccess } from "./limits";
+import { 
+  checkTransactionLimit, 
+  checkAccountLimit, 
+  checkFeatureAccess,
+  getUserSubscriptionData 
+} from "./subscription";
 import { PlanFeatures } from "@/lib/validations/plan";
 import { PlanErrorCode, createPlanError, type PlanError } from "@/lib/utils/plan-errors";
 
@@ -56,10 +60,10 @@ export async function guardTransactionLimit(
   month?: Date
 ): Promise<GuardResult> {
   try {
-    // Get plan limits once and reuse for both checks
-    const { limits, plan } = await checkPlanLimits(userId);
+    // Get subscription data using unified API
+    const { limits } = await getUserSubscriptionData(userId);
     
-    // Check if unlimited plan
+    // Unlimited transactions
     if (limits.maxTransactions === -1) {
       return { allowed: true };
     }
@@ -135,10 +139,10 @@ export async function guardTransactionLimit(
  */
 export async function guardAccountLimit(userId: string): Promise<GuardResult> {
   try {
-    // Get plan limits once and reuse for both checks
-    const { limits, plan } = await checkPlanLimits(userId);
+    // Get subscription data using unified API
+    const { limits, plan } = await getUserSubscriptionData(userId);
     
-    // Check if unlimited plan
+    // Unlimited accounts
     if (limits.maxAccounts === -1) {
       return { allowed: true };
     }
@@ -187,7 +191,19 @@ export async function guardAccountLimit(userId: string): Promise<GuardResult> {
  */
 export async function guardHouseholdMembers(userId: string): Promise<GuardResult> {
   try {
-    // Use guardFeatureAccess to check hasHousehold feature (Premium only)
+    // Check if user is super_admin - super_admin can always invite members
+    const supabase = await createServerClient();
+    const { data: user } = await supabase
+      .from("User")
+      .select("role")
+      .eq("id", userId)
+      .single();
+
+    if (user?.role === "super_admin") {
+      return { allowed: true };
+    }
+
+    // Use guardFeatureAccess to check hasHousehold feature (Pro-only)
     return await guardFeatureAccess(userId, "hasHousehold");
   } catch (error) {
     console.error("Error in guardHouseholdMembers:", error);

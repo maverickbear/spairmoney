@@ -22,29 +22,62 @@ export function FinancialHealthScoreWidget({
 }: FinancialHealthScoreWidgetProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Helper function to parse date from Supabase format
+  const parseTransactionDate = (dateStr: string | Date): Date => {
+    if (dateStr instanceof Date) {
+      return dateStr;
+    }
+    // Handle both "YYYY-MM-DD HH:MM:SS" and "YYYY-MM-DDTHH:MM:SS" formats
+    const normalized = dateStr.replace(' ', 'T').split('.')[0]; // Remove milliseconds if present
+    return new Date(normalized);
+  };
+
+  // Get today's date (without time) to filter out future transactions
+  const today = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }, []);
+
+  // Filter transactions to only include those with date <= today
+  // Exclude future transactions as they haven't happened yet
+  const pastSelectedMonthTransactions = useMemo(() => {
+    return selectedMonthTransactions.filter((t) => {
+      if (!t.date) return false;
+      try {
+        const txDate = parseTransactionDate(t.date);
+        txDate.setHours(0, 0, 0, 0);
+        return txDate <= today;
+      } catch (error) {
+        return false; // Exclude if date parsing fails
+      }
+    });
+  }, [selectedMonthTransactions, today]);
+  
   // Check if financial health data is available
   // Allow showing data even if classification is "Unknown" as long as we have a score
   // This handles edge cases where score might be 0 but we still want to show it
   const hasData = financialHealth && financialHealth.score !== undefined;
   
   // Calculate current income and expenses for the modal
+  // Only include past transactions (exclude future ones)
   const currentIncome = useMemo(() => {
-    return selectedMonthTransactions
+    return pastSelectedMonthTransactions
       .filter((t) => t && t.type === "income")
       .reduce((sum, t) => {
         const amount = Number(t.amount) || 0;
         return sum + Math.abs(amount);
       }, 0);
-  }, [selectedMonthTransactions]);
+  }, [pastSelectedMonthTransactions]);
 
   const currentExpenses = useMemo(() => {
-    return selectedMonthTransactions
+    return pastSelectedMonthTransactions
       .filter((t) => t && t.type === "expense")
       .reduce((sum, t) => {
         const amount = Number(t.amount) || 0;
         return sum + Math.abs(amount);
       }, 0);
-  }, [selectedMonthTransactions]);
+  }, [pastSelectedMonthTransactions]);
 
   const emergencyFundMonths = financialHealth?.emergencyFundMonths ?? 0;
   

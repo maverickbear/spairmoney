@@ -28,6 +28,7 @@ interface DashboardData {
   accounts: any[];
   liabilities: any[];
   debts: any[];
+  recurringPayments: any[];
   onboardingStatus: OnboardingStatus | null;
 }
 
@@ -263,6 +264,7 @@ async function loadDashboardDataInternal(
     accounts,
     liabilities,
     debts,
+    recurringPaymentsResult,
   ] = await Promise.all([
     getTransactionsInternal({ startDate: selectedMonth, endDate: selectedMonthEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching selected month transactions:", error);
@@ -276,7 +278,7 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching budgets:", error);
       return [];
     }),
-    getUpcomingTransactions(5).catch((error) => {
+    getUpcomingTransactions(50).catch((error) => {
       logger.error("Error fetching upcoming transactions:", error);
       return [];
     }),
@@ -319,6 +321,10 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching debts:", error);
       return [];
     }),
+    getTransactionsInternal({ recurring: true }, accessToken, refreshToken).catch((error) => {
+      logger.error("Error fetching recurring payments:", error);
+      return { transactions: [], total: 0 };
+    }),
   ]);
 
   // Calculate onboarding status using already-fetched accounts (avoid duplicate query)
@@ -342,6 +348,9 @@ async function loadDashboardDataInternal(
   const chartTransactions = Array.isArray(chartTransactionsResult)
     ? chartTransactionsResult
     : (chartTransactionsResult?.transactions || []);
+  const recurringPayments = Array.isArray(recurringPaymentsResult)
+    ? recurringPaymentsResult
+    : (recurringPaymentsResult?.transactions || []);
 
   // Calculate total balance for ALL accounts (all households)
   const totalBalance = accounts.reduce(
@@ -376,6 +385,7 @@ async function loadDashboardDataInternal(
     accounts,
     liabilities,
     debts,
+    recurringPayments,
     onboardingStatus,
   };
 }

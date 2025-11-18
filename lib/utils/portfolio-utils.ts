@@ -18,6 +18,43 @@ export function calculatePortfolioMetrics(holdings: Holding[]) {
   };
 }
 
+// Normalize asset type to standard format (first letter uppercase, rest lowercase)
+// Handles variations like "Stock", "stock", "STOCK", etc.
+export function normalizeAssetType(type: string | undefined | null): string {
+  if (!type) return "Stock"; // Default to Stock
+  
+  const normalized = type.trim();
+  const lower = normalized.toLowerCase();
+  
+  // Map common variations to standard format
+  const typeMap: Record<string, string> = {
+    stock: "Stock",
+    etf: "ETF",
+    crypto: "Crypto",
+    cryptocurrency: "Crypto",
+    fund: "Fund",
+    mutualfund: "Fund",
+    "mutual fund": "Fund",
+    bond: "Bond",
+    reit: "REIT",
+  };
+  
+  // Check if we have a direct mapping
+  if (typeMap[lower]) {
+    return typeMap[lower];
+  }
+  
+  // If it's already in a valid format (first letter uppercase), return as is
+  // Otherwise, capitalize first letter
+  const validTypes = ["Stock", "ETF", "Crypto", "Fund", "Bond", "REIT"];
+  if (validTypes.includes(normalized)) {
+    return normalized;
+  }
+  
+  // Default: capitalize first letter, lowercase rest
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
+}
+
 // Format asset type
 export function formatAssetType(type: string): string {
   const types: Record<string, string> = {

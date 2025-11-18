@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPlans, getCurrentUserSubscription } from "@/lib/api/plans";
+import { getPlans, getCurrentUserSubscriptionData } from "@/lib/api/subscription";
 import { createServerClient } from "@/lib/supabase-server";
 
 export async function GET() {
@@ -27,11 +27,11 @@ export async function GET() {
       }
       
       console.log("[API/BILLING/PLANS] User authenticated:", authUser.id);
-      // User is authenticated, get their subscription
-      console.log("[API/BILLING/PLANS] Getting current user subscription");
-      const subscription = await getCurrentUserSubscription();
+      // User is authenticated, get their subscription data using unified API
+      console.log("[API/BILLING/PLANS] Getting current user subscription data");
+      const { subscription } = await getCurrentUserSubscriptionData();
       console.log("[API/BILLING/PLANS] Subscription:", subscription);
-      // getUserSubscription returns null if user has no subscription
+      // getCurrentUserSubscriptionData returns null subscription if user has no subscription
       // User must select a plan on /select-plan page
       if (subscription) {
         currentPlanId = subscription.planId;

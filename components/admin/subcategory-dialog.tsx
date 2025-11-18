@@ -10,7 +10,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -42,7 +44,7 @@ interface SubcategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   subcategory?: SystemSubcategory | null;
-  availableCategories: { id: string; name: string }[];
+  availableCategories: { id: string; name: string; group?: { id: string; name: string } | null }[];
   onSuccess?: () => void;
 }
 
@@ -312,11 +314,37 @@ export function SubcategoryDialog({
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    // Group categories by group name
+                    const groupedCategories = availableCategories.reduce((acc, category) => {
+                      const groupName = category.group?.name || "Sem Grupo";
+                      if (!acc[groupName]) {
+                        acc[groupName] = [];
+                      }
+                      acc[groupName].push(category);
+                      return acc;
+                    }, {} as Record<string, typeof availableCategories>);
+
+                    // Sort group names, but put "Sem Grupo" at the end if it exists
+                    const sortedGroupNames = Object.keys(groupedCategories).sort((a, b) => {
+                      if (a === "Sem Grupo") return 1;
+                      if (b === "Sem Grupo") return -1;
+                      return a.localeCompare(b);
+                    });
+
+                    return sortedGroupNames.map((groupName) => (
+                      <SelectGroup key={groupName}>
+                        <SelectLabel>{groupName}</SelectLabel>
+                        {groupedCategories[groupName]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
               {form.formState.errors.categoryId && (

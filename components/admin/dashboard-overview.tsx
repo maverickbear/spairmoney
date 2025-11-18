@@ -1,7 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, CreditCard, TrendingUp, AlertTriangle, UserX, Calendar } from "lucide-react";
+import { Users, CreditCard, TrendingUp, AlertTriangle, UserX, Calendar, Wrench, Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardOverviewProps {
   overview: {
@@ -18,6 +21,67 @@ interface DashboardOverviewProps {
 }
 
 export function DashboardOverview({ overview, loading }: DashboardOverviewProps) {
+  const { toast } = useToast();
+  const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(true);
+  const [updatingMaintenance, setUpdatingMaintenance] = useState(false);
+
+  // Load maintenance mode status
+  useEffect(() => {
+    async function loadMaintenanceMode() {
+      try {
+        setLoadingMaintenance(true);
+        const response = await fetch("/api/admin/system-settings");
+        if (response.ok) {
+          const data = await response.json();
+          setMaintenanceMode(data.maintenanceMode || false);
+        }
+      } catch (error) {
+        console.error("Error loading maintenance mode:", error);
+      } finally {
+        setLoadingMaintenance(false);
+      }
+    }
+    loadMaintenanceMode();
+  }, []);
+
+  async function handleMaintenanceToggle(checked: boolean) {
+    try {
+      setUpdatingMaintenance(true);
+      const response = await fetch("/api/admin/system-settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ maintenanceMode: checked }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update maintenance mode");
+      }
+
+      const data = await response.json();
+      setMaintenanceMode(data.maintenanceMode);
+      
+      toast({
+        title: checked ? "Maintenance mode enabled" : "Maintenance mode disabled",
+        description: checked 
+          ? "Only super_admin users can access the platform now."
+          : "All users can access the platform normally.",
+      });
+    } catch (error: any) {
+      console.error("Error updating maintenance mode:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update maintenance mode",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingMaintenance(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -52,6 +116,36 @@ export function DashboardOverview({ overview, loading }: DashboardOverviewProps)
 
   return (
     <div className="space-y-4">
+      {/* Maintenance Mode Toggle */}
+      <Card className="border-primary/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Wrench className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Maintenance Mode</CardTitle>
+                <CardDescription>
+                  {maintenanceMode 
+                    ? "Platform is in maintenance. Only super_admin can access."
+                    : "Platform is operational. All users can access normally."}
+                </CardDescription>
+              </div>
+            </div>
+            {loadingMaintenance ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : (
+              <Switch
+                checked={maintenanceMode}
+                onCheckedChange={handleMaintenanceToggle}
+                disabled={updatingMaintenance}
+              />
+            )}
+          </div>
+        </CardHeader>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

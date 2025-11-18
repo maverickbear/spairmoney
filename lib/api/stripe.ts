@@ -1027,7 +1027,7 @@ async function handleSubscriptionChange(
 
   // Invalidate subscription cache to ensure UI reflects changes immediately
   if (userId) {
-    const { invalidateSubscriptionCache } = await import("@/lib/api/plans");
+    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
     await invalidateSubscriptionCache(userId);
     console.log("[WEBHOOK:SUBSCRIPTION] Subscription cache invalidated for user:", userId);
   }
@@ -1073,7 +1073,7 @@ async function handleSubscriptionDeletion(
       console.log("[WEBHOOK:DELETION] Subscription updated to cancelled successfully. User will need to sign up for a new plan.");
       
       // Invalidate subscription cache to ensure UI reflects cancellation immediately
-      const { invalidateSubscriptionCache } = await import("@/lib/api/plans");
+      const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
       await invalidateSubscriptionCache(existingSub.userId);
       console.log("[WEBHOOK:DELETION] Subscription cache invalidated for user:", existingSub.userId);
     }
@@ -1138,7 +1138,7 @@ async function handleInvoicePaymentSucceeded(
             .single();
 
           if (subData?.userId) {
-            const { invalidateSubscriptionCache } = await import("@/lib/api/plans");
+            const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
             await invalidateSubscriptionCache(subData.userId);
             console.log("[WEBHOOK:INVOICE] Subscription cache invalidated for user:", subData.userId);
           }
@@ -1207,6 +1207,7 @@ const FEATURE_DEFINITIONS = [
   { lookupKey: "household", name: "Household Members", description: "Add and manage household members" },
   { lookupKey: "advanced_reports", name: "Advanced Reports", description: "Access to advanced financial reports" },
   { lookupKey: "csv_export", name: "CSV Export", description: "Export data to CSV format" },
+  { lookupKey: "csv_import", name: "CSV Import", description: "Import data from CSV files" },
   { lookupKey: "debts", name: "Debt Tracking", description: "Track and manage debts" },
   { lookupKey: "goals", name: "Goals", description: "Set and track financial goals" },
   { lookupKey: "bank_integration", name: "Bank Integration", description: "Connect bank accounts via Plaid" },
@@ -1305,6 +1306,7 @@ export async function syncPlanFeaturesToStripe(planId: string): Promise<{ succes
       household: plan.features.hasHousehold,
       advanced_reports: plan.features.hasAdvancedReports,
       csv_export: plan.features.hasCsvExport,
+      csv_import: plan.features.hasCsvImport,
       debts: plan.features.hasDebts,
       goals: plan.features.hasGoals,
       bank_integration: plan.features.hasBankIntegration,
@@ -1338,6 +1340,7 @@ export async function syncPlanFeaturesToStripe(planId: string): Promise<{ succes
       hasInvestments: String(plan.features.hasInvestments),
       hasAdvancedReports: String(plan.features.hasAdvancedReports),
       hasCsvExport: String(plan.features.hasCsvExport),
+      hasCsvImport: String(plan.features.hasCsvImport),
       hasDebts: String(plan.features.hasDebts),
       hasGoals: String(plan.features.hasGoals),
       hasBankIntegration: String(plan.features.hasBankIntegration),
@@ -1361,6 +1364,185 @@ export async function syncPlanFeaturesToStripe(planId: string): Promise<{ succes
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Sync complete plan to Stripe (features, prices, product name)
+ * This is a comprehensive sync that updates everything in Stripe
+ */
+export async function syncPlanToStripe(planId: string): Promise<{ success: boolean; error?: string; warnings?: string[] }> {
+  const warnings: string[] = [];
+  
+  try {
+    const supabase = await createServerClient();
+    
+    // Get plan from database
+    const { data: plan, error: planError } = await supabase
+      .from("Plan")
+      .select("id, name, priceMonthly, priceYearly, features, stripeProductId, stripePriceIdMonthly, stripePriceIdYearly")
+      .eq("id", planId)
+      .single();
+
+    if (planError || !plan) {
+      return { success: false, error: `Plan ${planId} not found` };
+    }
+
+    if (!plan.stripeProductId) {
+      return { success: false, error: `Plan ${planId} has no Stripe Product ID configured` };
+    }
+
+    // 1. Update product name
+    try {
+      await stripe.products.update(plan.stripeProductId, {
+        name: plan.name,
+      });
+      console.log(`✅ Updated product name: ${plan.name}`);
+    } catch (error) {
+      warnings.push(`Failed to update product name: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+
+    // 2. Update or create prices
+    const currency = "cad"; // Assuming CAD currency
+    
+    // Update monthly price (only if price changed or doesn't exist)
+    if (plan.stripePriceIdMonthly) {
+      try {
+        // Check current price in Stripe
+        const currentPrice = await stripe.prices.retrieve(plan.stripePriceIdMonthly);
+        const currentAmount = currentPrice.unit_amount || 0;
+        const newAmount = Math.round(plan.priceMonthly * 100);
+        
+        // Only create new price if amount changed
+        if (currentAmount !== newAmount) {
+          const newMonthlyPrice = await stripe.prices.create({
+            product: plan.stripeProductId,
+            unit_amount: newAmount,
+            currency: currency,
+            recurring: {
+              interval: "month",
+            },
+          });
+          
+          // Archive old price
+          await stripe.prices.update(plan.stripePriceIdMonthly, {
+            active: false,
+          });
+          
+          // Update plan with new price ID
+          await supabase
+            .from("Plan")
+            .update({ stripePriceIdMonthly: newMonthlyPrice.id })
+            .eq("id", planId);
+          
+          console.log(`✅ Updated monthly price: ${newMonthlyPrice.id} (old: ${currentAmount}, new: ${newAmount})`);
+        } else {
+          console.log(`✅ Monthly price unchanged: ${currentAmount}`);
+        }
+      } catch (error) {
+        warnings.push(`Failed to update monthly price: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    } else {
+      // Create new monthly price if it doesn't exist
+      try {
+        const newMonthlyPrice = await stripe.prices.create({
+          product: plan.stripeProductId,
+          unit_amount: Math.round(plan.priceMonthly * 100),
+          currency: currency,
+          recurring: {
+            interval: "month",
+          },
+        });
+        
+        await supabase
+          .from("Plan")
+          .update({ stripePriceIdMonthly: newMonthlyPrice.id })
+          .eq("id", planId);
+        
+        console.log(`✅ Created monthly price: ${newMonthlyPrice.id}`);
+      } catch (error) {
+        warnings.push(`Failed to create monthly price: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    }
+
+    // Update yearly price (only if price changed or doesn't exist)
+    if (plan.stripePriceIdYearly) {
+      try {
+        // Check current price in Stripe
+        const currentPrice = await stripe.prices.retrieve(plan.stripePriceIdYearly);
+        const currentAmount = currentPrice.unit_amount || 0;
+        const newAmount = Math.round(plan.priceYearly * 100);
+        
+        // Only create new price if amount changed
+        if (currentAmount !== newAmount) {
+          const newYearlyPrice = await stripe.prices.create({
+            product: plan.stripeProductId,
+            unit_amount: newAmount,
+            currency: currency,
+            recurring: {
+              interval: "year",
+            },
+          });
+          
+          // Archive old price
+          await stripe.prices.update(plan.stripePriceIdYearly, {
+            active: false,
+          });
+          
+          // Update plan with new price ID
+          await supabase
+            .from("Plan")
+            .update({ stripePriceIdYearly: newYearlyPrice.id })
+            .eq("id", planId);
+          
+          console.log(`✅ Updated yearly price: ${newYearlyPrice.id} (old: ${currentAmount}, new: ${newAmount})`);
+        } else {
+          console.log(`✅ Yearly price unchanged: ${currentAmount}`);
+        }
+      } catch (error) {
+        warnings.push(`Failed to update yearly price: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    } else {
+      // Create new yearly price if it doesn't exist
+      try {
+        const newYearlyPrice = await stripe.prices.create({
+          product: plan.stripeProductId,
+          unit_amount: Math.round(plan.priceYearly * 100),
+          currency: currency,
+          recurring: {
+            interval: "year",
+          },
+        });
+        
+        await supabase
+          .from("Plan")
+          .update({ stripePriceIdYearly: newYearlyPrice.id })
+          .eq("id", planId);
+        
+        console.log(`✅ Created yearly price: ${newYearlyPrice.id}`);
+      } catch (error) {
+        warnings.push(`Failed to create yearly price: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    }
+
+    // 3. Sync features
+    const featuresResult = await syncPlanFeaturesToStripe(planId);
+    if (!featuresResult.success) {
+      warnings.push(`Failed to sync features: ${featuresResult.error || "Unknown error"}`);
+    }
+
+    return { 
+      success: warnings.length === 0, 
+      error: warnings.length > 0 ? warnings.join("; ") : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
+  } catch (error) {
+    console.error("Error syncing plan to Stripe:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      warnings,
     };
   }
 }

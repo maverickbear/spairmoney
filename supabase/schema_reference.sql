@@ -45,6 +45,221 @@ $$;
 ALTER FUNCTION "public"."check_invitation_email_match"("invitation_email" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+    v_planned_payment "public"."PlannedPayment"%ROWTYPE;
+    v_transaction_id "text";
+    v_encrypted_amount "text";
+    v_user_id "uuid";
+BEGIN
+    -- Get the planned payment
+    SELECT * INTO v_planned_payment
+    FROM "public"."PlannedPayment"
+    WHERE "id" = p_planned_payment_id
+    AND "userId" = "auth"."uid"()
+    AND "status" = 'scheduled'::"text";
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'PlannedPayment not found or already processed';
+    END IF;
+    
+    -- Check if already has a linked transaction (idempotency)
+    IF v_planned_payment."linkedTransactionId" IS NOT NULL THEN
+        RETURN v_planned_payment."linkedTransactionId";
+    END IF;
+    
+    v_user_id := v_planned_payment."userId";
+    
+    -- Encrypt amount (using same logic as Transaction)
+    -- Note: This assumes amount encryption function exists
+    -- For now, we'll store as numeric and let the application layer handle encryption
+    -- The Transaction table expects encrypted text, so we need to handle this
+    
+    -- Generate transaction ID
+    v_transaction_id := "gen_random_uuid"()::"text";
+    
+    -- Create the transaction
+    INSERT INTO "public"."Transaction" (
+        "id",
+        "date",
+        "type",
+        "amount",
+        "accountId",
+        "categoryId",
+        "subcategoryId",
+        "description",
+        "userId",
+        "recurring",
+        "createdAt",
+        "updatedAt"
+    ) VALUES (
+        v_transaction_id,
+        v_planned_payment."date",
+        v_planned_payment."type",
+        v_planned_payment."amount"::"text", -- Will be encrypted by application layer
+        v_planned_payment."accountId",
+        v_planned_payment."categoryId",
+        v_planned_payment."subcategoryId",
+        v_planned_payment."description",
+        v_user_id,
+        false, -- Planned payments are not recurring by default
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+    );
+    
+    -- Update planned payment status and link transaction
+    UPDATE "public"."PlannedPayment"
+    SET 
+        "status" = 'paid'::"text",
+        "linkedTransactionId" = v_transaction_id,
+        "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = p_planned_payment_id;
+    
+    RETURN v_transaction_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") IS 'Converts a PlannedPayment to a Transaction. Idempotent - returns existing transaction if already converted.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text" DEFAULT NULL::"text", "p_subcategory_id" "text" DEFAULT NULL::"text", "p_description" "text" DEFAULT NULL::"text", "p_description_search" "text" DEFAULT NULL::"text", "p_recurring" boolean DEFAULT false, "p_expense_type" "text" DEFAULT NULL::"text", "p_created_at" timestamp without time zone DEFAULT CURRENT_TIMESTAMP, "p_updated_at" timestamp without time zone DEFAULT CURRENT_TIMESTAMP, "p_max_transactions" integer DEFAULT '-1'::integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_month_date date;
+  v_current_count integer;
+  v_new_count integer;
+  v_transaction_id text;
+BEGIN
+  -- Calculate month_date (first day of month)
+  v_month_date := DATE_TRUNC('month', p_date)::date;
+  
+  -- Check limit if not unlimited
+  IF p_max_transactions != -1 THEN
+    SELECT COALESCE("transactions_count", 0) INTO v_current_count
+    FROM "user_monthly_usage"
+    WHERE "user_id" = p_user_id AND "month_date" = v_month_date;
+    
+    IF v_current_count >= p_max_transactions THEN
+      RAISE EXCEPTION 'Transaction limit reached for this month';
+    END IF;
+  END IF;
+  
+  -- Increment counter
+  v_new_count := "increment_transaction_count"(p_user_id, v_month_date);
+  
+  -- Insert transaction
+  INSERT INTO "Transaction" (
+    "id", "date", "type", "amount", "amount_numeric", "accountId", "userId",
+    "categoryId", "subcategoryId", "description", "description_search",
+    "recurring", "expenseType", "createdAt", "updatedAt"
+  ) VALUES (
+    p_id, p_date, p_type, p_amount, p_amount_numeric, p_account_id, p_user_id,
+    p_category_id, p_subcategory_id, p_description, p_description_search,
+    p_recurring, p_expense_type, p_created_at, p_updated_at
+  );
+  
+  -- Return JSON with transaction ID and new count
+  RETURN jsonb_build_object(
+    'transaction_id', p_id,
+    'new_count', v_new_count
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text", "p_subcategory_id" "text", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_expense_type" "text", "p_created_at" timestamp without time zone, "p_updated_at" timestamp without time zone, "p_max_transactions" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text", "p_subcategory_id" "text", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_expense_type" "text", "p_created_at" timestamp without time zone, "p_updated_at" timestamp without time zone, "p_max_transactions" integer) IS 'Creates a regular transaction atomically with limit checking. All operations in one transaction.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text" DEFAULT NULL::"text", "p_description_search" "text" DEFAULT NULL::"text", "p_recurring" boolean DEFAULT false, "p_max_transactions" integer DEFAULT '-1'::integer) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_outgoing_id text;
+  v_incoming_id text;
+  v_month_date date;
+  v_current_count integer;
+  v_new_count integer;
+  v_now timestamp(3) without time zone;
+  v_outgoing_description text;
+  v_incoming_description text;
+BEGIN
+  -- Generate IDs
+  v_outgoing_id := gen_random_uuid()::text;
+  v_incoming_id := gen_random_uuid()::text;
+  v_now := CURRENT_TIMESTAMP;
+  
+  -- Calculate month_date (first day of month)
+  v_month_date := DATE_TRUNC('month', p_date)::date;
+  
+  -- Check limit if not unlimited
+  IF p_max_transactions != -1 THEN
+    SELECT COALESCE("transactions_count", 0) INTO v_current_count
+    FROM "user_monthly_usage"
+    WHERE "user_id" = p_user_id AND "month_date" = v_month_date;
+    
+    IF v_current_count >= p_max_transactions THEN
+      RAISE EXCEPTION 'Transaction limit reached for this month';
+    END IF;
+  END IF;
+  
+  -- Increment counter ONCE (transfer = 1 action, not 2)
+  v_new_count := "increment_transaction_count"(p_user_id, v_month_date);
+  
+  -- Prepare descriptions
+  v_outgoing_description := COALESCE(p_description, 'Transfer to account');
+  v_incoming_description := COALESCE(p_description, 'Transfer from account');
+  
+  -- Create outgoing transaction (expense from source account)
+  INSERT INTO "Transaction" (
+    "id", "date", "type", "amount", "amount_numeric", "accountId", "userId",
+    "categoryId", "subcategoryId", "description", "description_search",
+    "recurring", "transferToId", "createdAt", "updatedAt"
+  ) VALUES (
+    v_outgoing_id, p_date, 'expense', p_amount, p_amount_numeric, p_from_account_id, p_user_id,
+    NULL, NULL, v_outgoing_description, p_description_search,
+    p_recurring, v_incoming_id, v_now, v_now
+  );
+  
+  -- Create incoming transaction (income to destination account)
+  INSERT INTO "Transaction" (
+    "id", "date", "type", "amount", "amount_numeric", "accountId", "userId",
+    "categoryId", "subcategoryId", "description", "description_search",
+    "recurring", "transferFromId", "createdAt", "updatedAt"
+  ) VALUES (
+    v_incoming_id, p_date, 'income', p_amount, p_amount_numeric, p_to_account_id, p_user_id,
+    NULL, NULL, v_incoming_description, p_description_search,
+    p_recurring, v_outgoing_id, v_now, v_now
+  );
+  
+  -- Return JSON with transaction IDs and new count
+  RETURN jsonb_build_object(
+    'outgoing_id', v_outgoing_id,
+    'incoming_id', v_incoming_id,
+    'new_count', v_new_count
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) IS 'Creates a transfer (2 transactions) atomically with limit checking. Counts as 1 transaction. All operations in one transaction.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") RETURNS TABLE("table_name" "text", "last_update" bigint)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     AS $$
@@ -119,6 +334,34 @@ ALTER FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") OWNER TO "postg
 
 
 COMMENT ON FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") IS 'Retorna timestamp da última atualização de cada tabela para um usuário. Usado pelo endpoint check-updates.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  INSERT INTO "user_monthly_usage" ("user_id", "month_date", "transactions_count")
+  VALUES (p_user_id, p_month_date, 1)
+  ON CONFLICT ("user_id", "month_date")
+  DO UPDATE SET
+    "transactions_count" = "user_monthly_usage"."transactions_count" + 1;
+  
+  SELECT "transactions_count" INTO v_count
+  FROM "user_monthly_usage"
+  WHERE "user_id" = p_user_id AND "month_date" = p_month_date;
+  
+  RETURN v_count;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") IS 'Atomically increments transaction count for a user/month. Used within transaction functions.';
 
 
 
@@ -247,7 +490,10 @@ CREATE TABLE IF NOT EXISTS "public"."Account" (
     "syncEnabled" boolean DEFAULT true,
     "plaidMask" "text",
     "plaidOfficialName" "text",
-    "plaidVerificationStatus" "text"
+    "plaidVerificationStatus" "text",
+    "dueDayOfMonth" integer,
+    "extraCredit" numeric(15,2) DEFAULT 0 NOT NULL,
+    CONSTRAINT "Account_type_check" CHECK (("type" = ANY (ARRAY['cash'::"text", 'checking'::"text", 'savings'::"text", 'credit'::"text", 'investment'::"text", 'other'::"text"])))
 );
 
 
@@ -255,6 +501,14 @@ ALTER TABLE "public"."Account" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."Account"."initialBalance" IS 'Initial balance for checking and savings accounts. Used as starting point for balance calculations.';
+
+
+
+COMMENT ON COLUMN "public"."Account"."dueDayOfMonth" IS 'Day of month when credit card bill is due (1-31). Only used for type=''credit'' accounts.';
+
+
+
+COMMENT ON COLUMN "public"."Account"."extraCredit" IS 'Extra prepaid credit on this credit card. Used when user pays more than the current debt balance.';
 
 
 
@@ -290,7 +544,7 @@ CREATE TABLE IF NOT EXISTS "public"."Budget" (
     "note" "text",
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
-    "macroId" "text",
+    "groupId" "text",
     "userId" "uuid" NOT NULL,
     "subcategoryId" "text",
     "isRecurring" boolean DEFAULT true NOT NULL,
@@ -318,17 +572,6 @@ CREATE TABLE IF NOT EXISTS "public"."BudgetCategory" (
 
 
 ALTER TABLE "public"."BudgetCategory" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."BudgetSubcategory" (
-    "id" "text" NOT NULL,
-    "budgetId" "text" NOT NULL,
-    "subcategoryId" "text" NOT NULL,
-    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-
-ALTER TABLE "public"."BudgetSubcategory" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."Candle" (
@@ -359,7 +602,7 @@ COMMENT ON TABLE "public"."Candle" IS 'Stores historical price data (candles) fr
 CREATE TABLE IF NOT EXISTS "public"."Category" (
     "id" "text" NOT NULL,
     "name" "text" NOT NULL,
-    "macroId" "text" NOT NULL,
+    "groupId" "text" NOT NULL,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
     "userId" "uuid"
@@ -414,6 +657,8 @@ CREATE TABLE IF NOT EXISTS "public"."Debt" (
     "accountId" "text",
     "userId" "uuid" NOT NULL,
     "startDate" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP,
+    "status" "text" DEFAULT 'active'::"text" NOT NULL,
+    "nextDueDate" "date",
     CONSTRAINT "Debt_additionalContributionAmount_check" CHECK (("additionalContributionAmount" >= (0)::double precision)),
     CONSTRAINT "Debt_currentBalance_check" CHECK (("currentBalance" >= (0)::double precision)),
     CONSTRAINT "Debt_downPayment_check" CHECK ((("downPayment" IS NULL) OR ("downPayment" >= (0)::double precision))),
@@ -427,7 +672,10 @@ CREATE TABLE IF NOT EXISTS "public"."Debt" (
     CONSTRAINT "Debt_principalPaid_check" CHECK (("principalPaid" >= (0)::double precision)),
     CONSTRAINT "Debt_priority_check" CHECK (("priority" = ANY (ARRAY['High'::"text", 'Medium'::"text", 'Low'::"text"]))),
     CONSTRAINT "Debt_totalMonths_check" CHECK ((("totalMonths" IS NULL) OR ("totalMonths" > 0))),
-    CONSTRAINT "debt_initialamount_positive" CHECK (("initialAmount" >= (0)::double precision))
+    CONSTRAINT "debt_first_payment_date_valid" CHECK ((("firstPaymentDate" IS NULL) OR (("firstPaymentDate" >= '1900-01-01'::"date") AND ("firstPaymentDate" <= (CURRENT_DATE + '50 years'::interval))))),
+    CONSTRAINT "debt_initialamount_positive" CHECK (("initialAmount" >= (0)::double precision)),
+    CONSTRAINT "debt_next_due_date_valid" CHECK ((("nextDueDate" IS NULL) OR (("nextDueDate" >= '1900-01-01'::"date") AND ("nextDueDate" <= (CURRENT_DATE + '10 years'::interval))))),
+    CONSTRAINT "debt_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'closed'::"text"])))
 );
 
 
@@ -435,6 +683,22 @@ ALTER TABLE "public"."Debt" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."Debt"."userId" IS 'User ID - obrigatório para RLS policies';
+
+
+
+COMMENT ON COLUMN "public"."Debt"."status" IS 'Estado da dívida (ativa ou encerrada)';
+
+
+
+COMMENT ON COLUMN "public"."Debt"."nextDueDate" IS 'Data de vencimento da fatura/dívida';
+
+
+
+COMMENT ON CONSTRAINT "debt_first_payment_date_valid" ON "public"."Debt" IS 'Valida que a data do primeiro pagamento está em um range válido';
+
+
+
+COMMENT ON CONSTRAINT "debt_next_due_date_valid" ON "public"."Debt" IS 'Valida que a próxima data de vencimento está em um range válido';
 
 
 
@@ -545,7 +809,8 @@ CREATE TABLE IF NOT EXISTS "public"."HouseholdMember" (
     "acceptedAt" timestamp(3) without time zone,
     "createdAt" timestamp(3) without time zone DEFAULT "now"() NOT NULL,
     "updatedAt" timestamp(3) without time zone DEFAULT "now"() NOT NULL,
-    "role" "text" DEFAULT 'member'::"text" NOT NULL
+    "role" "text" DEFAULT 'member'::"text" NOT NULL,
+    CONSTRAINT "HouseholdMember_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'active'::"text", 'declined'::"text"])))
 );
 
 
@@ -651,32 +916,6 @@ COMMENT ON CONSTRAINT "check_buy_sell_fields" ON "public"."InvestmentTransaction
 
 
 COMMENT ON CONSTRAINT "check_security_required" ON "public"."InvestmentTransaction" IS 'Garante que transações do tipo buy, sell, dividend e interest tenham securityId';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."InvestmentTransaction_backup_20251115" (
-    "id" "text",
-    "date" timestamp(3) without time zone,
-    "accountId" "text",
-    "securityId" "text",
-    "type" "text",
-    "quantity" double precision,
-    "price" double precision,
-    "fees" double precision,
-    "notes" "text",
-    "transferToId" "text",
-    "transferFromId" "text",
-    "createdAt" timestamp(3) without time zone,
-    "updatedAt" timestamp(3) without time zone,
-    "backup_date" timestamp with time zone,
-    "backup_reason" "text"
-);
-
-
-ALTER TABLE "public"."InvestmentTransaction_backup_20251115" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "public"."InvestmentTransaction_backup_20251115" IS 'Backup de transações inválidas removidas em 2025-11-15. Transações sem securityId mas do tipo buy/sell/dividend/interest.';
 
 
 
@@ -794,6 +1033,69 @@ CREATE TABLE IF NOT EXISTS "public"."Plan" (
 
 
 ALTER TABLE "public"."Plan" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."PlannedPayment" (
+    "id" "text" NOT NULL,
+    "date" "date" NOT NULL,
+    "type" "text" NOT NULL,
+    "amount" numeric(15,2) NOT NULL,
+    "accountId" "text" NOT NULL,
+    "categoryId" "text",
+    "subcategoryId" "text",
+    "description" "text",
+    "source" "text" DEFAULT 'manual'::"text" NOT NULL,
+    "status" "text" DEFAULT 'scheduled'::"text" NOT NULL,
+    "linkedTransactionId" "text",
+    "debtId" "text",
+    "userId" "uuid" NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL,
+    "toAccountId" "text",
+    "subscriptionId" "text",
+    CONSTRAINT "PlannedPayment_paid_has_transaction" CHECK ((("status" <> 'paid'::"text") OR ("linkedTransactionId" IS NOT NULL))),
+    CONSTRAINT "PlannedPayment_skipped_cancelled_no_transaction" CHECK ((("status" <> ALL (ARRAY['skipped'::"text", 'cancelled'::"text"])) OR ("linkedTransactionId" IS NULL))),
+    CONSTRAINT "PlannedPayment_source_check" CHECK (("source" = ANY (ARRAY['recurring'::"text", 'debt'::"text", 'manual'::"text", 'subscription'::"text"]))),
+    CONSTRAINT "PlannedPayment_status_check" CHECK (("status" = ANY (ARRAY['scheduled'::"text", 'paid'::"text", 'skipped'::"text", 'cancelled'::"text"]))),
+    CONSTRAINT "PlannedPayment_transaction_only_if_paid" CHECK ((("linkedTransactionId" IS NULL) OR ("status" = 'paid'::"text"))),
+    CONSTRAINT "PlannedPayment_type_check" CHECK (("type" = ANY (ARRAY['expense'::"text", 'income'::"text", 'transfer'::"text"]))),
+    CONSTRAINT "planned_payment_date_valid" CHECK ((("date" >= '1900-01-01'::"date") AND ("date" <= (CURRENT_DATE + '5 years'::interval))))
+);
+
+
+ALTER TABLE "public"."PlannedPayment" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."PlannedPayment" IS 'Future payments that will become Transactions when paid. Does not affect account balances.';
+
+
+
+COMMENT ON COLUMN "public"."PlannedPayment"."source" IS 'Origin of the planned payment: recurring (from recurring transaction), debt (from debt), manual (user created)';
+
+
+
+COMMENT ON COLUMN "public"."PlannedPayment"."status" IS 'Current status: scheduled (pending), paid (converted to Transaction), skipped (skipped without creating Transaction), cancelled (cancelled)';
+
+
+
+COMMENT ON COLUMN "public"."PlannedPayment"."linkedTransactionId" IS 'Transaction ID when this PlannedPayment was converted to a Transaction (only when status = paid)';
+
+
+
+COMMENT ON COLUMN "public"."PlannedPayment"."debtId" IS 'Debt ID if this PlannedPayment was created from a debt';
+
+
+
+COMMENT ON COLUMN "public"."PlannedPayment"."toAccountId" IS 'Destination account ID for transfer type planned payments';
+
+
+
+COMMENT ON COLUMN "public"."PlannedPayment"."subscriptionId" IS 'Subscription ID if this PlannedPayment was created from a UserServiceSubscription';
+
+
+
+COMMENT ON CONSTRAINT "planned_payment_date_valid" ON "public"."PlannedPayment" IS 'Valida que a data do pagamento planejado está em um range válido (1900 até 5 anos no futuro)';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."Position" (
@@ -980,9 +1282,27 @@ COMMENT ON COLUMN "public"."Subscription"."pendingEmail" IS 'Email address for p
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."SystemSettings" (
+    "id" "text" DEFAULT ("gen_random_uuid"())::"text" NOT NULL,
+    "maintenanceMode" boolean DEFAULT false NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE "public"."SystemSettings" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."SystemSettings" IS 'Stores system-wide configuration settings like maintenance mode. Only super_admin can read/write.';
+
+
+
+COMMENT ON COLUMN "public"."SystemSettings"."maintenanceMode" IS 'When true, only super_admin users can access the platform. All other users see maintenance page.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."Transaction" (
     "id" "text" NOT NULL,
-    "date" timestamp(3) without time zone NOT NULL,
     "type" "text" NOT NULL,
     "amount" "text" NOT NULL,
     "accountId" "text" NOT NULL,
@@ -999,7 +1319,11 @@ CREATE TABLE IF NOT EXISTS "public"."Transaction" (
     "suggestedCategoryId" "text",
     "suggestedSubcategoryId" "text",
     "plaidMetadata" "jsonb",
-    "expenseType" "text"
+    "expenseType" "text",
+    "amount_numeric" numeric(15,2),
+    "description_search" "text",
+    "date" "date" NOT NULL,
+    CONSTRAINT "transaction_date_valid" CHECK ((("date" >= '1900-01-01'::"date") AND ("date" <= (CURRENT_DATE + '1 year'::interval))))
 );
 
 
@@ -1007,6 +1331,22 @@ ALTER TABLE "public"."Transaction" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."Transaction"."expenseType" IS 'Indicates if expense is fixed or variable. Only applies to expense transactions. Values: "fixed" or "variable"';
+
+
+
+COMMENT ON COLUMN "public"."Transaction"."amount_numeric" IS 'Non-encrypted numeric amount for reports and aggregations. Populated from encrypted amount field.';
+
+
+
+COMMENT ON COLUMN "public"."Transaction"."description_search" IS 'Normalized description for search and category learning. Lowercase, no special characters, normalized whitespace.';
+
+
+
+COMMENT ON COLUMN "public"."Transaction"."date" IS 'Transaction date (date only, no time component). Changed from timestamp to date to avoid timezone issues.';
+
+
+
+COMMENT ON CONSTRAINT "transaction_date_valid" ON "public"."Transaction" IS 'Valida que a data da transação está em um range válido (1900 até 1 ano no futuro)';
 
 
 
@@ -1039,6 +1379,57 @@ CREATE TABLE IF NOT EXISTS "public"."User" (
 ALTER TABLE "public"."User" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."UserServiceSubscription" (
+    "id" "text" NOT NULL,
+    "userId" "uuid" NOT NULL,
+    "serviceName" "text" NOT NULL,
+    "subcategoryId" "text",
+    "amount" numeric(15,2) NOT NULL,
+    "description" "text",
+    "billingFrequency" "text" DEFAULT 'monthly'::"text" NOT NULL,
+    "billingDay" integer,
+    "accountId" "text" NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "firstBillingDate" "date" NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL,
+    CONSTRAINT "UserServiceSubscription_amount_check" CHECK (("amount" > (0)::numeric)),
+    CONSTRAINT "UserServiceSubscription_billingDay_check" CHECK (((("billingFrequency" = 'monthly'::"text") AND ("billingDay" >= 1) AND ("billingDay" <= 31)) OR (("billingFrequency" = 'semimonthly'::"text") AND ("billingDay" >= 1) AND ("billingDay" <= 31)) OR (("billingFrequency" = 'weekly'::"text") AND ("billingDay" >= 0) AND ("billingDay" <= 6)) OR (("billingFrequency" = 'biweekly'::"text") AND ("billingDay" >= 0) AND ("billingDay" <= 6)) OR (("billingFrequency" = 'daily'::"text") AND ("billingDay" IS NULL)))),
+    CONSTRAINT "UserServiceSubscription_billingFrequency_check" CHECK (("billingFrequency" = ANY (ARRAY['monthly'::"text", 'weekly'::"text", 'biweekly'::"text", 'semimonthly'::"text", 'daily'::"text"])))
+);
+
+
+ALTER TABLE "public"."UserServiceSubscription" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."UserServiceSubscription" IS 'Recurring service subscriptions that automatically create Planned Payments';
+
+
+
+COMMENT ON COLUMN "public"."UserServiceSubscription"."serviceName" IS 'Name of the service (can be custom or from subcategory)';
+
+
+
+COMMENT ON COLUMN "public"."UserServiceSubscription"."subcategoryId" IS 'Subcategory ID if service is based on existing subcategory';
+
+
+
+COMMENT ON COLUMN "public"."UserServiceSubscription"."billingFrequency" IS 'How often the subscription is billed: monthly, weekly, biweekly, semimonthly, daily';
+
+
+
+COMMENT ON COLUMN "public"."UserServiceSubscription"."billingDay" IS 'Day of month (1-31) for monthly/semimonthly, or day of week (0-6, Sunday=0) for weekly/biweekly';
+
+
+
+COMMENT ON COLUMN "public"."UserServiceSubscription"."isActive" IS 'Whether the subscription is currently active (paused subscriptions do not generate planned payments)';
+
+
+
+COMMENT ON COLUMN "public"."UserServiceSubscription"."firstBillingDate" IS 'Date of the first billing/payment';
+
+
+
 CREATE MATERIALIZED VIEW "public"."holdings_view" AS
  WITH "transaction_agg" AS (
          SELECT "it"."securityId",
@@ -1061,7 +1452,7 @@ CREATE MATERIALIZED VIEW "public"."holdings_view" AS
                     ELSE (0)::double precision
                 END) AS "book_value"
            FROM ("public"."InvestmentTransaction" "it"
-             JOIN "public"."Account" "a_1" ON (("a_1"."id" = "it"."accountId")))
+             JOIN "public"."Account" "a_1" ON ((("a_1"."id" = "it"."accountId") AND ("a_1"."type" = 'investment'::"text"))))
           WHERE (("it"."securityId" IS NOT NULL) AND ("a_1"."userId" IS NOT NULL))
           GROUP BY "it"."securityId", "it"."accountId", "a_1"."userId"
         ), "security_latest_price" AS (
@@ -1105,19 +1496,7 @@ CREATE MATERIALIZED VIEW "public"."holdings_view" AS
 ALTER MATERIALIZED VIEW "public"."holdings_view" OWNER TO "postgres";
 
 
-COMMENT ON MATERIALIZED VIEW "public"."holdings_view" IS 'View materializada que calcula holdings atuais de forma otimizada. Refresh automático via trigger.';
-
-
-
-COMMENT ON COLUMN "public"."holdings_view"."quantity" IS 'Quantidade atual do holding (compras - vendas)';
-
-
-
-COMMENT ON COLUMN "public"."holdings_view"."avg_price" IS 'Preço médio de aquisição (custo base)';
-
-
-
-COMMENT ON COLUMN "public"."holdings_view"."unrealized_pnl" IS 'Lucro/prejuízo não realizado em valor absoluto';
+COMMENT ON MATERIALIZED VIEW "public"."holdings_view" IS 'View materializada que calcula holdings atuais de forma otimizada. Refresh automático via trigger. Filtra apenas contas do tipo investment.';
 
 
 
@@ -1148,6 +1527,42 @@ ALTER MATERIALIZED VIEW "public"."asset_allocation_view" OWNER TO "postgres";
 
 
 COMMENT ON MATERIALIZED VIEW "public"."asset_allocation_view" IS 'Distribuição de portfolio por tipo de ativo (Stock, ETF, etc)';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."category_learning" (
+    "user_id" "uuid" NOT NULL,
+    "normalized_description" "text" NOT NULL,
+    "type" "text" NOT NULL,
+    "category_id" "text" NOT NULL,
+    "subcategory_id" "text",
+    "description_and_amount_count" integer DEFAULT 0 NOT NULL,
+    "description_only_count" integer DEFAULT 0 NOT NULL,
+    "last_used_at" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT "category_learning_type_check" CHECK (("type" = ANY (ARRAY['expense'::"text", 'income'::"text"])))
+);
+
+
+ALTER TABLE "public"."category_learning" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."category_learning" IS 'Aggregated category learning data for fast suggestions. Replaces scanning 12 months of transactions.';
+
+
+
+COMMENT ON COLUMN "public"."category_learning"."normalized_description" IS 'Normalized description (lowercase, no special chars, normalized whitespace). Must match normalizeDescription() function.';
+
+
+
+COMMENT ON COLUMN "public"."category_learning"."description_and_amount_count" IS 'Number of times this description+amount combination was used with this category.';
+
+
+
+COMMENT ON COLUMN "public"."category_learning"."description_only_count" IS 'Number of times this description (any amount) was used with this category.';
+
+
+
+COMMENT ON COLUMN "public"."category_learning"."last_used_at" IS 'Last time this category was used for this description. Used to prioritize recent suggestions.';
 
 
 
@@ -1204,6 +1619,61 @@ COMMENT ON MATERIALIZED VIEW "public"."sector_allocation_view" IS 'Distribuiçã
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."user_monthly_usage" (
+    "user_id" "uuid" NOT NULL,
+    "month_date" "date" NOT NULL,
+    "transactions_count" integer DEFAULT 0 NOT NULL
+);
+
+
+ALTER TABLE "public"."user_monthly_usage" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."user_monthly_usage" IS 'Aggregated monthly transaction counts per user. Used for fast limit checking without COUNT(*) queries.';
+
+
+
+COMMENT ON COLUMN "public"."user_monthly_usage"."month_date" IS 'First day of the month (e.g., 2025-11-01). Used instead of text YYYY-MM for better ergonomics.';
+
+
+
+COMMENT ON COLUMN "public"."user_monthly_usage"."transactions_count" IS 'Number of transactions for this user in this month. For transfers, counts as 1 (not 2) for new transactions.';
+
+
+
+CREATE OR REPLACE VIEW "public"."vw_transactions_for_reports" AS
+ SELECT "id",
+    "type",
+    "amount",
+    "accountId",
+    "categoryId",
+    "subcategoryId",
+    "description",
+    "tags",
+    "transferToId",
+    "transferFromId",
+    "createdAt",
+    "updatedAt",
+    "recurring",
+    "userId",
+    "suggestedCategoryId",
+    "suggestedSubcategoryId",
+    "plaidMetadata",
+    "expenseType",
+    "amount_numeric",
+    "description_search",
+    "date"
+   FROM "public"."Transaction"
+  WHERE (("transferFromId" IS NULL) AND ("transferToId" IS NULL) AND ("type" = ANY (ARRAY['expense'::"text", 'income'::"text"])));
+
+
+ALTER VIEW "public"."vw_transactions_for_reports" OWNER TO "postgres";
+
+
+COMMENT ON VIEW "public"."vw_transactions_for_reports" IS 'Transactions for reports, excluding transfers. Use this view for income/expense calculations to avoid double-counting transfers.';
+
+
+
 ALTER TABLE ONLY "public"."AccountInvestmentValue"
     ADD CONSTRAINT "AccountInvestmentValue_accountId_key" UNIQUE ("accountId");
 
@@ -1231,11 +1701,6 @@ ALTER TABLE ONLY "public"."Account"
 
 ALTER TABLE ONLY "public"."BudgetCategory"
     ADD CONSTRAINT "BudgetCategory_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."BudgetSubcategory"
-    ADD CONSTRAINT "BudgetSubcategory_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1349,6 +1814,11 @@ ALTER TABLE ONLY "public"."Plan"
 
 
 
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."Position"
     ADD CONSTRAINT "Position_accountId_securityId_unique" UNIQUE ("accountId", "securityId");
 
@@ -1409,6 +1879,11 @@ ALTER TABLE ONLY "public"."Subscription"
 
 
 
+ALTER TABLE ONLY "public"."SystemSettings"
+    ADD CONSTRAINT "SystemSettings_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."TransactionSync"
     ADD CONSTRAINT "TransactionSync_pkey" PRIMARY KEY ("id");
 
@@ -1424,8 +1899,23 @@ ALTER TABLE ONLY "public"."Transaction"
 
 
 
+ALTER TABLE ONLY "public"."UserServiceSubscription"
+    ADD CONSTRAINT "UserServiceSubscription_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."User"
     ADD CONSTRAINT "User_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."category_learning"
+    ADD CONSTRAINT "category_learning_pkey" PRIMARY KEY ("user_id", "normalized_description", "type");
+
+
+
+ALTER TABLE ONLY "public"."user_monthly_usage"
+    ADD CONSTRAINT "user_monthly_usage_pkey" PRIMARY KEY ("user_id", "month_date");
 
 
 
@@ -1465,23 +1955,11 @@ CREATE INDEX "BudgetCategory_categoryId_idx" ON "public"."BudgetCategory" USING 
 
 
 
-CREATE INDEX "BudgetSubcategory_budgetId_idx" ON "public"."BudgetSubcategory" USING "btree" ("budgetId");
-
-
-
-CREATE UNIQUE INDEX "BudgetSubcategory_budgetId_subcategoryId_key" ON "public"."BudgetSubcategory" USING "btree" ("budgetId", "subcategoryId");
-
-
-
-CREATE INDEX "BudgetSubcategory_subcategoryId_idx" ON "public"."BudgetSubcategory" USING "btree" ("subcategoryId");
-
-
-
 CREATE INDEX "Budget_categoryId_period_idx" ON "public"."Budget" USING "btree" ("categoryId", "period");
 
 
 
-CREATE INDEX "Budget_macroId_idx" ON "public"."Budget" USING "btree" ("macroId") WHERE ("macroId" IS NOT NULL);
+CREATE INDEX "Budget_groupId_idx" ON "public"."Budget" USING "btree" ("groupId") WHERE ("groupId" IS NOT NULL);
 
 
 
@@ -1489,11 +1967,11 @@ CREATE UNIQUE INDEX "Budget_period_categoryId_subcategoryId_key" ON "public"."Bu
 
 
 
+CREATE UNIQUE INDEX "Budget_period_groupId_key" ON "public"."Budget" USING "btree" ("period", "groupId") WHERE ("groupId" IS NOT NULL);
+
+
+
 CREATE INDEX "Budget_period_idx" ON "public"."Budget" USING "btree" ("period");
-
-
-
-CREATE UNIQUE INDEX "Budget_period_macroId_key" ON "public"."Budget" USING "btree" ("period", "macroId") WHERE ("macroId" IS NOT NULL);
 
 
 
@@ -1509,7 +1987,7 @@ CREATE INDEX "Candle_securityId_start_idx" ON "public"."Candle" USING "btree" ("
 
 
 
-CREATE INDEX "Category_macroId_idx" ON "public"."Category" USING "btree" ("macroId");
+CREATE INDEX "Category_groupId_idx" ON "public"."Category" USING "btree" ("groupId");
 
 
 
@@ -1689,6 +2167,10 @@ CREATE INDEX "Subscription_userId_idx" ON "public"."Subscription" USING "btree" 
 
 
 
+CREATE UNIQUE INDEX "SystemSettings_id_key" ON "public"."SystemSettings" USING "btree" ("id");
+
+
+
 CREATE INDEX "TransactionSync_accountId_idx" ON "public"."TransactionSync" USING "btree" ("accountId");
 
 
@@ -1701,19 +2183,7 @@ CREATE INDEX "Transaction_accountId_idx" ON "public"."Transaction" USING "btree"
 
 
 
-CREATE INDEX "Transaction_categoryId_date_idx" ON "public"."Transaction" USING "btree" ("categoryId", "date");
-
-
-
-CREATE INDEX "Transaction_date_desc_idx" ON "public"."Transaction" USING "btree" ("date" DESC);
-
-
-
-CREATE INDEX "Transaction_date_idx" ON "public"."Transaction" USING "btree" ("date");
-
-
-
-CREATE INDEX "Transaction_date_type_idx" ON "public"."Transaction" USING "btree" ("date", "type");
+CREATE INDEX "Transaction_amount_numeric_idx" ON "public"."Transaction" USING "btree" ("amount_numeric") WHERE ("amount_numeric" IS NOT NULL);
 
 
 
@@ -1737,19 +2207,19 @@ CREATE INDEX "Transaction_type_idx" ON "public"."Transaction" USING "btree" ("ty
 
 
 
-CREATE INDEX "Transaction_userId_date_desc_idx" ON "public"."Transaction" USING "btree" ("userId", "date" DESC);
-
-
-
 CREATE INDEX "Transaction_userId_idx" ON "public"."Transaction" USING "btree" ("userId");
 
 
 
-CREATE INDEX "Transaction_userId_type_categoryId_date_idx" ON "public"."Transaction" USING "btree" ("userId", "type", "categoryId", "date") WHERE ("categoryId" IS NOT NULL);
-
-
-
 CREATE INDEX "User_role_idx" ON "public"."User" USING "btree" ("role");
+
+
+
+CREATE INDEX "category_learning_last_used_idx" ON "public"."category_learning" USING "btree" ("last_used_at" DESC);
+
+
+
+CREATE INDEX "category_learning_user_type_desc_idx" ON "public"."category_learning" USING "btree" ("user_id", "type", "normalized_description");
 
 
 
@@ -1805,7 +2275,7 @@ CREATE INDEX "idx_budget_userid_period" ON "public"."Budget" USING "btree" ("use
 
 
 
-CREATE INDEX "idx_category_macro" ON "public"."Category" USING "btree" ("macroId") WHERE ("macroId" IS NOT NULL);
+CREATE INDEX "idx_category_group" ON "public"."Category" USING "btree" ("groupId") WHERE ("groupId" IS NOT NULL);
 
 
 
@@ -1813,7 +2283,7 @@ CREATE INDEX "idx_category_user" ON "public"."Category" USING "btree" ("userId")
 
 
 
-CREATE INDEX "idx_category_userid_macroid" ON "public"."Category" USING "btree" ("userId", "macroId") WHERE ("userId" IS NOT NULL);
+CREATE INDEX "idx_category_userid_groupid" ON "public"."Category" USING "btree" ("userId", "groupId") WHERE ("userId" IS NOT NULL);
 
 
 
@@ -1869,7 +2339,7 @@ CREATE INDEX "idx_holdings_view_user" ON "public"."holdings_view" USING "btree" 
 
 
 
-CREATE INDEX "idx_householdmember_memberid_status" ON "public"."HouseholdMember" USING "btree" ("memberId", "status") WHERE ("status" = 'accepted'::"text");
+CREATE INDEX "idx_householdmember_memberid_status" ON "public"."HouseholdMember" USING "btree" ("memberId", "status") WHERE ("status" = 'active'::"text");
 
 
 
@@ -1914,6 +2384,50 @@ CREATE INDEX "idx_plaidconnection_itemid" ON "public"."PlaidConnection" USING "b
 
 
 CREATE INDEX "idx_plaidconnection_userid" ON "public"."PlaidConnection" USING "btree" ("userId");
+
+
+
+CREATE INDEX "idx_planned_payment_date" ON "public"."PlannedPayment" USING "btree" ("date");
+
+
+
+CREATE INDEX "idx_planned_payment_date_status_user" ON "public"."PlannedPayment" USING "btree" ("date", "status", "userId");
+
+
+
+CREATE INDEX "idx_planned_payment_debt_id" ON "public"."PlannedPayment" USING "btree" ("debtId") WHERE ("debtId" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_planned_payment_linked_transaction" ON "public"."PlannedPayment" USING "btree" ("linkedTransactionId") WHERE ("linkedTransactionId" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_planned_payment_source" ON "public"."PlannedPayment" USING "btree" ("source");
+
+
+
+CREATE INDEX "idx_planned_payment_status" ON "public"."PlannedPayment" USING "btree" ("status");
+
+
+
+CREATE INDEX "idx_planned_payment_subscription_id" ON "public"."PlannedPayment" USING "btree" ("subscriptionId") WHERE ("subscriptionId" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_planned_payment_to_account_id" ON "public"."PlannedPayment" USING "btree" ("toAccountId") WHERE ("toAccountId" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_planned_payment_user_date_status" ON "public"."PlannedPayment" USING "btree" ("userId", "date", "status") WHERE ("date" IS NOT NULL);
+
+
+
+COMMENT ON INDEX "public"."idx_planned_payment_user_date_status" IS 'Índice para queries de pagamentos planejados por data e status';
+
+
+
+CREATE INDEX "idx_planned_payment_user_id" ON "public"."PlannedPayment" USING "btree" ("userId");
 
 
 
@@ -1969,14 +2483,6 @@ CREATE INDEX "idx_subscription_userid_status" ON "public"."Subscription" USING "
 
 
 
-CREATE INDEX "idx_transaction_accountid_date_type" ON "public"."Transaction" USING "btree" ("accountId", "date", "type");
-
-
-
-CREATE INDEX "idx_transaction_date" ON "public"."Transaction" USING "btree" ("date" DESC);
-
-
-
 CREATE INDEX "idx_transaction_description_gin" ON "public"."Transaction" USING "gin" ("to_tsvector"('"english"'::"regconfig", "description")) WHERE ("description" IS NOT NULL);
 
 
@@ -1989,15 +2495,47 @@ CREATE INDEX "idx_transaction_user_date" ON "public"."Transaction" USING "btree"
 
 
 
+COMMENT ON INDEX "public"."idx_transaction_user_date" IS 'Índice otimizado para queries de transações por usuário e período (query mais comum do sistema)';
+
+
+
+CREATE INDEX "idx_transaction_user_date_type" ON "public"."Transaction" USING "btree" ("userId", "date" DESC, "type") WHERE (("date" IS NOT NULL) AND ("type" IS NOT NULL));
+
+
+
+COMMENT ON INDEX "public"."idx_transaction_user_date_type" IS 'Índice composto para queries com filtro de tipo adicional';
+
+
+
 CREATE INDEX "idx_transaction_user_updated" ON "public"."Transaction" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
-CREATE INDEX "idx_transaction_userid_accountid_date" ON "public"."Transaction" USING "btree" ("userId", "accountId", "date" DESC) WHERE ("userId" IS NOT NULL);
+CREATE INDEX "idx_user_service_subscription_account_id" ON "public"."UserServiceSubscription" USING "btree" ("accountId");
 
 
 
-CREATE INDEX "idx_transaction_userid_date" ON "public"."Transaction" USING "btree" ("userId", "date" DESC) WHERE ("userId" IS NOT NULL);
+CREATE INDEX "idx_user_service_subscription_is_active" ON "public"."UserServiceSubscription" USING "btree" ("isActive") WHERE ("isActive" = true);
+
+
+
+CREATE INDEX "idx_user_service_subscription_subcategory_id" ON "public"."UserServiceSubscription" USING "btree" ("subcategoryId") WHERE ("subcategoryId" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_user_service_subscription_user_active" ON "public"."UserServiceSubscription" USING "btree" ("userId", "isActive");
+
+
+
+CREATE INDEX "idx_user_service_subscription_user_id" ON "public"."UserServiceSubscription" USING "btree" ("userId");
+
+
+
+CREATE INDEX "transaction_description_search_trgm_idx" ON "public"."Transaction" USING "gin" ("description_search" "public"."gin_trgm_ops") WHERE ("description_search" IS NOT NULL);
+
+
+
+CREATE INDEX "user_monthly_usage_user_month_idx" ON "public"."user_monthly_usage" USING "btree" ("user_id", "month_date");
 
 
 
@@ -2055,23 +2593,13 @@ ALTER TABLE ONLY "public"."BudgetCategory"
 
 
 
-ALTER TABLE ONLY "public"."BudgetSubcategory"
-    ADD CONSTRAINT "BudgetSubcategory_budgetId_fkey" FOREIGN KEY ("budgetId") REFERENCES "public"."Budget"("id") ON UPDATE CASCADE ON DELETE CASCADE;
-
-
-
-ALTER TABLE ONLY "public"."BudgetSubcategory"
-    ADD CONSTRAINT "BudgetSubcategory_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "public"."Subcategory"("id") ON UPDATE CASCADE ON DELETE CASCADE;
-
-
-
 ALTER TABLE ONLY "public"."Budget"
     ADD CONSTRAINT "Budget_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "public"."Category"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
 ALTER TABLE ONLY "public"."Budget"
-    ADD CONSTRAINT "Budget_macroId_fkey" FOREIGN KEY ("macroId") REFERENCES "public"."Group"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT "Budget_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "public"."Group"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
@@ -2091,7 +2619,7 @@ ALTER TABLE ONLY "public"."Candle"
 
 
 ALTER TABLE ONLY "public"."Category"
-    ADD CONSTRAINT "Category_groupId_fkey" FOREIGN KEY ("macroId") REFERENCES "public"."Group"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT "Category_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "public"."Group"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
@@ -2190,6 +2718,46 @@ ALTER TABLE ONLY "public"."PlaidLiability"
 
 
 
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "public"."Account"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "public"."Category"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_debtId_fkey" FOREIGN KEY ("debtId") REFERENCES "public"."Debt"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_linkedTransactionId_fkey" FOREIGN KEY ("linkedTransactionId") REFERENCES "public"."Transaction"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "public"."Subcategory"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "public"."UserServiceSubscription"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_toAccountId_fkey" FOREIGN KEY ("toAccountId") REFERENCES "public"."Account"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."PlannedPayment"
+    ADD CONSTRAINT "PlannedPayment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."Position"
     ADD CONSTRAINT "Position_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "public"."InvestmentAccount"("id") ON DELETE CASCADE;
 
@@ -2275,8 +2843,43 @@ ALTER TABLE ONLY "public"."Transaction"
 
 
 
+ALTER TABLE ONLY "public"."UserServiceSubscription"
+    ADD CONSTRAINT "UserServiceSubscription_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "public"."Account"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."UserServiceSubscription"
+    ADD CONSTRAINT "UserServiceSubscription_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "public"."Subcategory"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."UserServiceSubscription"
+    ADD CONSTRAINT "UserServiceSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."User"
     ADD CONSTRAINT "User_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."category_learning"
+    ADD CONSTRAINT "category_learning_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "public"."Category"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."category_learning"
+    ADD CONSTRAINT "category_learning_subcategory_id_fkey" FOREIGN KEY ("subcategory_id") REFERENCES "public"."Subcategory"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."category_learning"
+    ADD CONSTRAINT "category_learning_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."User"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."user_monthly_usage"
+    ADD CONSTRAINT "user_monthly_usage_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."User"("id") ON DELETE CASCADE;
 
 
 
@@ -2327,9 +2930,6 @@ ALTER TABLE "public"."Budget" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."BudgetCategory" ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE "public"."BudgetSubcategory" ENABLE ROW LEVEL SECURITY;
-
-
 ALTER TABLE "public"."Candle" ENABLE ROW LEVEL SECURITY;
 
 
@@ -2373,6 +2973,9 @@ ALTER TABLE "public"."PlaidLiability" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."Plan" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."PlannedPayment" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "Plans are publicly readable" ON "public"."Plan" FOR SELECT USING (true);
@@ -2527,6 +3130,27 @@ CREATE POLICY "Super admins can view all feedback submissions" ON "public"."Feed
 
 
 
+ALTER TABLE "public"."SystemSettings" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "SystemSettings_insert_super_admin" ON "public"."SystemSettings" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+
+
+
+CREATE POLICY "SystemSettings_select_super_admin" ON "public"."SystemSettings" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+
+
+
+CREATE POLICY "SystemSettings_update_super_admin" ON "public"."SystemSettings" FOR UPDATE USING ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+
+
+
 ALTER TABLE "public"."Transaction" ENABLE ROW LEVEL SECURITY;
 
 
@@ -2534,6 +3158,9 @@ ALTER TABLE "public"."TransactionSync" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."User" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."UserServiceSubscription" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "Users can delete TransactionSync for their accounts" ON "public"."TransactionSync" FOR DELETE USING ((EXISTS ( SELECT 1
@@ -2594,12 +3221,6 @@ CREATE POLICY "Users can delete own budget categories" ON "public"."BudgetCatego
 
 
 
-CREATE POLICY "Users can delete own budget subcategories" ON "public"."BudgetSubcategory" FOR DELETE USING ((EXISTS ( SELECT 1
-   FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetSubcategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
-
-
-
 CREATE POLICY "Users can delete own budgets" ON "public"."Budget" FOR DELETE USING (("userId" = "auth"."uid"()));
 
 
@@ -2630,6 +3251,10 @@ CREATE POLICY "Users can delete own investment transactions" ON "public"."Invest
 
 
 
+CREATE POLICY "Users can delete own planned payments" ON "public"."PlannedPayment" FOR DELETE USING (("userId" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can delete own simple investment entries" ON "public"."SimpleInvestmentEntry" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."Account"
   WHERE (("Account"."id" = "SimpleInvestmentEntry"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
@@ -2639,6 +3264,10 @@ CREATE POLICY "Users can delete own simple investment entries" ON "public"."Simp
 CREATE POLICY "Users can delete own subcategories" ON "public"."Subcategory" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."Category"
   WHERE (("Category"."id" = "Subcategory"."categoryId") AND ("Category"."userId" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can delete own subscriptions" ON "public"."UserServiceSubscription" FOR DELETE USING (("userId" = "auth"."uid"()));
 
 
 
@@ -2726,17 +3355,15 @@ CREATE POLICY "Users can insert own budget categories" ON "public"."BudgetCatego
 
 
 
-CREATE POLICY "Users can insert own budget subcategories" ON "public"."BudgetSubcategory" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetSubcategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
-
-
-
 CREATE POLICY "Users can insert own budgets" ON "public"."Budget" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
 CREATE POLICY "Users can insert own categories" ON "public"."Category" FOR INSERT WITH CHECK ((("userId" IS NULL) OR ("userId" = "auth"."uid"())));
+
+
+
+CREATE POLICY "Users can insert own category learning" ON "public"."category_learning" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
 
 
 
@@ -2770,6 +3397,10 @@ CREATE POLICY "Users can insert own investment transactions" ON "public"."Invest
 
 
 
+CREATE POLICY "Users can insert own planned payments" ON "public"."PlannedPayment" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can insert own profile" ON "public"."User" FOR INSERT WITH CHECK (("id" = "auth"."uid"()));
 
 
@@ -2787,6 +3418,10 @@ CREATE POLICY "Users can insert own subcategories" ON "public"."Subcategory" FOR
 
 
 CREATE POLICY "Users can insert own subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+
+
+
+CREATE POLICY "Users can insert own subscriptions" ON "public"."UserServiceSubscription" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
 
 
 
@@ -2872,17 +3507,15 @@ CREATE POLICY "Users can update own budget categories" ON "public"."BudgetCatego
 
 
 
-CREATE POLICY "Users can update own budget subcategories" ON "public"."BudgetSubcategory" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetSubcategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
-
-
-
 CREATE POLICY "Users can update own budgets" ON "public"."Budget" FOR UPDATE USING (("userId" = "auth"."uid"()));
 
 
 
 CREATE POLICY "Users can update own categories" ON "public"."Category" FOR UPDATE USING (("userId" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can update own category learning" ON "public"."category_learning" FOR UPDATE USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -2908,6 +3541,10 @@ CREATE POLICY "Users can update own investment transactions" ON "public"."Invest
 
 
 
+CREATE POLICY "Users can update own planned payments" ON "public"."PlannedPayment" FOR UPDATE USING (("userId" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can update own profile" ON "public"."User" FOR UPDATE USING (("id" = "auth"."uid"()));
 
 
@@ -2921,6 +3558,10 @@ CREATE POLICY "Users can update own simple investment entries" ON "public"."Simp
 CREATE POLICY "Users can update own subcategories" ON "public"."Subcategory" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."Category"
   WHERE (("Category"."id" = "Subcategory"."categoryId") AND ("Category"."userId" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Users can update own subscriptions" ON "public"."UserServiceSubscription" FOR UPDATE USING (("userId" = "auth"."uid"()));
 
 
 
@@ -3002,13 +3643,11 @@ CREATE POLICY "Users can view own budget categories" ON "public"."BudgetCategory
 
 
 
-CREATE POLICY "Users can view own budget subcategories" ON "public"."BudgetSubcategory" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetSubcategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
-
-
-
 CREATE POLICY "Users can view own budgets" ON "public"."Budget" FOR SELECT USING (("userId" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view own category learning" ON "public"."category_learning" FOR SELECT USING (("user_id" = "auth"."uid"()));
 
 
 
@@ -3038,6 +3677,14 @@ CREATE POLICY "Users can view own investment transactions" ON "public"."Investme
 
 
 
+CREATE POLICY "Users can view own monthly usage" ON "public"."user_monthly_usage" FOR SELECT USING (("user_id" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view own planned payments" ON "public"."PlannedPayment" FOR SELECT USING (("userId" = "auth"."uid"()));
+
+
+
 CREATE POLICY "Users can view own profile" ON "public"."User" FOR SELECT USING (("id" = "auth"."uid"()));
 
 
@@ -3049,6 +3696,10 @@ CREATE POLICY "Users can view own simple investment entries" ON "public"."Simple
 
 
 CREATE POLICY "Users can view own subscriptions" ON "public"."Subscription" FOR SELECT USING (("userId" = "auth"."uid"()));
+
+
+
+CREATE POLICY "Users can view own subscriptions" ON "public"."UserServiceSubscription" FOR SELECT USING (("userId" = "auth"."uid"()));
 
 
 
@@ -3094,6 +3745,12 @@ CREATE POLICY "Users cannot delete own profile" ON "public"."User" FOR DELETE US
 
 
 
+ALTER TABLE "public"."category_learning" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."user_monthly_usage" ENABLE ROW LEVEL SECURITY;
+
+
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
@@ -3101,87 +3758,88 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."check_invitation_email_match"("invitation_email" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."check_invitation_email_match"("invitation_email" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_invitation_email_match"("invitation_email" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."check_invitation_email_match"("invitation_email" "text") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text", "p_subcategory_id" "text", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_expense_type" "text", "p_created_at" timestamp without time zone, "p_updated_at" timestamp without time zone, "p_max_transactions" integer) TO "service_role";
+GRANT ALL ON FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text", "p_subcategory_id" "text", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_expense_type" "text", "p_created_at" timestamp without time zone, "p_updated_at" timestamp without time zone, "p_max_transactions" integer) TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) TO "service_role";
+GRANT ALL ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."is_account_owner_by_userid"("account_id" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."is_account_owner_by_userid"("account_id" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") TO "service_role";
+GRANT ALL ON FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."is_account_owner_by_userid"("account_id" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_account_owner_by_userid"("account_id" "text") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."is_account_owner_via_accountowner"("account_id" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."is_account_owner_via_accountowner"("account_id" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_account_owner_via_accountowner"("account_id" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_account_owner_via_accountowner"("account_id" "text") TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."is_current_user_admin"() TO "anon";
-GRANT ALL ON FUNCTION "public"."is_current_user_admin"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_current_user_admin"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_current_user_admin"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."notify_refresh_holdings"() TO "anon";
-GRANT ALL ON FUNCTION "public"."notify_refresh_holdings"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."notify_refresh_holdings"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."notify_refresh_holdings"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."refresh_portfolio_views"() TO "anon";
-GRANT ALL ON FUNCTION "public"."refresh_portfolio_views"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."refresh_portfolio_views"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."refresh_portfolio_views"() TO "authenticated";
 
 
 
-GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "anon";
-GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."update_updated_at_column"() TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Account" TO "anon";
-GRANT ALL ON TABLE "public"."Account" TO "authenticated";
 GRANT ALL ON TABLE "public"."Account" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Account" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."AccountInvestmentValue" TO "anon";
-GRANT ALL ON TABLE "public"."AccountInvestmentValue" TO "authenticated";
 GRANT ALL ON TABLE "public"."AccountInvestmentValue" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."AccountInvestmentValue" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."AccountOwner" TO "anon";
-GRANT ALL ON TABLE "public"."AccountOwner" TO "authenticated";
 GRANT ALL ON TABLE "public"."AccountOwner" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."AccountOwner" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Budget" TO "anon";
-GRANT ALL ON TABLE "public"."Budget" TO "authenticated";
 GRANT ALL ON TABLE "public"."Budget" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Budget" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."BudgetCategory" TO "anon";
-GRANT ALL ON TABLE "public"."BudgetCategory" TO "authenticated";
 GRANT ALL ON TABLE "public"."BudgetCategory" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."BudgetSubcategory" TO "anon";
-GRANT ALL ON TABLE "public"."BudgetSubcategory" TO "authenticated";
-GRANT ALL ON TABLE "public"."BudgetSubcategory" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."BudgetCategory" TO "authenticated";
 
 
 
@@ -3191,39 +3849,33 @@ GRANT ALL ON TABLE "public"."Candle" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."Category" TO "anon";
-GRANT ALL ON TABLE "public"."Category" TO "authenticated";
 GRANT ALL ON TABLE "public"."Category" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Category" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."ContactForm" TO "anon";
-GRANT ALL ON TABLE "public"."ContactForm" TO "authenticated";
 GRANT ALL ON TABLE "public"."ContactForm" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."ContactForm" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Debt" TO "anon";
-GRANT ALL ON TABLE "public"."Debt" TO "authenticated";
 GRANT ALL ON TABLE "public"."Debt" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Debt" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Execution" TO "anon";
-GRANT ALL ON TABLE "public"."Execution" TO "authenticated";
 GRANT ALL ON TABLE "public"."Execution" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Execution" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Feedback" TO "anon";
-GRANT ALL ON TABLE "public"."Feedback" TO "authenticated";
 GRANT ALL ON TABLE "public"."Feedback" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Feedback" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Goal" TO "anon";
-GRANT ALL ON TABLE "public"."Goal" TO "authenticated";
 GRANT ALL ON TABLE "public"."Goal" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Goal" TO "authenticated";
 
 
 
@@ -3233,105 +3885,98 @@ GRANT ALL ON TABLE "public"."Group" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."HouseholdMember" TO "anon";
-GRANT ALL ON TABLE "public"."HouseholdMember" TO "authenticated";
 GRANT ALL ON TABLE "public"."HouseholdMember" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."HouseholdMember" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."InvestmentAccount" TO "anon";
-GRANT ALL ON TABLE "public"."InvestmentAccount" TO "authenticated";
 GRANT ALL ON TABLE "public"."InvestmentAccount" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."InvestmentAccount" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."InvestmentTransaction" TO "anon";
-GRANT ALL ON TABLE "public"."InvestmentTransaction" TO "authenticated";
 GRANT ALL ON TABLE "public"."InvestmentTransaction" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."InvestmentTransaction" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."InvestmentTransaction_backup_20251115" TO "anon";
-GRANT ALL ON TABLE "public"."InvestmentTransaction_backup_20251115" TO "authenticated";
-GRANT ALL ON TABLE "public"."InvestmentTransaction_backup_20251115" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."Order" TO "anon";
-GRANT ALL ON TABLE "public"."Order" TO "authenticated";
 GRANT ALL ON TABLE "public"."Order" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Order" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."PlaidConnection" TO "anon";
-GRANT ALL ON TABLE "public"."PlaidConnection" TO "authenticated";
 GRANT ALL ON TABLE "public"."PlaidConnection" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."PlaidConnection" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."PlaidLiability" TO "anon";
-GRANT ALL ON TABLE "public"."PlaidLiability" TO "authenticated";
 GRANT ALL ON TABLE "public"."PlaidLiability" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."PlaidLiability" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Plan" TO "anon";
-GRANT ALL ON TABLE "public"."Plan" TO "authenticated";
 GRANT ALL ON TABLE "public"."Plan" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Plan" TO "authenticated";
+GRANT SELECT ON TABLE "public"."Plan" TO "anon";
 
 
 
-GRANT ALL ON TABLE "public"."Position" TO "anon";
-GRANT ALL ON TABLE "public"."Position" TO "authenticated";
+GRANT ALL ON TABLE "public"."PlannedPayment" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."PlannedPayment" TO "authenticated";
+
+
+
 GRANT ALL ON TABLE "public"."Position" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Position" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."PromoCode" TO "anon";
-GRANT ALL ON TABLE "public"."PromoCode" TO "authenticated";
 GRANT ALL ON TABLE "public"."PromoCode" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."PromoCode" TO "authenticated";
+GRANT SELECT ON TABLE "public"."PromoCode" TO "anon";
 
 
 
-GRANT ALL ON TABLE "public"."QuestradeConnection" TO "anon";
-GRANT ALL ON TABLE "public"."QuestradeConnection" TO "authenticated";
 GRANT ALL ON TABLE "public"."QuestradeConnection" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."QuestradeConnection" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Security" TO "anon";
-GRANT ALL ON TABLE "public"."Security" TO "authenticated";
 GRANT ALL ON TABLE "public"."Security" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Security" TO "authenticated";
+GRANT SELECT ON TABLE "public"."Security" TO "anon";
 
 
 
-GRANT ALL ON TABLE "public"."SecurityPrice" TO "anon";
-GRANT ALL ON TABLE "public"."SecurityPrice" TO "authenticated";
 GRANT ALL ON TABLE "public"."SecurityPrice" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."SecurityPrice" TO "authenticated";
+GRANT SELECT ON TABLE "public"."SecurityPrice" TO "anon";
 
 
 
-GRANT ALL ON TABLE "public"."SimpleInvestmentEntry" TO "anon";
-GRANT ALL ON TABLE "public"."SimpleInvestmentEntry" TO "authenticated";
 GRANT ALL ON TABLE "public"."SimpleInvestmentEntry" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."SimpleInvestmentEntry" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Subcategory" TO "anon";
-GRANT ALL ON TABLE "public"."Subcategory" TO "authenticated";
 GRANT ALL ON TABLE "public"."Subcategory" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Subcategory" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Subscription" TO "anon";
-GRANT ALL ON TABLE "public"."Subscription" TO "authenticated";
 GRANT ALL ON TABLE "public"."Subscription" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Subscription" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."Transaction" TO "anon";
-GRANT ALL ON TABLE "public"."Transaction" TO "authenticated";
+GRANT ALL ON TABLE "public"."SystemSettings" TO "anon";
+GRANT ALL ON TABLE "public"."SystemSettings" TO "authenticated";
+GRANT ALL ON TABLE "public"."SystemSettings" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."Transaction" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Transaction" TO "authenticated";
 
 
 
@@ -3341,33 +3986,48 @@ GRANT ALL ON TABLE "public"."TransactionSync" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."User" TO "anon";
-GRANT ALL ON TABLE "public"."User" TO "authenticated";
 GRANT ALL ON TABLE "public"."User" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."User" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."holdings_view" TO "anon";
-GRANT ALL ON TABLE "public"."holdings_view" TO "authenticated";
+GRANT ALL ON TABLE "public"."UserServiceSubscription" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."UserServiceSubscription" TO "authenticated";
+
+
+
 GRANT ALL ON TABLE "public"."holdings_view" TO "service_role";
+GRANT SELECT ON TABLE "public"."holdings_view" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."asset_allocation_view" TO "anon";
-GRANT ALL ON TABLE "public"."asset_allocation_view" TO "authenticated";
 GRANT ALL ON TABLE "public"."asset_allocation_view" TO "service_role";
+GRANT SELECT ON TABLE "public"."asset_allocation_view" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."portfolio_summary_view" TO "anon";
-GRANT ALL ON TABLE "public"."portfolio_summary_view" TO "authenticated";
+GRANT ALL ON TABLE "public"."category_learning" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."category_learning" TO "authenticated";
+
+
+
 GRANT ALL ON TABLE "public"."portfolio_summary_view" TO "service_role";
+GRANT SELECT ON TABLE "public"."portfolio_summary_view" TO "authenticated";
 
 
 
-GRANT ALL ON TABLE "public"."sector_allocation_view" TO "anon";
-GRANT ALL ON TABLE "public"."sector_allocation_view" TO "authenticated";
 GRANT ALL ON TABLE "public"."sector_allocation_view" TO "service_role";
+GRANT SELECT ON TABLE "public"."sector_allocation_view" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."user_monthly_usage" TO "service_role";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."user_monthly_usage" TO "authenticated";
+
+
+
+GRANT ALL ON TABLE "public"."vw_transactions_for_reports" TO "service_role";
+GRANT SELECT ON TABLE "public"."vw_transactions_for_reports" TO "authenticated";
 
 
 
@@ -3392,8 +4052,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,DELETE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
 
 

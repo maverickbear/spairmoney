@@ -43,7 +43,7 @@ export function getPlanErrorMessage(
       return `${featureName} is not available in your current plan. Upgrade to access this feature.`;
     
     case PlanErrorCode.HOUSEHOLD_MEMBERS_NOT_AVAILABLE:
-      return "Household members are not available in the Free plan. Upgrade to Basic or Premium to add family members.";
+      return "Household members are not available in your current plan. Upgrade to Essential or Pro to add family members.";
     
     default:
       return "This action is not available in your current plan. Please upgrade to continue.";
@@ -53,14 +53,19 @@ export function getPlanErrorMessage(
 /**
  * Get suggested plan for upgrade based on feature
  */
-export function getSuggestedPlan(feature: keyof PlanFeatures): "basic" | "premium" {
-  // Most features require Basic plan
-  if (feature === "hasInvestments" || feature === "hasAdvancedReports" || feature === "hasCsvExport") {
-    return "basic";
+export function getSuggestedPlan(feature: keyof PlanFeatures): "essential" | "pro" {
+  // Pro-only features: Investment tracking, Household members, Bank Integration
+  if (feature === "hasInvestments" || feature === "hasHousehold" || feature === "hasBankIntegration") {
+    return "pro";
   }
   
-  // For unlimited features, suggest Premium
-  return "premium";
+  // Unlimited resources require Pro
+  if (feature === "maxTransactions" || feature === "maxAccounts") {
+    return "pro";
+  }
+  
+  // Other features (Advanced reports, CSV export, CSV import, Debt tracking, Goals tracking, Budgets) require Essential
+  return "essential";
 }
 
 /**
@@ -75,13 +80,13 @@ export function createPlanError(
     current?: number;
   }
 ): PlanError {
-  const requiredPlan = options?.feature ? getSuggestedPlan(options.feature as keyof PlanFeatures) : "basic";
+  const requiredPlan = options?.feature ? getSuggestedPlan(options.feature as keyof PlanFeatures) : "essential";
   
   return {
     code,
     message: getPlanErrorMessage(code, options),
     feature: options?.feature,
-    currentPlan: options?.currentPlan || "free",
+    currentPlan: options?.currentPlan || "essential",
     requiredPlan,
     upgradeUrl: `/pricing?upgrade=${requiredPlan}`,
   };

@@ -3,17 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit, Trash2, CreditCard, Loader2, RefreshCw, Unlink } from "lucide-react";
-import { formatMoney } from "@/components/common/money";
+import { Plus, CreditCard } from "lucide-react";
 import { AccountForm } from "@/components/forms/account-form";
 import { TableSkeleton } from "@/components/ui/list-skeleton";
 import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { EmptyState } from "@/components/common/empty-state";
-import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { AccountCard } from "@/components/banking/account-card";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import {
@@ -309,171 +305,74 @@ export default function AccountsPage() {
           onAction={handleAddAccount}
           actionIcon={Plus}
         />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          {accounts.map((account) => {
-            const isCreditCard = account.type === "credit" && account.creditLimit;
-            const available = isCreditCard 
-              ? (account.creditLimit! + account.balance) 
-              : null;
-            
-            return (
-              <Card 
-                key={account.id}
-                className="transition-all flex flex-col"
-              >
-                <CardHeader className="pb-3 p-4">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {account.institutionLogo ? (
-                        <img 
-                          src={account.institutionLogo} 
-                          alt={account.institutionName || 'Bank logo'} 
-                          className="h-6 w-6 rounded object-contain flex-shrink-0"
-                        />
-                      ) : null}
-                      <div className="min-w-0 flex-1">
-                        <CardTitle className="text-sm font-semibold truncate">{account.name}</CardTitle>
-                        {account.institutionName && (
-                          <p className="text-[10px] text-muted-foreground truncate">{account.institutionName}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      {account.isConnected && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSync(account.id);
-                            }}
-                            disabled={syncingId === account.id}
-                            title="Sync transactions"
-                          >
-                            {syncingId === account.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDisconnect(account.id);
-                            }}
-                            disabled={disconnectingId === account.id}
-                            title="Disconnect account"
-                          >
-                            {disconnectingId === account.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Unlink className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={(e) => {
-                          e.stopPropagation();
+      ) : (() => {
+        // Group accounts by type
+        const accountsByType = accounts.reduce((acc, account) => {
+          const type = account.type;
+          if (!acc[type]) {
+            acc[type] = [];
+          }
+          acc[type].push(account);
+          return acc;
+        }, {} as Record<string, Account[]>);
+
+        // Define type display names
+        const typeDisplayNames: Record<string, string> = {
+          checking: "Checking",
+          savings: "Savings",
+          credit: "Credit Card",
+          cash: "Cash",
+          investment: "Investment",
+          other: "Other",
+        };
+
+        // Define type order for consistent display
+        const typeOrder = ["checking", "savings", "credit", "cash", "investment", "other"];
+
+        return (
+          <div className="space-y-6">
+            {typeOrder.map((type) => {
+              const typeAccounts = accountsByType[type];
+              if (!typeAccounts || typeAccounts.length === 0) return null;
+
+              return (
+                <div key={type} className="space-y-3">
+                  <h2 className="text-lg font-semibold capitalize">
+                    {typeDisplayNames[type] || type}
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                    {typeAccounts.map((account) => (
+                      <AccountCard
+                        key={account.id}
+                        account={account}
+                        onEdit={(id) => {
                           if (!checkWriteAccess()) return;
-                          setSelectedAccount(account);
-                          setIsFormOpen(true);
+                          const accountToEdit = accounts.find(a => a.id === id);
+                          if (accountToEdit) {
+                            setSelectedAccount(accountToEdit);
+                            setIsFormOpen(true);
+                          }
                         }}
-                        title="Edit account"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onDelete={(id) => {
                           if (!checkWriteAccess()) return;
-                          handleDelete(account.id);
+                          handleDelete(id);
                         }}
-                        disabled={deletingId === account.id || account.isConnected}
-                        title={account.isConnected ? "Cannot delete connected account. Disconnect first." : "Delete account"}
-                      >
-                        {deletingId === account.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </div>
+                        onSync={handleSync}
+                        onDisconnect={handleDisconnect}
+                        deletingId={deletingId}
+                        syncingId={syncingId}
+                        disconnectingId={disconnectingId}
+                        canDelete={checkWriteAccess()}
+                        canEdit={checkWriteAccess()}
+                      />
+                    ))}
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline" className="capitalize text-[10px] px-1.5 py-0.5">
-                      {account.type}
-                    </Badge>
-                    {account.householdName && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
-                        {account.householdName}
-                      </Badge>
-                    )}
-                    {account.isConnected && (
-                      <Badge variant="default" className="bg-green-600 dark:bg-green-500 text-white text-[10px] px-1.5 py-0.5">
-                        Connected
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2 flex-1 p-4 pt-0">
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-[10px] text-muted-foreground mb-0.5">Balance</div>
-                      <div className={cn(
-                        "text-lg font-bold",
-                        account.balance >= 0 
-                          ? "text-green-600 dark:text-green-400" 
-                          : "text-red-600 dark:text-red-400"
-                      )}>
-                        {formatMoney(account.balance)}
-                      </div>
-                    </div>
-                    {isCreditCard && (
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                        <div>
-                          <div className="text-[10px] text-muted-foreground mb-0.5">Credit Limit</div>
-                          <div className="text-xs font-semibold">
-                            {formatMoney(account.creditLimit!)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground mb-0.5">Available</div>
-                          <div className={cn(
-                            "text-xs font-semibold",
-                            available !== null && available >= 0
-                              ? "text-green-600 dark:text-green-400"
-                              : "text-red-600 dark:text-red-400"
-                          )}>
-                            {available !== null ? formatMoney(available) : "-"}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {account.isConnected && account.lastSyncedAt && (
-                      <div className="text-[10px] text-muted-foreground pt-2 border-t">
-                        Last synced: {format(new Date(account.lastSyncedAt), 'MMM dd, HH:mm')}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <AccountForm
         open={isFormOpen}

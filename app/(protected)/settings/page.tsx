@@ -21,7 +21,8 @@ import { UsageChart } from "@/components/billing/usage-chart";
 import { UpgradePlanCard } from "@/components/billing/upgrade-plan-card";
 import { SubscriptionManagement } from "@/components/billing/subscription-management";
 import { Subscription, Plan } from "@/lib/validations/plan";
-import { PlanFeatures, LimitCheckResult } from "@/lib/api/limits";
+import { PlanFeatures } from "@/lib/validations/plan";
+import { LimitCheckResult } from "@/lib/api/subscription";
 import { PageHeader } from "@/components/common/page-header";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
 
@@ -62,7 +63,7 @@ interface Profile {
   phoneNumber?: string;
   dateOfBirth?: string;
   plan?: {
-    name: "free" | "basic" | "premium";
+    name: "essential" | "pro";
     isShadow: boolean;
     ownerId?: string;
     ownerName?: string;
@@ -575,7 +576,7 @@ const billingDataCache = {
   } | null,
   promise: null as Promise<any> | null,
   timestamp: 0,
-  TTL: 5 * 60 * 1000, // 5 minutes cache
+  TTL: 30 * 1000, // 30 seconds cache - matches refresh interval
 };
 
 // Expose cache for preloading during login
@@ -774,6 +775,30 @@ function BillingModuleContent() {
       loadBillingData();
     }
   }, [hasLoaded, loadBillingData]);
+
+  // Refresh billing data periodically when billing tab is active
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab !== "billing") return;
+
+    // Refresh data every 30 seconds when billing tab is active
+    const interval = setInterval(() => {
+      loadBillingData(true); // Force refresh
+    }, 30000); // 30 seconds
+
+    // Also refresh when page becomes visible (user switches back to tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadBillingData(true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [searchParams, loadBillingData]);
 
   return (
     <div className="space-y-4 md:space-y-6">

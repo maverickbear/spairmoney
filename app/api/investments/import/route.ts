@@ -3,6 +3,7 @@ import { createInvestmentTransaction, createSecurity, getSecurities } from "@/li
 import { guardFeatureAccess, getCurrentUserId } from "@/lib/api/feature-guard";
 import { isPlanError } from "@/lib/utils/plan-errors";
 import { InvestmentTransactionInput } from "@/lib/csv/investment-import";
+import { normalizeAssetType } from "@/lib/utils/portfolio-utils";
 
 interface ImportRequest {
   transactions: InvestmentTransactionInput[];
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
                   const security = await createSecurity({
                     symbol: tx.securitySymbol,
                     name: tx.securityName || tx.securitySymbol,
-                    class: tx.securityClass || "Stock",
+                    class: normalizeAssetType(tx.securityClass) || "Stock",
                   });
                   if (security && security.id) {
                     securityId = security.id;

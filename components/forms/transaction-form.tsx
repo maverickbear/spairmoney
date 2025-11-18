@@ -8,6 +8,7 @@ import { transactionSchema, TransactionFormData } from "@/lib/validations/transa
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, ChevronsUpDown, Check } from "lucide-react";
+import { Search, ChevronsUpDown, Check, Loader2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -30,10 +31,10 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { Transaction } from "@/lib/api/transactions-client";
 import { LimitWarning } from "@/components/billing/limit-warning";
-import { Loader2 } from "lucide-react";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import { AccountRequiredDialog } from "@/components/common/account-required-dialog";
 import { parseDateInput, formatDateInput } from "@/lib/utils/timestamp";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 /**
  * Converts a Date object to YYYY-MM-DD string format
@@ -123,6 +124,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       type: "expense",
       amount: 0,
       recurring: false,
+      recurringFrequency: undefined,
     },
   });
 
@@ -160,6 +162,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           subcategoryId: transaction.subcategoryId || undefined,
           description: transaction.description || "",
           recurring: transaction.recurring ?? false,
+          recurringFrequency: (transaction as any).recurringFrequency || (transaction.recurring ? "monthly" : undefined),
         };
         
         // Only include expenseType if type is expense and it has a value
@@ -415,6 +418,73 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       });
       
       setIsSubmitting(true);
+
+      // Check if date is in the future
+      const transactionDate = data.date instanceof Date ? data.date : new Date(data.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      transactionDate.setHours(0, 0, 0, 0);
+      const isFutureDate = transactionDate > today;
+
+      // If date is in the future and it's a new transaction, automatically save as Planned Payment
+      if (isFutureDate && !transaction) {
+        // Create as PlannedPayment
+        const response = await fetch("/api/planned-payments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: transactionDate instanceof Date ? toDateOnlyString(transactionDate) : transactionDate,
+            type: data.type,
+            amount: data.amount,
+            accountId: data.accountId,
+            toAccountId: data.type === "transfer" ? (data.toAccountId || null) : null,
+            categoryId: data.type === "transfer" ? null : (data.categoryId || null),
+            subcategoryId: data.type === "transfer" ? null : (data.subcategoryId || null),
+            description: data.description || null,
+            source: "manual",
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to create planned payment");
+        }
+
+        toast({
+          title: "Planned Payment created",
+          description: "This payment has been saved as a planned payment and won't affect your current balance.",
+          variant: "success",
+        });
+
+        // Reload data
+        onSuccess?.();
+        setTimeout(() => {
+          onSuccess?.();
+        }, 500);
+
+        // If closeDialog is true, close the form and reset
+        if (closeDialog) {
+          onOpenChange(false);
+          form.reset();
+        } else {
+          // Reset form but keep dialog open
+          form.reset({
+            date: new Date(),
+            type: defaultType,
+            amount: 0,
+            recurring: false,
+            recurringFrequency: undefined,
+          });
+          setSelectedCategoryId("");
+          setSubcategories([]);
+          setSubcategoriesMap(new Map());
+        }
+
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Otherwise, create as regular Transaction
       // Check limit before creating (only for new transactions)
       if (!transaction && transactionLimit) {
         if (transactionLimit.limit !== -1 && transactionLimit.current >= transactionLimit.limit) {
@@ -1062,19 +1132,94 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
               </div>
             )}
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="recurring"
-                checked={form.watch("recurring")}
-                onCheckedChange={(checked) => form.setValue("recurring", checked === true)}
-              />
-              <label
-                htmlFor="recurring"
-                className="text-sm font-medium cursor-pointer flex items-center"
-              >
-                Recurring (occurs every month)
-              </label>
+            <div className="space-y-3 w-1/3">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="recurring"
+                  checked={form.watch("recurring")}
+                  onCheckedChange={(checked) => {
+                    form.setValue("recurring", checked);
+                    if (!checked) {
+                      form.setValue("recurringFrequency", undefined);
+                    } else if (!form.watch("recurringFrequency")) {
+                      form.setValue("recurringFrequency", "monthly");
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="recurring"
+                  className="text-sm font-medium cursor-pointer flex items-center"
+                >
+                  Repeat this payment
+                </label>
+              </div>
+              
+              {form.watch("recurring") && (() => {
+                const frequencyOptions = {
+                  daily: { label: "Daily", description: "Daily repetition" },
+                  weekly: { label: "Weekly", description: "Every 7 days" },
+                  biweekly: { label: "Biweekly", description: "Every 14 days" },
+                  monthly: { label: "Monthly", description: "Once per month" },
+                  semimonthly: { label: "Semimonthly", description: "Twice per month" },
+                  quarterly: { label: "Quarterly", description: "Every 3 months" },
+                  semiannual: { label: "Semiannual", description: "Every 6 months" },
+                  annual: { label: "Annual", description: "Once per year" },
+                } as const;
+
+                const selectedFrequency = form.watch("recurringFrequency") || "monthly";
+                const selectedOption = frequencyOptions[selectedFrequency as keyof typeof frequencyOptions];
+
+                return (
+                  <div className="space-y-2">
+                    <label htmlFor="recurringFrequency" className="text-sm text-muted-foreground">
+                      Frequency
+                    </label>
+                    <Select
+                      value={selectedFrequency}
+                      onValueChange={(value) => {
+                        form.setValue("recurringFrequency", value as any);
+                      }}
+                    >
+                      <SelectTrigger id="recurringFrequency">
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(frequencyOptions).map(([value, option]) => (
+                          <SelectItem key={value} value={value}>
+                            <div className="flex items-center gap-2 w-full">
+                              <span className="font-medium">{option.label}</span>
+                              <span className="text-xs text-muted-foreground">{option.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })()}
             </div>
+
+            {/* Show banner if date is future */}
+            {!transaction && (() => {
+              const transactionDate = form.watch("date");
+              const date = transactionDate instanceof Date ? transactionDate : new Date(transactionDate);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              date.setHours(0, 0, 0, 0);
+              const isFuture = date > today;
+              
+              if (isFuture) {
+                return (
+                  <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                      This transaction will be automatically saved as a <strong>Planned Payment</strong> and won't affect your current balance.
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           </div>

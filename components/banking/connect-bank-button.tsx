@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 // import { usePlaidLink } from 'react-plaid-link'; // TEMPORARILY DISABLED
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/toast-provider';
-import { usePlanLimits } from '@/hooks/use-plan-limits';
+import { useSubscription } from '@/hooks/use-subscription';
 import { UpgradePrompt } from '@/components/billing/upgrade-prompt';
 import { Loader2 } from 'lucide-react';
 
@@ -15,7 +15,7 @@ interface ConnectBankButtonProps {
 
 export function ConnectBankButton({ onSuccess, variant = "default" }: ConnectBankButtonProps) {
   const { toast } = useToast();
-  const { limits, loading: limitsLoading } = usePlanLimits();
+  const { limits, checking: limitsLoading } = useSubscription();
   const [isLoading, setIsLoading] = useState(false);
 
   // TEMPORARY BYPASS: Simulate bank connection without using Plaid Link
@@ -49,11 +49,35 @@ export function ConnectBankButton({ onSuccess, variant = "default" }: ConnectBan
 
       if (!response.ok) {
         if (response.status === 403 && data.planError) {
-          toast({
-            title: 'Upgrade Required',
-            description: 'Bank integration is only available for Basic and Premium plans.',
-            variant: 'destructive',
-          });
+          // Fetch plan names dynamically
+          fetch("/api/billing/plans/public")
+            .then(res => res.json())
+            .then(plansData => {
+              if (plansData.plans) {
+                const essentialPlan = plansData.plans.find((p: { id: string }) => p.id === 'essential');
+                const proPlan = plansData.plans.find((p: { id: string }) => p.id === 'pro');
+                const essentialPlanName = essentialPlan?.name || 'Essential';
+                const proPlanName = proPlan?.name || 'Pro';
+                toast({
+                  title: 'Upgrade Required',
+                  description: `Bank integration is only available for ${essentialPlanName} and ${proPlanName} plans.`,
+                  variant: 'destructive',
+                });
+              } else {
+                toast({
+                  title: 'Upgrade Required',
+                  description: 'Bank integration is only available for paid plans.',
+                  variant: 'destructive',
+                });
+              }
+            })
+            .catch(() => {
+              toast({
+                title: 'Upgrade Required',
+                description: 'Bank integration is only available for paid plans.',
+                variant: 'destructive',
+              });
+            });
           return;
         }
         throw new Error(data.error || 'Failed to connect bank account');
@@ -114,12 +138,17 @@ export function ConnectBankButton({ onSuccess, variant = "default" }: ConnectBan
     );
   }
 
-  if (!limits.hasBankIntegration) {
+  // Check if user has access to bank integration
+  // The database is the source of truth - if a feature is disabled in Supabase, it should be disabled here
+  // Safety check: convert string "true" to boolean (defensive programming)
+  const hasAccess = limits.hasBankIntegration === true || limits.hasBankIntegration === "true";
+  
+  if (!hasAccess) {
     return (
       <UpgradePrompt
         feature="Bank Integration"
-        requiredPlan="basic"
-        currentPlan="free"
+        requiredPlan="pro"
+        currentPlan={plan?.id || "essential"}
       />
     );
   }

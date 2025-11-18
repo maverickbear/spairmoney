@@ -3,6 +3,7 @@ import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { getCurrentUser } from "@/lib/api/auth";
 import { startServerPagePerformance } from "@/lib/utils/performance";
+import { createServiceRoleClient } from "@/lib/supabase-server";
 
 // Lazy load heavy landing page components for better initial load performance
 const HeroSection = dynamic(() => import("@/components/landing/hero-section").then(m => ({ default: m.HeroSection })), { ssr: true });
@@ -33,6 +34,22 @@ export default async function LandingPage() {
   const user = await getCurrentUser();
   const isAuthenticated = !!user;
   
+  // Check maintenance mode status
+  let isMaintenanceMode = false;
+  try {
+    const supabase = createServiceRoleClient();
+    const { data: settings } = await supabase
+      .from("SystemSettings")
+      .select("maintenanceMode")
+      .eq("id", "default")
+      .single();
+    
+    isMaintenanceMode = settings?.maintenanceMode || false;
+  } catch (error) {
+    // If error, default to no maintenance mode
+    console.error("Error checking maintenance mode:", error);
+  }
+  
   perf.end();
 
   return (
@@ -43,7 +60,7 @@ export default async function LandingPage() {
         <FeaturesSection />
         <ParallaxFeaturesSection />
         <TestimonialsSection />
-        <PricingSection />
+        {!isMaintenanceMode && <PricingSection />}
       </main>
       <LandingFooter />
     </div>

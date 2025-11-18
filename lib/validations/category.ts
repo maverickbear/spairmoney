@@ -2,8 +2,16 @@ import { z } from "zod";
 
 export const categorySchema = z.object({
   name: z.string().min(1, "Name is required"),
-  macroId: z.string().min(1, "Group is required"),
-});
+  groupId: z.string().min(1, "Group is required"),
+  // Deprecated: Use groupId instead
+  macroId: z.string().min(1, "Group is required").optional(),
+}).refine(
+  (data) => data.groupId || data.macroId,
+  {
+    message: "Group is required",
+    path: ["groupId"],
+  }
+);
 
 export type CategoryFormData = z.infer<typeof categorySchema>;
 

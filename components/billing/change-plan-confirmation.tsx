@@ -71,6 +71,11 @@ export function ChangePlanConfirmationModal({
       lostFeatures.push("CSV export");
     }
 
+    // Check CSV import
+    if (current.features.hasCsvImport && !target.features.hasCsvImport) {
+      lostFeatures.push("CSV import");
+    }
+
     // Check debts
     if (current.features.hasDebts && !target.features.hasDebts) {
       lostFeatures.push("Debt tracking");
@@ -81,8 +86,13 @@ export function ChangePlanConfirmationModal({
       lostFeatures.push("Goals tracking");
     }
 
+    // Check budgets
+    if (current.features.hasBudgets && !target.features.hasBudgets) {
+      lostFeatures.push("Budgets");
+    }
+
     // Check household members
-    if (current.name !== "free" && target.name === "free") {
+    if (current.features.hasHousehold && !target.features.hasHousehold) {
       lostFeatures.push("Household members");
     }
 
@@ -127,6 +137,16 @@ export function ChangePlanConfirmationModal({
       gainedFeatures.push("CSV export");
     }
 
+    // Check CSV import
+    if (!current.features.hasCsvImport && target.features.hasCsvImport) {
+      gainedFeatures.push("CSV import");
+    }
+
+    // Check budgets
+    if (!current.features.hasBudgets && target.features.hasBudgets) {
+      gainedFeatures.push("Budgets");
+    }
+
     // Check bank integration
     if (!current.features.hasBankIntegration && target.features.hasBankIntegration) {
       gainedFeatures.push("Bank account integration");
@@ -153,7 +173,7 @@ export function ChangePlanConfirmationModal({
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Warning:</strong> Cancelling your subscription will downgrade you to the Free plan at the end of your current billing period.
+                <strong>Warning:</strong> Cancelling your subscription will end your access to all plan features at the end of your current billing period.
               </AlertDescription>
             </Alert>
 
@@ -161,7 +181,6 @@ export function ChangePlanConfirmationModal({
               <div>
                 <h3 className="font-semibold mb-2">You will lose access to:</h3>
                 <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                  {currentPlan.name !== "free" && <li>Premium features</li>}
                   {currentPlan.features.maxTransactions > 0 && (
                     <li>{currentPlan.features.maxTransactions} transactions/month</li>
                   )}
@@ -171,7 +190,9 @@ export function ChangePlanConfirmationModal({
                   {currentPlan.features.hasInvestments && <li>Investment tracking</li>}
                   {currentPlan.features.hasAdvancedReports && <li>Advanced reports</li>}
                   {currentPlan.features.hasCsvExport && <li>CSV export</li>}
-                  {currentPlan.name !== "free" && <li>Household members</li>}
+                  {currentPlan.features.hasCsvImport && <li>CSV import</li>}
+                  {currentPlan.features.hasBudgets && <li>Budgets</li>}
+                  {currentPlan.features.hasHousehold && <li>Household members</li>}
                 </ul>
               </div>
             )}
@@ -219,7 +240,6 @@ export function ChangePlanConfirmationModal({
 
   const lostFeatures = isDowngrade ? getLostFeatures(currentPlan, targetPlan) : [];
   const gainedFeatures = isUpgrade ? getGainedFeatures(currentPlan, targetPlan) : [];
-  const isDowngradeToFree = isDowngrade && targetPlan.name === "free";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -286,14 +306,7 @@ export function ChangePlanConfirmationModal({
             </div>
           )}
 
-          {isDowngradeToFree ? (
-            <Alert>
-              <AlertDescription>
-                <strong>Note:</strong> Your subscription will be cancelled at the end of the current billing period. 
-                You will continue to have access to your current plan features until then.
-              </AlertDescription>
-            </Alert>
-          ) : isDowngrade ? (
+          {isDowngrade ? (
             <Alert>
               <AlertDescription>
                 <strong>Note:</strong> Your plan change will take effect at the end of the current billing period. 

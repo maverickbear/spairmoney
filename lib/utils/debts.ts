@@ -36,8 +36,8 @@ export function convertToMonthlyPayment(
     case "monthly":
       return paymentAmount;
     case "biweekly":
-      // Biweekly: 26 payments per year = 26/12 = 2.1667 per month
-      return paymentAmount * (26 / 12);
+      // Biweekly: 2 payments per month (more intuitive than 26/12)
+      return paymentAmount * 2;
     case "weekly":
       // Weekly: 52 payments per year = 52/12 = 4.3333 per month
       return paymentAmount * (52 / 12);
@@ -63,8 +63,8 @@ export function convertFromMonthlyPayment(
     case "monthly":
       return monthlyPayment;
     case "biweekly":
-      // Biweekly: 26 payments per year = 26/12 = 2.1667 per month
-      return monthlyPayment / (26 / 12);
+      // Biweekly: 2 payments per month (more intuitive than 26/12)
+      return monthlyPayment / 2;
     case "weekly":
       // Weekly: 52 payments per year = 52/12 = 4.3333 per month
       return monthlyPayment / (52 / 12);

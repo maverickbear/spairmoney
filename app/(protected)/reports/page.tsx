@@ -23,12 +23,14 @@ import type { PortfolioSummary, HistoricalDataPoint } from "@/lib/api/portfolio"
 import type { Holding } from "@/lib/api/investments";
 import type { PlanFeatures } from "@/lib/validations/plan";
 import { Loader2 } from "lucide-react";
+import { FeatureGuard } from "@/components/common/feature-guard";
+import { useSubscription } from "@/hooks/use-subscription";
 
 export default function ReportsPage() {
   const perf = usePagePerformance("Reports");
+  const { limits, checking } = useSubscription();
   const [period, setPeriod] = useState<ReportPeriod>("last-12-months");
   const [loading, setLoading] = useState(true);
-  const [limits, setLimits] = useState<PlanFeatures | null>(null);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [currentMonthTransactions, setCurrentMonthTransactions] = useState<Transaction[]>([]);
   const [historicalTransactions, setHistoricalTransactions] = useState<Transaction[]>([]);
@@ -86,41 +88,8 @@ export default function ReportsPage() {
         const dateRange = getDateRange(period);
         const historicalStartDate = dateRange.startDate;
 
-        // Load limits
-        try {
-          const response = await fetch("/api/limits");
-          if (response.ok) {
-            const limitsData = await response.json();
-            setLimits(limitsData);
-          } else {
-            // Use default limits if API fails
-            setLimits({
-              maxTransactions: 50,
-              maxAccounts: 2,
-              hasInvestments: false,
-              hasAdvancedReports: false,
-              hasCsvExport: false,
-              hasDebts: true,
-              hasGoals: true,
-              hasBankIntegration: false,
-              hasHousehold: false,
-            });
-          }
-        } catch (error) {
-          console.error("Error loading limits:", error);
-          // Use default limits if API fails
-          setLimits({
-            maxTransactions: 50,
-            maxAccounts: 2,
-            hasInvestments: false,
-            hasAdvancedReports: false,
-            hasCsvExport: false,
-            hasDebts: true,
-            hasGoals: true,
-            hasBankIntegration: false,
-            hasHousehold: false,
-          });
-        }
+        // Limits are already available via useSubscription hook
+        // No need to fetch separately
 
         // Load transactions
         const [currentMonthTx, historicalTx] = await Promise.all([
@@ -198,18 +167,22 @@ export default function ReportsPage() {
           console.error("Error loading financial health:", error);
         }
 
-        // Load portfolio data
-        try {
-          const [summaryRes, holdingsRes, historicalRes] = await Promise.all([
-            fetch("/api/portfolio/summary").then(r => r.ok ? r.json() : null),
-            fetch("/api/portfolio/holdings").then(r => r.ok ? r.json() : null),
-            fetch("/api/portfolio/historical").then(r => r.ok ? r.json() : null),
-          ]);
-          setPortfolioSummary(summaryRes);
-          setPortfolioHoldings(holdingsRes || []);
-          setPortfolioHistorical(historicalRes || []);
-        } catch (error) {
-          console.error("Error loading portfolio data:", error);
+        // Load portfolio data only if user has access to investments
+        // Safety check: convert string "true" to boolean (defensive programming)
+        const hasInvestments = limits?.hasInvestments;
+        if (hasInvestments === true || (typeof hasInvestments === "string" && hasInvestments === "true")) {
+          try {
+            const [summaryRes, holdingsRes, historicalRes] = await Promise.all([
+              fetch("/api/portfolio/summary").then(r => r.ok ? r.json() : null),
+              fetch("/api/portfolio/holdings").then(r => r.ok ? r.json() : null),
+              fetch("/api/portfolio/historical").then(r => r.ok ? r.json() : null),
+            ]);
+            setPortfolioSummary(summaryRes);
+            setPortfolioHoldings(holdingsRes || []);
+            setPortfolioHistorical(historicalRes || []);
+          } catch (error) {
+            console.error("Error loading portfolio data:", error);
+          }
         }
         
         perf.markDataLoaded();
@@ -222,9 +195,9 @@ export default function ReportsPage() {
     }
 
     loadData();
-  }, [period]);
+  }, [period, limits]);
 
-  if (loading || !limits) {
+  if (loading || checking || !limits) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -233,28 +206,30 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <ReportFilters
-        period={period}
-        onPeriodChange={setPeriod}
-      />
-      <ReportsContent
-        limits={limits}
-        budgets={budgets}
-        currentMonthTransactions={currentMonthTransactions}
-        historicalTransactions={historicalTransactions}
-        debts={debts}
-        goals={goals}
-        financialHealth={financialHealth}
-        accounts={accounts}
-        portfolioSummary={portfolioSummary}
-        portfolioHoldings={portfolioHoldings}
-        portfolioHistorical={portfolioHistorical}
-        now={new Date()}
-        period={period}
-        dateRange={getDateRange(period)}
-      />
-    </div>
+    <FeatureGuard feature="hasAdvancedReports" featureName="Advanced Reports" requiredPlan="essential">
+      <div className="space-y-4 md:space-y-6">
+        <ReportFilters
+          period={period}
+          onPeriodChange={setPeriod}
+        />
+        <ReportsContent
+          limits={limits}
+          budgets={budgets}
+          currentMonthTransactions={currentMonthTransactions}
+          historicalTransactions={historicalTransactions}
+          debts={debts}
+          goals={goals}
+          financialHealth={financialHealth}
+          accounts={accounts}
+          portfolioSummary={portfolioSummary}
+          portfolioHoldings={portfolioHoldings}
+          portfolioHistorical={portfolioHistorical}
+          now={new Date()}
+          period={period}
+          dateRange={getDateRange(period)}
+        />
+      </div>
+    </FeatureGuard>
   );
 }
 

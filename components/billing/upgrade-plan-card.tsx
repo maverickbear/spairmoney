@@ -17,8 +17,16 @@ export function UpgradePlanCard({
 }: UpgradePlanCardProps) {
   const router = useRouter();
 
-  // Don't show upgrade card if user is already on premium plan
-  if (currentPlan === "premium") {
+  // Only show upgrade card if user has an essential plan (can upgrade to pro)
+  // Don't show if:
+  // - No plan exists (user needs to select a plan first)
+  // - Already on pro plan (highest plan)
+  if (!currentPlan || currentPlan === "pro") {
+    return null;
+  }
+
+  // Only show for essential plan
+  if (currentPlan !== "essential") {
     return null;
   }
 

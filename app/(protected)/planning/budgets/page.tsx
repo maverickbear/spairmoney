@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import { FeatureGuard } from "@/components/common/feature-guard";
 
 interface Budget {
   id: string;
@@ -167,6 +168,7 @@ export default function BudgetsPage() {
     : 0;
 
   return (
+    <FeatureGuard feature="hasBudgets" featureName="Budgets" requiredPlan="essential">
     <div className="space-y-6 md:space-y-8">
       <PageHeader
         title="Budgets"
@@ -315,5 +317,6 @@ export default function BudgetsPage() {
       />
       {ConfirmDialog}
     </div>
+    </FeatureGuard>
   );
 }

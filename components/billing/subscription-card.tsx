@@ -42,13 +42,11 @@ export function SubscriptionCard({ subscription, plan, onSubscriptionUpdated }: 
       <Card>
         <CardHeader>
           <CardTitle>No Active Subscription</CardTitle>
-          <CardDescription>You're currently on the free plan</CardDescription>
+          <CardDescription>Please select a plan to continue</CardDescription>
         </CardHeader>
       </Card>
     );
   }
-
-  const isFree = plan.name === "free";
   const price = subscription.currentPeriodStart && subscription.currentPeriodEnd
     ? plan.priceMonthly
     : 0;
@@ -107,11 +105,9 @@ export function SubscriptionCard({ subscription, plan, onSubscriptionUpdated }: 
           </div>
         )}
 
-        {!isFree && (
           <Button onClick={handleManageSubscription} disabled={loading} className="w-full">
             {loading ? "Loading..." : "Manage Subscription"}
           </Button>
-        )}
       </CardContent>
     </Card>
   );

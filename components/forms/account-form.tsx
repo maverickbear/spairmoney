@@ -39,6 +39,7 @@ interface Account {
   createdAt?: string;
   updatedAt?: string;
   ownerIds?: string[];
+  dueDayOfMonth?: number | null;
 }
 
 interface Household {
@@ -75,6 +76,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
       creditLimit: undefined,
       initialBalance: undefined,
       ownerIds: [],
+      dueDayOfMonth: undefined,
     },
   });
   
@@ -193,6 +195,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
           creditLimit: account.creditLimit ?? undefined,
           initialBalance: account.initialBalance ?? undefined,
           ownerIds: ownerIds,
+          dueDayOfMonth: account.dueDayOfMonth ?? undefined,
         });
       } else {
         // When creating new account, always include current user ID
@@ -204,6 +207,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
           creditLimit: undefined,
           initialBalance: undefined,
           ownerIds: [],
+          dueDayOfMonth: undefined,
         });
       }
     }
@@ -258,7 +262,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
       const url = account ? `/api/accounts/${account.id}` : "/api/accounts";
       const method = account ? "PATCH" : "POST";
 
-      // Prepare data: include creditLimit if type is credit, initialBalance if checking/savings
+      // Prepare data: include creditLimit and dueDayOfMonth if type is credit, initialBalance if checking/savings
       // Always include ownerIds to ensure they are saved in AccountOwner table
       const payload: AccountFormData = {
         name: data.name,
@@ -266,6 +270,9 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
         ownerIds: finalOwnerIds, // Always include ownerIds to save in Supabase
         ...(data.type === "credit" && data.creditLimit !== undefined 
           ? { creditLimit: data.creditLimit } 
+          : {}),
+        ...(data.type === "credit" && data.dueDayOfMonth !== undefined 
+          ? { dueDayOfMonth: data.dueDayOfMonth } 
           : {}),
         ...((data.type === "checking" || data.type === "savings")
           ? { 
@@ -400,18 +407,40 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
               </div>
 
               {accountType === "credit" && (
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Credit Limit</label>
-                  <DollarAmountInput
-                    value={form.watch("creditLimit") || undefined}
-                    onChange={(value) => form.setValue("creditLimit", value ?? undefined, { shouldValidate: true })}
-                    placeholder="$ 0.00"
-                    required
-                  />
-                  {form.formState.errors.creditLimit && (
-                    <p className="text-sm text-destructive">{form.formState.errors.creditLimit.message}</p>
-                  )}
-                </div>
+                <>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Credit Limit</label>
+                    <DollarAmountInput
+                      value={form.watch("creditLimit") || undefined}
+                      onChange={(value) => form.setValue("creditLimit", value ?? undefined, { shouldValidate: true })}
+                      placeholder="$ 0.00"
+                      required
+                    />
+                    {form.formState.errors.creditLimit && (
+                      <p className="text-sm text-destructive">{form.formState.errors.creditLimit.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Due Day of Month</label>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Day of the month when your credit card bill is due (1-31). This is used to automatically track your credit card debt.
+                    </p>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={form.watch("dueDayOfMonth") ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                        form.setValue("dueDayOfMonth", value !== undefined && !isNaN(value) ? value : undefined, { shouldValidate: true });
+                      }}
+                      placeholder="e.g., 10"
+                    />
+                    {form.formState.errors.dueDayOfMonth && (
+                      <p className="text-sm text-destructive">{form.formState.errors.dueDayOfMonth.message}</p>
+                    )}
+                  </div>
+                </>
               )}
 
               {(accountType === "checking" || accountType === "savings") && (

@@ -132,6 +132,11 @@ export function GoalForm({
           if (res.ok) {
             const data = await res.json();
             incomeBasis = data.incomeBasis || 0;
+            if (incomeBasis === 0) {
+              console.warn("[GOAL-FORM] Income basis is 0 - no income transactions found in last 3 months");
+            }
+          } else {
+            console.error("[GOAL-FORM] Failed to fetch income basis:", res.status, res.statusText);
           }
         }
 
@@ -522,9 +527,6 @@ export function GoalForm({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Select a savings or investment account to automatically track your progress
-            </p>
           </div>
 
           {accountId && accounts.find(acc => acc.id === accountId)?.type === "investment" && (
@@ -533,16 +535,17 @@ export function GoalForm({
                 Track Specific Holding (Optional)
               </label>
               <Select
-                value={form.watch("holdingId") || undefined}
+                value={form.watch("holdingId") || "all"}
                 onValueChange={(value) => {
-                  form.setValue("holdingId", value || undefined, { shouldValidate: true });
+                  form.setValue("holdingId", value === "all" ? undefined : value, { shouldValidate: true });
                 }}
                 disabled={loadingHoldings}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={loadingHoldings ? "Loading..." : "Select a holding (optional - leave empty for all holdings)"} />
+                  <SelectValue placeholder={loadingHoldings ? "Loading..." : "All Holdings"} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Holdings</SelectItem>
                   {holdings.map((holding) => (
                     <SelectItem key={holding.securityId} value={holding.securityId}>
                       {holding.symbol} - {holding.name} ({formatMoney(holding.marketValue)})
@@ -550,9 +553,6 @@ export function GoalForm({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Track progress for a specific holding, or leave empty to track the entire account
-              </p>
             </div>
           )}
 
@@ -703,12 +703,20 @@ export function GoalForm({
                   </div>
                 )}
                 <div className="pt-2 border-t space-y-1.5">
+                  {forecast.incomeBasis > 0 ? (
+                    <>
                   <div className="text-xs text-muted-foreground leading-tight">
                     Based on your average monthly income: {formatMoney(forecast.incomeBasis)}
                   </div>
                   <div className="text-xs text-muted-foreground leading-tight">
                     {forecast.totalAllocation.toFixed(2)}% of your income is allocated to this goal
                   </div>
+                    </>
+                  ) : (
+                    <div className="text-xs text-amber-600 dark:text-amber-400 leading-tight">
+                      ⚠️ No income data found. Add income transactions to see accurate forecasts.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -2,24 +2,28 @@
 
 import { createServerClient } from "@/lib/supabase-server";
 import { getCurrentTimestamp } from "@/lib/utils/timestamp";
-import { checkPlanLimits } from "@/lib/api/plans";
+import { getUserSubscriptionData } from "@/lib/api/subscription";
 import { logger } from "@/lib/utils/logger";
 
 // Cache for categories (they don't change frequently)
 const categoriesCache = new Map<string, { data: any[]; timestamp: number; userId: string | null }>();
 const CATEGORIES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Cache for macros
-const macrosCache = new Map<string, { data: any[]; timestamp: number; userId: string | null }>();
-const MACROS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Cache for groups
+const groupsCache = new Map<string, { data: any[]; timestamp: number; userId: string | null }>();
+const GROUPS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Deprecated: Use groupsCache instead
+const macrosCache = groupsCache;
+const MACROS_CACHE_TTL = GROUPS_CACHE_TTL;
 
 /**
  * Check if user has a paid plan (not free)
  */
 async function hasPaidPlan(userId: string): Promise<boolean> {
   try {
-    const { plan } = await checkPlanLimits(userId);
-    return plan !== null && plan.id !== "free";
+    const { subscription } = await getUserSubscriptionData(userId);
+    return subscription !== null;
   } catch (error) {
     logger.error("Error checking plan:", error);
     return false;
@@ -31,7 +35,7 @@ async function hasPaidPlan(userId: string): Promise<boolean> {
  */
 export async function invalidateCategoriesCache(userId: string | null): Promise<void> {
   categoriesCache.delete(userId || 'null');
-  macrosCache.delete(userId || 'null');
+  groupsCache.delete(userId || 'null');
   logger.withPrefix("CATEGORIES").log("Invalidated cache for user:", userId || 'null');
 }
 
@@ -40,14 +44,14 @@ export async function invalidateCategoriesCache(userId: string | null): Promise<
  */
 export async function invalidateAllCategoriesCache(): Promise<void> {
   categoriesCache.clear();
-  macrosCache.clear();
+  groupsCache.clear();
   logger.withPrefix("CATEGORIES").log("Invalidated cache for all users (system entities modified)");
 }
 
 /**
- * Get all macros (system defaults + user's custom macros)
+ * Get all groups (system defaults + user's custom groups)
  */
-export async function getMacros() {
+export async function getGroups() {
   const supabase = await createServerClient();
 
   // Get current user for cache key
@@ -59,9 +63,9 @@ export async function getMacros() {
   
   // Check cache
   const now = Date.now();
-  const cached = macrosCache.get(cacheKey);
-  if (cached && (now - cached.timestamp) < MACROS_CACHE_TTL) {
-    log.log("getMacros - Using cache for user:", userId || 'null');
+  const cached = groupsCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < GROUPS_CACHE_TTL) {
+    log.log("getGroups - Using cache for user:", userId || 'null');
     return cached.data;
   }
   
@@ -80,7 +84,7 @@ export async function getMacros() {
     const result = data || [];
     
     // Update cache
-    macrosCache.set(cacheKey, {
+    groupsCache.set(cacheKey, {
       data: result,
       timestamp: now,
       userId: null,
@@ -103,7 +107,7 @@ export async function getMacros() {
   const result = data || [];
   
   // Update cache
-  macrosCache.set(cacheKey, {
+  groupsCache.set(cacheKey, {
     data: result,
     timestamp: now,
     userId,
@@ -112,7 +116,12 @@ export async function getMacros() {
   return result;
 }
 
-export async function getCategoriesByMacro(macroId: string) {
+// Deprecated: Use getGroups instead
+export async function getMacros() {
+  return getGroups();
+}
+
+export async function getCategoriesByGroup(groupId: string) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -126,7 +135,7 @@ export async function getCategoriesByMacro(macroId: string) {
         *,
         subcategories:Subcategory(*)
       `)
-      .eq("macroId", macroId)
+      .eq("groupId", groupId)
       .is("userId", null)
       .order("name", { ascending: true });
 
@@ -144,7 +153,7 @@ export async function getCategoriesByMacro(macroId: string) {
       *,
       subcategories:Subcategory(*)
     `)
-    .eq("macroId", macroId)
+    .eq("groupId", groupId)
     .or(`userId.is.null,userId.eq.${authUser.id}`)
     .order("name", { ascending: true });
 
@@ -153,6 +162,11 @@ export async function getCategoriesByMacro(macroId: string) {
   }
 
   return categories || [];
+}
+
+// Deprecated: Use getCategoriesByGroup instead
+export async function getCategoriesByMacro(macroId: string) {
+  return getCategoriesByGroup(macroId);
 }
 
 export async function getSubcategoriesByCategory(categoryId: string) {
@@ -232,11 +246,11 @@ export async function getAllCategories() {
       .select(`
         id,
         name,
-        macroId,
+        groupId,
         userId,
         createdAt,
         updatedAt,
-        macro:Group(*),
+        group:Group(*),
         subcategories:Subcategory(*)
       `)
       .is("userId", null)
@@ -297,7 +311,7 @@ export async function getAllCategories() {
   return uniqueData;
 }
 
-export async function createCategory(data: { name: string; macroId: string }) {
+export async function createCategory(data: { name: string; groupId: string; macroId?: string }) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -313,18 +327,24 @@ export async function createCategory(data: { name: string; macroId: string }) {
     throw new Error("Creating custom categories requires a paid plan");
   }
 
-  // Verify macro belongs to user or is system default
-  const { data: macro, error: macroError } = await supabase
-    .from("Group")
-    .select("id, userId")
-    .eq("id", data.macroId)
-    .single();
-
-  if (macroError || !macro) {
-    throw new Error("Macro not found");
+  // Support both groupId and deprecated macroId for backward compatibility
+  const groupId = data.groupId || data.macroId;
+  if (!groupId) {
+    throw new Error("groupId is required");
   }
 
-  // If macro is system default (userId IS NULL), user can still create category under it
+  // Verify group belongs to user or is system default
+  const { data: group, error: groupError } = await supabase
+    .from("Group")
+    .select("id, userId")
+    .eq("id", groupId)
+    .single();
+
+  if (groupError || !group) {
+    throw new Error("Group not found");
+  }
+
+  // If group is system default (userId IS NULL), user can still create category under it
   // But category will be personal (with userId)
   const id = crypto.randomUUID();
   const now = getCurrentTimestamp();
@@ -334,14 +354,14 @@ export async function createCategory(data: { name: string; macroId: string }) {
     .insert({
       id,
       name: data.name,
-      macroId: data.macroId,
+      groupId: groupId,
       userId: authUser.id, // Personal category
       createdAt: now,
       updatedAt: now,
     })
     .select(`
       *,
-      macro:Group(*),
+      group:Group(*),
       subcategories:Subcategory(*)
     `)
     .single();
@@ -357,7 +377,7 @@ export async function createCategory(data: { name: string; macroId: string }) {
   return category;
 }
 
-export async function updateCategory(id: string, data: { name?: string; macroId?: string }) {
+export async function updateCategory(id: string, data: { name?: string; groupId?: string; macroId?: string }) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -390,19 +410,21 @@ export async function updateCategory(id: string, data: { name?: string; macroId?
     updateData.name = data.name;
   }
   
-  if (data.macroId !== undefined) {
-    // Verify new macro belongs to user or is system default
-    const { data: macro, error: macroError } = await supabase
+  // Support both groupId and deprecated macroId for backward compatibility
+  const groupId = data.groupId || data.macroId;
+  if (groupId !== undefined) {
+    // Verify new group belongs to user or is system default
+    const { data: group, error: groupError } = await supabase
       .from("Group")
       .select("id, userId")
-      .eq("id", data.macroId)
+      .eq("id", groupId)
       .single();
 
-    if (macroError || !macro) {
-      throw new Error("Macro not found");
+    if (groupError || !group) {
+      throw new Error("Group not found");
     }
 
-    updateData.macroId = data.macroId;
+    updateData.groupId = groupId;
   }
 
   const { data: category, error } = await supabase
@@ -657,9 +679,9 @@ export async function deleteCategory(id: string) {
 }
 
 /**
- * Create a custom macro (requires paid plan)
+ * Create a custom group (requires paid plan)
  */
-export async function createMacro(data: { name: string }) {
+export async function createGroup(data: { name: string }) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -669,34 +691,34 @@ export async function createMacro(data: { name: string }) {
     throw new Error("Unauthorized");
   }
 
-  // Check if user has paid plan (required for custom macros)
+  // Check if user has paid plan (required for custom groups)
   const isPaidPlan = await hasPaidPlan(authUser.id);
   if (!isPaidPlan) {
-    throw new Error("Creating custom macros requires a paid plan");
+    throw new Error("Creating custom groups requires a paid plan");
   }
 
-  // Check if user already has a macro with this name
-  // Note: Users can have macros with the same name as system defaults
-  const { data: existingMacro, error: checkError } = await supabase
+  // Check if user already has a group with this name
+  // Note: Users can have groups with the same name as system defaults
+  const { data: existingGroup, error: checkError } = await supabase
     .from("Group")
     .select("id, userId")
     .eq("name", data.name)
     .eq("userId", authUser.id)
     .single();
 
-  if (existingMacro && !checkError) {
-    throw new Error("You already have a macro with this name");
+  if (existingGroup && !checkError) {
+    throw new Error("You already have a group with this name");
   }
 
   const id = crypto.randomUUID();
   const now = getCurrentTimestamp();
 
-  const { data: macro, error } = await supabase
+  const { data: group, error } = await supabase
     .from("Group")
     .insert({
       id,
       name: data.name,
-      userId: authUser.id, // Personal macro
+      userId: authUser.id, // Personal group
       createdAt: now,
       updatedAt: now,
     })
@@ -704,20 +726,25 @@ export async function createMacro(data: { name: string }) {
     .single();
 
   if (error) {
-    console.error("Supabase error creating macro:", error);
-    throw new Error(`Failed to create macro: ${error.message || JSON.stringify(error)}`);
+    console.error("Supabase error creating group:", error);
+    throw new Error(`Failed to create group: ${error.message || JSON.stringify(error)}`);
   }
 
   // Invalidate cache
   await invalidateCategoriesCache(authUser.id);
 
-  return macro;
+  return group;
+}
+
+// Deprecated: Use createGroup instead
+export async function createMacro(data: { name: string }) {
+  return createGroup(data);
 }
 
 /**
- * Delete a custom macro (only user's own macros)
+ * Delete a custom group (only user's own groups)
  */
-export async function deleteMacro(id: string) {
+export async function deleteGroup(id: string) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -727,35 +754,40 @@ export async function deleteMacro(id: string) {
     throw new Error("Unauthorized");
   }
 
-  // Verify macro belongs to user (can't delete system defaults)
-  const { data: existingMacro, error: checkError } = await supabase
+  // Verify group belongs to user (can't delete system defaults)
+  const { data: existingGroup, error: checkError } = await supabase
     .from("Group")
     .select("id, userId")
     .eq("id", id)
     .single();
 
-  if (checkError || !existingMacro) {
-    throw new Error("Macro not found");
+  if (checkError || !existingGroup) {
+    throw new Error("Group not found");
   }
 
-  if (existingMacro.userId !== authUser.id) {
-    throw new Error("Cannot delete system default macros");
+  if (existingGroup.userId !== authUser.id) {
+    throw new Error("Cannot delete system default groups");
   }
 
-  // Delete the macro (categories will be cascade deleted)
+  // Delete the group (categories will be cascade deleted)
   const { error } = await supabase
     .from("Group")
     .delete()
     .eq("id", id)
-    .eq("userId", authUser.id); // Only delete user's own macros
+    .eq("userId", authUser.id); // Only delete user's own groups
 
   if (error) {
-    console.error("Supabase error deleting macro:", error);
-    throw new Error(`Failed to delete macro: ${error.message || JSON.stringify(error)}`);
+    console.error("Supabase error deleting group:", error);
+    throw new Error(`Failed to delete group: ${error.message || JSON.stringify(error)}`);
   }
 
   // Invalidate cache
   await invalidateCategoriesCache(authUser.id);
 
   return true;
+}
+
+// Deprecated: Use deleteGroup instead
+export async function deleteMacro(id: string) {
+  return deleteGroup(id);
 }

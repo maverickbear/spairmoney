@@ -343,6 +343,7 @@ export async function createAccountClient(data: AccountFormData): Promise<Accoun
       type: data.type,
       creditLimit: data.type === "credit" ? data.creditLimit : null,
       initialBalance: (data.type === "checking" || data.type === "savings") ? (data.initialBalance ?? 0) : null,
+      dueDayOfMonth: data.type === "credit" ? (data.dueDayOfMonth ?? null) : null,
       userId: user.id,
       createdAt: now,
       updatedAt: now,
@@ -392,11 +393,21 @@ export async function updateAccountClient(id: string, data: Partial<AccountFormD
     if (data.type === "credit") {
       updateData.creditLimit = data.creditLimit ?? null;
       updateData.initialBalance = null;
+      // Handle dueDayOfMonth: keep it if provided, otherwise set to null when changing to credit
+      if (data.dueDayOfMonth !== undefined) {
+        updateData.dueDayOfMonth = data.dueDayOfMonth;
+      }
     } else {
       updateData.creditLimit = null;
+      updateData.dueDayOfMonth = null;
     }
   } else if (data.creditLimit !== undefined) {
     updateData.creditLimit = data.creditLimit;
+  }
+  
+  // Handle dueDayOfMonth: update if provided (only for credit cards)
+  if (data.dueDayOfMonth !== undefined) {
+    updateData.dueDayOfMonth = data.dueDayOfMonth;
   }
   
   // Handle initialBalance: set to null if not checking/savings type, otherwise use provided value

@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Invalidate cache
-    const { invalidateSubscriptionCache } = await import("@/lib/api/plans");
+    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
     await invalidateSubscriptionCache(authUser.id);
 
     return NextResponse.json({ 

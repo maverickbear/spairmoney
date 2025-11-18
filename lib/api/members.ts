@@ -5,7 +5,7 @@ import { MemberInviteFormData, MemberUpdateFormData } from "@/lib/validations/me
 import { formatTimestamp } from "@/lib/utils/timestamp";
 import { getAuthErrorMessage } from "@/lib/utils/auth-errors";
 import { validatePasswordAgainstHIBP } from "@/lib/utils/hibp";
-import { checkPlanLimits } from "./plans";
+// checkPlanLimits removed - not used in this file
 import { sendInvitationEmail } from "@/lib/utils/email";
 import { guardHouseholdMembers, throwIfNotAllowed } from "@/lib/api/feature-guard";
 
@@ -164,7 +164,7 @@ export async function inviteMember(ownerId: string, data: MemberInviteFormData):
         await sendInvitationEmail({
           to: data.email.toLowerCase(),
           memberName: data.name || data.email,
-          ownerName: owner.name || owner.email || "Um usuário",
+          ownerName: owner.name || owner.email || "A user",
           ownerEmail: owner.email,
           invitationToken,
           appUrl: process.env.NEXT_PUBLIC_APP_URL,
@@ -346,6 +346,60 @@ export async function removeMember(memberId: string): Promise<void> {
   try {
     const supabase = await createServerClient();
 
+    // Get member info before deleting
+    const { data: member, error: fetchError } = await supabase
+      .from("HouseholdMember")
+      .select("memberId, email, name")
+      .eq("id", memberId)
+      .single();
+
+    if (fetchError || !member) {
+      throw new Error("Member not found");
+    }
+
+    // Only proceed if member has a memberId (is an active member, not just pending)
+    if (member.memberId) {
+      const userId = member.memberId;
+      const now = formatTimestamp(new Date());
+
+      // Check if user already has their own household (is owner)
+      const { data: existingOwnerHousehold } = await supabase
+        .from("HouseholdMember")
+        .select("id")
+        .eq("ownerId", userId)
+        .eq("memberId", userId)
+        .maybeSingle();
+
+      // If user doesn't have their own household, create one
+      if (!existingOwnerHousehold) {
+        const invitationToken = crypto.randomUUID();
+        
+        const { error: createHouseholdError } = await supabase
+          .from("HouseholdMember")
+          .insert({
+            ownerId: userId,
+            memberId: userId,
+            email: member.email,
+            name: member.name || null,
+            role: "admin", // User becomes admin of their own household
+            status: "active",
+            invitationToken: invitationToken,
+            invitedAt: now,
+            acceptedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+        if (createHouseholdError) {
+          console.error("Error creating individual household for removed member:", createHouseholdError);
+          // Don't fail the removal if household creation fails, but log it
+        } else {
+          console.log("[MEMBERS] removeMember - Created individual household for removed member:", userId);
+        }
+      }
+    }
+
+    // Delete the member from the household
     const { error } = await supabase
       .from("HouseholdMember")
       .delete()
@@ -396,7 +450,7 @@ export async function resendInvitationEmail(memberId: string): Promise<void> {
     await sendInvitationEmail({
       to: member.email,
       memberName: member.name || member.email,
-      ownerName: owner.name || owner.email || "Um usuário",
+      ownerName: owner.name || owner.email || "A user",
       ownerEmail: owner.email,
       invitationToken: member.invitationToken,
       appUrl: process.env.NEXT_PUBLIC_APP_URL,

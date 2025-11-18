@@ -523,7 +523,7 @@ function SuccessContent() {
               </CardTitle>
               <CardDescription className="text-lg">
                 {subscriptionStatus === "trialing" 
-                  ? "Your 30-day trial has started. Start exploring all premium features!"
+                  ? "Your 30-day trial has started. Start exploring all pro features!"
                   : "Thank you for subscribing. Your account has been upgraded."}
               </CardDescription>
             </CardHeader>
@@ -535,7 +535,7 @@ function SuccessContent() {
                     <>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                        <span>Your 30-day trial is active and you have access to all premium features</span>
+                        <span>Your 30-day trial is active and you have access to all pro features</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
@@ -562,7 +562,7 @@ function SuccessContent() {
                     <>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                        <span>Your subscription is now active and you have access to all premium features</span>
+                        <span>Your subscription is now active and you have access to all pro features</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />

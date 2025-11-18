@@ -3,7 +3,7 @@
 import { createServerClient } from "@/lib/supabase-server";
 import { InvestmentTransactionFormData, SecurityPriceFormData, InvestmentAccountFormData } from "@/lib/validations/investment";
 import { formatTimestamp, formatDateStart, formatDateEnd, formatDateOnly } from "@/lib/utils/timestamp";
-import { mapClassToSector } from "@/lib/utils/portfolio-utils";
+import { mapClassToSector, normalizeAssetType } from "@/lib/utils/portfolio-utils";
 import { logger } from "@/lib/utils/logger";
 
 export interface Holding {
@@ -27,51 +27,20 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
   const supabase = await createServerClient();
   const log = logger.withPrefix("INVESTMENTS");
 
-  // OPTIMIZED: Try to use materialized view first (much faster)
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      let viewQuery = supabase
-        .from("holdings_view")
-        .select("*")
-        .eq("user_id", user.id)
-        .gt("quantity", 0)
-        .order("market_value", { ascending: false });
-
-      if (accountId) {
-        viewQuery = viewQuery.eq("account_id", accountId);
-      }
-
-      const { data: holdingsView, error: viewError } = await viewQuery;
-
-      if (!viewError && holdingsView && holdingsView.length > 0) {
-        // Convert view format to Holding format
-        const holdings: Holding[] = holdingsView.map((h: any) => ({
-          securityId: h.security_id,
-          symbol: h.symbol || "",
-          name: h.name || h.symbol || "",
-          assetType: h.asset_type || "Stock",
-          sector: h.sector || "Unknown",
-          quantity: h.quantity || 0,
-          avgPrice: h.avg_price || 0,
-          bookValue: h.book_value || 0,
-          lastPrice: h.last_price || 0,
-          marketValue: h.market_value || 0,
-          unrealizedPnL: h.unrealized_pnl || 0,
-          unrealizedPnLPercent: h.unrealized_pnl_percent || 0,
-          accountId: h.account_id,
-          accountName: h.account_name || "Unknown Account",
-        }));
-
-        return holdings;
-      }
-    }
-  } catch (viewError) {
-    // View not available or error - fallback to original logic
-    log.debug("Holdings view not available, using fallback:", viewError);
+  // Verify user context
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    console.error("[getHoldings] ERROR: No authenticated user!", userError);
+    return [];
   }
+  console.log("[getHoldings] Called for user:", user.id, accountId ? `(account: ${accountId})` : "(all accounts)");
 
-  // First, try to get holdings from Questrade positions (more accurate)
+  // NOTE: Materialized view (holdings_view) is disabled because it calculates
+  // book_value incorrectly for sell transactions (uses sell price instead of avg cost).
+  // We use Questrade positions when available, or calculate from transactions (correct).
+  // See: docs/ANALISE_PORTFOLIO_CALCULOS.md for details.
+
+  // First, try to get holdings from Questrade positions (more accurate and faster)
   const { data: questradePositions, error: positionsError } = await supabase
     .from("Position")
     .select(`
@@ -81,6 +50,8 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
     `)
     .gt("openQuantity", 0)
     .order("lastUpdatedAt", { ascending: false });
+  
+  console.log("[getHoldings] Questrade positions:", questradePositions?.length || 0, positionsError ? `(error: ${positionsError.message})` : "");
 
   if (!positionsError && questradePositions && questradePositions.length > 0) {
     // Questrade positions found - use them directly
@@ -129,7 +100,7 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
     .select(`
       *,
       security:Security(*),
-      account:Account(*)
+      account:Account!InvestmentTransaction_accountId_fkey(*)
     `)
     .order("date", { ascending: true });
 
@@ -141,12 +112,16 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
 
   if (error) {
     log.error("Error fetching investment transactions:", error);
+    console.error("[getHoldings] Query error:", error);
     return [];
   }
 
   if (!transactions || transactions.length === 0) {
+    console.log("[getHoldings] No transactions found for user:", user.id);
     return [];
   }
+  
+  console.log("[getHoldings] Found", transactions.length, "transactions for user:", user.id);
 
   // Group by security and account (same security in different accounts = different holdings)
   const holdingKeyMap = new Map<string, Holding>();
@@ -250,7 +225,7 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
     // Apply prices to holdings
     for (const [holdingKey, holding] of holdingKeyMap) {
       const latestPrice = priceMap.get(holding.securityId);
-      if (latestPrice) {
+      if (latestPrice && latestPrice > 0) {
         holding.lastPrice = latestPrice;
         holding.marketValue = holding.quantity * latestPrice;
         holding.unrealizedPnL = holding.marketValue - holding.bookValue;
@@ -260,9 +235,32 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
       } else {
         // Fallback: use average price if no current price available
         // This ensures marketValue is calculated even without SecurityPrice entries
-        holding.lastPrice = holding.avgPrice;
-        holding.marketValue = holding.quantity * holding.avgPrice;
-        holding.unrealizedPnL = 0; // No P&L if using book value
+        if (holding.avgPrice > 0) {
+          holding.lastPrice = holding.avgPrice;
+          holding.marketValue = holding.quantity * holding.avgPrice;
+          holding.unrealizedPnL = 0; // No P&L if using book value
+          holding.unrealizedPnLPercent = 0;
+        } else {
+          // Last resort: if no price at all, use book value as market value
+          // This ensures we at least show something instead of zero
+          console.warn(`[getHoldings] No price found for ${holding.symbol} (securityId: ${holding.securityId}). Using book value as fallback.`);
+          holding.lastPrice = holding.bookValue > 0 && holding.quantity > 0 
+            ? holding.bookValue / holding.quantity 
+            : 0;
+          holding.marketValue = holding.bookValue; // Use book value as market value
+          holding.unrealizedPnL = 0;
+          holding.unrealizedPnLPercent = 0;
+        }
+      }
+    }
+  } else {
+    // No prices found at all - use book value as fallback for all holdings
+    console.warn("[getHoldings] No prices found for any security. Using book value as market value fallback.");
+    for (const [holdingKey, holding] of holdingKeyMap) {
+      if (holding.quantity > 0 && holding.bookValue > 0) {
+        holding.lastPrice = holding.bookValue / holding.quantity;
+        holding.marketValue = holding.bookValue;
+        holding.unrealizedPnL = 0;
         holding.unrealizedPnLPercent = 0;
       }
     }
@@ -272,10 +270,17 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
   const holdings = Array.from(holdingKeyMap.values()).filter((h) => h.quantity > 0);
   
   // Log summary only in development and only if there were skipped transactions
-  if (process.env.NODE_ENV === "development" && skippedTransactions.length > 0) {
-    log.debug(`Skipped ${skippedTransactions.length} transactions without securityId:`, skippedTransactions.slice(0, 5));
-    if (skippedTransactions.length > 5) {
-      log.debug(`... and ${skippedTransactions.length - 5} more`);
+  if (process.env.NODE_ENV === "development") {
+    if (skippedTransactions.length > 0) {
+      log.debug(`Skipped ${skippedTransactions.length} transactions without securityId:`, skippedTransactions.slice(0, 5));
+      if (skippedTransactions.length > 5) {
+        log.debug(`... and ${skippedTransactions.length - 5} more`);
+      }
+    }
+    console.log(`[getHoldings] Final holdings count: ${holdings.length}`);
+    if (holdings.length > 0) {
+      const totalMarketValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
+      console.log(`[getHoldings] Total market value: ${totalMarketValue}`);
     }
   }
   
@@ -455,13 +460,16 @@ export async function createSecurity(data: { symbol: string; name: string; class
   const id = crypto.randomUUID();
   const now = formatTimestamp(new Date());
 
+  // Normalize asset type to ensure consistent format (Stock, ETF, Crypto, etc.)
+  const normalizedClass = normalizeAssetType(data.class);
+
   const { data: security, error } = await supabase
     .from("Security")
     .insert({
       id,
       symbol: data.symbol.toUpperCase(),
       name: data.name,
-      class: data.class,
+      class: normalizedClass,
       createdAt: now,
       updatedAt: now,
     })
