@@ -376,7 +376,8 @@ export async function checkTransactionLimit(userId: string, month: Date = new Da
     let current = 0;
     
     // If no usage data found (null) or error (except not found), fallback to COUNT
-    if (!usage || (usageError && usageError.code !== 'PGRST116')) {
+    const hasError = usageError && (usageError as { code?: string }).code !== 'PGRST116';
+    if (!usage || hasError) {
       // Fallback to COUNT if table doesn't have data or has error
       const { count, error } = await supabase
         .from("Transaction")
