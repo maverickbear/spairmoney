@@ -188,7 +188,7 @@ export function CandlesChart({ securityId, symbol }: CandlesChartProps) {
             </Select>
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={loadCandles}
               disabled={loading}
             >

@@ -118,7 +118,7 @@ export function QuotesTable() {
           <CardTitle>Market Quotes</CardTitle>
           <Button
             variant="outline"
-            size="sm"
+            size="small"
             onClick={handleRefresh}
             disabled={loading || refreshing}
           >
