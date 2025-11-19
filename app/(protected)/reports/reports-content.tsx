@@ -37,6 +37,7 @@ import { FinancialHealthInsights } from "@/components/reports/financial-health-i
 import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { CategoryExpensesChart } from "@/components/charts/category-expenses-chart";
 import { PageHeader } from "@/components/common/page-header";
+import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 
 interface ReportsContentProps {
   limits: PlanFeatures;
@@ -163,35 +164,74 @@ export function ReportsContent({
     : `${format(dateRange.startDate, "MMM dd, yyyy")} - ${format(dateRange.endDate, "MMM dd, yyyy")}`;
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <SimpleTabs defaultValue="overview" className="w-full">
       <PageHeader
         title="Reports"
-        description={`Complete financial overview and analysis for ${periodDescription}`}
       />
 
-      {/* Financial Overview - Always visible */}
-      <FinancialOverviewCard
-        currentMonthTransactions={currentMonthTransactions}
-        lastMonthTransactions={lastMonthTransactions}
-        financialHealth={financialHealth}
-        now={now}
-      />
+      {/* Fixed Tabs - Desktop only */}
+      <FixedTabsWrapper>
+          <SimpleTabsList className="flex-wrap">
+            <SimpleTabsTrigger value="overview">Overview</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="income-expenses">Income & Expenses</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="investments">Investments</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="debts">Debts</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="goals">Goals</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="accounts">Accounts</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="insights">Insights</SimpleTabsTrigger>
+          </SimpleTabsList>
+      </FixedTabsWrapper>
 
-      {/* Tabs for organized sections */}
-      <SimpleTabs defaultValue="overview" className="w-full">
-        <SimpleTabsList className="flex-wrap">
-          <SimpleTabsTrigger value="overview">Overview</SimpleTabsTrigger>
-          <SimpleTabsTrigger value="income-expenses">Income & Expenses</SimpleTabsTrigger>
-          <SimpleTabsTrigger value="investments">Investments</SimpleTabsTrigger>
-          <SimpleTabsTrigger value="debts">Debts</SimpleTabsTrigger>
-          <SimpleTabsTrigger value="goals">Goals</SimpleTabsTrigger>
-          <SimpleTabsTrigger value="accounts">Accounts</SimpleTabsTrigger>
-          <SimpleTabsTrigger value="insights">Insights</SimpleTabsTrigger>
-        </SimpleTabsList>
+      {/* Mobile/Tablet Tabs - Sticky at top */}
+        <div 
+        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        >
+          <div 
+            className="overflow-x-auto scrollbar-hide" 
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              scrollSnapType: 'x mandatory',
+              touchAction: 'pan-x',
+            }}
+          >
+            <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
+              <SimpleTabsTrigger value="overview" className="flex-shrink-0 whitespace-nowrap">
+                Overview
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="income-expenses" className="flex-shrink-0 whitespace-nowrap">
+                Income & Expenses
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="investments" className="flex-shrink-0 whitespace-nowrap">
+                Investments
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="debts" className="flex-shrink-0 whitespace-nowrap">
+                Debts
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="goals" className="flex-shrink-0 whitespace-nowrap">
+                Goals
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="accounts" className="flex-shrink-0 whitespace-nowrap">
+                Accounts
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="insights" className="flex-shrink-0 whitespace-nowrap">
+                Insights
+              </SimpleTabsTrigger>
+            </SimpleTabsList>
+        </div>
+      </div>
+
+      <div className="w-full p-4 lg:p-8">
+        {/* Financial Overview - Always visible */}
+        <FinancialOverviewCard
+          currentMonthTransactions={currentMonthTransactions}
+          lastMonthTransactions={lastMonthTransactions}
+          financialHealth={financialHealth}
+          now={now}
+        />
 
         {/* Overview Tab */}
-        <SimpleTabsContent value="overview" className="space-y-4">
-          {/* Income vs Expenses Trend */}
+        <SimpleTabsContent value="overview">
+        {/* Income vs Expenses Trend */}
           {monthlyData.length > 0 && (
             <IncomeExpensesChart data={monthlyData} />
           )}
@@ -205,11 +245,8 @@ export function ReportsContent({
           )}
 
           {/* Monthly Summary Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg md:text-xl">Monthly Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="space-y-2">
+            <h3 className="text-lg md:text-xl font-semibold">Monthly Summary</h3>
               <div className="rounded-[12px] border overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -259,16 +296,12 @@ export function ReportsContent({
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
+          </div>
 
           {/* Top 10 Expenses */}
           <FeatureGuard feature="hasAdvancedReports" featureName="Advanced Reports">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg md:text-xl">Top 10 Expenses</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <div className="space-y-2">
+              <h3 className="text-lg md:text-xl font-semibold">Top 10 Expenses</h3>
                 <div className="rounded-[12px] border overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -309,13 +342,12 @@ export function ReportsContent({
                     </TableBody>
                   </Table>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           </FeatureGuard>
         </SimpleTabsContent>
 
         {/* Income & Expenses Tab */}
-        <SimpleTabsContent value="income-expenses" className="space-y-4">
+        <SimpleTabsContent value="income-expenses">
           {monthlyData.length > 0 && (
             <IncomeExpensesChart data={monthlyData} />
           )}
@@ -329,7 +361,7 @@ export function ReportsContent({
         </SimpleTabsContent>
 
         {/* Investments Tab */}
-        <SimpleTabsContent value="investments" className="space-y-4">
+        <SimpleTabsContent value="investments">
           <InvestmentPerformanceSection
             portfolioSummary={portfolioSummary}
             portfolioHoldings={portfolioHoldings}
@@ -338,17 +370,17 @@ export function ReportsContent({
         </SimpleTabsContent>
 
         {/* Debts Tab */}
-        <SimpleTabsContent value="debts" className="space-y-4">
+        <SimpleTabsContent value="debts">
           <DebtAnalysisSection debts={debts} />
         </SimpleTabsContent>
 
         {/* Goals Tab */}
-        <SimpleTabsContent value="goals" className="space-y-4">
+        <SimpleTabsContent value="goals">
           <GoalsProgressSection goals={goals} />
         </SimpleTabsContent>
 
         {/* Accounts Tab */}
-        <SimpleTabsContent value="accounts" className="space-y-4">
+        <SimpleTabsContent value="accounts">
           <AccountBalancesSection
             accounts={accounts}
             historicalTransactions={historicalTransactions}
@@ -357,11 +389,11 @@ export function ReportsContent({
         </SimpleTabsContent>
 
         {/* Insights Tab */}
-        <SimpleTabsContent value="insights" className="space-y-4">
-          <FinancialHealthInsights financialHealth={financialHealth} />
-        </SimpleTabsContent>
-      </SimpleTabs>
-    </div>
+      <SimpleTabsContent value="insights">
+        <FinancialHealthInsights financialHealth={financialHealth} />
+      </SimpleTabsContent>
+      </div>
+    </SimpleTabs>
   );
 }
 

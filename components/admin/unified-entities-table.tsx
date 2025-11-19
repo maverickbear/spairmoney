@@ -144,7 +144,7 @@ export function UnifiedEntitiesTable({
   const totalItems = groups.length + categories.length + subcategories.length;
 
   return (
-    <div className="rounded-md border">
+    <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>

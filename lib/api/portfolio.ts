@@ -81,13 +81,56 @@ export async function convertSupabaseHoldingToHolding(supabaseHolding: SupabaseH
   };
 }
 
-// Internal function to calculate portfolio summary (without cache)
-async function getPortfolioSummaryInternal(): Promise<PortfolioSummary> {
+// Internal data structure to share between portfolio functions
+interface PortfolioInternalData {
+  holdings: import("@/lib/api/investments").Holding[]; // Use the Holding type from investments
+  accounts: any[];
+  questradeAccounts: any[];
+}
+
+// Internal function to get shared portfolio data (holdings, accounts, etc.)
+// This avoids duplicate calls to getHoldings() and getInvestmentAccounts()
+// EXPORTED: Can be used by API routes to share data between endpoints
+export async function getPortfolioInternalData(
+  accessToken?: string, 
+  refreshToken?: string
+): Promise<PortfolioInternalData> {
   const { createServerClient } = await import("@/lib/supabase-server");
-  const supabase = await createServerClient();
+  const supabase = await createServerClient(accessToken, refreshToken);
+
+  // Fetch all data in parallel to avoid sequential calls
+  const [holdings, accounts, questradeAccountsResult] = await Promise.all([
+    getHoldings(undefined, accessToken, refreshToken),
+    getInvestmentAccounts(accessToken, refreshToken),
+    supabase
+      .from("InvestmentAccount")
+      .select("totalEquity, marketValue, cash, id")
+      .eq("isQuestradeConnected", true)
+  ]);
+
+  return {
+    holdings,
+    accounts,
+    questradeAccounts: questradeAccountsResult.data || [],
+  };
+}
+
+// Internal function to calculate portfolio summary (without cache)
+// OPTIMIZED: Now accepts shared data to avoid duplicate calls
+export async function getPortfolioSummaryInternal(
+  accessToken?: string, 
+  refreshToken?: string,
+  sharedData?: PortfolioInternalData
+): Promise<PortfolioSummary> {
+  const { createServerClient } = await import("@/lib/supabase-server");
+  const supabase = await createServerClient(accessToken, refreshToken);
 
   console.log("[Portfolio Summary Internal] Starting calculation...");
-  const holdings = await getHoldings();
+  
+  // Use shared data if provided, otherwise fetch it
+  const data = sharedData || await getPortfolioInternalData(accessToken, refreshToken);
+  const { holdings, accounts: allAccounts, questradeAccounts } = data;
+  
   console.log("[Portfolio Summary Internal] getHoldings() returned", holdings.length, "holdings");
   
   // Debug: Log holdings count and values
@@ -117,16 +160,6 @@ async function getPortfolioSummaryInternal(): Promise<PortfolioSummary> {
   } else {
     console.warn("[Portfolio Summary] WARNING: No holdings found!");
   }
-  
-  // Try to get total value from Questrade accounts first (more accurate)
-  // Optimized: Single query with only needed fields
-  const { data: questradeAccounts } = await supabase
-    .from("InvestmentAccount")
-    .select("totalEquity, marketValue, cash, id")
-    .eq("isQuestradeConnected", true);
-
-  // Also get all investment accounts to calculate total value
-  const allAccounts = await getInvestmentAccounts();
   
   // Debug: Log accounts
   if (process.env.NODE_ENV === "development") {
@@ -268,35 +301,64 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
     throw new Error("Unauthorized");
   }
 
+  // Get session tokens before checking cache (needed for cache validation check)
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  try {
+    const { createServerClient } = await import("@/lib/supabase-server");
+    const supabase = await createServerClient();
+    // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      // Only get session tokens if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        accessToken = session.access_token;
+        refreshToken = session.refresh_token;
+      }
+    }
+  } catch (error: any) {
+    console.warn("[Portfolio Summary] Could not get session tokens for cache check:", error?.message);
+    // Continue without tokens - functions will try to get them themselves
+  }
+
   // OPTIMIZED: Try Redis cache first (5 minutes TTL for portfolio data)
   const cacheKey = `portfolio:summary:${userId}`;
   const cached = await cache.get<PortfolioSummary>(cacheKey);
   if (cached) {
-    // CRITICAL FIX: If cached data shows zero values but we have holdings, recalculate
-    // This prevents stale cache from showing zeros when there are actual holdings
-    if (cached.totalValue === 0 && cached.holdingsCount === 0) {
-      // Check if we actually have holdings - if yes, cache is stale, recalculate
-      const holdings = await getHoldings();
-      if (holdings.length > 0) {
-        console.warn("[Portfolio Summary] Cache shows zero but we have", holdings.length, "holdings. Recalculating...");
-        // Delete stale cache and recalculate
-        await cache.delete(cacheKey);
-        // Continue to calculation below
-      } else {
-        // No holdings, cache is correct
-        console.log("[Portfolio Summary] Using cached data (no holdings):", cached);
-        return cached;
+    // OPTIMIZED: Removed unnecessary validation that called getHoldings() even when cache is valid
+    // The cache is trusted - if it shows zero, it's likely correct (user has no holdings)
+    // Cache invalidation happens when transactions are created/updated via invalidatePortfolioCache()
+    console.log("[Portfolio Summary] Using cached data:", cached);
+    return cached;
+  }
+
+  // Use tokens already retrieved above (or get them if not retrieved yet)
+  if (!accessToken || !refreshToken) {
+    try {
+      const { createServerClient } = await import("@/lib/supabase-server");
+      const supabase = await createServerClient();
+      // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Only get session tokens if user is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          accessToken = session.access_token;
+          refreshToken = session.refresh_token;
+        }
       }
-    } else {
-      // Cache has valid data
-      console.log("[Portfolio Summary] Using cached data:", cached);
-      return cached;
+    } catch (error: any) {
+      console.warn("[Portfolio Summary] Could not get session tokens:", error?.message);
+      // Continue without tokens - functions will try to get them themselves
     }
   }
 
   // Fallback to Next.js cache if Redis not available
   const result = await unstable_cache(
-    async () => getPortfolioSummaryInternal(),
+    async () => getPortfolioSummaryInternal(accessToken, refreshToken),
     [`portfolio-summary-${userId}`],
     {
       tags: ['investments', 'portfolio'],
@@ -332,36 +394,39 @@ export async function invalidatePortfolioCache(userId?: string): Promise<void> {
   revalidateTag('investments', 'layout');
   revalidateTag('portfolio', 'layout');
   
+  // Clear in-memory holdings cache for this user
+  const { clearHoldingsCache } = await import("@/lib/api/investments");
+  clearHoldingsCache(targetUserId);
+  
   if (process.env.NODE_ENV === "development") {
     console.log("[Portfolio Cache] Invalidated cache for user:", targetUserId);
   }
 }
 
 // Get portfolio holdings (convert from Supabase format)
-export async function getPortfolioHoldings(): Promise<Holding[]> {
-  const supabaseHoldings = await getHoldings();
+export async function getPortfolioHoldings(accessToken?: string, refreshToken?: string): Promise<Holding[]> {
+  const supabaseHoldings = await getHoldings(undefined, accessToken, refreshToken);
   return Promise.all(supabaseHoldings.map(convertSupabaseHoldingToHolding));
 }
 
-// Get portfolio accounts with calculated values
-export async function getPortfolioAccounts(): Promise<Account[]> {
-  const { createServerClient } = await import("@/lib/supabase-server");
-  const supabase = await createServerClient();
+// Internal function to calculate portfolio accounts (without fetching data)
+// OPTIMIZED: Accepts shared data to avoid duplicate calls
+export async function getPortfolioAccountsInternal(
+  sharedData: PortfolioInternalData,
+  supabase: any
+): Promise<Account[]> {
+  const { holdings, accounts, questradeAccounts } = sharedData;
 
-  // Get all accounts, prioritizing Questrade accounts with real balance data
-  const accounts = await getInvestmentAccounts();
-  const holdings = await getHoldings();
-
-  // Get Questrade accounts with balance information
-  const { data: questradeAccounts } = await supabase
+  // Get full Questrade account details for display
+  const { data: questradeAccountsFull } = await supabase
     .from("InvestmentAccount")
     .select("*")
     .eq("isQuestradeConnected", true);
 
   // Create a map of account values from Questrade balances
   const questradeAccountValues = new Map<string, number>();
-  if (questradeAccounts) {
-    for (const account of questradeAccounts) {
+  if (questradeAccountsFull) {
+    for (const account of questradeAccountsFull) {
       // Use totalEquity if available, otherwise use marketValue + cash
       const accountValue = account.totalEquity ?? 
         ((account.marketValue || 0) + (account.cash || 0));
@@ -396,17 +461,58 @@ export async function getPortfolioAccounts(): Promise<Account[]> {
   });
 }
 
-// Internal function to calculate portfolio historical data (without cache)
-async function getPortfolioHistoricalDataInternal(days: number = 365): Promise<HistoricalDataPoint[]> {
+// Get portfolio accounts with calculated values
+// OPTIMIZED: Now reuses shared data to avoid duplicate calls
+export async function getPortfolioAccounts(sharedData?: PortfolioInternalData): Promise<Account[]> {
   const { createServerClient } = await import("@/lib/supabase-server");
   const supabase = await createServerClient();
+
+  // Get session tokens for passing to functions
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        accessToken = session.access_token;
+        refreshToken = session.refresh_token;
+      }
+    }
+  } catch (error: any) {
+    // Continue without tokens - functions will try to get them themselves
+  }
+
+  // OPTIMIZED: Use shared data if provided, otherwise fetch it
+  const data = sharedData || await getPortfolioInternalData(accessToken, refreshToken);
+  
+  return getPortfolioAccountsInternal(data, supabase);
+}
+
+// Internal function to calculate portfolio historical data (without cache)
+// OPTIMIZED: Now accepts shared data to avoid duplicate calls
+export async function getPortfolioHistoricalDataInternal(
+  days: number = 365, 
+  accessToken?: string, 
+  refreshToken?: string,
+  sharedData?: PortfolioInternalData
+): Promise<HistoricalDataPoint[]> {
+  const { createServerClient } = await import("@/lib/supabase-server");
+  const supabase = await createServerClient(accessToken, refreshToken);
+  
+  // Use shared data if provided, otherwise fetch it
+  const sharedPortfolioData = sharedData || await getPortfolioInternalData(accessToken, refreshToken);
+  const { holdings: supabaseHoldings, accounts: allAccounts, questradeAccounts } = sharedPortfolioData;
   
   // Get current portfolio value using the same logic as getPortfolioSummaryInternal
-  // This includes Questrade account values, not just holdings
-  const summary = await getPortfolioSummaryInternal();
+  // OPTIMIZED: Pass shared data to avoid recalculating
+  const summary = await getPortfolioSummaryInternal(accessToken, refreshToken, sharedPortfolioData);
   const currentValue = summary.totalValue;
   
-  const portfolioHoldings = await getPortfolioHoldings();
+  // Convert holdings to portfolio format (reuse the same holdings)
+  const portfolioHoldings = await Promise.all(
+    supabaseHoldings.map(convertSupabaseHoldingToHolding)
+  );
   
   // Try to get historical data from SecurityPrice table
   const endDate = new Date();
@@ -415,13 +521,6 @@ async function getPortfolioHistoricalDataInternal(days: number = 365): Promise<H
   // Get all unique security IDs from current holdings
   // Note: portfolioHoldings is converted from SupabaseHolding, where id = securityId
   const securityIds = Array.from(new Set(portfolioHoldings.map(h => h.id)));
-  
-  // Get all investment accounts to check for Questrade accounts
-  const allAccounts = await getInvestmentAccounts();
-  const { data: questradeAccounts } = await supabase
-    .from("InvestmentAccount")
-    .select("id, totalEquity, marketValue, cash, isQuestradeConnected")
-    .eq("isQuestradeConnected", true);
   
   // If we have Questrade accounts, we should use their values
   // For historical data, we'll calculate from holdings but ensure today's value is accurate
@@ -706,9 +805,31 @@ export async function getPortfolioHistoricalData(days: number = 365): Promise<Hi
     return cached;
   }
 
+  // Get session tokens before entering cache (cookies can't be accessed inside unstable_cache)
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  try {
+    const { createServerClient } = await import("@/lib/supabase-server");
+    const supabase = await createServerClient();
+    // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      // Only get session tokens if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        accessToken = session.access_token;
+        refreshToken = session.refresh_token;
+      }
+    }
+  } catch (error: any) {
+    console.warn("[Portfolio Historical] Could not get session tokens:", error?.message);
+    // Continue without tokens - functions will try to get them themselves
+  }
+
   // Fallback to Next.js cache if Redis not available
   const result = await unstable_cache(
-    async () => getPortfolioHistoricalDataInternal(days),
+    async () => getPortfolioHistoricalDataInternal(days, accessToken, refreshToken),
     [`portfolio-historical-${userId}-${days}`],
     {
       tags: ['investments', 'portfolio'],

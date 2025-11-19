@@ -169,110 +169,46 @@ export default function BudgetsPage() {
 
   return (
     <FeatureGuard feature="hasBudgets" featureName="Budgets" requiredPlan="essential">
-    <div className="space-y-6 md:space-y-8">
-      <PageHeader
-        title="Budgets"
-        description={`Track your spending against budgets for ${format(now, "MMMM yyyy")}`}
-      />
+      <div>
+        <PageHeader
+          title="Budgets"
+        >
+          <Button
+            onClick={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedBudget(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Budget
+          </Button>
+        </PageHeader>
 
-      {/* Summary Cards */}
-      {!loading && hasLoaded && budgets.length > 0 && (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="w-full p-4 lg:p-8">
+          {/* Budgets Grid */}
+          {loading && !hasLoaded ? (
           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
-                <p className="text-2xl font-bold">{formatMoney(totalBudget)}</p>
-              </div>
+            <CardContent className="py-12 text-center">
+              <div className="text-muted-foreground">Loading budgets...</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Total Spent</p>
-                <p className="text-2xl font-bold">{formatMoney(totalSpent)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}% of budget
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Remaining</p>
-                <p className={`text-2xl font-bold ${totalRemaining < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
-                  {formatMoney(totalRemaining)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                    <span className="text-sm">{budgetsOnTrack}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                    <span className="text-sm">{budgetsWarning}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="h-2 w-2 rounded-full bg-destructive" />
-                    <span className="text-sm">{budgetsOver}</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Avg usage: {averageUsage.toFixed(1)}%
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Budgets Grid */}
-      {loading && !hasLoaded ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <div className="text-muted-foreground">Loading budgets...</div>
-          </CardContent>
-        </Card>
-      ) : budgets.length === 0 ? (
-        <EmptyState
-          icon={Wallet}
-          title="No budgets yet"
-          description="Create your first budget to start tracking your spending and stay on top of your finances."
-          actionLabel="Create Your First Budget"
-          onAction={() => {
-            if (!checkWriteAccess()) return;
-            setSelectedBudget(null);
-            setIsFormOpen(true);
-          }}
-          actionIcon={Plus}
-        />
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">
-              All Budgets ({budgets.length})
-            </h3>
-            {budgets.length > 0 && (
-              <Button
-                onClick={() => {
-                  if (!checkWriteAccess()) return;
-                  setSelectedBudget(null);
-                  setIsFormOpen(true);
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Budget
-              </Button>
-            )}
+        ) : budgets.length === 0 ? (
+          <div className="w-full h-full min-h-[400px]">
+          <EmptyState
+            icon={Wallet}
+            title="No budgets yet"
+            description="Create your first budget to start tracking your spending and stay on top of your finances."
+            actionLabel="Create Your First Budget"
+            onAction={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedBudget(null);
+              setIsFormOpen(true);
+            }}
+            actionIcon={Plus}
+          />
           </div>
+        ) : (
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {budgets.map((budget) => (
               <BudgetCard
@@ -293,30 +229,30 @@ export default function BudgetsPage() {
               />
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      <BudgetForm 
-        macros={macros}
-        categories={categories} 
-        period={now}
-        budget={selectedBudget || undefined}
-        open={isFormOpen}
-        onOpenChange={(open) => {
-          setIsFormOpen(open);
-          if (!open) {
+        <BudgetForm 
+          macros={macros}
+          categories={categories} 
+          period={now}
+          budget={selectedBudget || undefined}
+          open={isFormOpen}
+          onOpenChange={(open) => {
+            setIsFormOpen(open);
+            if (!open) {
+              setSelectedBudget(null);
+            }
+          }}
+          onSuccess={async () => {
             setSelectedBudget(null);
-          }
-        }}
-        onSuccess={async () => {
-          setSelectedBudget(null);
-          // Small delay to ensure database is updated
-          await new Promise(resolve => setTimeout(resolve, 100));
-          loadData();
-        }}
-      />
-      {ConfirmDialog}
-    </div>
+            // Small delay to ensure database is updated
+            await new Promise(resolve => setTimeout(resolve, 100));
+            loadData();
+          }}
+        />
+        {ConfirmDialog}
+        </div>
+      </div>
     </FeatureGuard>
   );
 }

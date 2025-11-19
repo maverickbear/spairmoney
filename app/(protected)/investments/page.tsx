@@ -10,6 +10,7 @@ import type { Holding as SupabaseHolding } from "@/lib/api/investments";
 import { convertSupabaseHoldingToHolding, type Holding, type Account, type HistoricalDataPoint } from "@/lib/api/portfolio";
 import { IntegrationDropdown } from "@/components/banking/integration-dropdown";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
+import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Button } from "@/components/ui/button";
 import { Plus, Upload, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
@@ -57,6 +58,7 @@ export default function InvestmentsPage() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   
   useEffect(() => {
     loadPortfolioData();
@@ -66,46 +68,33 @@ export default function InvestmentsPage() {
     try {
       setLoading(true);
       
-      // Fetch all portfolio data in parallel
-      const [summaryRes, holdingsRes, accountsRes, historicalRes] = await Promise.all([
-        fetch("/api/portfolio/summary", { cache: 'no-store' }).catch((err) => {
-          console.error("[Investments Page] Error fetching summary:", err);
-          return null;
-        }),
-        fetch("/api/portfolio/holdings", { cache: 'no-store' }).catch((err) => {
-          console.error("[Investments Page] Error fetching holdings:", err);
-          return null;
-        }),
-        fetch("/api/portfolio/accounts", { cache: 'no-store' }).catch((err) => {
-          console.error("[Investments Page] Error fetching accounts:", err);
-          return null;
-        }),
-        fetch("/api/portfolio/historical?days=365", { cache: 'no-store' }).catch((err) => {
-          console.error("[Investments Page] Error fetching historical:", err);
-          return null;
-        }),
-      ]);
+      // OPTIMIZED: Use consolidated endpoint to fetch all portfolio data in one request
+      // This reduces from 4 HTTP requests to 1, and shares data between functions
+      const allDataRes = await fetch("/api/portfolio/all?days=365", { cache: 'no-store' }).catch((err) => {
+        console.error("[Investments Page] Error fetching portfolio data:", err);
+        return null;
+      });
 
-      // Check for errors in responses
-      if (!summaryRes) {
-        console.error("[Investments Page] Summary request failed");
-      } else if (!summaryRes.ok) {
-        const errorText = await summaryRes.text();
-        console.error("[Investments Page] Summary response error:", summaryRes.status, errorText);
+      // Check for errors
+      if (!allDataRes) {
+        console.error("[Investments Page] Portfolio data request failed");
+        setLoading(false);
+        return;
       }
 
-      if (!holdingsRes) {
-        console.error("[Investments Page] Holdings request failed");
-      } else if (!holdingsRes.ok) {
-        const errorText = await holdingsRes.text();
-        console.error("[Investments Page] Holdings response error:", holdingsRes.status, errorText);
+      if (!allDataRes.ok) {
+        const errorText = await allDataRes.text();
+        console.error("[Investments Page] Portfolio data response error:", allDataRes.status, errorText);
+        setLoading(false);
+        return;
       }
 
-      // Get data from API responses
-      const summary = summaryRes?.ok ? await summaryRes.json() : null;
-      const holdingsData: SupabaseHolding[] = holdingsRes?.ok ? await holdingsRes.json() : null;
-      const accountsData = accountsRes?.ok ? await accountsRes.json() : null;
-      const historical = historicalRes?.ok ? await historicalRes.json() : null;
+      // Get all data from single response
+      const allData = await allDataRes.json();
+      const summary = allData.summary || null;
+      const holdingsData: SupabaseHolding[] = allData.holdings || null;
+      const accountsData = allData.accounts || null;
+      const historical = allData.historical || null;
       
       // Debug logging
       console.log("[Investments Page] Summary:", summary);
@@ -187,82 +176,85 @@ export default function InvestmentsPage() {
 
   return (
     <FeatureGuard feature="hasInvestments" featureName="Investments" requiredPlan="pro">
-      <div className="space-y-4 md:space-y-6">
-      <PageHeader
-        title="Portfolio Management"
-        description="Overview of your investment portfolio"
-      >
-        <div className="flex items-center gap-2">
-          <IntegrationDropdown
-            onSync={() => {
-              loadPortfolioData();
-            }}
-            onDisconnect={() => {
-              loadPortfolioData();
-            }}
-            onSuccess={loadPortfolioData}
-          />
-          <Button
-            onClick={async () => {
-              if (!checkWriteAccess()) return;
-              setIsUpdatingPrices(true);
-              try {
-                const response = await fetch("/api/investments/prices/update", {
-                  method: "POST",
-                });
-                if (response.ok) {
-                  const result = await response.json();
-                  loadPortfolioData();
-                  toast({
-                    title: "Prices updated",
-                    description: `Updated ${result.updated || 0} security prices${result.errors && result.errors.length > 0 ? `. ${result.errors.length} errors occurred.` : "."}`,
-                    variant: result.errors && result.errors.length > 0 ? "default" : "success",
+      <SimpleTabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <PageHeader
+            title="Portfolio Management"
+          >
+          <div className="flex items-center gap-2">
+            <IntegrationDropdown
+              onSync={() => {
+                loadPortfolioData();
+              }}
+              onDisconnect={() => {
+                loadPortfolioData();
+              }}
+              onSuccess={loadPortfolioData}
+            />
+            <Button
+              onClick={async () => {
+                if (!checkWriteAccess()) return;
+                setIsUpdatingPrices(true);
+                try {
+                  const response = await fetch("/api/investments/prices/update", {
+                    method: "POST",
                   });
-                } else {
-                  const error = await response.json();
+                  if (response.ok) {
+                    const result = await response.json();
+                    loadPortfolioData();
+                    toast({
+                      title: "Prices updated",
+                      description: `Updated ${result.updated || 0} security prices${result.errors && result.errors.length > 0 ? `. ${result.errors.length} errors occurred.` : "."}`,
+                      variant: result.errors && result.errors.length > 0 ? "default" : "success",
+                    });
+                  } else {
+                    const error = await response.json();
+                    console.error("Error updating prices:", error);
+                    toast({
+                      title: "Error",
+                      description: error.error || "Failed to update prices",
+                      variant: "destructive",
+                    });
+                  }
+                } catch (error) {
                   console.error("Error updating prices:", error);
-                  toast({
-                    title: "Error",
-                    description: error.error || "Failed to update prices",
-                    variant: "destructive",
-                  });
+                } finally {
+                  setIsUpdatingPrices(false);
                 }
-              } catch (error) {
-                console.error("Error updating prices:", error);
-              } finally {
-                setIsUpdatingPrices(false);
-              }
-            }}
-            variant="outline"
-            disabled={isUpdatingPrices}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingPrices ? "animate-spin" : ""}`} />
-            Update Prices
-          </Button>
-          <Button
-            onClick={() => {
-              if (!checkWriteAccess()) return;
-              setShowImportDialog(true);
-            }}
-            variant="outline"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import CSV
-          </Button>
-          <Button
-            onClick={() => {
-              if (!checkWriteAccess()) return;
-              setShowTransactionForm(true);
-            }}
-            variant="default"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Transaction
-          </Button>
-        </div>
-      </PageHeader>
+              }}
+              variant="outline"
+              size="medium"
+              disabled={isUpdatingPrices}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingPrices ? "animate-spin" : ""}`} />
+              Update Prices
+            </Button>
+            <Button
+              onClick={() => {
+                if (!checkWriteAccess()) return;
+                setShowImportDialog(true);
+              }}
+              variant="outline"
+              size="medium"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            <Button
+              onClick={() => {
+                if (!checkWriteAccess()) return;
+                setShowTransactionForm(true);
+              }}
+              variant="default"
+              size="medium"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Transaction
+            </Button>
+          </div>
+        </PageHeader>
 
-        <SimpleTabs defaultValue="overview" className="w-full">
+        {/* Fixed Tabs - Desktop only */}
+        <FixedTabsWrapper>
           <SimpleTabsList>
             <SimpleTabsTrigger value="overview">Overview</SimpleTabsTrigger>
             <SimpleTabsTrigger value="transactions">Transactions</SimpleTabsTrigger>
@@ -270,8 +262,42 @@ export default function InvestmentsPage() {
             <SimpleTabsTrigger value="executions">Executions</SimpleTabsTrigger>
             <SimpleTabsTrigger value="market-data">Market Data</SimpleTabsTrigger>
           </SimpleTabsList>
+        </FixedTabsWrapper>
 
-          <SimpleTabsContent value="overview" className="mt-4">
+        {/* Mobile/Tablet Tabs - Sticky at top */}
+        <div 
+          className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        >
+          <div 
+            className="overflow-x-auto scrollbar-hide" 
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              scrollSnapType: 'x mandatory',
+              touchAction: 'pan-x',
+            }}
+          >
+            <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
+              <SimpleTabsTrigger value="overview" className="flex-shrink-0 whitespace-nowrap">
+                Overview
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="transactions" className="flex-shrink-0 whitespace-nowrap">
+                Transactions
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="orders" className="flex-shrink-0 whitespace-nowrap">
+                Orders
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="executions" className="flex-shrink-0 whitespace-nowrap">
+                Executions
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="market-data" className="flex-shrink-0 whitespace-nowrap">
+                Market Data
+              </SimpleTabsTrigger>
+            </SimpleTabsList>
+          </div>
+        </div>
+
+        <div className="w-full p-4 lg:p-8">
+          <SimpleTabsContent value="overview">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -310,21 +336,20 @@ export default function InvestmentsPage() {
             />
           </SimpleTabsContent>
 
-          <SimpleTabsContent value="orders" className="mt-4">
+          <SimpleTabsContent value="orders">
             <OrdersTabContent />
           </SimpleTabsContent>
 
-          <SimpleTabsContent value="executions" className="mt-4">
+          <SimpleTabsContent value="executions">
             <ExecutionsTabContent />
           </SimpleTabsContent>
 
-          <SimpleTabsContent value="market-data" className="mt-4">
+          <SimpleTabsContent value="market-data">
             <MarketDataTabContent />
           </SimpleTabsContent>
-        </SimpleTabs>
-      </div>
+        </div>
       
-      <InvestmentTransactionForm
+        <InvestmentTransactionForm
         open={showTransactionForm}
         onOpenChange={setShowTransactionForm}
         onSuccess={() => {
@@ -337,7 +362,8 @@ export default function InvestmentsPage() {
         onSuccess={() => {
           loadPortfolioData();
         }}
-      />
+        />
+      </SimpleTabs>
     </FeatureGuard>
   );
 }

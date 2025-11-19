@@ -36,12 +36,9 @@ export function DesktopHeader({ hasSubscription = true }: DesktopHeaderProps) {
 
   return (
     <header 
-      className={`hidden lg:block fixed transition-all duration-300 ${
-        isCollapsed ? "left-16 right-0" : "left-64 right-0"
+      className={`hidden lg:block sticky top-0 transition-all duration-300 z-40 ${
+        isCollapsed ? "ml-16" : "ml-64"
       }`}
-      style={{
-        top: 'var(--page-header-height, 0px)',
-      }}
       id="desktop-header"
     >
       <UpgradeBanner />

@@ -193,13 +193,13 @@ export default function SubscriptionsPage() {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div>
       <PageHeader
         title="Subscriptions"
-        description="Manage your recurring service subscriptions"
       >
         {!(filteredSubscriptions.length === 0 && filterBy === "all") && (
           <Button
+            size="medium"
             onClick={() => {
               if (!checkWriteAccess()) return;
               setSelectedSubscription(null);
@@ -212,7 +212,8 @@ export default function SubscriptionsPage() {
         )}
       </PageHeader>
 
-      {subscriptions.length > 0 && (
+      <div className="w-full p-4 lg:p-8">
+        {subscriptions.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex gap-4 items-center">
             <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
@@ -288,7 +289,7 @@ export default function SubscriptionsPage() {
             ))}
 
             {filteredSubscriptions.length === 0 && (
-              <div className="col-span-full">
+              <div className="col-span-full w-full h-full min-h-[400px]">
                 <EmptyState
                   icon={Plus}
                   title={filterBy === "all" ? "No subscriptions created yet" : `No ${filterBy} subscriptions found`}
@@ -316,7 +317,7 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
+      <div className={`hidden lg:block rounded-[12px] overflow-x-auto ${filteredSubscriptions.length > 0 || (loading && subscriptions.length > 0) ? 'border' : ''}`}>
         {loading && subscriptions.length > 0 ? (
           <Table>
             <TableHeader>
@@ -477,7 +478,7 @@ export default function SubscriptionsPage() {
             </TableBody>
           </Table>
         ) : (
-          <div className="p-8">
+          <div className="w-full h-full min-h-[400px]">
             <EmptyState
               icon={Plus}
               title={filterBy === "all" ? "No subscriptions created yet" : `No ${filterBy} subscriptions found`}
@@ -500,6 +501,7 @@ export default function SubscriptionsPage() {
             />
           </div>
         )}
+      </div>
       </div>
 
       <SubscriptionForm

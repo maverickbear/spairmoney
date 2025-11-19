@@ -11,6 +11,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -27,7 +28,6 @@ import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import { formatTransactionDate, parseDateInput, formatDateInput } from "@/lib/utils/timestamp";
 import { useToast } from "@/components/toast-provider";
 import { Loader2, Plus } from "lucide-react";
-import { Combobox, type ComboboxItem, type ComboboxGroup } from "@/components/ui/combobox";
 import { getAllCategoriesClient } from "@/lib/api/categories-client";
 import type { Category } from "@/lib/api/categories-client";
 import { getAccountsClient } from "@/lib/api/accounts-client";
@@ -61,8 +61,34 @@ export function SubscriptionForm({
   const [isAddingNewSubcategory, setIsAddingNewSubcategory] = useState(false);
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
 
-  // Get all subcategories grouped by category (only from Subscriptions group) for Combobox
-  const getComboboxGroups = (): ComboboxGroup[] => {
+  // Get all subcategories from Subscriptions group for Select
+  const getSubscriptionsSubcategories = () => {
+    // Filter categories to only include those from "Subscriptions" group
+    const subscriptionsCategories = allCategories.filter((category) => {
+      const groupName = category.group?.name?.toLowerCase() || "";
+      return groupName === "subscriptions" || groupName === "subscription";
+    });
+    
+    const allSubcategories: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [];
+    
+    subscriptionsCategories.forEach((category) => {
+      if (category.subcategories && category.subcategories.length > 0) {
+        category.subcategories.forEach((subcat) => {
+          allSubcategories.push({
+           id: subcat.id,
+           name: subcat.name,
+           categoryId: category.id,
+            categoryName: category.name,
+          });
+        });
+      }
+    });
+    
+    return allSubcategories;
+  };
+
+  // Get categories with subcategories grouped for Select
+  const getSubscriptionsCategoriesGrouped = () => {
     // Filter categories to only include those from "Subscriptions" group
     const subscriptionsCategories = allCategories.filter((category) => {
       const groupName = category.group?.name?.toLowerCase() || "";
@@ -74,7 +100,7 @@ export function SubscriptionForm({
       .map((category) => ({
         id: category.id,
         name: category.name,
-        items: category.subcategories!.map((subcat) => ({
+        subcategories: category.subcategories!.map((subcat) => ({
           id: subcat.id,
           name: subcat.name,
           categoryId: category.id,
@@ -271,22 +297,28 @@ export function SubscriptionForm({
     }
   }
 
-  function handleComboboxChange(value: string | null, item: ComboboxItem | null) {
-    if (item) {
-      // Selected an existing subcategory
-      form.setValue("subcategoryId", item.id);
-      form.setValue("serviceName", item.name);
-      setSelectedCategoryId((item as any).categoryId || "");
-      setIsAddingNewSubcategory(false);
-    } else if (value) {
-      // Custom value typed by user
-      form.setValue("serviceName", value);
+  function handleSelectChange(value: string) {
+    if (value === "custom") {
+      // User wants to create custom service name
+      setIsAddingNewSubcategory(true);
       form.setValue("subcategoryId", null);
+      form.setValue("serviceName", "");
+      setSelectedCategoryId("");
+    } else if (value) {
+      // Selected an existing subcategory
+      const subcategories = getSubscriptionsSubcategories();
+      const selected = subcategories.find((sub) => sub.id === value);
+      if (selected) {
+        form.setValue("subcategoryId", selected.id);
+        form.setValue("serviceName", selected.name);
+        setSelectedCategoryId(selected.categoryId);
       setIsAddingNewSubcategory(false);
+      }
     } else {
       // Cleared
-      form.setValue("serviceName", "");
       form.setValue("subcategoryId", null);
+      form.setValue("serviceName", "");
+      setSelectedCategoryId("");
       setIsAddingNewSubcategory(false);
     }
   }
@@ -397,20 +429,33 @@ export function SubscriptionForm({
           {/* Service Name / Subcategory */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Service Name</label>
-            <Combobox
-              groups={getComboboxGroups()}
-              value={form.watch("subcategoryId") || form.watch("serviceName") || null}
-              onChange={handleComboboxChange}
-              placeholder="Select or type service name..."
-              searchPlaceholder="Search or type service name..."
-              emptyMessage="No subcategories found in Subscriptions group."
-              noResultsMessage="No matches found. Type to create custom service name."
-              allowCustomValue={true}
-              size="large"
-              showClearButton={true}
-              onCreateNew={() => setIsAddingNewSubcategory(true)}
-              createNewLabel="Create New Subcategory"
-            />
+            <Select
+              value={form.watch("subcategoryId") || ""}
+              onValueChange={handleSelectChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select service name..." />
+              </SelectTrigger>
+              <SelectContent>
+                {getSubscriptionsCategoriesGrouped().map((category) => (
+                  <SelectGroup key={category.id}>
+                    <SelectLabel>{category.name}</SelectLabel>
+                    {category.subcategories.map((subcat) => (
+                      <SelectItem key={subcat.id} value={subcat.id}>
+                        {subcat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+                <SelectSeparator />
+                <SelectItem value="custom">
+                  <div className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    <span>Create New Service Name</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
             {isAddingNewSubcategory && (
               <div className="space-y-2">

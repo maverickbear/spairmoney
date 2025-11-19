@@ -398,6 +398,7 @@ export function GoalsTab() {
           </CardContent>
         </Card>
       ) : sortedGoals.length === 0 ? (
+        <div className="w-full h-full min-h-[400px]">
         <EmptyState
           icon={PiggyBank}
           title={filterBy === "all" ? "No goals created yet" : `No ${filterBy} goals found`}
@@ -417,6 +418,7 @@ export function GoalsTab() {
           }
           actionIcon={filterBy === "all" ? Plus : undefined}
         />
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">

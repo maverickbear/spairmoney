@@ -6,6 +6,21 @@ import { formatTimestamp, formatDateStart, formatDateEnd, formatDateOnly } from 
 import { mapClassToSector, normalizeAssetType } from "@/lib/utils/portfolio-utils";
 import { logger } from "@/lib/utils/logger";
 
+// In-memory cache for holdings to avoid duplicate calculations within the same request
+// This cache is request-scoped and helps reduce duplicate calls
+const holdingsCache = new Map<string, { data: Holding[], timestamp: number }>();
+const HOLDINGS_CACHE_TTL = 30000; // 30 seconds
+
+// Clear old cache entries periodically
+function cleanHoldingsCache() {
+  const now = Date.now();
+  for (const [key, value] of holdingsCache.entries()) {
+    if (now - value.timestamp > HOLDINGS_CACHE_TTL) {
+      holdingsCache.delete(key);
+    }
+  }
+}
+
 export interface Holding {
   securityId: string;
   symbol: string;
@@ -23,8 +38,13 @@ export interface Holding {
   accountName: string;
 }
 
-export async function getHoldings(accountId?: string): Promise<Holding[]> {
-  const supabase = await createServerClient();
+export async function getHoldings(
+  accountId?: string, 
+  accessToken?: string, 
+  refreshToken?: string,
+  useCache: boolean = true
+): Promise<Holding[]> {
+  const supabase = await createServerClient(accessToken, refreshToken);
   const log = logger.withPrefix("INVESTMENTS");
 
   // Verify user context
@@ -33,6 +53,18 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
     console.error("[getHoldings] ERROR: No authenticated user!", userError);
     return [];
   }
+
+  // Check in-memory cache first (helps avoid duplicate calls in same request)
+  const cacheKey = `holdings:${user.id}:${accountId || 'all'}`;
+  if (useCache) {
+    cleanHoldingsCache();
+    const cached = holdingsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < HOLDINGS_CACHE_TTL) {
+      console.log("[getHoldings] Using cached data for user:", user.id, accountId ? `(account: ${accountId})` : "(all accounts)");
+      return cached.data;
+    }
+  }
+
   console.log("[getHoldings] Called for user:", user.id, accountId ? `(account: ${accountId})` : "(all accounts)");
 
   // NOTE: Materialized view (holdings_view) is disabled because it calculates
@@ -89,6 +121,10 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
       };
     });
 
+    // Store in cache before returning
+    if (useCache) {
+      holdingsCache.set(cacheKey, { data: holdings, timestamp: Date.now() });
+    }
     return holdings;
   }
 
@@ -284,16 +320,36 @@ export async function getHoldings(accountId?: string): Promise<Holding[]> {
     }
   }
   
+  // Store in cache before returning (for transaction-based holdings)
+  if (useCache) {
+    holdingsCache.set(cacheKey, { data: holdings, timestamp: Date.now() });
+  }
+  
   return holdings;
 }
 
-export async function getPortfolioValue(accountId?: string): Promise<number> {
-  const holdings = await getHoldings(accountId);
+// Helper function to clear holdings cache (useful after transactions are created/updated)
+export async function clearHoldingsCache(userId?: string): Promise<void> {
+  if (userId) {
+    // Clear all cache entries for this user
+    for (const key of holdingsCache.keys()) {
+      if (key.startsWith(`holdings:${userId}:`)) {
+        holdingsCache.delete(key);
+      }
+    }
+  } else {
+    // Clear all cache
+    holdingsCache.clear();
+  }
+}
+
+export async function getPortfolioValue(accountId?: string, accessToken?: string, refreshToken?: string): Promise<number> {
+  const holdings = await getHoldings(accountId, accessToken, refreshToken);
   return holdings.reduce((sum, h) => sum + h.marketValue, 0);
 }
 
-export async function getAssetAllocation(accountId?: string) {
-  const holdings = await getHoldings(accountId);
+export async function getAssetAllocation(accountId?: string, accessToken?: string, refreshToken?: string) {
+  const holdings = await getHoldings(accountId, accessToken, refreshToken);
 
   const byClass = holdings.reduce(
     (acc, holding) => {
@@ -536,8 +592,8 @@ export async function createSecurityPrice(data: SecurityPriceFormData) {
   return price;
 }
 
-export async function getInvestmentAccounts() {
-  const supabase = await createServerClient();
+export async function getInvestmentAccounts(accessToken?: string, refreshToken?: string) {
+  const supabase = await createServerClient(accessToken, refreshToken);
   const log = logger.withPrefix("INVESTMENTS");
 
   // Verify authentication

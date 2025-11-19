@@ -27,10 +27,13 @@ export function PageHeader({ title, description, children, className }: PageHead
     const updateHeaderHeight = () => {
       const header = document.getElementById('page-header');
       if (header) {
-        const height = header.offsetHeight;
+        // Force height to 64px
+        header.style.height = '64px';
+        const height = 64; // Always 64px
         setHeaderHeight(height);
         // Update CSS variable on document root for banner positioning
-        document.documentElement.style.setProperty('--header-height', `${height}px`);
+        document.documentElement.style.setProperty('--header-height', '64px');
+        document.documentElement.style.setProperty('--page-header-height', '64px');
       }
     };
 
@@ -96,20 +99,21 @@ export function PageHeader({ title, description, children, className }: PageHead
       <div 
         id="page-header"
         style={isMounted ? { 
-          '--header-height': `${headerHeight}px`,
-        } as React.CSSProperties : {}}
+          '--header-height': '64px',
+          height: '64px',
+          lineHeight: '64px',
+        } as React.CSSProperties : { height: '64px', lineHeight: '64px' }}
         className={cn(
-          "fixed left-0 right-0 z-30 bg-card border-b transition-all duration-300",
+          "sticky top-0 z-30 bg-card border-b transition-all duration-300",
           "hidden lg:block",
-          "lg:top-0",
-          isMounted && isCollapsed ? "lg:left-16" : "lg:left-64",
+          "box-border overflow-hidden",
           className
         )}
         suppressHydrationWarning
       >
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 py-4 md:py-6">
-            <div className="space-y-1">
+        <div className="w-full p-4 lg:p-8 h-full flex items-center">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 w-full">
+            <div className="flex items-center">
               <h1 className="text-lg md:text-xl font-semibold">{title}</h1>
               {description && (
                 <p className="text-sm md:text-base text-muted-foreground">{description}</p>

@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Edit, Trash2, ChevronRight, ChevronDown, X, Loader2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { CategoryDialog } from "@/components/categories/category-dialog";
 import { GroupDialog } from "@/components/categories/group-dialog";
 import {
@@ -26,6 +27,13 @@ import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import type { Category, Macro } from "@/lib/api/categories-client";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import {
+  SimpleTabs,
+  SimpleTabsList,
+  SimpleTabsTrigger,
+  SimpleTabsContent,
+} from "@/components/ui/simple-tabs";
+import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 
 interface Subcategory {
   id: string;
@@ -57,6 +65,7 @@ export default function CategoriesPage() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [deletingSubcategoryId, setDeletingSubcategoryId] = useState<string | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"system" | "custom">("system");
 
   useEffect(() => {
     loadData();
@@ -355,323 +364,124 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <PageHeader
-        title="Categories"
-        description="Manage your categories and subcategories"
+    <SimpleTabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full">
+        <PageHeader
+          title="Categories"
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="medium" className="cursor-pointer">
+                Create New
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!checkWriteAccess()) return;
+                  setIsGroupDialogOpen(true);
+                }}
+              >
+                Create Group
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (!checkWriteAccess()) return;
+                  setSelectedCategory(null);
+                  setIsDialogOpen(true);
+                }}
+              >
+                Create Category
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </PageHeader>
+
+      {/* Fixed Tabs - Desktop only */}
+      <FixedTabsWrapper>
+        <SimpleTabsList>
+          <SimpleTabsTrigger value="system">
+            System Categories
+          </SimpleTabsTrigger>
+          <SimpleTabsTrigger value="custom">
+            Custom Categories
+          </SimpleTabsTrigger>
+        </SimpleTabsList>
+      </FixedTabsWrapper>
+
+      {/* Mobile/Tablet Tabs - Sticky at top */}
+      <div 
+        className="lg:hidden sticky top-0 z-40 bg-card border-b"
       >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="cursor-pointer">
-              Create New
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => {
-                if (!checkWriteAccess()) return;
-                setIsGroupDialogOpen(true);
-              }}
-            >
-              Create Group
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                if (!checkWriteAccess()) return;
-                setSelectedCategory(null);
-                setIsDialogOpen(true);
-              }}
-            >
-              Create Category
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </PageHeader>
+        <div 
+          className="overflow-x-auto scrollbar-hide" 
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            scrollSnapType: 'x mandatory',
+            touchAction: 'pan-x',
+          }}
+        >
+          <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
+            <SimpleTabsTrigger value="system" className="flex-shrink-0 whitespace-nowrap">
+              System Categories
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="custom" className="flex-shrink-0 whitespace-nowrap">
+              Custom Categories
+            </SimpleTabsTrigger>
+          </SimpleTabsList>
+        </div>
+      </div>
 
-      <div className="space-y-6">
-        {/* System Categories Section */}
-        {systemGroups.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold text-muted-foreground">System Categories</h2>
-            <div className="rounded-[12px] border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs md:text-sm w-[50px]"></TableHead>
-                    <TableHead className="text-xs md:text-sm">Group</TableHead>
-                    <TableHead className="text-xs md:text-sm">Category</TableHead>
-                    <TableHead className="text-xs md:text-sm">Subcategories</TableHead>
-                    <TableHead className="text-xs md:text-sm">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {systemGroups.map((group) => {
-                    const isExpanded = expandedGroups.has(group.macro.id);
-                    const hasCategories = group.categories.length > 0;
-                    
-                    return (
-                      <React.Fragment key={`system-${group.macro.id}`}>
-                        {/* Group header row */}
-                        <TableRow className="bg-muted/30 hover:bg-muted/50">
-                          <TableCell className="w-[50px]">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 md:h-8 md:w-8"
-                              onClick={() => toggleGroup(group.macro.id)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="text-xs md:text-sm font-semibold">
-                            {group.macro.name}
-                          </TableCell>
-                          <TableCell className="text-xs md:text-sm text-muted-foreground">
-                            {group.categories.length} {group.categories.length === 1 ? "category" : "categories"}
-                          </TableCell>
-                          <TableCell className="text-xs md:text-sm text-muted-foreground">
-                            {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0)}{" "}
-                            {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0) === 1
-                              ? "subcategory"
-                              : "subcategories"}
-                          </TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                        
-                        {/* Categories rows (shown when expanded) */}
-                        {isExpanded &&
-                          group.categories.map((category) => (
-                            <React.Fragment key={category.id}>
-                              {/* Category row */}
-                              <TableRow className="bg-background">
-                                <TableCell></TableCell>
-                                <TableCell></TableCell>
-                                <TableCell className="text-xs md:text-sm font-medium pl-6 md:pl-8">
-                                  {category.name}
-                                </TableCell>
-                                <TableCell className="text-xs md:text-sm">
-                                  {category.subcategories && category.subcategories.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {category.subcategories.map((subcat) => (
-                                        <div
-                                          key={subcat.id}
-                                          className="group relative inline-flex items-center gap-1"
-                                        >
-                                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground">
-                                            {subcat.logo && (
-                                              <img 
-                                                src={subcat.logo} 
-                                                alt={subcat.name}
-                                                className="h-3 w-3 object-contain rounded"
-                                                onError={(e) => {
-                                                  (e.target as HTMLImageElement).style.display = 'none';
-                                                }}
-                                              />
-                                            )}
-                                            {subcat.name}
-                                          </span>
-                                          {/* Only show delete button for user-created subcategories */}
-                                          {category.userId !== null && category.userId !== undefined && currentUserId && category.userId === currentUserId && (
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                              onClick={() => {
-                                                if (!checkWriteAccess()) return;
-                                                handleDeleteSubcategory(subcat.id);
-                                              }}
-                                              title="Delete subcategory"
-                                              disabled={deletingSubcategoryId === subcat.id}
-                                            >
-                                              {deletingSubcategoryId === subcat.id ? (
-                                                <Loader2 className="h-3 w-3 animate-spin text-destructive" />
-                                              ) : (
-                                                <X className="h-3 w-3 text-destructive" />
-                                              )}
-                                            </Button>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-1 md:space-x-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7 md:h-10 md:w-10"
-                                      onClick={() => {
-                                        if (!checkWriteAccess()) return;
-                                        setSelectedCategory(category);
-                                        setIsDialogOpen(true);
-                                      }}
-                                      title="Edit category (add subcategories)"
-                                    >
-                                      <Edit className="h-3 w-3 md:h-4 md:w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            </React.Fragment>
-                          ))}
-                        
-                      </React.Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        )}
-
-        {/* User Categories Section */}
-        {userGroups.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold">My Categories</h2>
-            <div className="rounded-[12px] border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs md:text-sm w-[50px]"></TableHead>
-                    <TableHead className="text-xs md:text-sm">Group</TableHead>
-                    <TableHead className="text-xs md:text-sm">Category</TableHead>
-                    <TableHead className="text-xs md:text-sm">Subcategories</TableHead>
-                    <TableHead className="text-xs md:text-sm">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {userGroups.map((group) => {
-                    const isExpanded = expandedGroups.has(group.macro.id);
-                    const hasCategories = group.categories.length > 0;
-                    
-                    return (
-                      <React.Fragment key={`user-${group.macro.id}`}>
-                        {/* Group header row */}
-                        <TableRow className="bg-muted/30 hover:bg-muted/50">
-                          <TableCell className="w-[50px]">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 md:h-8 md:w-8"
-                              onClick={() => toggleGroup(group.macro.id)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="text-xs md:text-sm font-semibold">
-                            {group.macro.name}
-                          </TableCell>
-                          <TableCell className="text-xs md:text-sm text-muted-foreground">
-                            {group.categories.length} {group.categories.length === 1 ? "category" : "categories"}
-                          </TableCell>
-                          <TableCell className="text-xs md:text-sm text-muted-foreground">
-                            {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0)}{" "}
-                            {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0) === 1
-                              ? "subcategory"
-                              : "subcategories"}
-                          </TableCell>
-                          <TableCell>
-                            {group.macro.userId !== null && (currentUserId ? group.macro.userId === currentUserId : false) && (
-                              <div className="flex space-x-1 md:space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 md:h-10 md:w-10"
-                                  onClick={() => {
-                                    if (!checkWriteAccess()) return;
-                                    handleDeleteGroup(group.macro.id);
-                                  }}
-                                  title="Delete group"
-                                  disabled={deletingGroupId === group.macro.id}
-                                >
-                                  {deletingGroupId === group.macro.id ? (
-                                    <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                                  )}
-                                </Button>
+      <div className="w-full p-4 lg:p-8">
+        <SimpleTabsContent value="system">
+          {/* System Categories Section */}
+          {systemGroups.length > 0 ? (
+            <>
+              {/* Mobile/Tablet Card View */}
+              <div className="lg:hidden space-y-4">
+                {systemGroups.map((group) => {
+                  const isExpanded = expandedGroups.has(group.macro.id);
+                  return (
+                    <Card key={`system-mobile-${group.macro.id}`}>
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => toggleGroup(group.macro.id)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-sm">{group.macro.name}</h3>
+                                <p className="text-xs text-muted-foreground">
+                                  {group.categories.length} {group.categories.length === 1 ? "category" : "categories"} • {" "}
+                                  {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0)}{" "}
+                                  {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0) === 1
+                                    ? "subcategory"
+                                    : "subcategories"}
+                                </p>
                               </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                        
-                        {/* Categories rows (shown when expanded) */}
-                        {isExpanded &&
-                          group.categories.map((category) => (
-                            <React.Fragment key={category.id}>
-                              {/* Category row */}
-                              <TableRow className="bg-background">
-                                <TableCell></TableCell>
-                                <TableCell></TableCell>
-                                <TableCell className="text-xs md:text-sm font-medium pl-6 md:pl-8">
-                                  {category.name}
-                                </TableCell>
-                                <TableCell className="text-xs md:text-sm">
-                                  {category.subcategories && category.subcategories.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {category.subcategories.map((subcat) => (
-                                        <div
-                                          key={subcat.id}
-                                          className="group relative inline-flex items-center gap-1"
-                                        >
-                                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground">
-                                            {subcat.logo && (
-                                              <img 
-                                                src={subcat.logo} 
-                                                alt={subcat.name}
-                                                className="h-3 w-3 object-contain rounded"
-                                                onError={(e) => {
-                                                  (e.target as HTMLImageElement).style.display = 'none';
-                                                }}
-                                              />
-                                            )}
-                                            {subcat.name}
-                                          </span>
-                                          {/* Only show delete button for user-created subcategories */}
-                                          {category.userId !== null && category.userId !== undefined && currentUserId && category.userId === currentUserId && (
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                              onClick={() => {
-                                                if (!checkWriteAccess()) return;
-                                                handleDeleteSubcategory(subcat.id);
-                                              }}
-                                              title="Delete subcategory"
-                                              disabled={deletingSubcategoryId === subcat.id}
-                                            >
-                                              {deletingSubcategoryId === subcat.id ? (
-                                                <Loader2 className="h-3 w-3 animate-spin text-destructive" />
-                                              ) : (
-                                                <X className="h-3 w-3 text-destructive" />
-                                              )}
-                                            </Button>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-1 md:space-x-2">
+                            </div>
+                          </div>
+                          
+                          {isExpanded && (
+                            <div className="space-y-3 pt-2 border-t">
+                              {group.categories.map((category) => (
+                                <div key={category.id} className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="font-medium text-sm">{category.name}</h4>
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-7 w-7 md:h-10 md:w-10"
+                                      className="h-8 w-8"
                                       onClick={() => {
                                         if (!checkWriteAccess()) return;
                                         setSelectedCategory(category);
@@ -679,43 +489,531 @@ export default function CategoriesPage() {
                                       }}
                                       title="Edit category"
                                     >
-                                      <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                                      <Edit className="h-4 w-4" />
                                     </Button>
-                                    {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
+                                  </div>
+                                  {category.subcategories && category.subcategories.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {category.subcategories.map((subcat) => (
+                                        <div
+                                          key={subcat.id}
+                                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs bg-muted text-muted-foreground"
+                                        >
+                                          {subcat.logo && (
+                                            <img 
+                                              src={subcat.logo} 
+                                              alt={subcat.name}
+                                              className="h-3 w-3 object-contain rounded"
+                                              onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                              }}
+                                            />
+                                          )}
+                                          {subcat.name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs md:text-sm w-[50px]"></TableHead>
+                      <TableHead className="text-xs md:text-sm">Group</TableHead>
+                      <TableHead className="text-xs md:text-sm">Category</TableHead>
+                      <TableHead className="text-xs md:text-sm">Subcategories</TableHead>
+                      <TableHead className="text-xs md:text-sm">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {systemGroups.map((group) => {
+                      const isExpanded = expandedGroups.has(group.macro.id);
+                      const hasCategories = group.categories.length > 0;
+                      
+                      return (
+                        <React.Fragment key={`system-${group.macro.id}`}>
+                          {/* Group header row */}
+                          <TableRow className="bg-muted/30 hover:bg-muted/50">
+                            <TableCell className="w-[50px]">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 md:h-8 md:w-8"
+                                onClick={() => toggleGroup(group.macro.id)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-xs md:text-sm font-semibold">
+                              {group.macro.name}
+                            </TableCell>
+                            <TableCell className="text-xs md:text-sm text-muted-foreground">
+                              {group.categories.length} {group.categories.length === 1 ? "category" : "categories"}
+                            </TableCell>
+                            <TableCell className="text-xs md:text-sm text-muted-foreground">
+                              {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0)}{" "}
+                              {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0) === 1
+                                ? "subcategory"
+                                : "subcategories"}
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                          
+                          {/* Categories rows (shown when expanded) */}
+                          {isExpanded &&
+                            group.categories.map((category) => (
+                              <React.Fragment key={category.id}>
+                                {/* Category row */}
+                                <TableRow className="bg-background">
+                                  <TableCell></TableCell>
+                                  <TableCell></TableCell>
+                                  <TableCell className="text-xs md:text-sm font-medium pl-6 md:pl-8">
+                                    {category.name}
+                                  </TableCell>
+                                  <TableCell className="text-xs md:text-sm">
+                                    {category.subcategories && category.subcategories.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {category.subcategories.map((subcat) => (
+                                          <div
+                                            key={subcat.id}
+                                            className="group relative inline-flex items-center gap-1"
+                                          >
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground">
+                                              {subcat.logo && (
+                                                <img 
+                                                  src={subcat.logo} 
+                                                  alt={subcat.name}
+                                                  className="h-3 w-3 object-contain rounded"
+                                                  onError={(e) => {
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                  }}
+                                                />
+                                              )}
+                                              {subcat.name}
+                                            </span>
+                                            {/* Only show delete button for user-created subcategories */}
+                                            {category.userId !== null && category.userId !== undefined && currentUserId && category.userId === currentUserId && (
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => {
+                                                  if (!checkWriteAccess()) return;
+                                                  handleDeleteSubcategory(subcat.id);
+                                                }}
+                                                title="Delete subcategory"
+                                                disabled={deletingSubcategoryId === subcat.id}
+                                              >
+                                                {deletingSubcategoryId === subcat.id ? (
+                                                  <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                                                ) : (
+                                                  <X className="h-3 w-3 text-destructive" />
+                                                )}
+                                              </Button>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex space-x-1 md:space-x-2">
                                       <Button
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 md:h-10 md:w-10"
                                         onClick={() => {
                                           if (!checkWriteAccess()) return;
-                                          handleDeleteCategory(category.id);
+                                          setSelectedCategory(category);
+                                          setIsDialogOpen(true);
                                         }}
-                                        title="Delete category"
-                                        disabled={deletingCategoryId === category.id}
+                                        title="Edit category (add subcategories)"
                                       >
-                                        {deletingCategoryId === category.id ? (
-                                          <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                                        ) : (
-                                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                                        )}
+                                        <Edit className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            </React.Fragment>
-                          ))}
-                        
-                      </React.Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              </React.Fragment>
+                            ))}
+                          
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-[12px] border p-12">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  No system categories found
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </SimpleTabsContent>
 
-      </div>
+        <SimpleTabsContent value="custom">
+        {/* Custom Categories Section */}
+          {userGroups.length > 0 ? (
+            <>
+              {/* Mobile/Tablet Card View */}
+              <div className="lg:hidden space-y-4">
+                {userGroups.map((group) => {
+                  const isExpanded = expandedGroups.has(group.macro.id);
+                  return (
+                    <Card key={`user-mobile-${group.macro.id}`}>
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => toggleGroup(group.macro.id)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-sm">{group.macro.name}</h3>
+                                <p className="text-xs text-muted-foreground">
+                                  {group.categories.length} {group.categories.length === 1 ? "category" : "categories"} • {" "}
+                                  {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0)}{" "}
+                                  {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0) === 1
+                                    ? "subcategory"
+                                    : "subcategories"}
+                                </p>
+                              </div>
+                            </div>
+                            {group.macro.userId !== null && (currentUserId ? group.macro.userId === currentUserId : false) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  if (!checkWriteAccess()) return;
+                                  handleDeleteGroup(group.macro.id);
+                                }}
+                                title="Delete group"
+                                disabled={deletingGroupId === group.macro.id}
+                              >
+                                {deletingGroupId === group.macro.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                          
+                          {isExpanded && (
+                            <div className="space-y-3 pt-2 border-t">
+                              {group.categories.map((category) => (
+                                <div key={category.id} className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="font-medium text-sm">{category.name}</h4>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => {
+                                          if (!checkWriteAccess()) return;
+                                          setSelectedCategory(category);
+                                          setIsDialogOpen(true);
+                                        }}
+                                        title="Edit category"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                          onClick={() => {
+                                            if (!checkWriteAccess()) return;
+                                            handleDeleteCategory(category.id);
+                                          }}
+                                          title="Delete category"
+                                          disabled={deletingCategoryId === category.id}
+                                        >
+                                          {deletingCategoryId === category.id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                          )}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {category.subcategories && category.subcategories.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {category.subcategories.map((subcat) => (
+                                        <div
+                                          key={subcat.id}
+                                          className="group relative inline-flex items-center gap-1"
+                                        >
+                                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs bg-muted text-muted-foreground">
+                                            {subcat.logo && (
+                                              <img 
+                                                src={subcat.logo} 
+                                                alt={subcat.name}
+                                                className="h-3 w-3 object-contain rounded"
+                                                onError={(e) => {
+                                                  (e.target as HTMLImageElement).style.display = 'none';
+                                                }}
+                                              />
+                                            )}
+                                            {subcat.name}
+                                          </span>
+                                          {category.userId !== null && category.userId !== undefined && currentUserId && category.userId === currentUserId && (
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              onClick={() => {
+                                                if (!checkWriteAccess()) return;
+                                                handleDeleteSubcategory(subcat.id);
+                                              }}
+                                              title="Delete subcategory"
+                                              disabled={deletingSubcategoryId === subcat.id}
+                                            >
+                                              {deletingSubcategoryId === subcat.id ? (
+                                                <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                                              ) : (
+                                                <X className="h-3 w-3 text-destructive" />
+                                              )}
+                                            </Button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs md:text-sm w-[50px]"></TableHead>
+                      <TableHead className="text-xs md:text-sm">Group</TableHead>
+                      <TableHead className="text-xs md:text-sm">Category</TableHead>
+                      <TableHead className="text-xs md:text-sm">Subcategories</TableHead>
+                      <TableHead className="text-xs md:text-sm">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userGroups.map((group) => {
+                      const isExpanded = expandedGroups.has(group.macro.id);
+                      const hasCategories = group.categories.length > 0;
+                      
+                      return (
+                        <React.Fragment key={`user-${group.macro.id}`}>
+                          {/* Group header row */}
+                          <TableRow className="bg-muted/30 hover:bg-muted/50">
+                            <TableCell className="w-[50px]">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 md:h-8 md:w-8"
+                                onClick={() => toggleGroup(group.macro.id)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-xs md:text-sm font-semibold">
+                              {group.macro.name}
+                            </TableCell>
+                            <TableCell className="text-xs md:text-sm text-muted-foreground">
+                              {group.categories.length} {group.categories.length === 1 ? "category" : "categories"}
+                            </TableCell>
+                            <TableCell className="text-xs md:text-sm text-muted-foreground">
+                              {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0)}{" "}
+                              {group.categories.reduce((sum, cat) => sum + (cat.subcategories?.length || 0), 0) === 1
+                                ? "subcategory"
+                                : "subcategories"}
+                            </TableCell>
+                            <TableCell>
+                              {group.macro.userId !== null && (currentUserId ? group.macro.userId === currentUserId : false) && (
+                                <div className="flex space-x-1 md:space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 md:h-10 md:w-10"
+                                    onClick={() => {
+                                      if (!checkWriteAccess()) return;
+                                      handleDeleteGroup(group.macro.id);
+                                    }}
+                                    title="Delete group"
+                                    disabled={deletingGroupId === group.macro.id}
+                                  >
+                                    {deletingGroupId === group.macro.id ? (
+                                      <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          
+                          {/* Categories rows (shown when expanded) */}
+                          {isExpanded &&
+                            group.categories.map((category) => (
+                              <React.Fragment key={category.id}>
+                                {/* Category row */}
+                                <TableRow className="bg-background">
+                                  <TableCell></TableCell>
+                                  <TableCell></TableCell>
+                                  <TableCell className="text-xs md:text-sm font-medium pl-6 md:pl-8">
+                                    {category.name}
+                                  </TableCell>
+                                  <TableCell className="text-xs md:text-sm">
+                                    {category.subcategories && category.subcategories.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {category.subcategories.map((subcat) => (
+                                          <div
+                                            key={subcat.id}
+                                            className="group relative inline-flex items-center gap-1"
+                                          >
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs bg-muted text-muted-foreground">
+                                              {subcat.logo && (
+                                                <img 
+                                                  src={subcat.logo} 
+                                                  alt={subcat.name}
+                                                  className="h-3 w-3 object-contain rounded"
+                                                  onError={(e) => {
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                  }}
+                                                />
+                                              )}
+                                              {subcat.name}
+                                            </span>
+                                            {/* Only show delete button for user-created subcategories */}
+                                            {category.userId !== null && category.userId !== undefined && currentUserId && category.userId === currentUserId && (
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => {
+                                                  if (!checkWriteAccess()) return;
+                                                  handleDeleteSubcategory(subcat.id);
+                                                }}
+                                                title="Delete subcategory"
+                                                disabled={deletingSubcategoryId === subcat.id}
+                                              >
+                                                {deletingSubcategoryId === subcat.id ? (
+                                                  <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                                                ) : (
+                                                  <X className="h-3 w-3 text-destructive" />
+                                                )}
+                                              </Button>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex space-x-1 md:space-x-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 md:h-10 md:w-10"
+                                        onClick={() => {
+                                          if (!checkWriteAccess()) return;
+                                          setSelectedCategory(category);
+                                          setIsDialogOpen(true);
+                                        }}
+                                        title="Edit category"
+                                      >
+                                        <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                                      </Button>
+                                      {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 md:h-10 md:w-10"
+                                          onClick={() => {
+                                            if (!checkWriteAccess()) return;
+                                            handleDeleteCategory(category.id);
+                                          }}
+                                          title="Delete category"
+                                          disabled={deletingCategoryId === category.id}
+                                        >
+                                          {deletingCategoryId === category.id ? (
+                                            <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                          )}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              </React.Fragment>
+                            ))}
+                          
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-[12px] border p-12">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  No custom categories found
+                </p>
+              </div>
+            </div>
+          )}
+        </SimpleTabsContent>
 
       <CategoryDialog
         open={isDialogOpen}
@@ -779,7 +1077,8 @@ export default function CategoriesPage() {
       {DeleteCategoryConfirmDialog}
       {DeleteSubcategoryConfirmDialog}
       {DeleteGroupConfirmDialog}
-    </div>
+      </div>
+    </SimpleTabs>
   );
 }
 

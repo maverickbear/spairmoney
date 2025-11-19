@@ -10,19 +10,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Loader2, Search, Users as UsersIcon } from "lucide-react";
+import { Loader2, Users as UsersIcon } from "lucide-react";
 import type { AdminUser } from "@/lib/api/admin";
 
 interface UsersTableProps {
   users: AdminUser[];
   loading?: boolean;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
-export function UsersTable({ users: initialUsers, loading: initialLoading }: UsersTableProps) {
+export function UsersTable({ users: initialUsers, loading: initialLoading, searchQuery: externalSearchQuery, onSearchChange }: UsersTableProps) {
   const [users, setUsers] = useState<AdminUser[]>(initialUsers);
   const [loading, setLoading] = useState(initialLoading);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [internalSearchQuery, setInternalSearchQuery] = useState("");
+  
+  // Use external search query if provided, otherwise use internal state
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const setSearchQuery = onSearchChange || setInternalSearchQuery;
 
   useEffect(() => {
     setUsers(initialUsers);
@@ -75,27 +80,11 @@ export function UsersTable({ users: initialUsers, loading: initialLoading }: Use
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search users by email, name, or plan..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="text-sm text-muted-foreground">
-          {filteredUsers.length} {filteredUsers.length === 1 ? "user" : "users"}
-        </div>
-      </div>
-
-      <div className="rounded-md border">
+      <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead>User</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Household</TableHead>
@@ -105,7 +94,7 @@ export function UsersTable({ users: initialUsers, loading: initialLoading }: Use
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="p-0">
+                <TableCell colSpan={5} className="p-0">
                   <div className="flex items-center justify-center min-h-[400px] w-full">
                     <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
                       <UsersIcon className="h-8 w-8" />
@@ -117,8 +106,12 @@ export function UsersTable({ users: initialUsers, loading: initialLoading }: Use
             ) : (
               filteredUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.email}</TableCell>
-                  <TableCell>{user.name || "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">{user.name || "-"}</span>
+                      <span className="text-sm text-muted-foreground">{user.email}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {user.plan ? (
                       <Badge variant="outline">{user.plan.name}</Badge>
@@ -133,16 +126,9 @@ export function UsersTable({ users: initialUsers, loading: initialLoading }: Use
                   </TableCell>
                   <TableCell>
                     {user.household.hasHousehold ? (
-                      <div className="flex flex-col gap-1">
-                        <Badge variant="secondary" className="w-fit">
-                          {user.household.isOwner ? "Owner" : "Member"}
-                        </Badge>
-                        {user.household.isOwner && (
-                          <span className="text-xs text-muted-foreground">
-                            {user.household.memberCount} {user.household.memberCount === 1 ? "member" : "members"}
-                          </span>
-                        )}
-                      </div>
+                      <Badge variant="secondary" className="w-fit">
+                        {user.household.isOwner ? "Owner" : "Member"}
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground">No</span>
                     )}

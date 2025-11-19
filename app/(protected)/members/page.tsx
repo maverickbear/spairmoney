@@ -148,13 +148,13 @@ export default function MembersPage() {
 
   return (
     <FeatureGuard feature="hasHousehold" featureName="Household Members" requiredPlan="pro">
-      <div className="space-y-4 md:space-y-6">
+      <div>
       <PageHeader
         title="Household Members"
-        description="Manage household members and invitations"
       >
         {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && members.length > 0 && (
           <Button
+            size="medium"
             onClick={() => {
               if (!checkWriteAccess()) return;
               setIsFormOpen(true);
@@ -166,7 +166,8 @@ export default function MembersPage() {
         )}
       </PageHeader>
 
-      {loading ? (
+      <div className="w-full p-4 lg:p-8">
+        {loading ? (
         <Card>
           <CardContent className="p-6">
             <div className="space-y-3">
@@ -177,6 +178,7 @@ export default function MembersPage() {
           </CardContent>
         </Card>
       ) : members.length === 0 ? (
+        <div className="w-full h-full min-h-[400px]">
         <EmptyState
           icon={Users}
           title="No members yet"
@@ -188,6 +190,7 @@ export default function MembersPage() {
           }}
           actionIcon={Plus}
         />
+        </div>
       ) : (
         <div className="rounded-[12px] border overflow-x-auto">
           <Table>
@@ -327,6 +330,7 @@ export default function MembersPage() {
         onSuccess={handleFormSuccess}
       />
       {ConfirmDialog}
+      </div>
       </div>
     </FeatureGuard>
   );

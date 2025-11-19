@@ -240,6 +240,7 @@ export function BudgetsTab() {
           </CardContent>
         </Card>
       ) : budgets.length === 0 ? (
+        <div className="w-full h-full min-h-[400px]">
         <EmptyState
           icon={Wallet}
           title="No budgets yet"
@@ -251,6 +252,7 @@ export function BudgetsTab() {
           }}
           actionIcon={Plus}
         />
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">

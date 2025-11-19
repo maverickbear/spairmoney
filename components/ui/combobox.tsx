@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Search, ChevronDown, Check, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,8 @@ export function Combobox({
   const [searchTerm, setSearchTerm] = useState("");
   const comboboxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const sizeConfig = sizeClasses[size];
 
@@ -138,17 +141,23 @@ export function Combobox({
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        comboboxRef.current &&
-        !comboboxRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target as Node;
+      const isClickInCombobox = comboboxRef.current?.contains(target);
+      const isClickInMenu = menuRef.current?.contains(target);
+      
+      // Only close if click is outside both combobox and menu
+      if (!isClickInCombobox && !isClickInMenu) {
         setIsOpen(false);
       }
     }
 
     if (isOpen) {
+      // Use bubbling phase so stopPropagation works correctly
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
     }
   }, [isOpen]);
 
@@ -159,21 +168,52 @@ export function Combobox({
     }
   }, [isOpen]);
 
-  // Sync search term with selected value when opening
+  // Calculate menu position when opening
   useEffect(() => {
-    if (isOpen && selectedItem) {
+    if (isOpen && comboboxRef.current) {
+      const updatePosition = () => {
+        const rect = comboboxRef.current?.getBoundingClientRect();
+        if (rect) {
+          // getBoundingClientRect returns viewport coordinates
+          // Since we use position: fixed, we use viewport coordinates directly
+          setMenuPosition({
+            top: rect.bottom + 8, // 8px = mt-2
+            left: rect.left,
+            width: rect.width,
+          });
+        }
+      };
+
+      updatePosition();
+      // Use capture phase to catch scroll events in nested containers (like dialog)
+      window.addEventListener("scroll", updatePosition, true);
+      window.addEventListener("resize", updatePosition);
+
+      return () => {
+        window.removeEventListener("scroll", updatePosition, true);
+        window.removeEventListener("resize", updatePosition);
+      };
+    } else {
+      setMenuPosition(null);
+    }
+  }, [isOpen]);
+
+  // Sync search term with selected value
+  useEffect(() => {
+    if (selectedItem) {
       setSearchTerm(selectedItem.name);
-    } else if (isOpen && !selectedItem && value) {
+    } else if (value && !selectedItem) {
       setSearchTerm(value);
-    } else if (isOpen && !selectedItem && !value) {
+    } else if (!value && !selectedItem) {
       setSearchTerm("");
     }
-  }, [isOpen, selectedItem, value]);
+  }, [selectedItem, value]);
 
   const handleSelect = (item: ComboboxItem) => {
     onChange?.(item.id, item);
-    setSearchTerm("");
+    setSearchTerm(item.name);
     setIsOpen(false);
+    inputRef.current?.blur();
   };
 
   const handleClear = () => {
@@ -186,6 +226,7 @@ export function Combobox({
     const newSearchTerm = e.target.value;
     setSearchTerm(newSearchTerm);
     onSearchChange?.(newSearchTerm);
+    setIsOpen(true);
 
     // If allowing custom values, update the value as user types
     if (allowCustomValue) {
@@ -209,36 +250,75 @@ export function Combobox({
     }
   };
 
-  const displayValue = selectedItem?.name || value || "";
+  const handleInputFocus = () => {
+    if (!disabled) {
+      setIsOpen(true);
+    }
+  };
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Don't close if clicking into the menu
+    if (menuRef.current?.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    // Close after a delay to allow click events to fire
+    setTimeout(() => {
+      if (document.activeElement !== inputRef.current && !menuRef.current?.contains(document.activeElement)) {
+        setIsOpen(false);
+      }
+    }, 300);
+  };
 
   return (
     <div className={cn("relative", className)} ref={comboboxRef}>
-      {/* Combobox Button */}
-      <button
-        type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
+      {/* Search Input */}
+      <div className="relative">
+        <Search
         className={cn(
-          "w-full flex items-center justify-between bg-background border border-input rounded-lg text-left transition-all",
-          "hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
-          sizeConfig.button
-        )}
-      >
-        <span
-          className={cn(
-            "truncate flex-1",
-            displayValue ? "text-foreground" : "text-muted-foreground"
+            "absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10 pointer-events-none",
+            sizeConfig.icon
           )}
-        >
-          {displayValue || placeholder}
-        </span>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {showClearButton && displayValue && (
+        />
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder={placeholder}
+          value={searchTerm}
+          onChange={handleSearchChange}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setIsOpen(false);
+              inputRef.current?.blur();
+            } else if (e.key === "Enter" && allowCustomValue && searchTerm.trim()) {
+              // Allow pressing Enter to confirm custom value
+              onChange?.(searchTerm, null);
+              setIsOpen(false);
+            }
+          }}
+          disabled={disabled}
+          className={cn(
+            "w-full border border-input rounded-lg bg-background",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            // Padding left: icon position (left-3 = 12px) + icon width + gap (8px)
+            // small/medium: icon w-4 (16px) = 12 + 16 + 8 = 36px (pl-9)
+            // large: icon w-5 (20px) = 12 + 20 + 8 = 40px (pl-10)
+            size === "small" || size === "medium" ? "pl-9" : "pl-10",
+            // Padding right: space for clear button and chevron (right-3 = 12px + icon + gap)
+            size === "small" || size === "medium" ? "pr-10" : "pr-12",
+            // Use only vertical padding and text size from sizeConfig
+            size === "small" ? "py-1.5 text-sm" : size === "medium" ? "py-2.5 text-sm" : "py-3 text-base"
+          )}
+        />
+        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2 flex-shrink-0">
+          {showClearButton && searchTerm && (
             <div
               onClick={(e) => {
                 e.stopPropagation();
                 handleClear();
+                inputRef.current?.focus();
               }}
               className="p-1 hover:bg-muted rounded transition-colors cursor-pointer"
               role="button"
@@ -248,6 +328,7 @@ export function Combobox({
                   e.preventDefault();
                   e.stopPropagation();
                   handleClear();
+                  inputRef.current?.focus();
                 }
               }}
             >
@@ -259,46 +340,36 @@ export function Combobox({
               "text-muted-foreground transition-transform",
               sizeConfig.icon,
               isOpen && "rotate-180"
-            )}
-          />
-        </div>
-      </button>
-
-      {/* Dropdown Menu */}
-      {isOpen && !disabled && (
-        <div className="absolute z-10 w-full mt-2 bg-popover border border-input rounded-lg shadow-xl overflow-hidden">
-          {/* Search Input */}
-          <div className="p-3 border-b border-border bg-muted/50">
-            <div className="relative">
-              <Search
-                className={cn(
-                  "absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10 pointer-events-none",
-                  sizeConfig.icon
-                )}
-              />
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchTerm}
-                onChange={handleSearchChange}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setIsOpen(false);
-                  }
-                }}
-                className={cn(
-                  "w-full pr-4 border border-input rounded-md bg-background",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
-                  size === "small" ? "pl-10" : size === "medium" ? "pl-11" : "pl-12",
-                  sizeConfig.input
                 )}
               />
             </div>
           </div>
 
+      {/* Dropdown Menu - Rendered via Portal to escape dialog overflow */}
+      {isOpen && !disabled && menuPosition && typeof window !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[100] bg-popover border border-input rounded-lg shadow-xl overflow-hidden"
+          style={{
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            width: `${menuPosition.width}px`,
+            maxHeight: '16rem',
+          }}
+          onMouseDown={(e) => {
+            // Prevent mousedown events from triggering outside click detection
+            e.stopPropagation();
+          }}
+        >
           {/* Items List */}
-          <div className="max-h-64 overflow-y-auto">
+          <div 
+            className="overflow-y-auto overflow-x-hidden"
+            style={{ 
+              maxHeight: '16rem',
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgb(156 163 175) transparent',
+            }}
+          >
             {(() => {
               const hasGroups = filteredData.groups && filteredData.groups.length > 0;
               const hasItems = filteredData.items && filteredData.items.length > 0;
@@ -342,7 +413,11 @@ export function Combobox({
                           <button
                             key={item.id}
                             type="button"
-                            onClick={() => handleSelect(item)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSelect(item);
+                            }}
                             className={cn(
                               "w-full flex items-center justify-between text-left hover:bg-muted transition-colors",
                               sizeConfig.item,
@@ -376,7 +451,15 @@ export function Combobox({
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => handleSelect(item)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSelect(item);
+                        }}
+                        onMouseDown={(e) => {
+                          // Prevent blur event from firing before click
+                          e.preventDefault();
+                        }}
                         className={cn(
                           "w-full flex items-center justify-between text-left hover:bg-muted transition-colors",
                           sizeConfig.item,
@@ -405,7 +488,9 @@ export function Combobox({
                   {onCreateNew && (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         onCreateNew();
                         setIsOpen(false);
                       }}
@@ -422,7 +507,8 @@ export function Combobox({
               );
             })()}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

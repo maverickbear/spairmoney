@@ -272,7 +272,7 @@ export function IntegrationDropdown({
     <FeatureGuard feature="hasInvestments" featureName="Investments">
       <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline">
+          <Button variant="outline" size="medium">
             Integration
             <ChevronDown className="ml-2 h-4 w-4" />
           </Button>

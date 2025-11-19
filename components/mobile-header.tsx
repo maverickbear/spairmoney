@@ -312,9 +312,11 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
 
   return (
     <header 
-      className="fixed top-0 left-0 right-0 z-40 bg-card lg:hidden" 
+      className="bg-card lg:hidden sticky top-0 z-40" 
       id="mobile-header"
-      style={{ '--mobile-header-height': '3rem' } as React.CSSProperties}
+      style={{ 
+        '--mobile-header-height': '3rem',
+      } as React.CSSProperties}
     >
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-3 min-h-[44px]">

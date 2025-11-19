@@ -70,19 +70,20 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   perf.end();
 
   return (
-    <div className="space-y-4 md:space-y-6 max-w-full overflow-x-hidden">
+    <div>
       <DashboardRealtime />
       <DashboardUpdateChecker />
       <PageHeader
         title="Financial Overview"
-        description="Track your Spare Score: cash flow, spending, bills, buffers, risk and long-term planning."
       >
         <MonthSelector />
       </PageHeader>
 
-      <Suspense fallback={null}>
-        <DashboardContent selectedMonthDate={selectedMonth} />
-      </Suspense>
+      <div className="w-full p-4 lg:p-8">
+        <Suspense fallback={null}>
+          <DashboardContent selectedMonthDate={selectedMonth} />
+        </Suspense>
+      </div>
     </div>
   );
 }

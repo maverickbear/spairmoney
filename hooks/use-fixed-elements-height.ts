@@ -101,6 +101,37 @@ export function useFixedElementsHeight() {
           document.documentElement.style.setProperty('--desktop-header-height', `${desktopHeaderHeight}px`);
         }
       }
+      
+      // Calculate fixed tabs height if present
+      const fixedTabs = document.querySelector('[data-fixed-tabs]');
+      if (fixedTabs) {
+        const tabsHeight = fixedTabs.getBoundingClientRect().height;
+        document.documentElement.style.setProperty('--fixed-tabs-height', `${tabsHeight}px`);
+        // Update total fixed height to include tabs
+        const totalFixedHeight = height + tabsHeight;
+        document.documentElement.style.setProperty('--total-fixed-height', `${totalFixedHeight}px`);
+      } else {
+        document.documentElement.style.setProperty('--fixed-tabs-height', '0px');
+        document.documentElement.style.setProperty('--total-fixed-height', `${height}px`);
+      }
+      
+      // Calculate bottom nav height for mobile
+      if (isMobile) {
+        const bottomNav = document.querySelector('nav[class*="fixed bottom-0"]');
+        if (bottomNav) {
+          const computedStyle = window.getComputedStyle(bottomNav);
+          if (computedStyle.display !== 'none') {
+            const bottomNavHeight = bottomNav.getBoundingClientRect().height;
+            document.documentElement.style.setProperty('--bottom-nav-height', `${bottomNavHeight}px`);
+          } else {
+            document.documentElement.style.setProperty('--bottom-nav-height', '0px');
+          }
+        } else {
+          document.documentElement.style.setProperty('--bottom-nav-height', '0px');
+        }
+      } else {
+        document.documentElement.style.setProperty('--bottom-nav-height', '0px');
+      }
     };
 
     // Debounce function to prevent excessive recalculations
@@ -143,6 +174,22 @@ export function useFixedElementsHeight() {
     if (desktopHeader) {
       const observer = new ResizeObserver(debouncedCalculateHeight);
       observer.observe(desktopHeader);
+      observers.push(observer);
+    }
+
+    // Observe fixed tabs if present
+    const fixedTabs = document.querySelector('[data-fixed-tabs]');
+    if (fixedTabs) {
+      const observer = new ResizeObserver(debouncedCalculateHeight);
+      observer.observe(fixedTabs);
+      observers.push(observer);
+    }
+
+    // Observe bottom nav (mobile only)
+    const bottomNav = document.querySelector('nav[class*="fixed bottom-0"]');
+    if (bottomNav) {
+      const observer = new ResizeObserver(debouncedCalculateHeight);
+      observer.observe(bottomNav);
       observers.push(observer);
     }
 

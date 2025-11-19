@@ -204,7 +204,7 @@ export async function getGoalsInternal(accessToken?: string, refreshToken?: stri
     
     for (const accountId of accountIds) {
       try {
-        const holdings = await getHoldings(accountId);
+        const holdings = await getHoldings(accountId, accessToken, refreshToken);
         holdings.forEach((holding) => {
           holdingsMap.set(`${accountId}_${holding.securityId}`, holding);
         });

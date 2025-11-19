@@ -68,7 +68,7 @@ export function MonthSelector() {
       value={isCurrentMonth ? "current" : selectedValue}
       onValueChange={handleMonthChange}
     >
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger size="small" className="w-[180px]">
         <SelectValue>
           {format(selectedMonth, "MMMM yyyy")}
         </SelectValue>

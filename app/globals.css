@@ -115,13 +115,25 @@
     overflow-x: hidden;
   }
   
-  /* Prevent horizontal scroll when modal is open */
+  /* Prevent body scroll - scroll only happens in content area for protected pages */
+  /* Public pages (landing, auth, etc.) can still scroll normally */
   body {
     overflow-x: hidden;
   }
   
+  /* When layout wrapper is active (protected pages), prevent body scroll */
+  body.layout-fixed {
+    overflow: hidden;
+    height: 100%;
+  }
+  
+  html.layout-fixed {
+    overflow: hidden;
+    height: 100%;
+  }
+  
   body[data-scroll-locked] {
-    overflow-x: hidden !important;
+    overflow: hidden !important;
   }
 
   /* Landing page animations */

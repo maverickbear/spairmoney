@@ -200,13 +200,12 @@ export default function DebtsPage() {
 
   return (
     <FeatureGuard feature="hasDebts" featureName="Debt Tracking" requiredPlan="essential">
-      <div className="space-y-4 md:space-y-6">
-        <PageHeader
-          title="Debts"
-          description="Track your loans and debt payments"
-        >
+      <PageHeader
+        title="Debts"
+      >
         {!(sortedDebts.length === 0 && filterBy === "all") && (
           <Button
+            size="medium"
             onClick={() => {
               if (!checkWriteAccess()) return;
               setSelectedDebt(null);
@@ -219,7 +218,8 @@ export default function DebtsPage() {
         )}
       </PageHeader>
 
-      {debts.length > 0 && (
+      <div className="w-full p-4 lg:p-8">
+        {debts.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex gap-4 items-center">
             <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
@@ -312,7 +312,7 @@ export default function DebtsPage() {
           ))}
 
           {sortedDebts.length === 0 && (
-            <div className="col-span-full">
+            <div className="col-span-full w-full h-full min-h-[400px]">
               <EmptyState
                 icon={CreditCard}
                 title={filterBy === "all" ? "No debts created yet" : `No ${filterBy} debts found`}

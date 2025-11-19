@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { SimpleTabs, SimpleTabsContent, SimpleTabsList, SimpleTabsTrigger } from "@/components/ui/simple-tabs";
+import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ export default function PortalManagementPage() {
   const router = useRouter();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -497,7 +499,7 @@ export default function PortalManagementPage() {
 
   if (isSuperAdmin === null) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-full min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -508,45 +510,78 @@ export default function PortalManagementPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <PageHeader
-        title="Portal Management"
-        description="Manage users, promotional codes, and system entities (groups, categories, subcategories) for the platform."
-      />
+    <SimpleTabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <PageHeader
+          title="Portal Management"
+        />
 
-      <SimpleTabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      {/* Fixed Tabs - Desktop only */}
+      <FixedTabsWrapper>
         <SimpleTabsList>
-          <SimpleTabsTrigger value="dashboard" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
+          <SimpleTabsTrigger value="dashboard">
             Dashboard
           </SimpleTabsTrigger>
-          <SimpleTabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
+          <SimpleTabsTrigger value="users">
             Users
           </SimpleTabsTrigger>
-          <SimpleTabsTrigger value="promo-codes" className="flex items-center gap-2">
-            <Tag className="h-4 w-4" />
+          <SimpleTabsTrigger value="promo-codes">
             Promo Codes
           </SimpleTabsTrigger>
-          <SimpleTabsTrigger value="system-entities" className="flex items-center gap-2">
-            <FolderTree className="h-4 w-4" />
+          <SimpleTabsTrigger value="system-entities">
             System Entities
           </SimpleTabsTrigger>
-          <SimpleTabsTrigger value="contact-forms" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
+          <SimpleTabsTrigger value="contact-forms">
             Contact Forms
           </SimpleTabsTrigger>
-          <SimpleTabsTrigger value="feedback" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
+          <SimpleTabsTrigger value="feedback">
             Feedback
           </SimpleTabsTrigger>
-          <SimpleTabsTrigger value="plans" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
+          <SimpleTabsTrigger value="plans">
             Plans
           </SimpleTabsTrigger>
         </SimpleTabsList>
+      </FixedTabsWrapper>
 
-        <SimpleTabsContent value="dashboard" className="space-y-6">
+        {/* Mobile/Tablet Tabs - Sticky at top */}
+      <div 
+          className="lg:hidden sticky top-0 z-40 bg-card border-b"
+      >
+        <div 
+          className="overflow-x-auto scrollbar-hide" 
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            scrollSnapType: 'x mandatory',
+            touchAction: 'pan-x',
+          }}
+        >
+          <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
+            <SimpleTabsTrigger value="dashboard" className="flex-shrink-0 whitespace-nowrap">
+              Dashboard
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="users" className="flex-shrink-0 whitespace-nowrap">
+              Users
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="promo-codes" className="flex-shrink-0 whitespace-nowrap">
+              Promo Codes
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="system-entities" className="flex-shrink-0 whitespace-nowrap">
+              System Entities
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="contact-forms" className="flex-shrink-0 whitespace-nowrap">
+              Contact Forms
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="feedback" className="flex-shrink-0 whitespace-nowrap">
+              Feedback
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="plans" className="flex-shrink-0 whitespace-nowrap">
+              Plans
+            </SimpleTabsTrigger>
+          </SimpleTabsList>
+        </div>
+      </div>
+
+      <div className="w-full p-4 lg:p-8">
+        <SimpleTabsContent value="dashboard">
           <div className="space-y-6">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold tracking-tight">System Overview</h2>
@@ -587,17 +622,26 @@ export default function PortalManagementPage() {
           </div>
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="users" className="space-y-4">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight">All Users</h2>
-            <p className="text-sm text-muted-foreground">
-              View and manage all registered users on the platform.
-            </p>
+        <SimpleTabsContent value="users">
+          <div className="space-y-2 pb-6">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-2xl font-semibold tracking-tight">All Users</h2>
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search users by email, name, or plan..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="pl-9"
+                  size="medium"
+                />
+              </div>
+            </div>
           </div>
-          <UsersTable users={users} loading={loading} />
+          <UsersTable users={users} loading={loading} searchQuery={userSearchQuery} onSearchChange={setUserSearchQuery} />
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="promo-codes" className="space-y-4">
+        <SimpleTabsContent value="promo-codes">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold tracking-tight">Promo Codes</h2>
@@ -619,61 +663,55 @@ export default function PortalManagementPage() {
           />
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="system-entities" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                  <CardTitle>System Entities</CardTitle>
-                      <CardDescription>
-                    Manage system groups, categories, and subcategories. Click the expand icons to see categories and subcategories.
-                      </CardDescription>
-                    </div>
-                <div className="flex items-center gap-2">
-                  <Button onClick={() => setIsBulkImportDialogOpen(true)} variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Bulk Import
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button className="flex items-center justify-center">
-                        <Plus className="h-4 w-4 mr-2" />
-                        <span>Create</span>
-                        <ChevronDown className="h-4 w-4 ml-2" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleCreateGroup}>
-                        <FolderTree className="h-4 w-4 mr-2" />
+        <SimpleTabsContent value="system-entities">
+          <div className="space-y-2 pb-6">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-2xl font-semibold tracking-tight">System Entities</h2>
+              <div className="flex items-center gap-2">
+                <Button onClick={() => setIsBulkImportDialogOpen(true)} variant="outline">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Bulk Import
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="flex items-center justify-center">
+                      <Plus className="h-4 w-4 mr-2" />
+                      <span>Create</span>
+                      <ChevronDown className="h-4 w-4 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleCreateGroup}>
+                      <FolderTree className="h-4 w-4 mr-2" />
                       Create Group
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCreateCategory}>
-                        <Tag className="h-4 w-4 mr-2" />
-                        Create Category
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCreateSubcategory}>
-                        <Tag className="h-4 w-4 mr-2" />
-                        Create Subcategory
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="text"
-                        placeholder="Search groups, categories, or subcategories..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-              <UnifiedEntitiesTable
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCreateCategory}>
+                      <Tag className="h-4 w-4 mr-2" />
+                      Create Category
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCreateSubcategory}>
+                      <Tag className="h-4 w-4 mr-2" />
+                      Create Subcategory
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search groups, categories, or subcategories..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <UnifiedEntitiesTable
                     groups={filteredEntities.groups}
                     categories={filteredEntities.categories}
                 subcategories={filteredEntities.subcategories}
@@ -685,11 +723,10 @@ export default function PortalManagementPage() {
                 onEditSubcategory={handleEditSubcategory}
                 onDeleteSubcategory={handleDeleteSubcategory}
                   />
-                </CardContent>
-              </Card>
+              </div>
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="contact-forms" className="space-y-4">
+        <SimpleTabsContent value="contact-forms">
           <Card>
             <CardHeader>
               <CardTitle>Contact Forms</CardTitle>
@@ -707,7 +744,7 @@ export default function PortalManagementPage() {
           </Card>
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="plans" className="space-y-4">
+        <SimpleTabsContent value="plans">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight">Subscription Plans</h2>
             <p className="text-sm text-muted-foreground">
@@ -721,66 +758,67 @@ export default function PortalManagementPage() {
           />
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="feedback" className="space-y-4">
-          {feedbackMetrics && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{feedbackMetrics.total}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
-                  <Star className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {feedbackMetrics.averageRating.toFixed(2)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">out of 5.0</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">5 Star Ratings</CardTitle>
-                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {feedbackMetrics.ratingDistribution[5] || 0}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {feedbackMetrics.total > 0
-                      ? `${((feedbackMetrics.ratingDistribution[5] || 0) / feedbackMetrics.total * 100).toFixed(1)}%`
-                      : "0%"} of total
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Low Ratings (1-2)</CardTitle>
-                  <Star className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {(feedbackMetrics.ratingDistribution[1] || 0) + (feedbackMetrics.ratingDistribution[2] || 0)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {feedbackMetrics.total > 0
-                      ? `${(((feedbackMetrics.ratingDistribution[1] || 0) + (feedbackMetrics.ratingDistribution[2] || 0)) / feedbackMetrics.total * 100).toFixed(1)}%`
-                      : "0%"} of total
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+        <SimpleTabsContent value="feedback">
+          <div className="space-y-6">
+            {feedbackMetrics && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{feedbackMetrics.total}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
+                    <Star className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {feedbackMetrics.averageRating.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">out of 5.0</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">5 Star Ratings</CardTitle>
+                    <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {feedbackMetrics.ratingDistribution[5] || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {feedbackMetrics.total > 0
+                        ? `${((feedbackMetrics.ratingDistribution[5] || 0) / feedbackMetrics.total * 100).toFixed(1)}%`
+                        : "0%"} of total
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Low Ratings (1-2)</CardTitle>
+                    <Star className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {(feedbackMetrics.ratingDistribution[1] || 0) + (feedbackMetrics.ratingDistribution[2] || 0)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {feedbackMetrics.total > 0
+                        ? `${(((feedbackMetrics.ratingDistribution[1] || 0) + (feedbackMetrics.ratingDistribution[2] || 0)) / feedbackMetrics.total * 100).toFixed(1)}%`
+                        : "0%"} of total
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-          <Card>
+            <Card>
             <CardHeader>
               <CardTitle>Rating Distribution</CardTitle>
               <CardDescription>
@@ -849,8 +887,8 @@ export default function PortalManagementPage() {
               />
             </CardContent>
           </Card>
+          </div>
         </SimpleTabsContent>
-      </SimpleTabs>
 
       <PromoCodeDialog
         open={isDialogOpen}
@@ -931,13 +969,14 @@ export default function PortalManagementPage() {
             setEditingPlan(null);
           }
         }}
-        plan={editingPlan}
+          plan={editingPlan}
         onSuccess={async () => {
           // Reload plans to show updated data
           await loadAdminPlans();
         }}
       />
-    </div>
+      </div>
+    </SimpleTabs>
   );
 }
 

@@ -72,10 +72,9 @@ export default function HelpSupportPage() {
     }
   }
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div>
       <PageHeader
         title="Help & Support"
-        description="Get help with your account, billing, and using Spare Finance"
       />
 
       {/* Frequently Asked Questions */}

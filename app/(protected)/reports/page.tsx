@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { ReportsContent } from "./reports-content";
-import { ReportFilters, type ReportPeriod } from "@/components/reports/report-filters";
+import type { ReportPeriod } from "@/components/reports/report-filters";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { getTransactionsClient } from "@/lib/api/transactions-client";
 import { getBudgetsClient } from "@/lib/api/budgets-client";
@@ -207,12 +207,7 @@ export default function ReportsPage() {
 
   return (
     <FeatureGuard feature="hasAdvancedReports" featureName="Advanced Reports" requiredPlan="essential">
-      <div className="space-y-4 md:space-y-6">
-        <ReportFilters
-          period={period}
-          onPeriodChange={setPeriod}
-        />
-        <ReportsContent
+      <ReportsContent
           limits={limits}
           budgets={budgets}
           currentMonthTransactions={currentMonthTransactions}
@@ -228,7 +223,6 @@ export default function ReportsPage() {
           period={period}
           dateRange={getDateRange(period)}
         />
-      </div>
     </FeatureGuard>
   );
 }

@@ -133,16 +133,16 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
   );
 
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="p-0 pb-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <Card className="border-0 shadow-none !p-0">
+      <CardHeader className="!p-0 !md:p-0">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <CardTitle>Holdings</CardTitle>
           <div className="flex gap-2">
             <Select
               value={assetTypeFilter || "all"}
               onValueChange={(value) => setAssetTypeFilter(value === "all" ? null : value)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger size="small" className="w-[140px]">
                 <SelectValue placeholder="Asset Type" />
               </SelectTrigger>
               <SelectContent>
@@ -158,7 +158,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
               value={sectorFilter || "all"}
               onValueChange={(value) => setSectorFilter(value === "all" ? null : value)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger size="small" className="w-[140px]">
                 <SelectValue placeholder="Sector" />
               </SelectTrigger>
               <SelectContent>
@@ -173,7 +173,7 @@ export function HoldingsTable({ holdings }: HoldingsTableProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="!p-0 !md:p-0">
         {/* Mobile Card View */}
         <div className="lg:hidden space-y-3">
           {sortedHoldings.length === 0 ? (

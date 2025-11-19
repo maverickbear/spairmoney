@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useSubscriptionContext } from "@/contexts/subscription-context";
 import { usePathname } from "next/navigation";
 import { logger } from "@/lib/utils/logger";
+import { cn } from "@/lib/utils";
 
 // Preload profile data hook - loads profile in background when app starts
 function useProfilePreload() {
@@ -91,6 +92,25 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Add class to body/html to prevent scroll - must be called before any conditional returns
+  // Only apply to protected pages (not public pages, API routes, select-plan, or welcome)
+  const shouldUseFixedLayout = !isApiRoute && !isPublicPage && !isSelectPlanPage && !isWelcomePage && (hasSubscription || isDashboardRoute);
+  
+  useEffect(() => {
+    if (shouldUseFixedLayout) {
+      document.body.classList.add('layout-fixed');
+      document.documentElement.classList.add('layout-fixed');
+      return () => {
+        document.body.classList.remove('layout-fixed');
+        document.documentElement.classList.remove('layout-fixed');
+      };
+    } else {
+      // Ensure classes are removed if we're not using fixed layout
+      document.body.classList.remove('layout-fixed');
+      document.documentElement.classList.remove('layout-fixed');
+    }
+  }, [shouldUseFixedLayout]);
+
   // Removed debug log to improve performance - only log in development if needed
   if (process.env.NODE_ENV === 'development') {
     log.debug("Render:", {
@@ -135,30 +155,41 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   // Normal layout with nav for users with subscription or optimistically for dashboard routes
   const showNav = hasSubscription || isDashboardRoute;
+  
   return (
-    <>
-      <MobileHeader hasSubscription={showNav} />
-      <MobileBanner hasSubscription={showNav} />
-      <DesktopHeader hasSubscription={showNav} />
-      <div className="flex">
-        <Nav hasSubscription={showNav} />
+    <div className="fixed inset-0 overflow-hidden bg-background">
+      {/* Sidebar - Fixed Left (full height, desktop only) */}
+      <Nav hasSubscription={showNav} />
+      
+      {/* Main Content Area */}
+      <div
+        className={cn(
+          "flex flex-col h-full overflow-hidden transition-all duration-300",
+          "lg:ml-64",
+          isSidebarCollapsed && "lg:!ml-16"
+        )}
+      >
+        {/* Headers - Fixed Top */}
+        <MobileHeader hasSubscription={showNav} />
+        <MobileBanner hasSubscription={showNav} />
+        <DesktopHeader hasSubscription={showNav} />
+        
+        {/* Content Container - Scrollable */}
         <main
-          className={`flex-1 pb-16 lg:pb-0 transition-all duration-300 bg-white dark:bg-background z-0 ${
-            isSidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
-          }`}
+          className="flex-1 overflow-y-auto overflow-x-hidden bg-white dark:bg-background"
+          style={{
+            paddingBottom: 'var(--bottom-nav-height, 0px)',
+          }}
         >
-          <div 
-            className="w-full container mx-auto px-4 sm:px-6 lg:px-8 pb-6 z-0"
-            style={{
-              paddingTop: 'var(--fixed-elements-height, 0px)',
-            }}
-          >
+          <div className="w-full max-w-full">
             {children}
           </div>
         </main>
       </div>
+      
+      {/* Bottom Navigation - Fixed Bottom (mobile only) */}
       <BottomNav hasSubscription={showNav} />
-    </>
+    </div>
   );
 }
 

@@ -87,10 +87,9 @@ export default function FeedbackPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div>
       <PageHeader
         title="Feedback"
-        description="Share your thoughts and help us improve Spare Finance"
       />
 
       <Card>

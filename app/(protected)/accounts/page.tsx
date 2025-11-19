@@ -277,14 +277,14 @@ export default function AccountsPage() {
 
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div>
       <PageHeader
         title="Accounts"
-        description="Manage your accounts and view balances"
       >
         <div className="flex gap-2">
           {accounts.length > 0 && (
             <Button
+              size="medium"
               onClick={handleAddAccount}
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -294,9 +294,11 @@ export default function AccountsPage() {
         </div>
       </PageHeader>
 
-      {loading && accounts.length > 0 ? (
+      <div className="w-full p-4 lg:p-8">
+        {loading && accounts.length > 0 ? (
         <TableSkeleton rowCount={5} />
       ) : accounts.length === 0 ? (
+        <div className="w-full h-full min-h-[400px]">
         <EmptyState
           icon={CreditCard}
           title="No accounts yet"
@@ -305,6 +307,7 @@ export default function AccountsPage() {
           onAction={handleAddAccount}
           actionIcon={Plus}
         />
+        </div>
       ) : (() => {
         // Group accounts by type
         const accountsByType = accounts.reduce((acc, account) => {
@@ -373,6 +376,7 @@ export default function AccountsPage() {
           </div>
         );
       })()}
+      </div>
 
       <AccountForm
         open={isFormOpen}

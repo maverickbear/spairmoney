@@ -24,6 +24,7 @@ import { Subscription, Plan } from "@/lib/validations/plan";
 import { PlanFeatures } from "@/lib/validations/plan";
 import { LimitCheckResult } from "@/lib/api/subscription";
 import { PageHeader } from "@/components/common/page-header";
+import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
 
 // Lazy load PaymentHistory to improve initial load time
@@ -923,30 +924,55 @@ export default function MyAccountPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <PageHeader
-        title="My Account"
-        description="Manage your account settings and preferences"
-      />
-
       <SimpleTabs 
         value={activeTab}
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <SimpleTabsList>
-          <SimpleTabsTrigger value="profile">Profile</SimpleTabsTrigger>
-          <SimpleTabsTrigger value="billing">Billing</SimpleTabsTrigger>
-        </SimpleTabsList>
+      <PageHeader
+        title="My Account"
+      />
 
-        <SimpleTabsContent value="profile" className="space-y-4 md:space-y-6">
-          <ProfileModule />
-        </SimpleTabsContent>
+      {/* Fixed Tabs - Desktop only */}
+      <FixedTabsWrapper>
+          <SimpleTabsList>
+            <SimpleTabsTrigger value="profile">Profile</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="billing">Billing</SimpleTabsTrigger>
+          </SimpleTabsList>
+      </FixedTabsWrapper>
 
-        <SimpleTabsContent value="billing" className="space-y-4 md:space-y-6">
-          <BillingModule />
-        </SimpleTabsContent>
+      {/* Mobile/Tablet Tabs - Sticky at top */}
+        <div 
+        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        >
+          <div 
+            className="overflow-x-auto scrollbar-hide" 
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              scrollSnapType: 'x mandatory',
+              touchAction: 'pan-x',
+            }}
+          >
+            <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
+              <SimpleTabsTrigger value="profile" className="flex-shrink-0 whitespace-nowrap">
+                Profile
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="billing" className="flex-shrink-0 whitespace-nowrap">
+                Billing
+              </SimpleTabsTrigger>
+            </SimpleTabsList>
+        </div>
+      </div>
+
+      <div className="w-full p-4 lg:p-8">
+        <SimpleTabsContent value="profile">
+        <ProfileModule />
+      </SimpleTabsContent>
+
+      <SimpleTabsContent value="billing">
+        <BillingModule />
+      </SimpleTabsContent>
+      </div>
       </SimpleTabs>
-    </div>
   );
 }

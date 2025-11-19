@@ -1,5 +1,4 @@
 import { getPlannedPayments, PLANNED_HORIZON_DAYS } from "@/lib/api/planned-payments";
-import { PageHeader } from "@/components/common/page-header";
 import { PlannedPaymentList } from "./planned-payment-list";
 import type { Metadata } from "next";
 
@@ -22,13 +21,7 @@ export default async function PlannedPaymentPage() {
   });
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <PageHeader
-        title="Planned Payment"
-        description={`All scheduled payments for the next ${PLANNED_HORIZON_DAYS} days`}
-      />
-      <PlannedPaymentList plannedPayments={plannedPayments} />
-    </div>
+    <PlannedPaymentList plannedPayments={plannedPayments} />
   );
 }
 

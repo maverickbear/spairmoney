@@ -127,29 +127,65 @@ export async function getAccounts(accessToken?: string, refreshToken?: string) {
       }
     }
     
-    // 3. For accounts without Questrade or AccountInvestmentValue, calculate from holdings
+    // 3. OPTIMIZED: Lazy load holdings only if there are investment accounts without value
+    // This avoids calling getHoldings() when there are no investment accounts
     const accountsWithoutValue = investmentAccountIds.filter(
       accountId => !balances.has(accountId)
     );
     
     if (accountsWithoutValue.length > 0) {
       try {
-        // Import getHoldings to calculate account values from holdings
+        // Only fetch holdings if we actually have investment accounts that need values
+        // This is a lazy load optimization - getHoldings() is expensive
         const { getHoldings } = await import("@/lib/api/investments");
-        const holdings = await getHoldings();
+        const holdings = await getHoldings(undefined, accessToken, refreshToken);
+        
+        logger.debug(`[getAccounts] Fetched ${holdings.length} holdings for ${accountsWithoutValue.length} accounts without value`);
+        
+        // Create a map from InvestmentAccount.id to Account.id for Questrade accounts
+        // Holdings from Questrade use InvestmentAccount.id, but we need Account.id
+        const investmentAccountMap = new Map<string, string>();
+        if (investmentAccounts.length > 0) {
+          const { data: investmentAccountsData } = await supabase
+            .from("InvestmentAccount")
+            .select("id, accountId")
+            .in("accountId", investmentAccountIds)
+            .not("accountId", "is", null);
+          
+          if (investmentAccountsData) {
+            for (const ia of investmentAccountsData) {
+              if (ia.accountId) {
+                investmentAccountMap.set(ia.id, ia.accountId);
+              }
+            }
+          }
+        }
         
         // Calculate value for each account based on holdings
         for (const accountId of accountsWithoutValue) {
-          const accountHoldings = holdings.filter((h: any) => h.accountId === accountId);
+          // Holdings may have accountId as InvestmentAccount.id (from Questrade) or Account.id (from transactions)
+          // We need to check both
+          const accountHoldings = holdings.filter((h: any) => {
+            // Direct match (from transactions)
+            if (h.accountId === accountId) {
+              return true;
+            }
+            // Check if this holding's accountId is an InvestmentAccount that maps to our Account.id
+            const mappedAccountId = investmentAccountMap.get(h.accountId);
+            return mappedAccountId === accountId;
+          });
+          
           const accountValue = accountHoldings.reduce((sum: number, h: any) => {
             return sum + (h.marketValue || 0);
           }, 0);
           
-          if (accountValue > 0) {
-            balances.set(accountId, accountValue);
-          }
+          logger.debug(`[getAccounts] Account ${accountId}: ${accountHoldings.length} holdings, total value: ${accountValue}`);
+          
+          // Always set the balance, even if it's 0 (to ensure it's calculated)
+          balances.set(accountId, accountValue);
         }
       } catch (error) {
+        logger.error("Error fetching holdings for account values:", error);
         console.error("Error fetching holdings for account values:", error);
         // Continue without failing - will use 0 for accounts without value
       }

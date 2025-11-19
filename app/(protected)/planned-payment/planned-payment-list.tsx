@@ -16,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
+import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
+import { PageHeader } from "@/components/common/page-header";
 import {
   Table,
   TableBody,
@@ -50,10 +52,18 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
     });
   }, [payments]);
 
-  // Filter payments by type
-  const filteredPayments = useMemo(() => {
-    return sortedPayments.filter((p) => p.type === activeTab);
-  }, [sortedPayments, activeTab]);
+  // Filter payments by type for each tab
+  const expensePayments = useMemo(() => {
+    return sortedPayments.filter((p) => p.type === "expense");
+  }, [sortedPayments]);
+
+  const incomePayments = useMemo(() => {
+    return sortedPayments.filter((p) => p.type === "income");
+  }, [sortedPayments]);
+
+  const transferPayments = useMemo(() => {
+    return sortedPayments.filter((p) => p.type === "transfer");
+  }, [sortedPayments]);
 
   const handleMarkAsPaid = async (payment: PlannedPayment) => {
     if (processingIds.has(payment.id)) return;
@@ -217,42 +227,27 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
   const incomeCount = sortedPayments.filter((p) => p.type === "income").length;
   const transferCount = sortedPayments.filter((p) => p.type === "transfer").length;
 
-  // Set default tab to first available tab with items on initial load
+  // Set default tab to first available tab with items on initial load only
   useEffect(() => {
-    if (sortedPayments.length > 0) {
-      const currentTabCount = 
-        activeTab === "expense" ? expenseCount :
-        activeTab === "income" ? incomeCount :
-        transferCount;
-      
-      // Only switch if current tab is empty and there are items in other tabs
-      if (currentTabCount === 0) {
-        if (expenseCount > 0) {
-          setActiveTab("expense");
-        } else if (incomeCount > 0) {
-          setActiveTab("income");
-        } else if (transferCount > 0) {
-          setActiveTab("transfer");
-        }
+    if (sortedPayments.length > 0 && activeTab === "expense" && expenseCount === 0) {
+      // Only set initial tab if expense is empty and we're still on the default tab
+      if (incomeCount > 0) {
+        setActiveTab("income");
+      } else if (transferCount > 0) {
+        setActiveTab("transfer");
       }
     }
-  }, [sortedPayments.length, expenseCount, incomeCount, transferCount, activeTab]);
-
-  if (sortedPayments.length === 0) {
-    return (
-      <div className="rounded-[12px] border p-12">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">
-            No future payments found
-          </p>
-        </div>
-      </div>
-    );
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedPayments.length]);
 
   return (
-    <div className="space-y-4">
-      <SimpleTabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+    <SimpleTabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full">
+      <PageHeader
+        title="Planned Payment"
+      />
+
+      {/* Fixed Tabs - Desktop only */}
+      <FixedTabsWrapper>
         <SimpleTabsList>
           <SimpleTabsTrigger value="expense">
             Expense {expenseCount > 0 && `(${expenseCount})`}
@@ -264,10 +259,46 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
             Transfer {transferCount > 0 && `(${transferCount})`}
           </SimpleTabsTrigger>
         </SimpleTabsList>
+      </FixedTabsWrapper>
 
-        <SimpleTabsContent value="expense" className="mt-4">
-          {filteredPayments.length === 0 ? (
-            <div className="rounded-[12px] border p-12">
+      {/* Mobile/Tablet Tabs - Sticky at top */}
+      <div 
+        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+      >
+        <div 
+          className="overflow-x-auto scrollbar-hide" 
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            scrollSnapType: 'x mandatory',
+            touchAction: 'pan-x',
+          }}
+        >
+          <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
+            <SimpleTabsTrigger value="expense" className="flex-shrink-0 whitespace-nowrap">
+              Expense {expenseCount > 0 && `(${expenseCount})`}
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="income" className="flex-shrink-0 whitespace-nowrap">
+              Income {incomeCount > 0 && `(${incomeCount})`}
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="transfer" className="flex-shrink-0 whitespace-nowrap">
+              Transfer {transferCount > 0 && `(${transferCount})`}
+            </SimpleTabsTrigger>
+          </SimpleTabsList>
+        </div>
+      </div>
+
+      <div className="w-full p-4 lg:p-8">
+        <SimpleTabsContent value="expense">
+          {sortedPayments.length === 0 ? (
+            <div className="rounded-[12px] p-12">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  No future payments found
+                </p>
+              </div>
+            </div>
+          ) : expensePayments.length === 0 ? (
+            <div className="rounded-[12px] p-12">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   No future expenses found
@@ -289,7 +320,7 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPayments.map((payment, index) => {
+                  {expensePayments.map((payment, index) => {
                     const daysUntil = getDaysUntil(payment.date);
                     const amount = Math.abs(payment.amount || 0);
                     const dateLabel = formatDateLabel(payment.date);
@@ -415,9 +446,9 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
           )}
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="income" className="mt-4">
-          {filteredPayments.length === 0 ? (
-            <div className="rounded-[12px] border p-12">
+        <SimpleTabsContent value="income">
+          {incomePayments.length === 0 ? (
+            <div className="rounded-[12px] p-12">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   No future income found
@@ -439,7 +470,7 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPayments.map((payment, index) => {
+                  {incomePayments.map((payment, index) => {
                     const daysUntil = getDaysUntil(payment.date);
                     const amount = Math.abs(payment.amount || 0);
                     const dateLabel = formatDateLabel(payment.date);
@@ -560,9 +591,9 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
           )}
         </SimpleTabsContent>
 
-        <SimpleTabsContent value="transfer" className="mt-4">
-          {filteredPayments.length === 0 ? (
-            <div className="rounded-[12px] border p-12">
+      <SimpleTabsContent value="transfer">
+        {transferPayments.length === 0 ? (
+            <div className="rounded-[12px] p-12">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   No future transfers found
@@ -584,7 +615,7 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPayments.map((payment, index) => {
+                  {transferPayments.map((payment, index) => {
                     const daysUntil = getDaysUntil(payment.date);
                     const amount = Math.abs(payment.amount || 0);
                     const dateLabel = formatDateLabel(payment.date);
@@ -707,8 +738,8 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
             </div>
           )}
         </SimpleTabsContent>
-      </SimpleTabs>
-    </div>
+      </div>
+    </SimpleTabs>
   );
 }
 

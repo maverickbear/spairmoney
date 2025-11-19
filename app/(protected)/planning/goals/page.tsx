@@ -62,8 +62,7 @@ export default function GoalsPage() {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [topUpAmount, setTopUpAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"priority" | "progress" | "eta">("priority");
-  const [filterBy, setFilterBy] = useState<"all" | "active" | "completed">("all");
+  const [sortBy, setSortBy] = useState<"progress" | "eta">("progress");
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -255,18 +254,8 @@ export default function GoalsPage() {
     }
   }
 
-  // Filter and sort goals
-  const filteredGoals = goals.filter((goal) => {
-    if (filterBy === "active") return !goal.isCompleted;
-    if (filterBy === "completed") return goal.isCompleted;
-    return true;
-  });
-
-  const sortedGoals = [...filteredGoals].sort((a, b) => {
-    if (sortBy === "priority") {
-      const priorityOrder = { High: 3, Medium: 2, Low: 1 };
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
-    }
+  // Sort goals
+  const sortedGoals = [...goals].sort((a, b) => {
     if (sortBy === "progress") {
       return (b.progressPct || 0) - (a.progressPct || 0);
     }
@@ -284,13 +273,13 @@ export default function GoalsPage() {
 
   return (
     <FeatureGuard feature="hasGoals" featureName="Goals Tracking" requiredPlan="essential">
-      <div className="space-y-4 md:space-y-6">
+      <div>
         <PageHeader
           title="Goals"
-          description="Track your progress toward your financial goals"
         >
-        {!(sortedGoals.length === 0 && filterBy === "all") && (
+        {sortedGoals.length > 0 && (
           <Button
+            size="medium"
             onClick={() => {
               if (!checkWriteAccess()) return;
               setSelectedGoal(null);
@@ -303,26 +292,15 @@ export default function GoalsPage() {
         )}
       </PageHeader>
 
-      {goals.length > 0 && (
+      <div className="w-full p-4 lg:p-8">
+        {goals.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex gap-4 items-center">
-            <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
-              <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Goals</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
               <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="priority">Priority</SelectItem>
                 <SelectItem value="progress">Progress</SelectItem>
                 <SelectItem value="eta">ETA</SelectItem>
               </SelectContent>
@@ -344,26 +322,18 @@ export default function GoalsPage() {
             Loading goals...
           </div>
         ) : sortedGoals.length === 0 ? (
-          <div className="col-span-full">
+          <div className="col-span-full w-full h-full min-h-[400px]">
             <EmptyState
               icon={PiggyBank}
-              title={filterBy === "all" ? "No goals created yet" : `No ${filterBy} goals found`}
-              description={
-                filterBy === "all"
-                  ? "Create your first savings goal to start tracking your progress and achieve your financial dreams."
-                  : `Try adjusting your filters to see ${filterBy === "active" ? "completed" : "active"} goals.`
-              }
-              actionLabel={filterBy === "all" ? "Create Your First Goal" : undefined}
-              onAction={
-                filterBy === "all"
-                  ? () => {
-                      if (!checkWriteAccess()) return;
-                      setSelectedGoal(null);
-                      setIsFormOpen(true);
-                    }
-                  : undefined
-              }
-              actionIcon={filterBy === "all" ? Plus : undefined}
+              title="No goals created yet"
+              description="Create your first savings goal to start tracking your progress and achieve your financial dreams."
+              actionLabel="Create Your First Goal"
+              onAction={() => {
+                if (!checkWriteAccess()) return;
+                setSelectedGoal(null);
+                setIsFormOpen(true);
+              }}
+              actionIcon={Plus}
             />
           </div>
         ) : (
@@ -486,6 +456,7 @@ export default function GoalsPage() {
         </DialogContent>
       </Dialog>
       {ConfirmDialog}
+      </div>
       </div>
     </FeatureGuard>
   );

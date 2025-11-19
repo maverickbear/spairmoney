@@ -278,7 +278,7 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching budgets:", error);
       return [];
     }),
-    getUpcomingTransactions(50).catch((error) => {
+    getUpcomingTransactions(50, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching upcoming transactions:", error);
       return [];
     }),
@@ -313,7 +313,7 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching accounts:", error);
       return [];
     }),
-    userId ? getUserLiabilities(userId).catch((error) => {
+    userId ? getUserLiabilities(userId, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching liabilities:", error);
       return [];
     }) : Promise.resolve([]),

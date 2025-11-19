@@ -52,6 +52,7 @@ import {
   SimpleTabsList,
   SimpleTabsTrigger,
 } from "@/components/ui/simple-tabs";
+import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Input } from "@/components/ui/input";
 import { formatTransactionDate, formatShortDate, parseDateWithoutTimezone, parseDateInput, formatDateInput } from "@/lib/utils/timestamp";
 import { format } from "date-fns";
@@ -1521,12 +1522,15 @@ export default function TransactionsPage() {
 
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <SimpleTabs 
+      value={filters.type === "all" ? "all" : filters.type} 
+      onValueChange={(value) => setFilters({ ...filters, type: value })}
+      className="w-full"
+    >
       <PageHeader
         title="Transactions"
-        description="Manage your income and expenses"
       >
-        <div className="flex flex-wrap gap-3 justify-center md:justify-end">
+          <div className="flex flex-wrap gap-3 justify-center md:justify-end">
           {selectedTransactionIds.size > 0 && (
             <>
               <Select
@@ -1550,6 +1554,7 @@ export default function TransactionsPage() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
+                    size="medium"
                     disabled={updatingTypes || updatingCategories}
                     className="h-9 w-auto min-w-[160px] text-xs"
                   >
@@ -1611,7 +1616,8 @@ export default function TransactionsPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button 
-                variant="destructive" 
+                variant="destructive"
+                size="medium"
                 onClick={handleDeleteMultiple}
                 disabled={deletingMultiple || updatingTypes || updatingCategories}
                 className="text-xs md:text-sm"
@@ -1631,16 +1637,17 @@ export default function TransactionsPage() {
               </Button>
             </>
           )}
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="text-xs md:text-sm">
+          <Button variant="outline" size="medium" onClick={() => setIsImportOpen(true)} className="text-xs md:text-sm">
             <Upload className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
             <span className="hidden md:inline">Import CSV</span>
           </Button>
-          <Button variant="outline" onClick={handleExport} className="text-xs md:text-sm" disabled={transactions.length === 0}>
+          <Button variant="outline" size="medium" onClick={handleExport} className="text-xs md:text-sm" disabled={transactions.length === 0}>
             <Download className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
             <span className="hidden md:inline">Export CSV</span>
           </Button>
           <Button 
             variant="outline"
+            size="medium"
             onClick={() => setIsFiltersModalOpen(true)} 
             className="text-xs md:text-sm hidden lg:flex"
           >
@@ -1652,7 +1659,7 @@ export default function TransactionsPage() {
               </Badge>
             )}
           </Button>
-          <Button onClick={() => {
+          <Button size="medium" onClick={() => {
             // Check if user can perform write operations
             if (!checkWriteAccess()) {
               return;
@@ -1666,21 +1673,44 @@ export default function TransactionsPage() {
         </div>
       </PageHeader>
 
-      {/* Type Tabs - Fixed at top, attached to header */}
-      <div className="sticky top-[var(--mobile-header-height,3rem)] lg:top-0 z-30 bg-card border-b -mx-4 px-4 lg:mx-0 lg:px-0">
-        <SimpleTabs 
-          value={filters.type === "all" ? "all" : filters.type} 
-          onValueChange={(value) => setFilters({ ...filters, type: value })}
-          className="w-full"
+      {/* Fixed Tabs - Desktop only */}
+      <FixedTabsWrapper>
+        <SimpleTabsList>
+          <SimpleTabsTrigger value="all">All</SimpleTabsTrigger>
+          <SimpleTabsTrigger value="expense">Expense</SimpleTabsTrigger>
+          <SimpleTabsTrigger value="income">Income</SimpleTabsTrigger>
+          <SimpleTabsTrigger value="transfer">Transfer</SimpleTabsTrigger>
+        </SimpleTabsList>
+      </FixedTabsWrapper>
+
+      {/* Mobile/Tablet Tabs - Sticky at top */}
+      <div 
+        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+      >
+        <div 
+          className="overflow-x-auto scrollbar-hide" 
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            scrollSnapType: 'x mandatory',
+            touchAction: 'pan-x',
+          }}
         >
-          <SimpleTabsList className="w-full">
-            <SimpleTabsTrigger value="all">All</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="expense">Expense</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="income">Income</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="transfer">Transfer</SimpleTabsTrigger>
+          <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
+            <SimpleTabsTrigger value="all" className="flex-shrink-0 whitespace-nowrap">
+              All
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="expense" className="flex-shrink-0 whitespace-nowrap">
+              Expense
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="income" className="flex-shrink-0 whitespace-nowrap">
+              Income
+            </SimpleTabsTrigger>
+            <SimpleTabsTrigger value="transfer" className="flex-shrink-0 whitespace-nowrap">
+              Transfer
+            </SimpleTabsTrigger>
           </SimpleTabsList>
-        </SimpleTabs>
-            </div>
+        </div>
+      </div>
 
       {/* Floating Filter Button - Mobile only */}
       <div className="lg:hidden fixed bottom-24 right-4 z-[60]">
@@ -1698,9 +1728,10 @@ export default function TransactionsPage() {
         </Button>
       </div>
 
-
-      {/* Mobile Card View */}
-      <div className="lg:hidden" ref={pullToRefreshRef}>
+      {/* Content Container */}
+      <div className="w-full p-4 lg:p-8">
+        {/* Mobile Card View */}
+        <div className="lg:hidden" ref={pullToRefreshRef}>
         {/* Pull to refresh indicator */}
         {pullDistance > 0 && (
           <div 
@@ -1773,10 +1804,10 @@ export default function TransactionsPage() {
             )}
           </>
         )}
-      </div>
+        </div>
 
-      {/* Desktop/Tablet Table View */}
-      <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
+        {/* Desktop/Tablet Table View */}
+        <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -2068,11 +2099,11 @@ export default function TransactionsPage() {
             )}
           </TableBody>
         </Table>
-      </div>
+        </div>
 
-      {/* Pagination Controls - Desktop only */}
-      {transactions.length > 0 && (
-        <div className="hidden lg:flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+        {/* Pagination Controls - Desktop only */}
+        {transactions.length > 0 && (
+          <div className="hidden lg:flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Items per page:</span>
             <Select
@@ -2152,7 +2183,8 @@ export default function TransactionsPage() {
             </Button>
           </div>
         </div>
-      )}
+        )}
+      </div>
 
 
       <TransactionForm
@@ -2393,7 +2425,7 @@ export default function TransactionsPage() {
       </Dialog>
       {DeleteConfirmDialog}
       {DeleteMultipleConfirmDialog}
-    </div>
+    </SimpleTabs>
   );
 }
 

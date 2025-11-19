@@ -290,14 +290,14 @@ export async function syncAccountLiabilities(
 /**
  * Get all liabilities for a user (including shared accounts via AccountOwner)
  */
-export async function getUserLiabilities(userId: string): Promise<PlaidLiability[]> {
+export async function getUserLiabilities(userId: string, accessToken?: string, refreshToken?: string): Promise<PlaidLiability[]> {
   try {
     if (!userId) {
       console.warn('getUserLiabilities: userId is null or undefined');
       return [];
     }
 
-    const supabase = await createServerClient();
+    const supabase = await createServerClient(accessToken, refreshToken);
 
     // Get all account IDs the user has access to:
     // 1. Accounts where userId matches directly

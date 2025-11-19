@@ -893,7 +893,7 @@ export async function getTransactions(filters?: {
   return getTransactionsInternal(filters, accessToken, refreshToken);
 }
 
-export async function getUpcomingTransactions(limit: number = 5) {
+export async function getUpcomingTransactions(limit: number = 5, accessToken?: string, refreshToken?: string) {
   const now = new Date();
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
@@ -927,7 +927,7 @@ export async function getUpcomingTransactions(limit: number = 5) {
 
   // Also get recurring transactions and generate planned payments for them
   // This is a temporary solution until we fully migrate to PlannedPayments
-  const supabase = await createServerClient();
+  const supabase = await createServerClient(accessToken, refreshToken);
   const { data: recurringTransactions, error: recurringError } = await supabase
     .from("Transaction")
     .select(`
