@@ -68,15 +68,15 @@ export async function GET(request: NextRequest) {
     if (expiresAt <= fiveMinutesFromNow) {
       try {
         const refreshed = await refreshAccessToken(refreshToken);
-        accessToken = refreshed.accessToken;
+        accessToken = refreshed.access_token;
 
         // Update connection with new tokens
         const encrypted = encryptTokens(
-          refreshed.accessToken,
-          refreshed.refreshToken
+          refreshed.access_token,
+          refreshed.refresh_token
         );
         const newExpiresAt = new Date(
-          now.getTime() + refreshed.expiresIn * 1000
+          now.getTime() + refreshed.expires_in * 1000
         );
 
         await supabase
