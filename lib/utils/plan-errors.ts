@@ -30,6 +30,7 @@ export function getPlanErrorMessage(
     currentPlan?: string;
     limit?: number;
     current?: number;
+    message?: string;
   }
 ): string {
   switch (code) {

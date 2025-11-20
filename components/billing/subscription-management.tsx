@@ -12,6 +12,13 @@ import {
   AlertDescription,
 } from "@/components/ui/alert";
 
+interface UserHouseholdInfo {
+  isOwner: boolean;
+  isMember: boolean;
+  ownerId?: string;
+  ownerName?: string;
+}
+
 interface SubscriptionManagementProps {
   subscription: Subscription | null;
   plan: Plan | null;
@@ -38,6 +45,7 @@ export function SubscriptionManagement({
 }: SubscriptionManagementProps) {
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,6 +67,22 @@ export function SubscriptionManagement({
 
     loadPaymentMethod();
   }, [subscription?.stripeCustomerId]);
+
+  useEffect(() => {
+    async function loadHouseholdInfo() {
+      try {
+        const response = await fetch("/api/household/info");
+        if (response.ok) {
+          const data = await response.json();
+          setHouseholdInfo(data);
+        }
+      } catch (error) {
+        console.error("Error loading household info:", error);
+      }
+    }
+
+    loadHouseholdInfo();
+  }, []);
 
   async function handleOpenStripePortal() {
     try {
@@ -193,23 +217,35 @@ export function SubscriptionManagement({
             </Alert>
           )}
 
-          <div className="flex flex-col gap-2">
-            <Button
-              onClick={handleManageSubscription}
-              disabled={loading}
-              variant="outline"
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Manage Subscription"
-              )}
-            </Button>
-          </div>
+          {householdInfo?.isMember && !householdInfo?.isOwner && (
+            <Alert>
+              <AlertDescription>
+                {householdInfo.ownerName 
+                  ? `You are viewing the subscription managed by ${householdInfo.ownerName}. Only the account owner can manage the subscription.`
+                  : "You are viewing the subscription as a household member. Only the account owner can manage the subscription."}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {(!householdInfo?.isMember || householdInfo?.isOwner) && (
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleManageSubscription}
+                disabled={loading}
+                variant="outline"
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Manage Subscription"
+                )}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

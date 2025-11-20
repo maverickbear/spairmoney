@@ -552,13 +552,12 @@ export function SubscriptionForm({
             <div className="space-y-2">
               <label className="text-sm font-medium">First Billing Date</label>
               <DatePicker
-                date={
-                  form.watch("firstBillingDate")
-                    ? form.watch("firstBillingDate") instanceof Date
-                      ? form.watch("firstBillingDate")
-                      : new Date(form.watch("firstBillingDate"))
-                    : undefined
-                }
+                date={(() => {
+                  const value = form.watch("firstBillingDate");
+                  if (!value) return undefined;
+                  if (value instanceof Date) return value;
+                  return new Date(value as string);
+                })()}
                 onDateChange={(date) => {
                   if (date) {
                     form.setValue("firstBillingDate", date);

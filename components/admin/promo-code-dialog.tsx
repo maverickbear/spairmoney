@@ -286,7 +286,7 @@ export function PromoCodeDialog({
             <div className="space-y-2">
               <Label htmlFor="expiresAt">Expires At (optional)</Label>
               <DatePicker
-                date={form.watch("expiresAt") ? new Date(form.watch("expiresAt")) : undefined}
+                date={form.watch("expiresAt") ? new Date(form.watch("expiresAt") as string) : undefined}
                 onDateChange={(date) => {
                   form.setValue("expiresAt", date ? date.toISOString().split("T")[0] : "");
                 }}

@@ -180,6 +180,10 @@ export function InvestmentPortfolioWidget({
         // This avoids duplicate calls to getHoldings() and getInvestmentAccounts()
         const portfolioRes = await fetch("/api/portfolio/all?days=30").catch(() => null);
 
+        // Calculate asset mix from holdings and accounts
+        let assetTypes = new Set<string>();
+        let accountTypes = new Set<string>();
+
         if (portfolioRes?.ok) {
           const portfolioData = await portfolioRes.json();
           
@@ -191,10 +195,6 @@ export function InvestmentPortfolioWidget({
           if (portfolioData.historical) {
             setHistoricalData(Array.isArray(portfolioData.historical) ? portfolioData.historical : []);
           }
-
-          // Calculate asset mix from holdings and accounts
-          let assetTypes = new Set<string>();
-          let accountTypes = new Set<string>();
 
           if (portfolioData.holdings && Array.isArray(portfolioData.holdings)) {
             portfolioData.holdings.forEach((holding: any) => {

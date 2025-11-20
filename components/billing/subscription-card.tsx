@@ -5,7 +5,18 @@ import { Button } from "@/components/ui/button";
 import { PlanBadge } from "@/components/common/plan-badge";
 import { Subscription, Plan } from "@/lib/validations/plan";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
+
+interface UserHouseholdInfo {
+  isOwner: boolean;
+  isMember: boolean;
+  ownerId?: string;
+  ownerName?: string;
+}
 
 interface SubscriptionCardProps {
   subscription: Subscription | null;
@@ -15,6 +26,23 @@ interface SubscriptionCardProps {
 
 export function SubscriptionCard({ subscription, plan, onSubscriptionUpdated }: SubscriptionCardProps) {
   const [loading, setLoading] = useState(false);
+  const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(null);
+
+  useEffect(() => {
+    async function loadHouseholdInfo() {
+      try {
+        const response = await fetch("/api/household/info");
+        if (response.ok) {
+          const data = await response.json();
+          setHouseholdInfo(data);
+        }
+      } catch (error) {
+        console.error("Error loading household info:", error);
+      }
+    }
+
+    loadHouseholdInfo();
+  }, []);
 
   async function handleManageSubscription() {
     try {
@@ -105,9 +133,21 @@ export function SubscriptionCard({ subscription, plan, onSubscriptionUpdated }: 
           </div>
         )}
 
+        {householdInfo?.isMember && !householdInfo?.isOwner && (
+          <Alert>
+            <AlertDescription>
+              {householdInfo.ownerName 
+                ? `You are viewing the subscription managed by ${householdInfo.ownerName}. Only the account owner can manage the subscription.`
+                : "You are viewing the subscription as a household member. Only the account owner can manage the subscription."}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {(!householdInfo?.isMember || householdInfo?.isOwner) && (
           <Button onClick={handleManageSubscription} disabled={loading} className="w-full">
             {loading ? "Loading..." : "Manage Subscription"}
           </Button>
+        )}
       </CardContent>
     </Card>
   );

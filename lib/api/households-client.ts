@@ -1,9 +1,7 @@
 "use client";
 
-import { createBrowserClient } from "@/lib/supabase-client";
+import { supabase } from "@/lib/supabase";
 import { Household, HouseholdMemberNew } from "@/lib/types/household";
-
-const supabase = createBrowserClient();
 
 /**
  * Map database Household to Household type

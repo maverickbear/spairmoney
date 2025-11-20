@@ -140,11 +140,13 @@ export async function GET(request: NextRequest) {
           .select()
           .single();
 
+        let householdMemberError: any = null;
+
         if (householdError || !household) {
           console.error("[OAUTH-CALLBACK] Error creating household:", householdError);
         } else {
           // Create household member (owner role)
-          const { error: householdMemberError } = await serviceRoleClient
+          const { error } = await serviceRoleClient
             .from("HouseholdMemberNew")
             .insert({
               householdId: household.id,
@@ -156,6 +158,7 @@ export async function GET(request: NextRequest) {
             createdAt: now,
             updatedAt: now,
           });
+          householdMemberError = error;
 
           if (householdMemberError) {
             console.error("[OAUTH-CALLBACK] Error creating household member:", householdMemberError);

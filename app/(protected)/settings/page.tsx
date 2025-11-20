@@ -528,7 +528,7 @@ function ProfileModule() {
                 <div className="space-y-1.5">
                   <label className="text-xs sm:text-sm font-medium">Date of Birth</label>
                   <DatePicker
-                    date={form.watch("dateOfBirth") ? new Date(form.watch("dateOfBirth")) : undefined}
+                    date={form.watch("dateOfBirth") ? new Date(form.watch("dateOfBirth") as string) : undefined}
                     onDateChange={(date) => {
                       form.setValue("dateOfBirth", date ? date.toISOString().split("T")[0] : "");
                     }}

@@ -24,7 +24,7 @@ export async function verifyAccountOwnership(accountId: string): Promise<boolean
     // Check if account exists and user is owner via userId
     const { data: account, error: accountError } = await supabase
       .from("Account")
-      .select("id, userId")
+      .select("id, userId, householdId")
       .eq("id", accountId)
       .single();
 
@@ -88,7 +88,7 @@ export async function verifyTransactionOwnership(transactionId: string): Promise
     // Get transaction with userId and accountId
     const { data: transaction, error: transactionError } = await supabase
       .from("Transaction")
-      .select("id, userId, accountId")
+      .select("id, userId, accountId, householdId")
       .eq("id", transactionId)
       .single();
 
@@ -139,7 +139,7 @@ export async function verifyBudgetOwnership(budgetId: string): Promise<boolean> 
 
     const { data: budget, error: budgetError } = await supabase
       .from("Budget")
-      .select("id, userId")
+      .select("id, userId, householdId")
       .eq("id", budgetId)
       .single();
 
@@ -186,7 +186,7 @@ export async function verifyGoalOwnership(goalId: string): Promise<boolean> {
 
     const { data: goal, error: goalError } = await supabase
       .from("Goal")
-      .select("id, userId")
+      .select("id, userId, householdId")
       .eq("id", goalId)
       .single();
 
@@ -233,7 +233,7 @@ export async function verifyDebtOwnership(debtId: string): Promise<boolean> {
 
     const { data: debt, error: debtError } = await supabase
       .from("Debt")
-      .select("id, userId")
+      .select("id, userId, householdId")
       .eq("id", debtId)
       .single();
 
