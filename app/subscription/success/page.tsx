@@ -202,9 +202,10 @@ function SuccessContent() {
       console.error("[SUCCESS] Error invalidating cache:", error);
     }
     
-    // Force a full page reload to ensure cache is cleared and subscription is re-checked
+    // Force a full page reload with cache-busting to ensure cache is cleared and subscription is re-checked
     // This ensures the layout will fetch fresh subscription data
-    window.location.href = "/dashboard";
+    const timestamp = Date.now();
+    window.location.replace(`/dashboard?_t=${timestamp}`);
   };
 
   const handleGoToBilling = () => {

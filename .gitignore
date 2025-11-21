@@ -1,135 +1,228 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# ============================================
+# Dependencies
+# ============================================
 /node_modules
 /.pnp
 .pnp.js
 
-# testing
+# ============================================
+# Next.js
+# ============================================
+/.next/
+/out/
+/.swc/
+next-env.d.ts
+
+# ============================================
+# Build outputs
+# ============================================
+/build
+/dist
+*.min.js
+*.min.css
+*.bundle.js
+
+# ============================================
+# TypeScript
+# ============================================
+*.tsbuildinfo
+.tsbuildinfo
+
+# ============================================
+# Testing
+# ============================================
 /coverage
 /.nyc_output
 *.lcov
 .jest-cache/
+test-results/
+playwright-report/
+playwright/.cache/
+.cypress/
+cypress/videos/
+cypress/screenshots/
 
-# next.js
-/.next/
-/out/
-/.swc/
-
-# production
-/build
-
-# misc
+# ============================================
+# Environment and secrets
+# ============================================
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+.env.production.backup
+.env.local.backup
+*.secret
+*.key
 *.pem
-*.swp
-*.swo
+secrets/
+.secrets/
+# Allow .env.example to be versioned
+!.env.example
+!.env.template
 
-# debug
+# ============================================
+# Vercel
+# ============================================
+.vercel
+
+# ============================================
+# Supabase local
+# ============================================
+supabase/.branches
+supabase/.temp
+supabase/.env
+
+# ============================================
+# Docker
+# ============================================
+docker-compose.override.yml
+docker-compose.local.yml
+*.dockerignore
+.docker/
+
+# ============================================
+# Database backups and local files
+# ============================================
+*.sql.backup
+full_backup.sql
+schema_only.sql
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ============================================
+# Email templates (not versioned)
+# ============================================
+/email-templates/
+
+# ============================================
+# Sentry
+# ============================================
+.sentryclirc
+.sentry/
+.sentry-sourcemaps/
+*.map
+sourcemaps/
+
+# ============================================
+# Cache and temporary files
+# ============================================
+.cache/
+.turbo/
+.temp/
+tmp/
+*.cache
+.eslintcache
+.prettiercache
+.stylelintcache
+node_modules/.cache/
+
+# ============================================
+# Logs
+# ============================================
+*.log
+*.log.*
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-*.log
 
-# local env files
-.env*.local
-.env
-.env.production
-.env.production.backup
-.env.local.backup
-# Allow .env.example to be versioned
-!.env.example
-!.env.template
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-.tsbuildinfo
-
-# Supabase local
-supabase/.branches
-supabase/.temp
-supabase/.env
-
-# IDE / Editor
-.vscode/
-.idea/
-*.code-workspace
-*.sublime-project
-*.sublime-workspace
-*.iml
-
-# OS
-.DS_Store
-**/.DS_Store
-Thumbs.db
-.AppleDouble
-.LSOverride
-*~
-
-# Backup files
-*.backup
-*.bak
-*.tmp
-
-# Database backups (sensitive data)
-*.sql.backup
-full_backup.sql
-schema_only.sql
-
-# Docker
-docker-compose.override.yml
-*.dockerignore
-.docker/
-
-# Email templates (not versioned)
-/email-templates/
-
-# Sentry
-.sentryclirc
-.sentry/
-*.map
-sourcemaps/
-
-# Cache and temporary files
-.cache/
-.turbo/
-*.cache
-.temp/
-tmp/
-
-# Lock files (keep package-lock.json, ignore others)
+# ============================================
+# Package manager lock files
+# ============================================
+# Keep package-lock.json, ignore others
 yarn.lock
 pnpm-lock.yaml
+bun.lockb
 package-lock.json.backup
 
-# Symbolic links (created during organization)
-.eslintrc.json
-.prettierrc
-docker-compose.yml
+# ============================================
+# Performance and analysis reports
+# ============================================
+*.performance.json
+*.bundle-analysis.json
+*.webpack-stats.json
+*.lint-report.json
+lighthouse-report/
+performance-reports/
 
-# IDE / Editor (additional)
-*.sublime-*
+# ============================================
+# Generated documentation
+# ============================================
+docs/generated/
+docs/api/
+
+# ============================================
+# Storybook
+# ============================================
+storybook-static/
+
+# ============================================
+# PWA files (if generated)
+# ============================================
+**/public/sw.js.map
+**/public/workbox-*.js
+**/public/workbox-*.js.map
+
+# ============================================
+# IDE / Editor
+# ============================================
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.vscode-test/
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+*.sublime-*
+*.iml
 .history/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+.eslintrc.json
+.prettierrc
 
-# OS (additional)
+# ============================================
+# OS files
+# ============================================
+.DS_Store
+**/.DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
 Desktop.ini
+.AppleDouble
+.LSOverride
+Thumbs.db
+*~
+
+# ============================================
+# Backup and temporary files
+# ============================================
+*.backup
+*.bak
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# ============================================
+# Misc
+# ============================================
+*.pem

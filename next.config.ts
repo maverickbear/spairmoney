@@ -139,6 +139,24 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Disable caching for dynamic routes (dashboard, insights, etc.)
+        source: "/(dashboard|insights|reports|planning|investments|banking|billing|profile|members)/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          },
+          {
+            key: "Pragma",
+            value: "no-cache",
+          },
+          {
+            key: "Expires",
+            value: "0",
+          },
+        ],
+      },
     ];
   },
 };

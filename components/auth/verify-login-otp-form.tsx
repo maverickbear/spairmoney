@@ -263,8 +263,10 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       await preloadUserData();
 
       // Always redirect to dashboard after login
-      // Use window.location.href to ensure full page reload with new session
-      window.location.href = "/dashboard";
+      // Use window.location.replace with cache-busting to ensure fresh page load
+      // This bypasses service worker cache and ensures new session is loaded
+      const timestamp = Date.now();
+      window.location.replace(`/dashboard?_t=${timestamp}`);
     } catch (error) {
       console.error("Error verifying OTP:", error);
       setError("An unexpected error occurred. Please try again.");

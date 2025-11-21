@@ -1,11 +1,23 @@
 // Service Worker for caching static assets
-// Version: 1.0.0
+// Version: 2.0.0
 
-const CACHE_NAME = 'spare-finance-v1';
+const CACHE_NAME = 'spare-finance-v2';
 const STATIC_ASSETS = [
-  '/',
-  '/dashboard',
   '/icon.svg',
+];
+
+// Routes that should NEVER be cached (always fetch from network)
+const NO_CACHE_ROUTES = [
+  '/dashboard',
+  '/insights',
+  '/reports',
+  '/planning',
+  '/investments',
+  '/banking',
+  '/billing',
+  '/profile',
+  '/members',
+  '/api/',
 ];
 
 // Install event - cache static assets
@@ -39,18 +51,40 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip non-GET requests and external URLs
+  const url = new URL(event.request.url);
+  const pathname = url.pathname;
+
+  // Skip external URLs (extensions, etc.)
   if (
     event.request.url.startsWith('chrome-extension://') ||
-    event.request.url.startsWith('moz-extension://') ||
-    event.request.url.includes('_next/static') ||
-    event.request.url.includes('/api/')
+    event.request.url.startsWith('moz-extension://')
   ) {
+    return;
+  }
+
+  // NEVER cache dynamic routes - always fetch from network
+  const shouldNotCache = NO_CACHE_ROUTES.some(route => pathname.startsWith(route));
+  
+  if (shouldNotCache) {
+    // For dynamic routes, always fetch from network and bypass cache
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(() => {
+        // If network fails, return a basic error response
+        return new Response('Network error', { status: 408 });
+      })
+    );
+    return;
+  }
+
+  // For static assets and Next.js static files, use cache-first strategy
+  if (event.request.url.includes('_next/static') || event.request.url.includes('/api/')) {
+    // Let Next.js handle its own caching
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
+      // For static assets, prefer cache but fallback to network
       if (cachedResponse) {
         return cachedResponse;
       }
@@ -64,9 +98,10 @@ self.addEventListener('fetch', (event) => {
         // Clone the response
         const responseToCache = response.clone();
 
-        // Cache static assets (images, fonts, etc.)
+        // Only cache static assets (images, fonts, icons) - never cache HTML pages
         if (
-          event.request.url.match(/\.(jpg|jpeg|png|gif|svg|webp|woff|woff2|ttf|eot)$/i)
+          event.request.url.match(/\.(jpg|jpeg|png|gif|svg|webp|woff|woff2|ttf|eot|ico)$/i) &&
+          !pathname.match(/\.html?$/i)
         ) {
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);

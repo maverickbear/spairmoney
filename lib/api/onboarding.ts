@@ -20,7 +20,8 @@ export interface OnboardingStatus {
 export async function checkOnboardingStatus(): Promise<OnboardingStatus> {
   try {
     // Check if user has at least 1 account
-    const accounts = await getAccounts();
+    // OPTIMIZATION: Don't include holdings for onboarding check - we only need account count and balance
+    const accounts = await getAccounts(undefined, undefined, { includeHoldings: false });
     const hasAccount = accounts.length > 0;
 
     // Calculate total balance if accounts exist

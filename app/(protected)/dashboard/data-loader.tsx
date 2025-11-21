@@ -59,13 +59,15 @@ async function loadDashboardDataInternal(
   // Helper function to get accounts with tokens
   // OPTIMIZED: Uses getAccounts() which already has optimized balance calculation
   // and proper RLS filtering by userId
+  // OPTIMIZATION: Include holdings for dashboard to show accurate investment balances
   async function getAccountsWithTokens(accessToken?: string, refreshToken?: string) {
     // Use the existing optimized getAccounts function which:
     // 1. Properly filters by userId via RLS
     // 2. Has optimized balance calculation
     // 3. Handles investment accounts correctly
     // Pass tokens to ensure proper authentication
-    const accounts = await getAccounts(accessToken, refreshToken);
+    // Include holdings for dashboard to show accurate investment account balances
+    const accounts = await getAccounts(accessToken, refreshToken, { includeHoldings: true });
     
     // Still need to fetch AccountOwner relationships and owner names
     const supabase = await createServerClient(accessToken, refreshToken);

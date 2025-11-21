@@ -361,9 +361,11 @@ async function calculateFinancialHealthInternal(
   }
 
   // Calculate emergency fund months
+  // OPTIMIZATION: Include holdings for accurate investment account balances in emergency fund calculation
+  // This ensures investment accounts are properly included in the emergency fund calculation
   let emergencyFundMonths = 0;
   try {
-    const accounts = await getAccounts(accessToken, refreshToken);
+    const accounts = await getAccounts(accessToken, refreshToken, { includeHoldings: true });
     const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
     
     // Emergency fund months = total balance / monthly expenses

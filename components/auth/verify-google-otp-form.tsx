@@ -306,10 +306,10 @@ export function VerifyGoogleOtpForm() {
         return;
       }
 
-      // Use window.location.href for a full page reload to ensure cookies are read correctly
-      // This is more reliable in production where cookie settings are stricter
-      // The full page reload ensures the server-side middleware and layout can read the cookies
-      window.location.href = "/dashboard";
+      // Use window.location.replace with cache-busting to ensure fresh page load
+      // This bypasses service worker cache and ensures new session is loaded
+      const timestamp = Date.now();
+      window.location.replace(`/dashboard?_t=${timestamp}`);
     } catch (error) {
       console.error("Error verifying OTP:", error);
       setError("An unexpected error occurred. Please try again.");

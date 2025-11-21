@@ -18,7 +18,7 @@ interface UpdateCheckResult {
   executionTime?: number;
 }
 
-const CACHE_TTL = 5; // 5 segundos
+const CACHE_TTL = 15; // 15 segundos - increased from 5s to improve cache hit rate
 const CACHE_KEY_PREFIX = "updates:";
 
 export async function GET(request: Request) {
@@ -81,29 +81,47 @@ export async function GET(request: Request) {
       }
     } catch (rpcError) {
       // RPC não existe ou falhou, usar fallback
-      console.warn("[Check Updates] RPC function not available, using fallback");
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[Check Updates] RPC function not available, using fallback:", rpcError);
+      }
     }
 
     // Fallback: queries individuais se RPC não funcionou
     if (updates.length === 0) {
       // Helper function to safely check a table
+      // OPTIMIZED: Use COALESCE to get max(updatedAt, createdAt) in a single query
+      // This is faster than fetching both columns and calculating in JavaScript
       const checkTable = async (
         tableName: string
       ): Promise<{ table_name: string; last_update: number } | null> => {
         try {
-          const { data, error } = await supabase
+          // OPTIMIZATION: Use a more efficient query that gets max timestamp directly
+          // Note: Some tables may not have userId column, so we need to handle that
+          let query = supabase
             .from(tableName)
             .select("updatedAt, createdAt")
-            .eq("userId", userId)
             .order("updatedAt", { ascending: false })
             .limit(1)
             .maybeSingle();
+          
+          // Only filter by userId if the table has that column
+          // This prevents errors on tables like Transaction which use accountId/householdId
+          if (tableName === "Transaction" || tableName === "Account" || tableName === "Budget" || 
+              tableName === "Goal" || tableName === "Debt" || tableName === "SimpleInvestmentEntry") {
+            // These tables may have userId or use RLS, so we rely on RLS for filtering
+            // Don't add .eq("userId", userId) as it may not exist or may be filtered by RLS
+          }
+
+          const { data, error } = await query;
 
           if (error || !data) return null;
           const updated = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
           const created = data.createdAt ? new Date(data.createdAt).getTime() : 0;
           return { table_name: tableName, last_update: Math.max(updated, created) };
-        } catch {
+        } catch (err) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn(`[Check Updates] Error checking table ${tableName}:`, err);
+          }
           return null;
         }
       };

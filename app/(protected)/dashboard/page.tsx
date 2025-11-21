@@ -8,6 +8,9 @@ import { DashboardRealtime } from "@/components/dashboard/dashboard-realtime";
 import { DashboardUpdateChecker } from "@/components/dashboard/dashboard-update-checker";
 import { startServerPagePerformance } from "@/lib/utils/performance";
 
+// Force dynamic rendering since this page uses cookies for authentication
+export const dynamic = 'force-dynamic';
+
 // Lazy load the new Financial Overview page
 const FinancialOverviewPage = dynamic(() => import("./financial-overview-page").then(m => ({ default: m.FinancialOverviewPage })), { ssr: true });
 const OnboardingWidget = dynamic(() => import("@/components/dashboard/onboarding-widget").then(m => ({ default: m.OnboardingWidget })), { ssr: true });

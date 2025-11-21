@@ -156,7 +156,16 @@ export async function getGoalsInternal(accessToken?: string, refreshToken?: stri
   // Get current user to verify authentication
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
-    console.error("[GOALS] Authentication error:", authError);
+    // Silently handle expected auth errors (invalid tokens, expired sessions, etc.)
+    // These are normal when user is not authenticated or tokens are invalid
+    const isExpectedError = authError?.message?.includes("refresh_token_not_found") ||
+      authError?.message?.includes("Invalid refresh token") ||
+      authError?.message?.includes("JWT expired") ||
+      authError?.message?.includes("Auth session missing");
+    
+    if (!isExpectedError) {
+      console.warn("[GOALS] Unexpected authentication error:", authError?.message);
+    }
     return [];
   }
   console.log("[GOALS] Fetching goals for user:", user.id);

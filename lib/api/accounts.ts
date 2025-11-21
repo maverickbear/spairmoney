@@ -10,8 +10,13 @@ import { requireAccountOwnership } from "@/lib/utils/security";
 import { logger } from "@/lib/utils/logger";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 
-export async function getAccounts(accessToken?: string, refreshToken?: string) {
+export async function getAccounts(
+  accessToken?: string, 
+  refreshToken?: string,
+  options?: { includeHoldings?: boolean }
+) {
     const supabase = await createServerClient(accessToken, refreshToken);
+    const includeHoldings = options?.includeHoldings ?? true; // Default to true for backward compatibility
 
   // Verify user is authenticated
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -133,11 +138,14 @@ export async function getAccounts(accessToken?: string, refreshToken?: string) {
     // 3. OPTIMIZED: Calculate from holdings for all investment accounts
     // This ensures we get accurate balances even when InvestmentAccount values are null/0
     // We'll calculate from holdings and use the higher value (InvestmentAccount or holdings sum)
-    try {
-      // Only fetch holdings if we actually have investment accounts
-      // This is a lazy load optimization - getHoldings() is expensive
-      const { getHoldings } = await import("@/lib/api/investments");
-      const holdings = await getHoldings(undefined, accessToken, refreshToken);
+    // OPTIMIZATION: Only fetch holdings if explicitly requested (includeHoldings=true)
+    // This prevents redundant calls when holdings are not needed
+    if (includeHoldings) {
+      try {
+        // Only fetch holdings if we actually have investment accounts
+        // This is a lazy load optimization - getHoldings() is expensive
+        const { getHoldings } = await import("@/lib/api/investments");
+        const holdings = await getHoldings(undefined, accessToken, refreshToken);
       
       logger.debug(`[getAccounts] Fetched ${holdings.length} holdings for ${investmentAccountIds.length} investment accounts`);
       
@@ -188,10 +196,15 @@ export async function getAccounts(accessToken?: string, refreshToken?: string) {
         // Always set the balance to the calculated value
         balances.set(accountId, finalBalance);
       }
-    } catch (error) {
-      logger.error("Error fetching holdings for account values:", error);
-      console.error("Error fetching holdings for account values:", error);
-      // Continue without failing - will use existing balances or 0
+      } catch (error) {
+        logger.error("Error fetching holdings for account values:", error);
+        console.error("Error fetching holdings for account values:", error);
+        // Continue without failing - will use existing balances or 0
+      }
+    } else {
+      // If holdings are not included, use existing balances from InvestmentAccount/AccountInvestmentValue
+      // This is faster and avoids the expensive getHoldings() call
+      logger.debug(`[getAccounts] Skipping holdings calculation (includeHoldings=false) for ${investmentAccountIds.length} investment accounts`);
     }
     
     // 4. For accounts without any value, set to 0

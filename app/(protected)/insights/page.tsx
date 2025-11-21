@@ -5,6 +5,9 @@ import { SpareScoreInsightsPage } from "./insights-content";
 import { PageHeader } from "@/components/common/page-header";
 import { Loader2 } from "lucide-react";
 
+// Force dynamic rendering since this page uses cookies for authentication
+export const dynamic = 'force-dynamic';
+
 async function InsightsContent() {
   const selectedMonthDate = startOfMonth(new Date());
   const data = await loadDashboardData(selectedMonthDate);
