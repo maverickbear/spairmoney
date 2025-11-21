@@ -32,6 +32,10 @@ export function DashboardRealtime() {
   const pathname = usePathname();
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const subscriptionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSubscribingRef = useRef(false);
+  const instanceIdRef = useRef(Math.random().toString(36).substring(7));
   const circuitBreakerRef = useRef({
     consecutiveFailures: 0,
     lastFailureTime: 0,
@@ -41,6 +45,22 @@ export function DashboardRealtime() {
   useEffect(() => {
     // Only set up subscriptions on dashboard page
     if (pathname !== "/dashboard") {
+      // Cleanup if navigating away from dashboard
+      if (subscriptionRef.current) {
+        console.log(`[DashboardRealtime-${instanceIdRef.current}] Cleaning up subscription (navigated away)`);
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // CRITICAL FIX: Prevent multiple subscriptions from being created
+    if (subscriptionRef.current || isSubscribingRef.current) {
+      console.log(`[DashboardRealtime-${instanceIdRef.current}] Subscription already exists or in progress, skipping`);
       return;
     }
 
@@ -111,10 +131,21 @@ export function DashboardRealtime() {
 
     // OPTIMIZED: Lazy loading - wait 1 second before creating subscriptions
     // This improves initial page load performance
-    const subscriptionTimeout = setTimeout(() => {
+    // CRITICAL FIX: Store timeout ref to prevent multiple executions
+    subscriptionTimeoutRef.current = setTimeout(() => {
+      // Double-check that we're still on dashboard and no subscription exists
+      if (pathname !== "/dashboard" || subscriptionRef.current || isSubscribingRef.current) {
+        console.log(`[DashboardRealtime-${instanceIdRef.current}] Aborting subscription creation (conditions changed)`);
+        return;
+      }
+
+      isSubscribingRef.current = true;
+      console.log(`[DashboardRealtime-${instanceIdRef.current}] Creating Realtime subscription...`);
+
       // Check circuit breaker before creating subscriptions
       if (checkCircuitBreaker()) {
-        console.info("[DashboardRealtime] Circuit breaker is open, using polling only");
+        console.info(`[DashboardRealtime-${instanceIdRef.current}] Circuit breaker is open, using polling only`);
+        isSubscribingRef.current = false;
         startPolling();
         return;
       }
@@ -126,7 +157,7 @@ export function DashboardRealtime() {
         // Only Transaction and Account use Realtime (change frequently)
         // Budget and Goal use polling (change less frequently)
         subscriptionRef.current = supabase
-          .channel("dashboard-critical")
+          .channel(`dashboard-critical-${instanceIdRef.current}`)
           .on(
             "postgres_changes",
             {
@@ -135,8 +166,6 @@ export function DashboardRealtime() {
               table: "Transaction",
             },
             () => {
-              const duration = performance.now() - startTime;
-              logPerformance("Transaction change", duration);
               recordSuccess();
               scheduleRefresh();
             }
@@ -149,8 +178,6 @@ export function DashboardRealtime() {
               table: "Account",
             },
             () => {
-              const duration = performance.now() - startTime;
-              logPerformance("Account change", duration);
               recordSuccess();
               scheduleRefresh();
             }
@@ -158,49 +185,77 @@ export function DashboardRealtime() {
           .subscribe((status) => {
             const duration = performance.now() - startTime;
             logPerformance("Subscription setup", duration);
+            isSubscribingRef.current = false;
 
             if (status === "SUBSCRIBED") {
               recordSuccess();
-              console.info("[DashboardRealtime] Realtime subscriptions active for Transaction and Account");
+              console.info(`[DashboardRealtime-${instanceIdRef.current}] Realtime subscriptions active for Transaction and Account (took ${duration.toFixed(2)}ms)`);
             } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
               recordFailure();
-              console.warn(`[DashboardRealtime] Subscription error: ${status}, falling back to polling`);
+              console.warn(`[DashboardRealtime-${instanceIdRef.current}] Subscription error: ${status}, falling back to polling`);
+              // Cleanup failed subscription
+              if (subscriptionRef.current) {
+                supabase.removeChannel(subscriptionRef.current);
+                subscriptionRef.current = null;
+              }
               // Fallback to polling if Realtime fails
               startPolling();
             }
           });
       } catch (error) {
+        isSubscribingRef.current = false;
         recordFailure();
-        console.error("[DashboardRealtime] Error setting up subscriptions:", error);
+        console.error(`[DashboardRealtime-${instanceIdRef.current}] Error setting up subscriptions:`, error);
         // Fallback to polling on error
         startPolling();
       }
     }, 1000); // Wait 1 second before creating subscriptions
 
-    // Start polling for Budget and Goal immediately (after delay)
-    const pollingTimeout = setTimeout(() => {
-      startPolling();
-    }, 1000);
+    // Start polling for Budget and Goal (after delay)
+    // CRITICAL FIX: Only start polling if not already running
+    if (!pollingIntervalRef.current) {
+      pollingTimeoutRef.current = setTimeout(() => {
+        if (pathname === "/dashboard" && !subscriptionRef.current) {
+          console.log(`[DashboardRealtime-${instanceIdRef.current}] Starting polling for Budget and Goal`);
+          startPolling();
+        }
+      }, 1000);
+    }
 
-    // Cleanup subscriptions on unmount
+    // Cleanup subscriptions on unmount or dependency change
     return () => {
+      console.log(`[DashboardRealtime-${instanceIdRef.current}] Cleanup triggered`);
+      
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
       }
-      clearTimeout(subscriptionTimeout);
-      clearTimeout(pollingTimeout);
+      
+      // Clear timeouts
+      if (subscriptionTimeoutRef.current) {
+        clearTimeout(subscriptionTimeoutRef.current);
+        subscriptionTimeoutRef.current = null;
+      }
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+        pollingTimeoutRef.current = null;
+      }
       
       // Cleanup subscription if it was created
       if (subscriptionRef.current) {
+        console.log(`[DashboardRealtime-${instanceIdRef.current}] Removing subscription`);
         supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
       }
 
       // Cleanup polling interval
       if (pollingIntervalRef.current) {
+        console.log(`[DashboardRealtime-${instanceIdRef.current}] Clearing polling interval`);
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
+
+      // Reset subscribing flag
+      isSubscribingRef.current = false;
     };
   }, [router, pathname]);
 
