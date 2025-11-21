@@ -13,8 +13,11 @@ export function PricingSection() {
             Pricing
           </p>
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-            Try For Free And<br />Start Controlling Your Finances
+            Start Organizing Your Finances<br />Try It Free Today
           </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Track expenses, understand spending, and learn to save together as a family. Choose the plan that fits your needs.
+          </p>
         </div>
 
         {/* Stripe Pricing Table */}

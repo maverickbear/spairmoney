@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getCurrentUserClient } from "@/lib/api/auth-client";
 import { Logo } from "@/components/common/logo";
 import { useTheme } from "next-themes";
+import { Sun, Moon } from "lucide-react";
 
 interface LandingHeaderProps {
   isAuthenticated?: boolean;
@@ -15,7 +16,7 @@ interface LandingHeaderProps {
 export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderProps = {}) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth ?? false);
-  const { theme, resolvedTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -71,7 +72,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative flex items-center justify-center md:justify-between h-16 md:h-20">
           {/* Logo - Centralizado no mobile, à esquerda no desktop */}
-          <Link href="/" className="flex items-center gap-3 absolute left-1/2 -translate-x-1/2 md:relative md:left-0 md:translate-x-0">
+          <Link href="/" className="flex items-center gap-3 absolute left-1/2 -translate-x-1/2 md:relative md:left-0 md:translate-x-0 md:flex-1">
             {(() => {
               // When not scrolled, header is transparent over dark background - use white logo
               if (!isScrolled) {
@@ -99,8 +100,8 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
             })()}
           </Link>
 
-          {/* Desktop Navigation e CTA Buttons - À direita */}
-          <div className="hidden md:flex items-center gap-8 ml-auto">
+          {/* Desktop Navigation - Centralizado */}
+          <div className="hidden md:flex items-center justify-center flex-1">
             <div className="flex items-center gap-8">
               {navItems.map((item) => (
                 <Link
@@ -116,41 +117,44 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                 </Link>
               ))}
             </div>
-            <div className="flex items-center gap-3">
-              {isAuthenticated ? (
+          </div>
+
+          {/* CTA Buttons - À direita */}
+          <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
+            {isAuthenticated ? (
+              <Button
+                asChild
+                className={isScrolled 
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90" 
+                  : "bg-white text-primary hover:bg-white/90 font-semibold"
+                }
+              >
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className={`relative ${isScrolled 
+                    ? "text-foreground hover:bg-muted" 
+                    : "text-white hover:bg-white/10"
+                  }`}
+                  aria-label="Toggle theme"
+                >
+                  <Sun className="absolute h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                  <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                </Button>
                 <Button
                   asChild
-                  className={isScrolled 
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90" 
-                    : "bg-white text-primary hover:bg-white/90 font-semibold"
-                  }
+                  variant="ghost"
+                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white"}
                 >
-                  <Link href="/dashboard">Dashboard</Link>
+                  <Link href="/auth/login">Sign In</Link>
                 </Button>
-              ) : (
-                <>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white"}
-                  >
-                    <Link href="/auth/login">Sign In</Link>
-                  </Button>
-                  {isScrolled ? (
-                    <Button asChild className="bg-[#4A4AF2] text-white hover:bg-[#3A3AD2] font-semibold">
-                      <Link href="#pricing">Get Started</Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      asChild
-                      className="bg-white text-primary hover:bg-white/90 font-semibold"
-                    >
-                      <Link href="#pricing">Get Started</Link>
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+              </>
+            )}
           </div>
         </div>
       </nav>

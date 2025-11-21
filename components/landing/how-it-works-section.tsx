@@ -7,20 +7,20 @@ export function HowItWorksSection() {
   const steps = [
     {
       number: "1",
-      title: "Add Your Accounts",
-      description: "Connect bank accounts via Plaid, link Questrade for investments, or manually add accounts. Import transactions via CSV or enter them manually—your choice.",
+      title: "Track All Your Expenses",
+      description: "Connect your bank accounts or add transactions manually. See where every dollar goes—groceries, bills, entertainment, everything. No more wondering where your money went.",
       icon: Link2,
     },
     {
       number: "2",
-      title: "AI Categorizes Everything",
-      description: "Our smart system learns your spending patterns and automatically categorizes transactions. Just approve or adjust—it gets smarter over time.",
+      title: "Understand Your Spending",
+      description: "Get insights based on your real spending. See your Spare Score, understand your savings rate, and learn where you can save more. Our AI helps you understand your finances.",
       icon: TrendingUp,
     },
     {
       number: "3",
-      title: "Set Goals & Budgets",
-      description: "Create budgets by category, set savings goals with deadlines, and track debt payoff. Get Spare Score insights to improve your financial health.",
+      title: "Learn to Save Together",
+      description: "Set savings goals with your family and see when you'll reach them. Create budgets that work and track progress together. Build wealth, not just pay bills.",
       icon: Target,
     },
   ];
@@ -33,7 +33,7 @@ export function HowItWorksSection() {
             How It Works
           </p>
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-            How Spare Finance<br />Can Help You
+            How Your Family<br />Can Get Organized
           </h2>
         </div>
 

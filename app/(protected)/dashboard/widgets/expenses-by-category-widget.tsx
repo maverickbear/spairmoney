@@ -80,13 +80,14 @@ export function ExpensesByCategoryWidget({
       const categoryName = t.category?.name || "Other";
       const categoryId = t.category?.id || null;
       const amount = parseTransactionAmount(t.amount);
+      const absAmount = Math.abs(amount);
       
-      if (amount <= 0) return acc;
+      if (absAmount <= 0) return acc;
 
       if (!acc[categoryName]) {
         acc[categoryName] = { value: 0, categoryId };
       }
-      acc[categoryName].value += Math.abs(amount);
+      acc[categoryName].value += absAmount;
       return acc;
     }, {} as Record<string, { value: number; categoryId: string | null }>);
 

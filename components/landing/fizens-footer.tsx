@@ -11,16 +11,16 @@ export function FizensFooter() {
         {/* CTA Section */}
         <div className="text-center mb-16 pb-16 border-b border-border">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-            Your First Step To Financial Freedom Begins Here
+            Start Organizing Your Finances Today
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Watch your money grow. Download the app now and start taking control of your money today.
+            Join families learning to track expenses, understand spending, and build wealth together. Stop working just to pay bills—start building your future.
           </p>
           <Button
             asChild
             className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg font-semibold px-10 h-14 rounded-full"
           >
-            <Link href="#pricing">Get Started Free</Link>
+            <Link href="#pricing">Start Organizing Your Finances</Link>
           </Button>
         </div>
 
@@ -33,7 +33,7 @@ export function FizensFooter() {
               <Logo variant="wordmark" color="auto" height={40} />
             </Link>
             <p className="text-sm text-muted-foreground">
-              Complete personal finance management with AI-powered insights, bank integration, and investment tracking. Take control of your financial future.
+              Help your family organize finances, track expenses, and learn to save together. A place where families learn to build wealth, not just pay bills.
             </p>
           </div>
 

@@ -6,39 +6,39 @@ import { cn } from "@/lib/utils";
 export function FizensTestimonialsSection() {
   const testimonials = [
     {
-      quote: "The AI categorization is incredible. It learned my spending patterns and now automatically categorizes 90% of my transactions. Saves me hours every month!",
-      author: "Michael Brown",
-      location: "Toronto, Canada",
+      quote: "For the first time, we know exactly where our money goes. We can see we spend too much on takeout and now we're learning to cook more at home. Our Spare Score is improving!",
+      author: "Maria & Carlos Silva",
+      location: "Family of 4, Toronto",
       rating: 5,
     },
     {
-      quote: "Spare Score helped me understand my financial health. I've improved my score from 65 to 85 by following the insights and setting better budgets.",
-      author: "Sarah Jane",
-      location: "Vancouver, Canada",
+      quote: "We set a savings goal for our kids' education and can see exactly when we'll reach it. It's motivating to see the progress together as a family every month.",
+      author: "Jennifer & Mark Thompson",
+      location: "Family of 3, Vancouver",
       rating: 5,
     },
     {
-      quote: "As a Questrade user, being able to track my investments alongside my expenses in one dashboard is a game-changer. Everything in one place!",
-      author: "David Lee",
+      quote: "I finally understand my spending. The insights showed me I was spending $400/month on subscriptions I barely use. Canceled half of them and now saving that money.",
+      author: "David Chen",
       location: "Montreal, Canada",
       rating: 5,
     },
     {
-      quote: "The savings goals feature with ETA calculations kept me motivated. I saved $10,000 for my vacation faster than I thought possible.",
-      author: "Emily Smith",
-      location: "Calgary, Canada",
+      quote: "We're learning to budget together. My partner and I can see all our expenses in one place and make decisions together. It's changed how we talk about money.",
+      author: "Sarah & James Wilson",
+      location: "Couple, Calgary",
       rating: 5,
     },
     {
-      quote: "Household sharing is perfect for our family. We can see our collective finances while keeping individual accounts separate. Exactly what we needed.",
-      author: "Sarah Johnson",
+      quote: "The Spare Score helped me realize I was living paycheck to paycheck. Now I'm learning to save 20% of my income and it's actually working. My score went from 45 to 72!",
+      author: "Roberto Martinez",
       location: "Ottawa, Canada",
       rating: 5,
     },
     {
-      quote: "The debt management tools helped me create a payoff strategy. I've paid off $15K in credit card debt using the avalanche method they suggested.",
-      author: "Guy Hawkins",
-      location: "Edmonton, Canada",
+      quote: "We track everything as a family now. The kids can see where money goes and we're teaching them about saving. It's become a family activity.",
+      author: "The Johnson Family",
+      location: "Family of 5, Edmonton",
       rating: 5,
     },
   ];
@@ -55,21 +55,10 @@ export function FizensTestimonialsSection() {
             Testimonials
           </p>
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-            Our Users<br />Talk About Us
+            Families Learning<br />to Grow Together
           </h2>
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-3xl font-bold">4.8/5</span>
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className="w-5 h-5 text-yellow-400 fill-current"
-                />
-              ))}
-            </div>
-          </div>
-          <p className="text-lg text-muted-foreground">
-            Based on 14K+ reviews
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            See how families are organizing their finances, learning to save, and building wealth together
           </p>
         </div>
       </div>

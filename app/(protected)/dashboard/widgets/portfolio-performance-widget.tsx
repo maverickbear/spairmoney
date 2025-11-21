@@ -39,12 +39,12 @@ export function PortfolioPerformanceWidget({
         // Use the same consolidated endpoint as the Investments page
         // This ensures we get the same data structure and avoids inconsistencies
         const allDataRes = await fetch("/api/portfolio/all?days=365", { cache: 'no-store' }).catch((err) => {
-          console.error("[Portfolio Performance Widget] Error fetching portfolio data:", err);
+          // Silently handle errors (e.g., in demo/landing page context)
           return null;
         });
 
         if (!allDataRes || !allDataRes.ok) {
-          console.error("[Portfolio Performance Widget] Portfolio data request failed");
+          // Silently handle failed requests (e.g., in demo/landing page context)
           setIsLoading(false);
           return;
         }
@@ -53,10 +53,6 @@ export function PortfolioPerformanceWidget({
         const allData = await allDataRes.json();
         const summary = allData.summary || null;
         const historical = allData.historical || null;
-
-        // Debug logging
-        console.log("[Portfolio Performance Widget] Summary:", summary);
-        console.log("[Portfolio Performance Widget] Historical data points:", historical?.length || 0);
 
         if (summary) {
           setPortfolioSummary(summary);
@@ -70,12 +66,11 @@ export function PortfolioPerformanceWidget({
             return dateA - dateB;
           });
           setHistoricalData(sortedHistorical);
-          console.log("[Portfolio Performance Widget] Historical data sorted, first date:", sortedHistorical[0]?.date, "last date:", sortedHistorical[sortedHistorical.length - 1]?.date);
         } else {
           setHistoricalData([]);
         }
       } catch (error) {
-        console.error("Error loading portfolio data:", error);
+        // Silently handle errors (e.g., in demo/landing page context)
       } finally {
         setIsLoading(false);
       }

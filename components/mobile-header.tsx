@@ -274,8 +274,13 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
 
   // Get page title based on pathname
   const getPageTitle = () => {
+    // Special case for dashboard - show personalized welcome
+    if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) {
+      const firstName = userData?.user?.name?.split(' ')[0] || 'there';
+      return `Welcome, ${firstName}`;
+    }
+
     const routeMap: Record<string, string> = {
-      "/dashboard": "Dashboard",
       "/transactions": "Transactions",
       "/planned-payment": "Planned Payment",
       "/accounts": "Accounts",

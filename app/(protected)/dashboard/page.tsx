@@ -75,7 +75,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       <DashboardRealtime />
       <DashboardUpdateChecker />
       <PageHeader
-        title="Financial Overview"
+        title={`Welcome, ${firstName}`}
       >
         <MonthSelector />
       </PageHeader>

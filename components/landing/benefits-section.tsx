@@ -1,40 +1,43 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Clock, TrendingUp, Shield, CheckCircle2 } from "lucide-react";
+import { Clock, TrendingUp, Shield, CheckCircle2, Target } from "lucide-react";
 import { BenefitsActivityCard } from "./demo/benefits-activity-card";
 
 export function BenefitsSection() {
   const benefits = [
     {
-      title: "Time and Stress Reduction",
-      subtitle: "Save your time and reduce financial anxiety",
-      description: "AI-powered categorization learns your patterns and automatically organizes transactions. Bank integration syncs everything automatically—no more manual entry or spreadsheets.",
+      title: "Know Exactly Where Your Money Goes",
+      subtitle: "Complete Visibility",
+      description: "Stop wondering where your money disappeared. Track every expense automatically, see spending by category, and understand your patterns. Share this view with your family so everyone knows where you stand.",
       features: [
-        "Automatic transaction categorization saves hours monthly",
-        "Bank sync eliminates manual data entry",
+        "See all expenses in one place, automatically categorized",
+        "Understand spending patterns by category and time",
+        "Share financial overview with family members",
       ],
       icon: Clock,
     },
     {
-      title: "Financial Growth",
-      subtitle: "Take control of your financial future",
-      description: "Spare Score provides AI-powered insights into your financial health. Track savings goals with ETA calculations, monitor investments, and optimize debt payoff strategies.",
+      title: "Learn to Save Money with Personalized Insights",
+      subtitle: "Financial Education",
+      description: "Get your Spare Score to understand your financial health. Learn your savings rate, spending discipline, and receive insights based on your actual spending. Our AI chat helps you understand your finances better.",
       features: [
-        "Spare Score tracks your financial health automatically",
-        "Savings goals with progress tracking and deadlines",
+        "Spare Score shows your financial health (0-100)",
+        "Personalized insights based on your real spending",
+        "Learn where you can save more money",
       ],
       icon: TrendingUp,
     },
     {
-      title: "Security and Privacy",
-      subtitle: "Enterprise-grade security for your finances",
-      description: "Bank-level encryption, secure Plaid integration with read-only access, and Row Level Security (RLS) ensure your data is protected. We never store bank credentials.",
+      title: "Build Wealth Together as a Family",
+      subtitle: "Family Growth",
+      description: "Set savings goals together and track progress. Manage household finances with shared accounts and budgets. Learn and grow financially as a family, not just as individuals.",
       features: [
-        "256-bit encryption and secure authentication",
-        "Plaid integration with SOC 2 Type 2 certification",
+        "Set and track savings goals with your family",
+        "Shared accounts and budgets for household management",
+        "Work together toward financial goals",
       ],
-      icon: Shield,
+      icon: Target,
     },
   ];
 
@@ -43,10 +46,10 @@ export function BenefitsSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-4xl mx-auto mb-20">
           <p className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wide">
-            Benefit
+            Why Families Choose Spare Finance
           </p>
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-            Experience The<br />Future of Finance
+            Stop Living Paycheck to Paycheck.<br />Start Building Your Future.
           </h2>
         </div>
 
@@ -66,12 +69,12 @@ export function BenefitsSection() {
               
               {/* Text Content */}
               <div className="flex flex-col justify-center">
-                <p className="text-sm font-medium text-primary mb-3">• Time and Stress Reduction</p>
+                <p className="text-sm font-medium text-primary mb-3">• {benefits[0].subtitle}</p>
                 <h3 className="text-3xl font-bold mb-4">
-                  Save your time and reduce financial anxiety
+                  {benefits[0].title}
                 </h3>
                 <p className="text-base text-muted-foreground mb-6 leading-relaxed">
-                  Automate tasks like budgeting, tracking, and saving, freeing up your time for more important things.
+                  {benefits[0].description}
                 </p>
                 <ul className="space-y-3">
                   {benefits[0].features.map((feature, idx) => (
@@ -86,7 +89,7 @@ export function BenefitsSection() {
           </div>
         </div>
 
-        {/* Other Benefits */}
+        {/* Other Benefits - Grid Layout */}
         <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {benefits.slice(1).map((benefit, index) => {
             const Icon = benefit.icon;
@@ -118,6 +121,7 @@ export function BenefitsSection() {
             );
           })}
         </div>
+
       </div>
     </section>
   );

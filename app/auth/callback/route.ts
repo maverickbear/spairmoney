@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient();
 
-    // Exchange the code for a session
-    // The createServerClient with @supabase/ssr will automatically handle cookie setting
+    // Exchange the code for a session temporarily to get user info
+    // We'll sign out and require OTP verification before final login
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError || !data.session || !data.user) {
@@ -51,6 +51,60 @@ export async function GET(request: NextRequest) {
     }
 
     const authUser = data.user;
+    const userEmail = authUser.email;
+
+    if (!userEmail) {
+      console.error("[OAUTH-CALLBACK] No email in OAuth response");
+      const redirectUrl = new URL("/auth/login", requestUrl.origin);
+      redirectUrl.searchParams.set("error", "no_email");
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // Sign out to prevent session creation before OTP verification
+    await supabase.auth.signOut();
+
+    // Send OTP for login
+    const { createClient } = await import("@supabase/supabase-js");
+    const anonClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    );
+
+    console.log("[OAUTH-CALLBACK] Sending OTP for Google login");
+    const { error: otpError } = await anonClient.auth.signInWithOtp({
+      email: userEmail,
+      options: {
+        shouldCreateUser: false,
+      },
+    });
+
+    if (otpError) {
+      console.error("[OAUTH-CALLBACK] Error sending OTP:", otpError);
+      const redirectUrl = new URL("/auth/login", requestUrl.origin);
+      redirectUrl.searchParams.set("error", "otp_failed");
+      redirectUrl.searchParams.set("error_description", otpError.message || "Failed to send verification code");
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // Store OAuth data temporarily in URL params to recreate user profile after OTP verification
+    const oauthData = {
+      name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || null,
+      avatarUrl: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
+      userId: authUser.id,
+    };
+
+    // Redirect to OTP verification page with OAuth data
+    const otpUrl = new URL("/auth/verify-google-otp", requestUrl.origin);
+    otpUrl.searchParams.set("email", userEmail);
+    otpUrl.searchParams.set("oauth_data", encodeURIComponent(JSON.stringify(oauthData)));
+    
+    return NextResponse.redirect(otpUrl);
 
     // Check if email has a pending invitation
     const { data: pendingInvitation } = await supabase

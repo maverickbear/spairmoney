@@ -277,6 +277,9 @@ export function FinancialOverviewPage({
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* Financial Overview Title */}
+      <h2 className="text-2xl font-semibold">Financial Overview</h2>
+      
       {/* Financial Summary - Full Width */}
       <FinancialSummaryWidget
         totalBalance={totalBalance}

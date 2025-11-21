@@ -159,6 +159,16 @@
     background-size: 60px 60px;
   }
 
+  /* Hero section gradient with smooth transition */
+  .hero-gradient {
+    background: linear-gradient(to bottom right, #1A1A8F, #2A2AB8, #4A4AF2);
+    transition: background 1s ease-in-out;
+  }
+
+  .dark .hero-gradient {
+    background: linear-gradient(to bottom right, #0D0D5A, #1A1A7A, #2A2AB8);
+  }
+
   /* Responsive improvements for tablets and mobile */
   @media (max-width: 1023px) {
     /* Improve touch targets on mobile/tablet */
