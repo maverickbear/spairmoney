@@ -283,8 +283,8 @@ export async function GET(request: NextRequest) {
       const subscription = subscriptionData.subscription;
       const hasActiveSubscription = 
         subscription !== null && 
-        (subscription.status === "active" || 
-         subscription.status === "trialing");
+        (subscription?.status === "active" || 
+         subscription?.status === "trialing");
 
       if (!hasActiveSubscription) {
         // No active subscription - redirect to select-plan (which redirects to dashboard with modal)

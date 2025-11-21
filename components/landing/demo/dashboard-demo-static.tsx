@@ -14,39 +14,41 @@ import { NetWorthWidget } from "@/app/(protected)/dashboard/widgets/net-worth-wi
 import { PortfolioPerformanceWidget } from "@/app/(protected)/dashboard/widgets/portfolio-performance-widget";
 import { calculateTotalIncome, calculateTotalExpenses } from "@/app/(protected)/dashboard/utils/transaction-helpers";
 import { getDefaultFeatures } from "@/lib/utils/plan-features";
+import type { TransactionWithRelations } from "@/lib/types/transaction.types";
 
 // Mock data
-const mockSelectedMonthTransactions = [
-  { id: "1", type: "income", amount: 8000, category: { id: "1", name: "Salary" }, date: new Date(2024, 11, 1) },
-  { id: "2", type: "expense", amount: -1200, category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 11, 5), expenseType: "variable" },
-  { id: "3", type: "expense", amount: -850, category: { id: "3", name: "Transportation" }, date: new Date(2024, 11, 10), expenseType: "variable" },
-  { id: "4", type: "expense", amount: -450, category: { id: "4", name: "Entertainment" }, date: new Date(2024, 11, 15), expenseType: "variable" },
-  { id: "5", type: "expense", amount: -380, category: { id: "5", name: "Utilities" }, date: new Date(2024, 11, 20), expenseType: "fixed" },
-  { id: "6", type: "expense", amount: -320, category: { id: "6", name: "Shopping" }, date: new Date(2024, 11, 22), expenseType: "variable" },
-  { id: "7", type: "expense", amount: -220, category: { id: "7", name: "Healthcare" }, date: new Date(2024, 11, 25), expenseType: "variable" },
-  { id: "8", type: "expense", amount: -1500, category: { id: "8", name: "Housing" }, date: new Date(2024, 11, 1), expenseType: "fixed" },
-  { id: "9", type: "expense", amount: -650, category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 11, 12), expenseType: "variable" },
-  { id: "10", type: "expense", amount: -420, category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 11, 18), expenseType: "variable" },
+
+const mockSelectedMonthTransactions: TransactionWithRelations[] = [
+  { id: "1", type: "income", amount: 8000, accountId: "demo-account-1", category: { id: "1", name: "Salary" }, date: new Date(2024, 11, 1) },
+  { id: "2", type: "expense", amount: -1200, accountId: "demo-account-1", category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 11, 5), expenseType: "variable" },
+  { id: "3", type: "expense", amount: -850, accountId: "demo-account-1", category: { id: "3", name: "Transportation" }, date: new Date(2024, 11, 10), expenseType: "variable" },
+  { id: "4", type: "expense", amount: -450, accountId: "demo-account-1", category: { id: "4", name: "Entertainment" }, date: new Date(2024, 11, 15), expenseType: "variable" },
+  { id: "5", type: "expense", amount: -380, accountId: "demo-account-1", category: { id: "5", name: "Utilities" }, date: new Date(2024, 11, 20), expenseType: "fixed" },
+  { id: "6", type: "expense", amount: -320, accountId: "demo-account-1", category: { id: "6", name: "Shopping" }, date: new Date(2024, 11, 22), expenseType: "variable" },
+  { id: "7", type: "expense", amount: -220, accountId: "demo-account-1", category: { id: "7", name: "Healthcare" }, date: new Date(2024, 11, 25), expenseType: "variable" },
+  { id: "8", type: "expense", amount: -1500, accountId: "demo-account-1", category: { id: "8", name: "Housing" }, date: new Date(2024, 11, 1), expenseType: "fixed" },
+  { id: "9", type: "expense", amount: -650, accountId: "demo-account-1", category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 11, 12), expenseType: "variable" },
+  { id: "10", type: "expense", amount: -420, accountId: "demo-account-1", category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 11, 18), expenseType: "variable" },
 ];
 
-const mockLastMonthTransactions = [
-  { id: "1", type: "income", amount: 7500, category: { id: "1", name: "Salary" }, date: new Date(2024, 10, 1) },
-  { id: "2", type: "expense", amount: -3700, category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 10, 5) },
+const mockLastMonthTransactions: TransactionWithRelations[] = [
+  { id: "1", type: "income", amount: 7500, accountId: "demo-account-1", category: { id: "1", name: "Salary" }, date: new Date(2024, 10, 1) },
+  { id: "2", type: "expense", amount: -3700, accountId: "demo-account-1", category: { id: "2", name: "Food & Dining" }, date: new Date(2024, 10, 5) },
 ];
 
-const mockChartTransactions = [
-  { id: "1", type: "income", amount: 5000, date: new Date(2024, 6, 1) },
-  { id: "2", type: "expense", amount: -3200, date: new Date(2024, 6, 15) },
-  { id: "3", type: "income", amount: 5500, date: new Date(2024, 7, 1) },
-  { id: "4", type: "expense", amount: -3500, date: new Date(2024, 7, 15) },
-  { id: "5", type: "income", amount: 6000, date: new Date(2024, 8, 1) },
-  { id: "6", type: "expense", amount: -3800, date: new Date(2024, 8, 15) },
-  { id: "7", type: "income", amount: 6500, date: new Date(2024, 9, 1) },
-  { id: "8", type: "expense", amount: -4000, date: new Date(2024, 9, 15) },
-  { id: "9", type: "income", amount: 7000, date: new Date(2024, 10, 1) },
-  { id: "10", type: "expense", amount: -4200, date: new Date(2024, 10, 15) },
-  { id: "11", type: "income", amount: 8000, date: new Date(2024, 11, 1) },
-  { id: "12", type: "expense", amount: -3500, date: new Date(2024, 11, 15) },
+const mockChartTransactions: TransactionWithRelations[] = [
+  { id: "1", type: "income", amount: 5000, accountId: "demo-account-1", date: new Date(2024, 6, 1) },
+  { id: "2", type: "expense", amount: -3200, accountId: "demo-account-1", date: new Date(2024, 6, 15) },
+  { id: "3", type: "income", amount: 5500, accountId: "demo-account-1", date: new Date(2024, 7, 1) },
+  { id: "4", type: "expense", amount: -3500, accountId: "demo-account-1", date: new Date(2024, 7, 15) },
+  { id: "5", type: "income", amount: 6000, accountId: "demo-account-1", date: new Date(2024, 8, 1) },
+  { id: "6", type: "expense", amount: -3800, accountId: "demo-account-1", date: new Date(2024, 8, 15) },
+  { id: "7", type: "income", amount: 6500, accountId: "demo-account-1", date: new Date(2024, 9, 1) },
+  { id: "8", type: "expense", amount: -4000, accountId: "demo-account-1", date: new Date(2024, 9, 15) },
+  { id: "9", type: "income", amount: 7000, accountId: "demo-account-1", date: new Date(2024, 10, 1) },
+  { id: "10", type: "expense", amount: -4200, accountId: "demo-account-1", date: new Date(2024, 10, 15) },
+  { id: "11", type: "income", amount: 8000, accountId: "demo-account-1", date: new Date(2024, 11, 1) },
+  { id: "12", type: "expense", amount: -3500, accountId: "demo-account-1", date: new Date(2024, 11, 15) },
 ];
 
 const mockFinancialHealth = {
@@ -165,30 +167,48 @@ const mockRecurringPayments = [
 const mockSubscriptions = [
   {
     id: "1",
+    userId: "demo-user",
     serviceName: "Netflix",
     amount: 99,
     billingFrequency: "monthly" as const,
     billingDay: 1,
+    accountId: "demo-account-1",
     isActive: true,
-    category: { id: "4", name: "Entertainment" },
+    firstBillingDate: new Date(2024, 0, 1).toISOString(),
+    createdAt: new Date(2024, 0, 1).toISOString(),
+    updatedAt: new Date(2024, 0, 1).toISOString(),
+    subcategory: { id: "1", name: "Streaming", logo: null },
+    account: { id: "demo-account-1", name: "Checking Account" },
   },
   {
     id: "2",
+    userId: "demo-user",
     serviceName: "Spotify",
     amount: 49,
     billingFrequency: "monthly" as const,
     billingDay: 5,
+    accountId: "demo-account-1",
     isActive: true,
-    category: { id: "4", name: "Entertainment" },
+    firstBillingDate: new Date(2024, 0, 5).toISOString(),
+    createdAt: new Date(2024, 0, 5).toISOString(),
+    updatedAt: new Date(2024, 0, 5).toISOString(),
+    subcategory: { id: "2", name: "Music", logo: null },
+    account: { id: "demo-account-1", name: "Checking Account" },
   },
   {
     id: "3",
+    userId: "demo-user",
     serviceName: "Gym Membership",
     amount: 79,
     billingFrequency: "monthly" as const,
     billingDay: 10,
+    accountId: "demo-account-1",
     isActive: true,
-    category: { id: "9", name: "Health & Fitness" },
+    firstBillingDate: new Date(2024, 0, 10).toISOString(),
+    createdAt: new Date(2024, 0, 10).toISOString(),
+    updatedAt: new Date(2024, 0, 10).toISOString(),
+    subcategory: { id: "3", name: "Fitness", logo: null },
+    account: { id: "demo-account-1", name: "Checking Account" },
   },
 ];
 
