@@ -63,8 +63,8 @@ export interface DebtWithCalculations extends Debt {
 /**
  * Get all debts with calculated metrics
  */
-export async function getDebts(): Promise<DebtWithCalculations[]> {
-  const supabase = await createServerClient();
+export async function getDebts(accessToken?: string, refreshToken?: string): Promise<DebtWithCalculations[]> {
+  const supabase = await createServerClient(accessToken, refreshToken);
 
   // Verify user is authenticated (required for RLS policies)
   const { data: { user }, error: authError } = await supabase.auth.getUser();

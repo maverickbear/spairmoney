@@ -138,6 +138,15 @@ export async function signUp(data: SignUpFormData): Promise<{ user: User | null;
 
             if (activeError) {
               console.error("Error setting active household:", activeError);
+            } else {
+              // Create emergency fund goal for new user
+              try {
+                const { ensureEmergencyFundGoal } = await import("./goals");
+                await ensureEmergencyFundGoal(userData.id, household.id);
+              } catch (goalError) {
+                console.error("Error creating emergency fund goal:", goalError);
+                // Don't fail signup if goal creation fails
+              }
             }
           }
         }
@@ -255,6 +264,15 @@ export async function signIn(data: SignInFormData): Promise<{ user: User | null;
 
             if (activeError) {
               console.error("Error setting active household:", activeError);
+            } else {
+              // Create emergency fund goal for new user
+              try {
+                const { ensureEmergencyFundGoal } = await import("./goals");
+                await ensureEmergencyFundGoal(userData.id, household.id);
+              } catch (goalError) {
+                console.error("Error creating emergency fund goal:", goalError);
+                // Don't fail signin if goal creation fails
+              }
             }
           }
         }

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/components/common/money";
 import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Calendar, Check, X, SkipForward, ArrowRight } from "lucide-react";
+import { Calendar, Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
-import type { PlannedPayment } from "@/lib/api/planned-payments";
+import type { PlannedPayment } from "@/lib/api/planned-payments-types";
+import { PLANNED_HORIZON_DAYS } from "@/lib/api/planned-payments-types";
 import { Loader2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -32,16 +33,47 @@ import {
   SimpleTabsTrigger,
   SimpleTabsContent,
 } from "@/components/ui/simple-tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-interface PlannedPaymentListProps {
-  plannedPayments: PlannedPayment[];
-}
-
-export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps) {
+export function PlannedPaymentList() {
   const { toast } = useToast();
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
-  const [payments, setPayments] = useState<PlannedPayment[]>(plannedPayments);
+  const [payments, setPayments] = useState<PlannedPayment[]>([]);
+  const [totalPayments, setTotalPayments] = useState(0);
   const [activeTab, setActiveTab] = useState<"expense" | "income" | "transfer">("expense");
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [allPayments, setAllPayments] = useState<PlannedPayment[]>([]); // Accumulated payments for mobile
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Counts by type (for tab badges)
+  const [expenseCount, setExpenseCount] = useState(0);
+  const [incomeCount, setIncomeCount] = useState(0);
+  const [transferCount, setTransferCount] = useState(0);
+  
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const pullToRefreshRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number>(0);
+  const touchCurrentY = useRef<number>(0);
+  const isPulling = useRef<boolean>(false);
+  const currentPullDistance = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Calculate totalPages
+  const totalPages = useMemo(() => {
+    return Math.ceil(totalPayments / itemsPerPage);
+  }, [totalPayments, itemsPerPage]);
 
   // Sort payments by date (earliest first)
   const sortedPayments = useMemo(() => {
@@ -51,6 +83,9 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
       return dateA.getTime() - dateB.getTime();
     });
   }, [payments]);
+  
+  // For mobile: use accumulated payments for infinite scroll
+  const mobilePayments = allPayments.length > 0 ? allPayments : payments;
 
   // Filter payments by type for each tab
   const expensePayments = useMemo(() => {
@@ -64,6 +99,233 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
   const transferPayments = useMemo(() => {
     return sortedPayments.filter((p) => p.type === "transfer");
   }, [sortedPayments]);
+
+  // Load initial data and counts
+  useEffect(() => {
+    loadCounts();
+    loadPlannedPayments();
+  }, []);
+
+  // Reset to page 1 when tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setAllPayments([]);
+    loadPlannedPayments();
+    // Note: We don't reload counts when tab changes because counts are totals for all types
+  }, [activeTab]);
+
+  // Infinite scroll for mobile
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.innerWidth < 1024;
+    if (!isMobile) return;
+
+    if (loading || loadingMore || currentPage >= totalPages || payments.length === 0 || totalPages === 0) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && currentPage < totalPages) {
+          setLoadingMore(true);
+          setCurrentPage(prev => prev + 1);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [loading, loadingMore, currentPage, totalPages, payments.length]);
+
+  // Reset loadingMore when payments are loaded
+  useEffect(() => {
+    if (!loading) {
+      setLoadingMore(false);
+    }
+  }, [loading]);
+
+  // Load payments when page changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      loadPlannedPayments();
+    }
+  }, [currentPage]);
+
+  // Pull to refresh for mobile
+  useEffect(() => {
+    const container = pullToRefreshRef.current;
+    if (!container) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (window.scrollY === 0) {
+        touchStartY.current = e.touches[0].clientY;
+        isPulling.current = true;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isPulling.current) return;
+      
+      touchCurrentY.current = e.touches[0].clientY;
+      const distance = touchCurrentY.current - touchStartY.current;
+      
+      if (distance > 0 && window.scrollY === 0) {
+        e.preventDefault();
+        const pullDistance = Math.min(distance, 100);
+        currentPullDistance.current = pullDistance;
+        setPullDistance(pullDistance);
+      } else {
+        isPulling.current = false;
+        currentPullDistance.current = 0;
+        setPullDistance(0);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (currentPullDistance.current >= 60 && !loading && !isRefreshing) {
+        setIsRefreshing(true);
+        setCurrentPage(1);
+        setAllPayments([]);
+        setTimeout(() => {
+          Promise.all([loadCounts(), loadPlannedPayments()]).finally(() => {
+            setIsRefreshing(false);
+            setPullDistance(0);
+            currentPullDistance.current = 0;
+          });
+        }, 100);
+      } else {
+        setPullDistance(0);
+        currentPullDistance.current = 0;
+      }
+      isPulling.current = false;
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [pullDistance, loading, isRefreshing]);
+
+  async function loadCounts() {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const horizonDate = new Date(today);
+      horizonDate.setDate(horizonDate.getDate() + PLANNED_HORIZON_DAYS);
+      
+      // Single optimized call to get all counts at once
+      const response = await fetch(
+        `/api/planned-payments/counts?startDate=${today.toISOString().split('T')[0]}&endDate=${horizonDate.toISOString().split('T')[0]}&status=scheduled`
+      );
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch counts");
+      }
+      
+      const data = await response.json();
+      setExpenseCount(data.expense || 0);
+      setIncomeCount(data.income || 0);
+      setTransferCount(data.transfer || 0);
+    } catch (error) {
+      console.error("Error loading counts:", error);
+    }
+  }
+
+  async function loadPlannedPayments() {
+    // Cancel any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      setLoading(true);
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const horizonDate = new Date(today);
+      horizonDate.setDate(horizonDate.getDate() + PLANNED_HORIZON_DAYS);
+      
+      const params = new URLSearchParams();
+      params.append("startDate", today.toISOString().split('T')[0]);
+      params.append("endDate", horizonDate.toISOString().split('T')[0]);
+      params.append("status", "scheduled");
+      params.append("type", activeTab);
+      
+      // Add pagination parameters
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+      const limit = isMobile ? 10 : itemsPerPage;
+      params.append("page", currentPage.toString());
+      params.append("limit", limit.toString());
+      
+      const url = `/api/planned-payments?${params.toString()}&_t=${Date.now()}`;
+      
+      const response = await fetch(url, {
+        cache: 'no-store',
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch planned payments");
+      }
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      const data = await response.json();
+      
+      const newPayments: PlannedPayment[] = data.plannedPayments || [];
+      const total = data.total || 0;
+      
+      setTotalPayments(total);
+      
+      // For mobile infinite scroll: accumulate payments
+      // For desktop: replace payments (normal pagination)
+      if (currentPage === 1) {
+        setPayments(newPayments);
+        setAllPayments(newPayments);
+      } else {
+        setPayments(newPayments);
+        setAllPayments(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const uniqueNew = newPayments.filter(p => !existingIds.has(p.id));
+          return [...prev, ...uniqueNew];
+        });
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      console.error("Error loading planned payments:", error);
+      toast({
+        title: "Error loading planned payments",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      if (!abortController.signal.aborted) {
+        setLoading(false);
+      }
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
+    }
+  }
 
   const handleMarkAsPaid = async (payment: PlannedPayment) => {
     if (processingIds.has(payment.id)) return;
@@ -79,8 +341,10 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
         throw new Error(data.error || "Failed to mark payment as paid");
       }
       
-      // Remove from list (it's now paid)
-      setPayments((prev) => prev.filter((p) => p.id !== payment.id));
+      // Reload payments to reflect changes
+      setCurrentPage(1);
+      setAllPayments([]);
+      await Promise.all([loadCounts(), loadPlannedPayments()]);
       toast({
         title: "Payment marked as paid",
         description: "Transaction has been created successfully.",
@@ -115,8 +379,10 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
         throw new Error(data.error || "Failed to skip payment");
       }
       
-      // Remove from list (it's now skipped)
-      setPayments((prev) => prev.filter((p) => p.id !== payment.id));
+      // Reload payments to reflect changes
+      setCurrentPage(1);
+      setAllPayments([]);
+      await Promise.all([loadCounts(), loadPlannedPayments()]);
       toast({
         title: "Payment skipped",
         description: "This payment has been skipped.",
@@ -151,8 +417,10 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
         throw new Error(data.error || "Failed to cancel payment");
       }
       
-      // Remove from list (it's now cancelled)
-      setPayments((prev) => prev.filter((p) => p.id !== payment.id));
+      // Reload payments to reflect changes
+      setCurrentPage(1);
+      setAllPayments([]);
+      await Promise.all([loadCounts(), loadPlannedPayments()]);
       toast({
         title: "Payment cancelled",
         description: "This payment has been cancelled.",
@@ -222,14 +490,13 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
     return payment.toAccount?.name || "-";
   };
 
-  // Count payments by type
-  const expenseCount = sortedPayments.filter((p) => p.type === "expense").length;
-  const incomeCount = sortedPayments.filter((p) => p.type === "income").length;
-  const transferCount = sortedPayments.filter((p) => p.type === "transfer").length;
 
   // Set default tab to first available tab with items on initial load only
   useEffect(() => {
-    if (sortedPayments.length > 0 && activeTab === "expense" && expenseCount === 0) {
+    if (!loading && expenseCount === 0 && incomeCount === 0 && transferCount === 0) {
+      return; // Don't change tab if no payments at all
+    }
+    if (!loading && activeTab === "expense" && expenseCount === 0) {
       // Only set initial tab if expense is empty and we're still on the default tab
       if (incomeCount > 0) {
         setActiveTab("income");
@@ -238,7 +505,7 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortedPayments.length]);
+  }, [loading, expenseCount, incomeCount, transferCount]);
 
   return (
     <SimpleTabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full">
@@ -263,7 +530,7 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
 
       {/* Mobile/Tablet Tabs - Sticky at top */}
       <div 
-        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        className="lg:hidden sticky top-0 z-40 bg-card dark:bg-transparent border-b"
       >
         <div 
           className="overflow-x-auto scrollbar-hide" 
@@ -288,12 +555,140 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
       </div>
 
       <div className="w-full p-4 lg:p-8">
+        {/* Mobile Card View */}
+        <div className="lg:hidden" ref={pullToRefreshRef}>
+          {/* Pull to refresh indicator */}
+          {pullDistance > 0 && (
+            <div 
+              className="flex items-center justify-center py-4 transition-opacity"
+              style={{ 
+                opacity: Math.min(pullDistance / 60, 1),
+                transform: `translateY(${Math.min(pullDistance, 60)}px)`
+              }}
+            >
+              {isRefreshing ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Refreshing...</span>
+                </div>
+              ) : pullDistance >= 60 ? (
+                <div className="text-sm text-muted-foreground">Release to refresh</div>
+              ) : (
+                <div className="text-sm text-muted-foreground">Pull to refresh</div>
+              )}
+            </div>
+          )}
+          
+          {loading && currentPage === 1 && !isRefreshing ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Loading planned payments...
+            </div>
+          ) : mobilePayments.filter(p => p.type === activeTab).length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No {activeTab} payments found
+            </div>
+          ) : (
+            <>
+              {mobilePayments
+                .filter(p => p.type === activeTab)
+                .map((payment, index) => {
+                  const daysUntil = getDaysUntil(payment.date);
+                  const amount = Math.abs(payment.amount || 0);
+                  const dateLabel = formatDateLabel(payment.date);
+                  const isProcessing = processingIds.has(payment.id);
+                  
+                  return (
+                    <div key={payment.id || index} className="mb-4 p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className={cn("font-medium text-sm", getUrgencyColor(daysUntil))}>
+                            {dateLabel}
+                          </span>
+                        </div>
+                        <div className={cn("font-bold text-sm", 
+                          payment.type === "expense" ? "text-red-600 dark:text-red-400" :
+                          payment.type === "income" ? "text-green-600 dark:text-green-400" :
+                          ""
+                        )}>
+                          {payment.type === "expense" ? "-" : payment.type === "income" ? "+" : ""}
+                          {formatMoney(amount)}
+                        </div>
+                      </div>
+                      <div className="text-sm font-medium mb-1">{getCategoryName(payment)}</div>
+                      {payment.description && (
+                        <div className="text-xs text-muted-foreground mb-2 truncate">
+                          {payment.description}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          {getAccountName(payment)}
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              disabled={isProcessing}
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MoreVertical className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleMarkAsPaid(payment)}
+                              disabled={isProcessing}
+                            >
+                              <Check className="h-4 w-4 mr-2" />
+                              Mark as Paid
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleSkip(payment)}
+                              disabled={isProcessing}
+                            >
+                              <SkipForward className="h-4 w-4 mr-2" />
+                              Skip
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleCancel(payment)}
+                              disabled={isProcessing}
+                              className="text-destructive"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Cancel
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  );
+                })}
+              {/* Infinite scroll sentinel */}
+              {currentPage < totalPages && (
+                <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+                  {loadingMore && (
+                    <div className="text-sm text-muted-foreground">Loading more...</div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Desktop/Tablet Table View */}
+        <div className="hidden lg:block">
         <SimpleTabsContent value="expense">
-          {sortedPayments.length === 0 ? (
+          {loading && currentPage === 1 ? (
             <div className="rounded-[12px] p-12">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  No future payments found
+                  Loading planned payments...
                 </p>
               </div>
             </div>
@@ -738,6 +1133,91 @@ export function PlannedPaymentList({ plannedPayments }: PlannedPaymentListProps)
             </div>
           )}
         </SimpleTabsContent>
+        </div>
+
+        {/* Pagination Controls - Desktop only */}
+        {payments.length > 0 && (
+          <div className="hidden lg:flex flex-col sm:flex-row items-center justify-between gap-4 px-2 mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Items per page:</span>
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setItemsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 w-[80px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalPayments)} of {totalPayments} payments
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || loading}
+                className="h-9"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1">Previous</span>
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="small"
+                      onClick={() => setCurrentPage(pageNum)}
+                      disabled={loading}
+                      className="h-9 w-9"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="small"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || loading}
+                className="h-9"
+              >
+                <span className="hidden sm:inline mr-1">Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </SimpleTabs>
   );

@@ -66,7 +66,7 @@ interface Debt {
 export default function DebtsPage() {
   const perf = usePagePerformance("Debts");
   const { openDialog, ConfirmDialog } = useConfirmDialog();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -202,7 +202,7 @@ export default function DebtsPage() {
       <PageHeader
         title="Debts"
       >
-        {!(sortedDebts.length === 0 && filterBy === "all") && (
+        {!(sortedDebts.length === 0 && filterBy === "all") && canWrite && (
           <Button
             size="medium"
             onClick={() => {
@@ -320,9 +320,9 @@ export default function DebtsPage() {
                     ? "Create your first debt entry to start tracking your loans and debt payments."
                     : `Try adjusting your filters to see ${filterBy === "active" ? "completed" : "active"} debts.`
                 }
-                actionLabel={filterBy === "all" ? "Create Your First Debt" : undefined}
+                actionLabel={filterBy === "all" && canWrite ? "Create Your First Debt" : undefined}
                 onAction={
-                  filterBy === "all"
+                  filterBy === "all" && canWrite
                     ? () => {
                         if (!checkWriteAccess()) return;
                         setSelectedDebt(null);
@@ -330,7 +330,7 @@ export default function DebtsPage() {
                       }
                     : undefined
                 }
-                actionIcon={filterBy === "all" ? Plus : undefined}
+                actionIcon={filterBy === "all" && canWrite ? Plus : undefined}
               />
             </div>
           )}
@@ -415,19 +415,21 @@ export default function DebtsPage() {
       </div>
 
       {/* Mobile Floating Action Button */}
-      <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
-        <Button
-          size="large"
-          className="h-14 w-14 rounded-full shadow-lg"
-          onClick={() => {
-            if (!checkWriteAccess()) return;
-            setSelectedDebt(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+      {canWrite && (
+        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+          <Button
+            size="large"
+            className="h-14 w-14 rounded-full shadow-lg"
+            onClick={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedDebt(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
     </>
   );
 }

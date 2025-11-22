@@ -255,15 +255,13 @@ async function loadDashboardDataInternal(
     }
   }
 
-  // Fetch all data in parallel, using tokens when available
-  // OPTIMIZED: Get accounts first, then use it for onboarding status to avoid duplicate query
+  // OPTIMIZED: Fetch accounts first, then use it for goals and financial-health to avoid duplicate calls
+  // This reduces from 3 getAccounts() calls to 1
   const [
     selectedMonthTransactionsResult,
     lastMonthTransactionsResult,
     budgets,
     upcomingTransactions,
-    financialHealth,
-    goals,
     chartTransactionsResult,
     accounts,
     liabilities,
@@ -287,29 +285,6 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching upcoming transactions:", error);
       return [];
     }),
-    calculateFinancialHealth(selectedMonth, userId, accessToken, refreshToken).catch((error) => {
-      logger.error("Error calculating financial health:", error);
-      // Return a valid FinancialHealthData object instead of null
-      // This ensures the widget can still render with an error message
-      return {
-        score: 0,
-        classification: "Critical" as const,
-        monthlyIncome: 0,
-        monthlyExpenses: 0,
-        netAmount: 0,
-        savingsRate: 0,
-        message: "Unable to calculate Spare Score at this time. Please try refreshing the page.",
-        spendingDiscipline: "Unknown" as const,
-        debtExposure: "Low" as const,
-        emergencyFundMonths: 0,
-        alerts: [],
-        suggestions: [],
-      };
-    }),
-    getGoalsInternal(accessToken, refreshToken).catch((error) => {
-      logger.error("Error fetching goals:", error);
-      return [];
-    }),
     getTransactionsInternal({ startDate: chartStart, endDate: chartEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching chart transactions:", error);
       return { transactions: [], total: 0 };
@@ -330,17 +305,46 @@ async function loadDashboardDataInternal(
       logger.error("Error fetching recurring payments:", error);
       return { transactions: [], total: 0 };
     }),
-    getUserSubscriptions()
-      .then((subs) => {
+    (async () => {
+      try {
+        const { getUserSubscriptionsInternal } = await import('@/lib/api/user-subscriptions');
+        const subs = await getUserSubscriptionsInternal(accessToken, refreshToken);
         logger.info(`[Dashboard] Loaded ${subs.length} subscription(s) for dashboard`);
         if (subs.length > 0) {
           logger.info(`[Dashboard] Subscription details:`, subs.map(s => ({ id: s.id, name: s.serviceName, active: s.isActive })));
         }
         return subs;
-      })
-      .catch((error) => {
+      } catch (error) {
         logger.error("[Dashboard] Error fetching subscriptions:", error);
         return [];
+      }
+    })(),
+  ]);
+
+  // OPTIMIZED: Now fetch goals and financial-health using already-loaded accounts
+  // This eliminates duplicate getAccounts() calls
+  const [goals, financialHealth] = await Promise.all([
+    getGoalsInternal(accessToken, refreshToken, accounts).catch((error) => {
+      logger.error("Error fetching goals:", error);
+      return [];
+    }),
+    calculateFinancialHealth(selectedMonth, userId, accessToken, refreshToken, accounts).catch((error) => {
+      logger.error("Error calculating financial health:", error);
+      // Return a valid FinancialHealthData object instead of null
+      return {
+        score: 0,
+        classification: "Critical" as const,
+        monthlyIncome: 0,
+        monthlyExpenses: 0,
+        netAmount: 0,
+        savingsRate: 0,
+        message: "Unable to calculate Spare Score at this time. Please try refreshing the page.",
+        spendingDiscipline: "Unknown" as const,
+        debtExposure: "Low" as const,
+        emergencyFundMonths: 0,
+        alerts: [],
+        suggestions: [],
+      };
       }),
   ]);
 
@@ -458,7 +462,7 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
           CACHE_TAGS.GOALS,
           CACHE_TAGS.SUBSCRIPTIONS,
         ],
-        revalidate: CACHE_DURATIONS.SHORT, // 10 seconds for fresh data
+        revalidate: 300, // 300 seconds (5 minutes) - increased since manual refresh is available
       }
     );
   } catch (error) {

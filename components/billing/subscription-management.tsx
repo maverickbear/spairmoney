@@ -23,6 +23,7 @@ interface SubscriptionManagementProps {
   subscription: Subscription | null;
   plan: Plan | null;
   interval?: "month" | "year" | null;
+  householdInfo?: UserHouseholdInfo | null;
   onSubscriptionUpdated?: () => void;
 }
 
@@ -41,11 +42,13 @@ export function SubscriptionManagement({
   subscription,
   plan,
   interval,
+  householdInfo: initialHouseholdInfo,
   onSubscriptionUpdated,
 }: SubscriptionManagementProps) {
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(null);
+  // OPTIMIZED: Use provided householdInfo or load it if not provided
+  const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(initialHouseholdInfo ?? null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -69,6 +72,12 @@ export function SubscriptionManagement({
   }, [subscription?.stripeCustomerId]);
 
   useEffect(() => {
+    // Only load if not provided as prop
+    if (initialHouseholdInfo !== undefined) {
+      setHouseholdInfo(initialHouseholdInfo);
+      return;
+    }
+    
     async function loadHouseholdInfo() {
       try {
         const response = await fetch("/api/household/info");
@@ -82,7 +91,7 @@ export function SubscriptionManagement({
     }
 
     loadHouseholdInfo();
-  }, []);
+  }, [initialHouseholdInfo]);
 
   async function handleOpenStripePortal() {
     try {

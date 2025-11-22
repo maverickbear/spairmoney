@@ -20,7 +20,7 @@ const TransactionForm = dynamic(() => import("@/components/forms/transaction-for
 const CsvImportDialog = dynamic(() => import("@/components/forms/csv-import-dialog").then(m => ({ default: m.CsvImportDialog })), { ssr: false });
 const CategorySelectionModal = dynamic(() => import("@/components/transactions/category-selection-modal").then(m => ({ default: m.CategorySelectionModal })), { ssr: false });
 import { formatMoney } from "@/components/common/money";
-import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight, Filter, Calendar, Wallet, Tag, Type, XCircle } from "lucide-react";
 import { TransactionsMobileCard } from "@/components/transactions/transactions-mobile-card";
 import {
   Select,
@@ -203,7 +203,7 @@ export default function TransactionsPage() {
   const [activeCategoryIds, setActiveCategoryIds] = useState<Set<string>>(new Set());
   const [selectValue, setSelectValue] = useState<string>("");
   const { limits, checking: limitsLoading } = useSubscription();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
 
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -599,8 +599,9 @@ export default function TransactionsPage() {
       ]);
       
       // Load accounts and categories in parallel for better performance
+      // OPTIMIZED: Skip investment balances calculation for Transactions page (not needed, saves ~1s)
       const [accountsData, categoriesData] = await Promise.all([
-        getAccountsClient(),
+        getAccountsClient({ includeInvestmentBalances: false }),
         getAllCategoriesClient(),
       ]);
       
@@ -634,7 +635,7 @@ export default function TransactionsPage() {
     }
   }
 
-  async function loadTransactions() {
+  async function loadTransactions(forceRefresh: boolean = false) {
     // Cancel any previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -665,7 +666,10 @@ export default function TransactionsPage() {
       // Use API route to get transactions (descriptions are decrypted on server)
       // Add cache busting timestamp to force fresh data after deletions
       const queryString = params.toString();
-      const url = `/api/transactions${queryString ? `?${queryString}` : ''}${queryString ? '&' : '?'}_t=${Date.now()}`;
+      // OPTIMIZED: Add _forceRefresh parameter to bypass server-side unstable_cache
+      // This forces getTransactions() to bypass cache by using search parameter trick
+      const refreshParam = forceRefresh ? '&_forceRefresh=true' : '';
+      const url = `/api/transactions${queryString ? `?${queryString}` : ''}${queryString ? '&' : '?'}_t=${Date.now()}${refreshParam}`;
       
       const response = await fetch(url, {
         // Force fresh fetch - cache is invalidated server-side but browser may still cache
@@ -811,7 +815,7 @@ export default function TransactionsPage() {
     openDeleteDialog(
       {
         title: "Delete Transaction",
-        description: "Are you sure you want to delete this transaction?",
+        description: "This transaction will be permanently deleted. This action cannot be undone.",
         variant: "destructive",
         confirmLabel: "Delete",
       },
@@ -865,7 +869,7 @@ export default function TransactionsPage() {
     openDeleteMultipleDialog(
       {
         title: "Delete Transactions",
-        description: `Are you sure you want to delete ${count} transaction${count > 1 ? 's' : ''}?`,
+        description: `${count} transaction${count > 1 ? 's will' : ' will'} be permanently deleted. This action cannot be undone.`,
         variant: "destructive",
         confirmLabel: "Delete",
       },
@@ -1524,6 +1528,18 @@ export default function TransactionsPage() {
   }
 
 
+  // Count active filters
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (dateRange !== "all-dates" || customDateRange) count++;
+    if (filters.accountId !== "all") count++;
+    if (filters.type !== "all") count++;
+    if (filters.search) count++;
+    if (filters.categoryId !== "all") count++;
+    if (filters.recurring !== "all") count++;
+    return count;
+  }, [dateRange, customDateRange, filters]);
+
   return (
     <SimpleTabs 
       value={filters.type === "all" ? "all" : filters.type} 
@@ -1662,17 +1678,19 @@ export default function TransactionsPage() {
               </Badge>
             )}
           </Button>
-          <Button size="medium" onClick={() => {
-            // Check if user can perform write operations
-            if (!checkWriteAccess()) {
-              return;
-            }
-            setSelectedTransaction(null);
-            setIsFormOpen(true);
-          }} className="text-xs md:text-sm">
-            <Plus className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
-            <span className="hidden md:inline">Add Transaction</span>
-          </Button>
+          {canWrite && (
+            <Button size="medium" onClick={() => {
+              // Check if user can perform write operations
+              if (!checkWriteAccess()) {
+                return;
+              }
+              setSelectedTransaction(null);
+              setIsFormOpen(true);
+            }} className="text-xs md:text-sm">
+              <Plus className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+              <span className="hidden md:inline">Add Transaction</span>
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -1688,7 +1706,7 @@ export default function TransactionsPage() {
 
       {/* Mobile/Tablet Tabs - Sticky at top */}
       <div 
-        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        className="lg:hidden sticky top-0 z-40 bg-card dark:bg-transparent border-b"
       >
         <div 
           className="overflow-x-auto scrollbar-hide" 
@@ -2069,36 +2087,38 @@ export default function TransactionsPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex space-x-1 md:space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 md:h-10 md:w-10"
-                      onClick={() => {
-                        // Check if user can perform write operations
-                        if (!checkWriteAccess()) {
-                          return;
-                        }
-                        setSelectedTransaction(tx);
-                        setIsFormOpen(true);
-                      }}
-                    >
-                      <Edit className="h-3 w-3 md:h-4 md:w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 md:h-10 md:w-10"
-                      onClick={() => handleDelete(tx.id)}
-                      disabled={deletingId === tx.id}
-                    >
-                      {deletingId === tx.id ? (
-                        <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                      )}
-                    </Button>
-                  </div>
+                  {canWrite && (
+                    <div className="flex space-x-1 md:space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 md:h-10 md:w-10"
+                        onClick={() => {
+                          // Check if user can perform write operations
+                          if (!checkWriteAccess()) {
+                            return;
+                          }
+                          setSelectedTransaction(tx);
+                          setIsFormOpen(true);
+                        }}
+                      >
+                        <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 md:h-10 md:w-10"
+                        onClick={() => handleDelete(tx.id)}
+                        disabled={deletingId === tx.id}
+                      >
+                        {deletingId === tx.id ? (
+                          <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
               );
@@ -2205,7 +2225,17 @@ export default function TransactionsPage() {
         }}
         transaction={selectedTransaction}
         onSuccess={async () => {
-          await loadTransactions();
+          // OPTIMIZED: Reset to first page and force refresh to show new transaction
+          setCurrentPage(1);
+          setAllTransactions([]); // Clear accumulated transactions
+          
+          // CRITICAL: Wait to ensure server cache invalidation has propagated
+          // unstable_cache can take time to invalidate even after revalidateTag is called
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Force reload with cache bypass to ensure new transaction appears
+          // forceRefresh=true bypasses unstable_cache by using search parameter trick
+          await loadTransactions(true);
           setSelectedTransaction(null);
         }}
       />
@@ -2220,30 +2250,51 @@ export default function TransactionsPage() {
 
       {/* Filters Modal */}
       <Dialog open={isFiltersModalOpen} onOpenChange={setIsFiltersModalOpen}>
-        <DialogContent className="max-w-md flex flex-col p-0">
-          <DialogHeader className="px-4 pt-4 pb-3 flex-shrink-0 text-left">
-            <DialogTitle>Filters</DialogTitle>
-            <DialogDescription>
-              Filter your transactions by date, account, type, and search terms
-            </DialogDescription>
+        <DialogContent className="max-w-md flex flex-col p-0 max-h-[90vh]">
+          <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0 text-left border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-xl font-semibold">Filters</DialogTitle>
+                  {activeFiltersCount > 0 && (
+                    <Badge variant="secondary" className="h-5 px-2 text-xs font-medium">
+                      {activeFiltersCount} active
+                    </Badge>
+                  )}
+                </div>
+                <DialogDescription className="mt-1.5 text-sm text-muted-foreground">
+                  Filter your transactions by date, account, type, and search terms
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="space-y-4 px-4 overflow-y-auto flex-1">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date Range</label>
+          
+          <div className="space-y-6 px-6 py-4 overflow-y-auto flex-1">
+            {/* Date Range */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <label className="text-sm font-medium">Date Range</label>
+              </div>
               <DateRangePicker
                 value={dateRange}
                 dateRange={customDateRange}
                 onValueChange={handleDateRangeChange}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Account</label>
+
+            {/* Account */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+                <label className="text-sm font-medium">Account</label>
+              </div>
               <Select
                 value={filters.accountId}
                 onValueChange={(value) => setFilters({ ...filters, accountId: value })}
               >
-                <SelectTrigger className="h-9 w-full">
-                  <SelectValue placeholder="Account" />
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="Select an account" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Accounts</SelectItem>
@@ -2255,14 +2306,19 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Type</label>
+
+            {/* Type */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Type className="h-4 w-4 text-muted-foreground" />
+                <label className="text-sm font-medium">Type</label>
+              </div>
               <Select
                 value={filters.type}
                 onValueChange={(value) => setFilters({ ...filters, type: value })}
               >
-                <SelectTrigger className="h-9 w-full">
-                  <SelectValue placeholder="Type" />
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="Select a type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
@@ -2272,31 +2328,51 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
+
+            {/* Search */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <label className="text-sm font-medium">Search</label>
+              </div>
               <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   placeholder="Search transactions..."
                   value={filters.search}
                   onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                  className="h-9 w-full pr-8"
+                  className="h-10 w-full pl-9 pr-10"
                 />
-                {searchLoading && (
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                {filters.search && (
+                  <button
+                    onClick={() => setFilters({ ...filters, search: "" })}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <XCircle className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                )}
+                {searchLoading && !filters.search && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
+
+            {/* Category */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <label className="text-sm font-medium">Category</label>
+              </div>
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     variant={filters.categoryId === "all" ? "default" : "outline"}
                     onClick={() => setFilters({ ...filters, categoryId: "all" })}
-                    className="rounded-full h-8 text-xs"
+                    className="rounded-full h-9 px-4 text-xs font-medium transition-all hover:scale-105"
                     size="small"
                   >
                     All
@@ -2309,10 +2385,13 @@ export default function TransactionsPage() {
                         type="button"
                         variant={filters.categoryId === category.id ? "default" : "outline"}
                         onClick={() => setFilters({ ...filters, categoryId: category.id })}
-                        className="rounded-full h-8 text-xs"
+                        className="rounded-full h-9 px-4 text-xs font-medium transition-all hover:scale-105"
                         size="small"
                       >
                         {category.name}
+                        {filters.categoryId === category.id && (
+                          <Check className="h-3 w-3 ml-1.5" />
+                        )}
                       </Button>
                     ))}
                 </div>
@@ -2329,9 +2408,9 @@ export default function TransactionsPage() {
                     }
                   }}
                 >
-                  <SelectTrigger className="h-9 w-full border-dashed">
+                  <SelectTrigger className="h-10 w-full border-dashed hover:border-primary/50 transition-colors">
                     <div className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-4 w-4 text-muted-foreground" />
                       <SelectValue placeholder="Add category to filter" />
                     </div>
                   </SelectTrigger>
@@ -2354,7 +2433,8 @@ export default function TransactionsPage() {
               </div>
             </div>
           </div>
-          <DialogFooter className="px-4 pb-4 pt-3 border-t flex-shrink-0 sticky bottom-0 bg-background flex-row gap-2">
+
+          <DialogFooter className="px-6 pb-6 pt-4 border-t flex-shrink-0 bg-background flex-row gap-3">
             <Button
               variant="outline"
               onClick={() => {
@@ -2369,12 +2449,17 @@ export default function TransactionsPage() {
                   search: "",
                   recurring: "all",
                 });
+                setActiveCategoryIds(new Set());
               }}
-              className="flex-1"
+              className="flex-1 h-10"
             >
+              <XCircle className="h-4 w-4 mr-2" />
               Clear All
             </Button>
-            <Button onClick={() => setIsFiltersModalOpen(false)} className="flex-1">
+            <Button 
+              onClick={() => setIsFiltersModalOpen(false)} 
+              className="flex-1 h-10"
+            >
               Apply Filters
             </Button>
           </DialogFooter>
@@ -2434,21 +2519,23 @@ export default function TransactionsPage() {
       {DeleteMultipleConfirmDialog}
 
       {/* Mobile Floating Action Button */}
-      <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
-        <Button
-          size="large"
-          className="h-14 w-14 rounded-full shadow-lg"
-          onClick={() => {
-            if (!checkWriteAccess()) {
-              return;
-            }
-            setSelectedTransaction(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+      {canWrite && (
+        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+          <Button
+            size="large"
+            className="h-14 w-14 rounded-full shadow-lg"
+            onClick={() => {
+              if (!checkWriteAccess()) {
+                return;
+              }
+              setSelectedTransaction(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
     </SimpleTabs>
   );
 }

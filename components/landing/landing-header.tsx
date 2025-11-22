@@ -2,21 +2,39 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { getCurrentUserClient } from "@/lib/api/auth-client";
+import { getCurrentUserClient, User, signOutClient } from "@/lib/api/auth-client";
 import { Logo } from "@/components/common/logo";
 import { useTheme } from "next-themes";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, LogOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface LandingHeaderProps {
   isAuthenticated?: boolean;
 }
 
+function getInitials(name: string | undefined | null): string {
+  if (!name) return "U";
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return name[0].toUpperCase();
+}
+
 export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderProps = {}) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth ?? false);
+  const [user, setUser] = useState<User | null>(null);
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,9 +47,10 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
   useEffect(() => {
     // Check authentication status and verify user exists in User table
     async function checkAuth() {
-      const user = await getCurrentUserClient();
+      const currentUser = await getCurrentUserClient();
       // getCurrentUserClient verifies user exists in User table and logs out if not
-      setIsAuthenticated(!!user);
+      setIsAuthenticated(!!currentUser);
+      setUser(currentUser);
     }
     
     // Always check auth on client side to ensure we have the latest state
@@ -42,10 +61,12 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         // Verify user exists in User table
-        const user = await getCurrentUserClient();
-        setIsAuthenticated(!!user);
+        const currentUser = await getCurrentUserClient();
+        setIsAuthenticated(!!currentUser);
+        setUser(currentUser);
       } else {
         setIsAuthenticated(false);
+        setUser(null);
       }
     });
 
@@ -53,6 +74,23 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
       subscription.unsubscribe();
     };
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      const result = await signOutClient();
+      
+      if (!result.error) {
+        setIsAuthenticated(false);
+        setUser(null);
+        router.push("/");
+        router.refresh();
+      } else {
+        console.error("Failed to sign out:", result.error);
+      }
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   const navItems = [
     { label: "Home", href: "#home" },
@@ -122,15 +160,76 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
           {/* CTA Buttons - À direita */}
           <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
             {isAuthenticated ? (
-              <Button
-                asChild
-                className={isScrolled 
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90" 
-                  : "bg-white text-primary hover:bg-white/90 font-semibold"
-                }
-              >
-                <Link href="/dashboard">Dashboard</Link>
-              </Button>
+              <>
+                <Button
+                  asChild
+                  variant="ghost"
+                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white"}
+                >
+                  <Link href="/dashboard">Dashboard</Link>
+                </Button>
+                <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`relative rounded-full ${isScrolled 
+                      ? "hover:bg-muted" 
+                      : "hover:bg-white/10"
+                    }`}
+                  >
+                    {user?.avatarUrl ? (
+                      <>
+                        <img
+                          src={user.avatarUrl}
+                          alt={user.name || "User"}
+                          className="h-10 w-10 rounded-full object-cover border"
+                          loading="eager"
+                          decoding="async"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                            const initialsContainer =
+                              e.currentTarget.nextElementSibling;
+                            if (initialsContainer) {
+                              (initialsContainer as HTMLElement).style.display =
+                                "flex";
+                            }
+                          }}
+                        />
+                        <div className={`h-10 w-10 rounded-full hidden items-center justify-center text-xs font-semibold border ${
+                          isScrolled 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-white text-primary"
+                        }`}>
+                          {getInitials(user?.name)}
+                        </div>
+                      </>
+                    ) : user?.name ? (
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-xs font-semibold border ${
+                        isScrolled 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-white text-primary"
+                      }`}>
+                        {getInitials(user.name)}
+                      </div>
+                    ) : (
+                      <div className={`h-10 w-10 rounded-full ${
+                        isScrolled ? "bg-muted" : "bg-white/20"
+                      } animate-pulse`} />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              </>
             ) : (
               <>
                 <Button

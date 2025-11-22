@@ -54,7 +54,21 @@ export async function GET(request: NextRequest) {
       filters.limit = parseInt(limit, 10);
     }
     
-    const result = await getTransactions(filters);
+    // OPTIMIZED: Check for force refresh parameter to bypass unstable_cache
+    // This is used after creating/updating/deleting transactions to ensure fresh data
+    const forceRefresh = searchParams.get("_forceRefresh") === "true";
+    
+    // If force refresh is requested, bypass cache by adding a temporary search parameter
+    // This makes getTransactions() skip unstable_cache (searches bypass cache)
+    // The search parameter will be filtered out in getTransactionsInternal if it starts with "_refresh_"
+    let result;
+    if (forceRefresh && !filters.search) {
+      // Add temporary search parameter to bypass cache
+      // getTransactionsInternal will ignore searches starting with "_refresh_"
+      result = await getTransactions({ ...filters, search: `_refresh_${Date.now()}` });
+    } else {
+      result = await getTransactions(filters);
+    }
     
     // Use appropriate cache headers based on whether search is active
     // Search results should not be cached, but regular queries can be cached briefly

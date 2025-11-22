@@ -26,12 +26,13 @@ interface UsersTableProps {
   loading?: boolean;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  filterType?: string | null;
   onManageSubscription?: (user: AdminUser) => void;
   onBlockUser?: (user: AdminUser) => void;
   onUnblockUser?: (user: AdminUser) => void;
 }
 
-export function UsersTable({ users: initialUsers, loading: initialLoading, searchQuery: externalSearchQuery, onSearchChange, onManageSubscription, onBlockUser, onUnblockUser }: UsersTableProps) {
+export function UsersTable({ users: initialUsers, loading: initialLoading, searchQuery: externalSearchQuery, onSearchChange, filterType, onManageSubscription, onBlockUser, onUnblockUser }: UsersTableProps) {
   const [users, setUsers] = useState<AdminUser[]>(initialUsers);
   const [loading, setLoading] = useState(initialLoading);
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
@@ -61,14 +62,71 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
     setLoading(initialLoading);
   }, [initialLoading]);
 
-  // Filter users based on search query
+  // Filter users based on search query and filter type
   const filteredUsers = users.filter((user) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      user.email.toLowerCase().includes(query) ||
-      (user.name && user.name.toLowerCase().includes(query)) ||
-      (user.plan && user.plan.name.toLowerCase().includes(query))
-    );
+    // Apply filter type first
+    if (filterType) {
+      switch (filterType) {
+        case "all":
+          // Show all users
+          break;
+        case "active":
+          if (!user.subscription || user.subscription.status !== "active") {
+            return false;
+          }
+          break;
+        case "trialing":
+          if (!user.subscription || user.subscription.status !== "trialing") {
+            return false;
+          }
+          break;
+        case "cancelled":
+          if (!user.subscription || user.subscription.status !== "cancelled") {
+            return false;
+          }
+          break;
+        case "past_due":
+          if (!user.subscription || user.subscription.status !== "past_due") {
+            return false;
+          }
+          break;
+        case "with_subscription":
+          if (!user.subscription) {
+            return false;
+          }
+          break;
+        case "without_subscription":
+          if (user.subscription) {
+            return false;
+          }
+          break;
+        case "churn_risk":
+          // Users with active subscription and cancelAtPeriodEnd = true
+          if (!user.subscription || user.subscription.status !== "active" || !user.subscription.cancelAtPeriodEnd) {
+            return false;
+          }
+          break;
+        case "without_subscription":
+          if (user.subscription) {
+            return false;
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    
+    // Then apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        user.email.toLowerCase().includes(query) ||
+        (user.name && user.name.toLowerCase().includes(query)) ||
+        (user.plan && user.plan.name.toLowerCase().includes(query))
+      );
+    }
+    
+    return true;
   });
 
   // Group users by household

@@ -1,19 +1,22 @@
-import { Logo } from "@/components/common/logo";
+import { LandingHeader } from "@/components/landing/landing-header";
 import { Wrench, Clock } from "lucide-react";
+import { getCurrentUser } from "@/lib/api/auth";
 
 export const metadata = {
   title: "Maintenance - Spare Finance",
   description: "We are currently under maintenance. We'll be back soon.",
 };
 
-export default function MaintenancePage() {
+export default async function MaintenancePage() {
+  // Check authentication status on server to show correct buttons in header
+  const user = await getCurrentUser();
+  const isAuthenticated = !!user;
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-      <div className="max-w-md w-full space-y-8 text-center">
-        {/* Logo */}
-        <div className="flex justify-center">
-          <Logo variant="wordmark" color="auto" width={180} height={50} priority />
-        </div>
+    <div className="min-h-screen flex flex-col bg-background">
+      <LandingHeader isAuthenticated={isAuthenticated} />
+      <div className="flex-1 flex items-center justify-center p-4 pt-24 md:pt-28">
+        <div className="max-w-md w-full space-y-8 text-center">
 
         {/* Maintenance Icon */}
         <div className="flex justify-center">
@@ -43,10 +46,11 @@ export default function MaintenancePage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-sm text-muted-foreground">
-          Thank you for your patience!
-        </p>
+          {/* Footer */}
+          <p className="text-sm text-muted-foreground">
+            Thank you for your patience!
+          </p>
+        </div>
       </div>
     </div>
   );

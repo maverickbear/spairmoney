@@ -23,6 +23,7 @@ export interface Goal {
   targetMonths?: number | null;
   accountId?: string | null;
   holdingId?: string | null;
+  isSystemGoal?: boolean;
   createdAt: string;
   updatedAt: string;
   // Calculated fields
@@ -65,6 +66,9 @@ export async function calculateIncomeBasis(
 
   console.log("[GOALS] Calculating income basis from last 3 months:", months.length, "months");
 
+  // Import decryption utilities
+  const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
+
   const monthlyIncomes = await Promise.all(
     months.map(async (month) => {
       const monthStart = startOfMonth(month);
@@ -72,7 +76,7 @@ export async function calculateIncomeBasis(
 
       const { data: transactions, error } = await supabase
         .from("Transaction")
-        .select("amount")
+        .select("amount, amount_numeric")
         .eq("type", "income")
         .gte("date", formatDateStart(monthStart))
         .lte("date", formatDateEnd(monthEnd));
@@ -82,7 +86,18 @@ export async function calculateIncomeBasis(
         return 0;
       }
 
-      const monthIncome = (transactions || []).reduce((sum: number, tx: any) => sum + (Number(tx.amount) || 0), 0);
+      // Decrypt transactions in batch
+      const decryptedTransactions = decryptTransactionsBatch(transactions || []);
+      
+      // Calculate month income using decrypted amounts
+      // Prefer amount_numeric if available (already decrypted), otherwise use decrypted amount
+      const monthIncome = decryptedTransactions.reduce((sum: number, tx: any) => {
+        const amount = tx.amount_numeric !== null && tx.amount_numeric !== undefined
+          ? tx.amount_numeric
+          : (tx.amount || 0);
+        return sum + (Number(amount) || 0);
+      }, 0);
+      
       console.log(`[GOALS] Month ${monthStart.toISOString().substring(0, 7)}: ${transactions?.length || 0} transactions, total: ${monthIncome}`);
       return monthIncome;
     })
@@ -149,8 +164,13 @@ export async function validateAllocation(
 
 /**
  * Get all goals with calculated progress, ETA, and monthly contribution
+ * OPTIMIZED: Accepts accounts as optional parameter to avoid duplicate calls
  */
-export async function getGoalsInternal(accessToken?: string, refreshToken?: string): Promise<GoalWithCalculations[]> {
+export async function getGoalsInternal(
+  accessToken?: string, 
+  refreshToken?: string,
+  accounts?: any[] // OPTIMIZED: Accept accounts to avoid duplicate getAccounts() call
+): Promise<GoalWithCalculations[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
 
   // Get current user to verify authentication
@@ -193,13 +213,21 @@ export async function getGoalsInternal(accessToken?: string, refreshToken?: stri
   const incomeBasis = await calculateIncomeBasis(undefined, accessToken, refreshToken);
 
   // Get accounts to sync balances for goals with accountId
+  // OPTIMIZED: Use provided accounts if available, otherwise fetch
   const goalsWithAccount = goals.filter((g: any) => g.accountId);
   let accountsMap = new Map<string, any>();
   
   if (goalsWithAccount.length > 0) {
+    let accountsToUse = accounts;
+    
+    // Only fetch if not provided
+    if (!accountsToUse || accountsToUse.length === 0) {
     const { getAccounts } = await import("./accounts");
-    const accounts = await getAccounts(accessToken, refreshToken);
-    accounts.forEach((acc: any) => {
+      // OPTIMIZED: Skip holdings calculation for goals (not needed, saves ~1-2s)
+      accountsToUse = await getAccounts(accessToken, refreshToken, { includeHoldings: false });
+    }
+    
+    accountsToUse.forEach((acc: any) => {
       accountsMap.set(acc.id, acc);
     });
   }
@@ -350,6 +378,7 @@ export async function createGoal(data: {
   targetMonths?: number;
   accountId?: string;
   holdingId?: string;
+  isSystemGoal?: boolean;
 }): Promise<Goal> {
     const supabase = await createServerClient();
 
@@ -357,6 +386,11 @@ export async function createGoal(data: {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     throw new Error("Unauthorized");
+  }
+
+  // Validate targetAmount: must be > 0 unless it's a system goal
+  if (data.targetAmount <= 0 && !data.isSystemGoal) {
+    throw new Error("Target amount must be greater than 0");
   }
 
   // If targetMonths is provided and incomePercentage is not, calculate incomePercentage
@@ -383,7 +417,8 @@ export async function createGoal(data: {
   }
 
   // Check if goal is already completed (startingBalance >= targetAmount)
-  const isCompleted = (data.currentBalance || 0) >= data.targetAmount;
+  // For system goals with targetAmount = 0, we consider it incomplete until user sets a target
+  const isCompleted = data.targetAmount > 0 && (data.currentBalance || 0) >= data.targetAmount;
 
   // Get active household ID
   const { getActiveHouseholdId } = await import("@/lib/utils/household");
@@ -410,6 +445,7 @@ export async function createGoal(data: {
     targetMonths: data.targetMonths || null,
     accountId: data.accountId || null,
     holdingId: data.holdingId || null,
+    isSystemGoal: data.isSystemGoal || false,
     userId: user.id,
     householdId: householdId, // Add householdId for household-based architecture
     createdAt: now,
@@ -469,6 +505,13 @@ export async function updateGoal(
     throw new Error("Goal not found");
   }
 
+  // Validate targetAmount: must be > 0 unless it's a system goal
+  const targetAmount = data.targetAmount ?? currentGoal.targetAmount;
+  const isSystemGoal = (currentGoal as any).isSystemGoal ?? false;
+  if (data.targetAmount !== undefined && data.targetAmount <= 0 && !isSystemGoal) {
+    throw new Error("Target amount must be greater than 0");
+  }
+
   // Use provided currentBalance or keep existing one
   const effectiveCurrentBalance = data.currentBalance !== undefined ? data.currentBalance : currentGoal.currentBalance;
 
@@ -498,8 +541,8 @@ export async function updateGoal(
   }
 
   // Check if goal should be marked as completed
-  const targetAmount = data.targetAmount ?? currentGoal.targetAmount;
-  const isCompleted = effectiveCurrentBalance >= targetAmount;
+  // For system goals with targetAmount = 0, we consider it incomplete until user sets a target
+  const isCompleted = targetAmount > 0 && effectiveCurrentBalance >= targetAmount;
 
   const updateData: Record<string, unknown> = {
     updatedAt: formatTimestamp(new Date()),
@@ -545,6 +588,51 @@ export async function updateGoal(
 }
 
 /**
+ * Ensure emergency fund goal exists for a user/household
+ * Creates one if it doesn't exist
+ */
+export async function ensureEmergencyFundGoal(userId: string, householdId: string): Promise<Goal | null> {
+  const supabase = await createServerClient();
+
+  // Check if emergency fund goal already exists
+  const { data: existingGoal, error: checkError } = await supabase
+    .from("Goal")
+    .select("*")
+    .eq("householdId", householdId)
+    .eq("name", "Emergency Funds")
+    .eq("isSystemGoal", true)
+    .maybeSingle();
+
+  if (checkError) {
+    console.error("Error checking for emergency fund goal:", checkError);
+    return null;
+  }
+
+  // If goal already exists, return it
+  if (existingGoal) {
+    return existingGoal as Goal;
+  }
+
+  // Create new emergency fund goal
+  try {
+    const goal = await createGoal({
+      name: "Emergency Funds",
+      targetAmount: 0.00,
+      currentBalance: 0.00,
+      incomePercentage: 0.00,
+      priority: "High",
+      description: "Emergency fund for unexpected expenses",
+      isPaused: false,
+      isSystemGoal: true,
+    });
+    return goal;
+  } catch (error) {
+    console.error("Error creating emergency fund goal:", error);
+    return null;
+  }
+}
+
+/**
  * Delete a goal
  */
 export async function deleteGoal(id: string): Promise<void> {
@@ -552,6 +640,21 @@ export async function deleteGoal(id: string): Promise<void> {
 
   // Verify ownership before deleting
   await requireGoalOwnership(id);
+
+  // Check if this is a system goal (cannot be deleted)
+  const { data: goal, error: fetchError } = await supabase
+    .from("Goal")
+    .select("isSystemGoal")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) {
+    throw new Error("Goal not found");
+  }
+
+  if (goal?.isSystemGoal === true) {
+    throw new Error("System goals cannot be deleted. You can edit them instead.");
+  }
 
   const { error } = await supabase.from("Goal").delete().eq("id", id);
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/use-subscription";
+import { usePortfolioData } from "@/hooks/use-portfolio-data";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { format, parseISO } from "date-fns";
 
@@ -156,108 +157,77 @@ export function InvestmentPortfolioWidget({
 
   // Real component logic (only used in protected routes)
   const { limits, checking: limitsLoading } = useSubscription();
-  const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
-  const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
-  const [assetMix, setAssetMix] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
-
+  
   // Check if user has access to investments feature
   // The database is the source of truth - if a feature is disabled in Supabase, it should be disabled here
   const hasInvestmentsAccess = limits.hasInvestments === true;
 
-  useEffect(() => {
-    // Skip API calls if user doesn't have access to investments
-    if (!hasInvestmentsAccess) {
-      setIsLoading(false);
-      return;
+  // OPTIMIZED: Use shared portfolio hook to avoid duplicate API calls
+  // This hook deduplicates requests and shares data between widgets
+  const { data: portfolioData, isLoading } = usePortfolioData({
+    days: 30,
+    enabled: hasInvestmentsAccess,
+  });
+
+  const portfolioSummary = portfolioData.summary as PortfolioSummary | null;
+  const historicalData = portfolioData.historical as HistoricalDataPoint[];
+
+  // Calculate asset mix from holdings and accounts
+  const assetMix = useMemo(() => {
+    const assetTypes = new Set<string>();
+    const accountTypes = new Set<string>();
+
+    if (portfolioData.holdings && Array.isArray(portfolioData.holdings)) {
+      portfolioData.holdings.forEach((holding: any) => {
+        if (holding.assetType) {
+          // Map asset types to display names
+          const assetTypeMap: Record<string, string> = {
+            "Stock": "Stocks",
+            "ETF": "ETFs",
+            "Crypto": "Crypto",
+            "Fund": "Funds",
+            "Bond": "Bonds",
+            "Option": "Options",
+          };
+          const displayName = assetTypeMap[holding.assetType] || holding.assetType;
+          assetTypes.add(displayName);
+        }
+      });
     }
 
-    async function loadPortfolioData() {
-      try {
-        setIsLoading(true);
-        
-        // OPTIMIZED: Use /api/portfolio/all endpoint to fetch all data in one request
-        // This avoids duplicate calls to getHoldings() and getInvestmentAccounts()
-        const portfolioRes = await fetch("/api/portfolio/all?days=30").catch(() => null);
-
-        // Calculate asset mix from holdings and accounts
-        let assetTypes = new Set<string>();
-        let accountTypes = new Set<string>();
-
-        if (portfolioRes?.ok) {
-          const portfolioData = await portfolioRes.json();
-          
-          // Extract data from the combined response
-          if (portfolioData.summary) {
-            setPortfolioSummary(portfolioData.summary);
-          }
-          
-          if (portfolioData.historical) {
-            setHistoricalData(Array.isArray(portfolioData.historical) ? portfolioData.historical : []);
-          }
-
-          if (portfolioData.holdings && Array.isArray(portfolioData.holdings)) {
-            portfolioData.holdings.forEach((holding: any) => {
-              if (holding.assetType) {
-                // Map asset types to display names
-                const assetTypeMap: Record<string, string> = {
-                  "Stock": "Stocks",
-                  "ETF": "ETFs",
-                  "Crypto": "Crypto",
-                  "Fund": "Funds",
-                  "Bond": "Bonds",
-                  "Option": "Options",
-                };
-                const displayName = assetTypeMap[holding.assetType] || holding.assetType;
-                assetTypes.add(displayName);
-              }
-            });
-          }
-
-          if (portfolioData.accounts && Array.isArray(portfolioData.accounts)) {
-            portfolioData.accounts.forEach((account: any) => {
-              if (account.type) {
-                // Map account types to display names
-                const accountTypeMap: Record<string, string> = {
-                  "401k": "401(k)",
-                  "403b": "403(b)",
-                  "ira": "IRA",
-                  "roth_ira": "Roth IRA",
-                  "sep_ira": "SEP IRA",
-                  "brokerage": "Brokerage",
-                  "taxable": "Taxable",
-                  "retirement": "Retirement",
-                };
-                const displayName = accountTypeMap[account.type.toLowerCase()] || account.type;
-                accountTypes.add(displayName);
-              }
-            });
-          }
+    if (portfolioData.accounts && Array.isArray(portfolioData.accounts)) {
+      portfolioData.accounts.forEach((account: any) => {
+        if (account.type) {
+          // Map account types to display names
+          const accountTypeMap: Record<string, string> = {
+            "401k": "401(k)",
+            "403b": "403(b)",
+            "ira": "IRA",
+            "roth_ira": "Roth IRA",
+            "sep_ira": "SEP IRA",
+            "brokerage": "Brokerage",
+            "taxable": "Taxable",
+            "retirement": "Retirement",
+          };
+          const displayName = accountTypeMap[account.type.toLowerCase()] || account.type;
+          accountTypes.add(displayName);
         }
-
-        // Build mix string
-        const mixParts: string[] = [];
-        if (assetTypes.size > 0) {
-          mixParts.push(Array.from(assetTypes).join(" · "));
-        }
-        if (accountTypes.size > 0) {
-          mixParts.push(Array.from(accountTypes).join(" · "));
-        }
-        
-        const mix = mixParts.length > 0 
-          ? mixParts.join(" · ")
-          : "No investments yet";
-        
-        setAssetMix(mix);
-      } catch (error) {
-        console.error("Error loading portfolio data:", error);
-      } finally {
-        setIsLoading(false);
-      }
+      });
     }
 
-    loadPortfolioData();
-  }, [hasInvestmentsAccess]);
+    // Build mix string
+    const mixParts: string[] = [];
+    if (assetTypes.size > 0) {
+      mixParts.push(Array.from(assetTypes).join(" · "));
+    }
+    if (accountTypes.size > 0) {
+      mixParts.push(Array.from(accountTypes).join(" · "));
+    }
+    
+    return mixParts.length > 0 
+      ? mixParts.join(" · ")
+      : "No investments yet";
+  }, [portfolioData.holdings, portfolioData.accounts]);
 
   // Use portfolio data if available, otherwise fallback to savings
   const portfolioValue = portfolioSummary?.totalValue ?? savings;

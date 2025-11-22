@@ -4,47 +4,12 @@ import { logger } from "@/lib/utils/logger";
 import { encryptDescription, decryptDescription, decryptAmount } from "@/lib/utils/transaction-encryption";
 import { createTransaction } from "./transactions";
 import type { TransactionFormData } from "@/lib/validations/transaction";
+import type { PlannedPayment, PlannedPaymentFormData } from "./planned-payments-types";
+import { PLANNED_HORIZON_DAYS } from "./planned-payments-types";
 
-// Constant for planned payment horizon (90 days)
-export const PLANNED_HORIZON_DAYS = 90;
-
-export interface PlannedPayment {
-  id: string;
-  date: Date | string;
-  type: "expense" | "income" | "transfer";
-  amount: number;
-  accountId: string;
-  toAccountId?: string | null;
-  categoryId?: string | null;
-  subcategoryId?: string | null;
-  description?: string | null;
-  source: "recurring" | "debt" | "manual" | "subscription";
-  status: "scheduled" | "paid" | "skipped" | "cancelled";
-  linkedTransactionId?: string | null;
-  debtId?: string | null;
-  subscriptionId?: string | null;
-  userId: string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  account?: { id: string; name: string } | null;
-  toAccount?: { id: string; name: string } | null;
-  category?: { id: string; name: string } | null;
-  subcategory?: { id: string; name: string; logo?: string | null } | null;
-}
-
-export interface PlannedPaymentFormData {
-  date: Date | string;
-  type: "expense" | "income" | "transfer";
-  amount: number;
-  accountId: string;
-  toAccountId?: string | null;
-  categoryId?: string | null;
-  subcategoryId?: string | null;
-  description?: string | null;
-  source?: "recurring" | "debt" | "manual" | "subscription";
-  debtId?: string | null;
-  subscriptionId?: string | null;
-}
+// Re-export types and constants for backward compatibility
+export type { PlannedPayment, PlannedPaymentFormData };
+export { PLANNED_HORIZON_DAYS };
 
 /**
  * Create a new planned payment
@@ -127,13 +92,14 @@ export async function getPlannedPayments(filters?: {
   accountId?: string;
   type?: "expense" | "income" | "transfer";
   limit?: number;
-}, accessToken?: string, refreshToken?: string): Promise<PlannedPayment[]> {
+  page?: number;
+}, accessToken?: string, refreshToken?: string): Promise<{ plannedPayments: PlannedPayment[]; total: number }> {
   const supabase = await createServerClient(accessToken, refreshToken);
 
   // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
-    return [];
+    return { plannedPayments: [], total: 0 };
   }
 
   // OPTIMIZED: Select only necessary fields instead of * to reduce payload size
@@ -175,11 +141,54 @@ export async function getPlannedPayments(filters?: {
     query = query.eq("type", filters.type);
   }
 
-  if (filters?.limit) {
+  // Count query for pagination
+  const countQuery = supabase
+    .from("PlannedPayment")
+    .select("*", { count: "exact", head: true })
+    .eq("userId", user.id);
+
+  // Apply same filters to count query
+  if (filters?.startDate) {
+    countQuery.gte("date", formatDateOnly(filters.startDate));
+  }
+  if (filters?.endDate) {
+    countQuery.lte("date", formatDateOnly(filters.endDate));
+  }
+  if (filters?.status) {
+    countQuery.eq("status", filters.status);
+  }
+  if (filters?.source) {
+    countQuery.eq("source", filters.source);
+  }
+  if (filters?.debtId) {
+    countQuery.eq("debtId", filters.debtId);
+  }
+  if (filters?.subscriptionId) {
+    countQuery.eq("subscriptionId", filters.subscriptionId);
+  }
+  if (filters?.accountId) {
+    countQuery.eq("accountId", filters.accountId);
+  }
+  if (filters?.type) {
+    countQuery.eq("type", filters.type);
+  }
+
+  // Apply pagination if provided
+  if (filters?.page !== undefined && filters?.limit !== undefined) {
+    const page = Math.max(1, filters.page);
+    const limit = Math.max(1, Math.min(100, filters.limit)); // Limit max to 100
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    query = query.range(from, to);
+  } else if (filters?.limit) {
     query = query.limit(filters.limit);
   }
 
-  const { data, error } = await query;
+  // Execute count query and data query in parallel
+  const [{ count }, { data, error }] = await Promise.all([
+    countQuery,
+    query
+  ]);
 
   if (error) {
     logger.error("Supabase error fetching planned payments:", error);
@@ -187,15 +196,58 @@ export async function getPlannedPayments(filters?: {
   }
 
   if (!data || data.length === 0) {
-    return [];
+    return { plannedPayments: [], total: count || 0 };
   }
 
-  // Enrich with related data
-  const enrichedPayments = await Promise.all(
-    data.map((pp) => enrichPlannedPayment(pp, supabase))
-  );
+  // OPTIMIZED: Batch fetch all related data to avoid N+1 queries
+  // Collect all unique IDs first
+  const accountIds = new Set<string>();
+  const categoryIds = new Set<string>();
+  const subcategoryIds = new Set<string>();
 
-  return enrichedPayments;
+  data.forEach(pp => {
+    if (pp.accountId) accountIds.add(pp.accountId);
+    if (pp.toAccountId) accountIds.add(pp.toAccountId);
+    if (pp.categoryId) categoryIds.add(pp.categoryId);
+    if (pp.subcategoryId) subcategoryIds.add(pp.subcategoryId);
+  });
+
+  // Batch fetch all related data in parallel (only 3 queries total instead of 4×N)
+  const [accountsResult, categoriesResult, subcategoriesResult] = await Promise.all([
+    accountIds.size > 0
+      ? supabase.from("Account").select("id, name").in("id", Array.from(accountIds))
+      : Promise.resolve({ data: [], error: null }),
+    categoryIds.size > 0
+      ? supabase.from("Category").select("id, name").in("id", Array.from(categoryIds))
+      : Promise.resolve({ data: [], error: null }),
+    subcategoryIds.size > 0
+      ? supabase.from("Subcategory").select("id, name, logo").in("id", Array.from(subcategoryIds))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  // Create maps for O(1) lookup
+  const accountMap = new Map((accountsResult.data || []).map(a => [a.id, a]));
+  const categoryMap = new Map((categoriesResult.data || []).map(c => [c.id, c]));
+  const subcategoryMap = new Map((subcategoriesResult.data || []).map(s => [s.id, s]));
+
+  // Enrich payments using maps (no additional queries)
+  const enrichedPayments = data.map(pp => {
+    const description = decryptDescription(pp.description);
+    return {
+      ...pp,
+      date: new Date(pp.date),
+      amount: Number(pp.amount),
+      description,
+      account: pp.accountId ? (accountMap.get(pp.accountId) || null) : null,
+      toAccount: pp.toAccountId ? (accountMap.get(pp.toAccountId) || null) : null,
+      category: pp.categoryId ? (categoryMap.get(pp.categoryId) || null) : null,
+      subcategory: pp.subcategoryId ? (subcategoryMap.get(pp.subcategoryId) || null) : null,
+      createdAt: new Date(pp.createdAt),
+      updatedAt: new Date(pp.updatedAt),
+    };
+  });
+
+  return { plannedPayments: enrichedPayments, total: count || 0 };
 }
 
 /**

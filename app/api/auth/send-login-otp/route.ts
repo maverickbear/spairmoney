@@ -57,6 +57,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if user is blocked
+    const { data: userData, error: userError } = await serviceRoleClient
+      .from("User")
+      .select("isBlocked, role")
+      .eq("id", authData.user.id)
+      .single();
+
+    if (!userError && userData?.isBlocked && userData?.role !== "super_admin") {
+      console.log("[SEND-LOGIN-OTP] User is blocked:", authData.user.id);
+      return NextResponse.json(
+        { error: "Your account has been blocked. Please contact support@sparefinance.com for assistance." },
+        { status: 403 }
+      );
+    }
+
     // Send OTP for login (numeric OTP sent via email)
     // Use anon client to send OTP (service role might not work correctly for OTP)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

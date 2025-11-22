@@ -8,6 +8,16 @@ export async function GET(request: NextRequest) {
     const macroId = searchParams.get("macroId");
     const categoryId = searchParams.get("categoryId");
     const all = searchParams.get("all");
+    const consolidated = searchParams.get("consolidated");
+
+    // If "consolidated" parameter is present, return both groups and categories in one call
+    if (consolidated === "true" || consolidated === "") {
+      const [groups, categories] = await Promise.all([
+        getMacros(),
+        getAllCategories(),
+      ]);
+      return NextResponse.json({ groups, categories }, { status: 200 });
+    }
 
     // If "all" parameter is present, return all categories
     if (all === "true" || all === "") {

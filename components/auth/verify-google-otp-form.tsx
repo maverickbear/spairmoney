@@ -263,6 +263,25 @@ export function VerifyGoogleOtpForm() {
         }
       }
 
+      // Check if user is blocked
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from("User")
+          .select("isBlocked, role")
+          .eq("id", currentUser.id)
+          .single();
+
+        if (!userError && userData?.isBlocked && userData?.role !== "super_admin") {
+          // Sign out the user
+          await supabase.auth.signOut();
+          router.push("/account-blocked");
+          return;
+        }
+      } catch (blockedError) {
+        console.error("Error checking user blocked status:", blockedError);
+        // Continue anyway - don't block access if check fails
+      }
+
       // Check maintenance mode
       let isMaintenanceMode = false;
       try {

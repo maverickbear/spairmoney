@@ -25,7 +25,7 @@ const CIRCUIT_BREAKER_CONFIG = {
 };
 
 // Polling configuration for less critical data
-const POLLING_INTERVAL = 30000; // 30 seconds for Budget and Goal
+const POLLING_INTERVAL = 300000; // 300 seconds (5 minutes) - increased since manual refresh button is available
 
 export function DashboardRealtime() {
   const router = useRouter();

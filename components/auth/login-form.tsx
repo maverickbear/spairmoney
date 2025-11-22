@@ -86,6 +86,12 @@ function LoginFormContent() {
     const oauthError = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
     
+    // If account is blocked, redirect to blocked page
+    if (oauthError === "blocked") {
+      router.push("/account-blocked");
+      return;
+    }
+    
     if (oauthError === "oauth_cancelled") {
       setError("Sign in with Google was cancelled. Please try again.");
     } else if (oauthError === "oauth_error") {
@@ -97,13 +103,13 @@ function LoginFormContent() {
     }
     
     // Clean up URL params after showing error
-    if (oauthError) {
+    if (oauthError && oauthError !== "blocked") {
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete("error");
       newUrl.searchParams.delete("error_description");
       window.history.replaceState({}, "", newUrl.toString());
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   // Load invitation info if token is present
   useEffect(() => {

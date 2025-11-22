@@ -6,12 +6,14 @@ import { createPlannedPayment, PLANNED_HORIZON_DAYS } from "@/lib/api/planned-pa
 import { createSubcategory } from "@/lib/api/categories";
 import { addMonths, addYears, addDays, startOfMonth, setDate } from "date-fns";
 import { logger } from "@/lib/utils/logger";
+import { invalidateSubscriptionCaches } from "@/lib/services/cache-manager";
 
 export interface UserServiceSubscription {
   id: string;
   userId: string;
   serviceName: string;
   subcategoryId?: string | null;
+  planId?: string | null;
   amount: number;
   description?: string | null;
   billingFrequency: "monthly" | "weekly" | "biweekly" | "semimonthly" | "daily";
@@ -24,6 +26,8 @@ export interface UserServiceSubscription {
   // Relations
   subcategory?: { id: string; name: string; logo?: string | null } | null;
   account?: { id: string; name: string } | null;
+  serviceLogo?: string | null; // Logo from SubscriptionService table
+  plan?: { id: string; planName: string } | null; // Plan from SubscriptionServicePlan
 }
 
 export interface UserServiceSubscriptionFormData {
@@ -38,13 +42,17 @@ export interface UserServiceSubscriptionFormData {
   // For creating new subcategory
   categoryId?: string | null;
   newSubcategoryName?: string | null;
+  planId?: string | null; // ID of the selected SubscriptionServicePlan
 }
 
 /**
- * Get all user subscriptions
+ * Get all user subscriptions (internal version that accepts tokens)
  */
-export async function getUserSubscriptions(): Promise<UserServiceSubscription[]> {
-  const supabase = await createServerClient();
+export async function getUserSubscriptionsInternal(
+  accessToken?: string,
+  refreshToken?: string
+): Promise<UserServiceSubscription[]> {
+  const supabase = await createServerClient(accessToken, refreshToken);
 
   // Get current user
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -58,10 +66,13 @@ export async function getUserSubscriptions(): Promise<UserServiceSubscription[]>
 
   logger.info(`[getUserSubscriptions] Fetching subscriptions for user: ${user.id}`);
 
+  // Note: We don't filter by userId here because RLS policies handle access control
+  // RLS policy allows access if:
+  // 1. householdId is in user's accessible households, OR
+  // 2. userId matches auth.uid() (backward compatibility)
   const { data, error } = await supabase
     .from("UserServiceSubscription")
     .select("*")
-    .eq("userId", user.id)
     .order("createdAt", { ascending: false });
 
   if (error) {
@@ -78,48 +89,82 @@ export async function getUserSubscriptions(): Promise<UserServiceSubscription[]>
   logger.info(`[getUserSubscriptions] Query executed successfully. Raw data:`, {
     dataLength: data?.length || 0,
     hasData: !!data,
-    userId: user.id
+    userId: user.id,
+    error: error ? {
+      message: (error as any).message,
+      code: (error as any).code,
+      details: (error as any).details,
+      hint: (error as any).hint
+    } : null
   });
 
   if (!data || data.length === 0) {
-    logger.info(`[getUserSubscriptions] No subscriptions found for user: ${user.id}`);
+    logger.info(`[getUserSubscriptions] No subscriptions found for user: ${user.id}. This could be due to RLS policies or no subscriptions exist.`);
     return [];
   }
 
   logger.info(`[getUserSubscriptions] Found ${data.length} subscription(s) for user: ${user.id}`, {
     subscriptionIds: data.map(s => s.id),
-    serviceNames: data.map(s => s.serviceName)
+    serviceNames: data.map(s => s.serviceName),
+    householdIds: data.map(s => s.householdId || 'NULL'),
+    userIds: data.map(s => s.userId)
   });
 
-  // Enrich with related data
-  const enrichedSubscriptions = await Promise.all(
-    data.map(async (sub) => {
-      const [subcategoryResult, accountResult] = await Promise.all([
-        sub.subcategoryId
-          ? supabase
-              .from("Subcategory")
-              .select("id, name, logo")
-              .eq("id", sub.subcategoryId)
-              .single()
-          : Promise.resolve({ data: null, error: null }),
-        supabase
-          .from("Account")
-          .select("id, name")
-          .eq("id", sub.accountId)
-          .single(),
-      ]);
+  // OPTIMIZED: Batch fetch all related data to avoid N+1 queries
+  // Collect all unique IDs first
+  const subcategoryIds = new Set<string>();
+  const accountIds = new Set<string>();
+  const serviceNames = new Set<string>();
+  const planIds = new Set<string>();
 
-      return {
+  data.forEach(sub => {
+    if (sub.subcategoryId) subcategoryIds.add(sub.subcategoryId);
+    if (sub.accountId) accountIds.add(sub.accountId);
+    if (sub.serviceName) serviceNames.add(sub.serviceName);
+    if (sub.planId) planIds.add(sub.planId);
+  });
+
+  // Batch fetch all related data in parallel (only 4 queries total instead of 4×N)
+  const [subcategoriesResult, accountsResult, servicesResult, plansResult] = await Promise.all([
+    subcategoryIds.size > 0
+      ? supabase.from("Subcategory").select("id, name, logo").in("id", Array.from(subcategoryIds))
+      : Promise.resolve({ data: [], error: null }),
+    accountIds.size > 0
+      ? supabase.from("Account").select("id, name").in("id", Array.from(accountIds))
+      : Promise.resolve({ data: [], error: null }),
+    serviceNames.size > 0
+      ? supabase.from("SubscriptionService").select("name, logo").in("name", Array.from(serviceNames))
+      : Promise.resolve({ data: [], error: null }),
+    planIds.size > 0
+      ? supabase.from("SubscriptionServicePlan").select("id, planName").in("id", Array.from(planIds))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  // Create maps for O(1) lookup
+  const subcategoriesMap = new Map((subcategoriesResult.data || []).map(s => [s.id, s]));
+  const accountsMap = new Map((accountsResult.data || []).map(a => [a.id, a]));
+  const servicesMap = new Map((servicesResult.data || []).map(s => [s.name, s]));
+  const plansMap = new Map((plansResult.data || []).map(p => [p.id, p]));
+
+  // Enrich subscriptions using maps (no additional queries)
+  const enrichedSubscriptions = data.map(sub => ({
         ...sub,
         amount: Number(sub.amount),
-        subcategory: subcategoryResult.data || null,
-        account: accountResult.data || null,
-      };
-    })
-  );
+    subcategory: sub.subcategoryId ? (subcategoriesMap.get(sub.subcategoryId) || null) : null,
+    account: sub.accountId ? (accountsMap.get(sub.accountId) || null) : null,
+    serviceLogo: servicesMap.get(sub.serviceName)?.logo || null,
+    plan: sub.planId ? (plansMap.get(sub.planId) || null) : null,
+  }));
 
   logger.info(`[getUserSubscriptions] Returning ${enrichedSubscriptions.length} enriched subscription(s)`);
   return enrichedSubscriptions;
+}
+
+/**
+ * Get all user subscriptions (public API)
+ */
+export async function getUserSubscriptions(): Promise<UserServiceSubscription[]> {
+  return getUserSubscriptionsInternal();
 }
 
 /**
@@ -171,6 +216,7 @@ export async function createUserSubscription(
     householdId: householdId, // Add householdId for household-based architecture
     serviceName: data.serviceName.trim(),
     subcategoryId: subcategoryId || null,
+    planId: data.planId || null,
     amount: data.amount,
     description: data.description?.trim() || null,
     billingFrequency: data.billingFrequency,
@@ -206,6 +252,9 @@ export async function createUserSubscription(
 
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(subscription, supabase);
+
+  // Invalidate cache to ensure dashboard shows the new subscription
+  invalidateSubscriptionCaches();
 
   return enrichedSubscription;
 }
@@ -265,6 +314,9 @@ export async function updateUserSubscription(
   if (subcategoryId !== undefined) {
     updateData.subcategoryId = subcategoryId || null;
   }
+  if (data.planId !== undefined) {
+    updateData.planId = data.planId || null;
+  }
   if (data.amount !== undefined) {
     updateData.amount = data.amount;
   }
@@ -309,6 +361,9 @@ export async function updateUserSubscription(
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(updated, supabase);
 
+  // Invalidate cache to ensure dashboard shows the updated subscription
+  invalidateSubscriptionCaches();
+
   return enrichedSubscription;
 }
 
@@ -350,6 +405,9 @@ export async function deleteUserSubscription(id: string): Promise<void> {
       `Failed to delete subscription: ${error.message || JSON.stringify(error)}`
     );
   }
+
+  // Invalidate cache to ensure dashboard reflects the deletion
+  invalidateSubscriptionCaches();
 }
 
 /**
@@ -402,6 +460,9 @@ export async function pauseUserSubscription(id: string): Promise<UserServiceSubs
 
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(updated, supabase);
+
+  // Invalidate cache to ensure dashboard reflects the pause
+  invalidateSubscriptionCaches();
 
   return enrichedSubscription;
 }
@@ -460,6 +521,9 @@ export async function resumeUserSubscription(id: string): Promise<UserServiceSub
 
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(updated, supabase);
+
+  // Invalidate cache to ensure dashboard reflects the resume
+  invalidateSubscriptionCaches();
 
   return enrichedSubscription;
 }
@@ -616,7 +680,7 @@ async function enrichSubscription(
   subscription: any,
   supabase: any
 ): Promise<UserServiceSubscription> {
-  const [subcategoryResult, accountResult] = await Promise.all([
+  const [subcategoryResult, accountResult, serviceResult, planResult] = await Promise.all([
     subscription.subcategoryId
       ? supabase
           .from("Subcategory")
@@ -629,6 +693,20 @@ async function enrichSubscription(
       .select("id, name")
       .eq("id", subscription.accountId)
       .single(),
+    subscription.serviceName
+      ? supabase
+          .from("SubscriptionService")
+          .select("name, logo")
+          .eq("name", subscription.serviceName)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    subscription.planId
+      ? supabase
+          .from("SubscriptionServicePlan")
+          .select("id, planName")
+          .eq("id", subscription.planId)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   return {
@@ -636,6 +714,8 @@ async function enrichSubscription(
     amount: Number(subscription.amount),
     subcategory: subcategoryResult.data || null,
     account: accountResult.data || null,
+    serviceLogo: serviceResult.data?.logo || null,
+    plan: planResult.data || null,
   };
 }
 

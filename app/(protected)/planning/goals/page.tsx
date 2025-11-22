@@ -41,6 +41,7 @@ interface Goal {
   description?: string | null;
   expectedIncome?: number | null;
   targetMonths?: number | null;
+  isSystemGoal?: boolean;
   createdAt: string;
   updatedAt: string;
   monthlyContribution?: number;
@@ -53,7 +54,7 @@ export default function GoalsPage() {
   const perf = usePagePerformance("Goals");
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
@@ -83,6 +84,22 @@ export default function GoalsPage() {
       const data = await res.json();
       console.log("Goals loaded:", data);
       setGoals(data || []);
+      
+      // Ensure emergency fund goal exists
+      try {
+        const { ensureEmergencyFundGoalClient } = await import("@/lib/api/goals-client");
+        await ensureEmergencyFundGoalClient();
+        // Reload goals to include the emergency fund goal if it was just created
+        const res2 = await fetch(`/api/goals?t=${Date.now()}`);
+        if (res2.ok) {
+          const data2 = await res2.json();
+          setGoals(data2 || []);
+        }
+      } catch (goalError) {
+        console.error("Error ensuring emergency fund goal:", goalError);
+        // Don't fail if goal creation fails
+      }
+      
       setHasLoaded(true);
       perf.markDataLoaded();
     } catch (error) {
@@ -271,7 +288,7 @@ export default function GoalsPage() {
         <PageHeader
           title="Goals"
         >
-        {sortedGoals.length > 0 && (
+        {sortedGoals.length > 0 && canWrite && (
           <Button
             size="medium"
             onClick={() => {
@@ -298,13 +315,13 @@ export default function GoalsPage() {
               icon={PiggyBank}
               title="No goals created yet"
               description="Create your first savings goal to start tracking your progress and achieve your financial dreams."
-              actionLabel="Create Your First Goal"
-              onAction={() => {
+              actionLabel={canWrite ? "Create Your First Goal" : undefined}
+              onAction={canWrite ? () => {
                 if (!checkWriteAccess()) return;
                 setSelectedGoal(null);
                 setIsFormOpen(true);
-              }}
-              actionIcon={Plus}
+              } : undefined}
+              actionIcon={canWrite ? Plus : undefined}
             />
           </div>
         ) : (
@@ -430,19 +447,21 @@ export default function GoalsPage() {
       </div>
 
       {/* Mobile Floating Action Button */}
-      <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
-        <Button
-          size="large"
-          className="h-14 w-14 rounded-full shadow-lg"
-          onClick={() => {
-            if (!checkWriteAccess()) return;
-            setSelectedGoal(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+      {canWrite && (
+        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+          <Button
+            size="large"
+            className="h-14 w-14 rounded-full shadow-lg"
+            onClick={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedGoal(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
       </div>
   );
 }

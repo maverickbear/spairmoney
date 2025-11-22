@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       targetMonths: body.targetMonths,
       accountId: body.accountId,
       holdingId: body.holdingId,
+      isSystemGoal: body.isSystemGoal,
     });
     
     return NextResponse.json(goal, { status: 201 });

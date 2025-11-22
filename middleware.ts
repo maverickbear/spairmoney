@@ -271,9 +271,9 @@ export async function middleware(request: NextRequest) {
 
             // Check if user is blocked (super_admin cannot be blocked)
             if (userData?.isBlocked && userData?.role !== "super_admin") {
-              // User is blocked - sign them out and redirect to login
+              // User is blocked - sign them out and redirect to account blocked page
               await supabase.auth.signOut();
-              return NextResponse.redirect(new URL("/auth/login?error=blocked", request.url));
+              return NextResponse.redirect(new URL("/account-blocked", request.url));
             }
 
             // If super_admin, allow access

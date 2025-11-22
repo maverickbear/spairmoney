@@ -80,10 +80,10 @@ export function useDashboardUpdates(enabled: boolean = true) {
       checkUpdates();
     }, 2000);
 
-    // Poll every 15 seconds (optimized: reduced from 10s to reduce server load)
+    // Poll every 300 seconds (5 minutes) - increased since manual refresh button is available
     intervalRef.current = setInterval(() => {
       checkUpdates();
-    }, 15000);
+    }, 300000);
 
     return () => {
       clearTimeout(initialTimeout);

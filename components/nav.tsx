@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, createContext, useContext, memo, useMemo, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/utils/logger";
-import { LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, User, Settings, LogOut, CreditCard, PiggyBank, Users, ChevronLeft, ChevronRight, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar, Repeat } from "lucide-react";
+import { LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, User, Settings, LogOut, CreditCard, PiggyBank, Users, ChevronLeft, ChevronRight, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar, Repeat, Tag, Mail, Star, ChevronDown } from "lucide-react";
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 import { TrialWidget, calculateTrialDaysRemaining, calculateTrialProgress } from "@/components/billing/trial-widget";
@@ -122,6 +122,7 @@ function NavComponent({ hasSubscription = true }: NavProps) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showPortalManagementItems, setShowPortalManagementItems] = useState(false);
 
   const log = logger.withPrefix("NAV");
 
@@ -132,6 +133,13 @@ function NavComponent({ hasSubscription = true }: NavProps) {
       setIsCollapsed(saved === "true");
     }
   }, []);
+
+  // Auto-show Portal Management items if on portal-management page
+  useEffect(() => {
+    if (pathname.startsWith("/portal-management")) {
+      setShowPortalManagementItems(true);
+    }
+  }, [pathname]);
 
   // Save collapsed state to localStorage
   useEffect(() => {
@@ -284,19 +292,44 @@ function NavComponent({ hasSubscription = true }: NavProps) {
 
   const user = userData?.user;
 
-  // Build nav sections dynamically - add Portal Management if super_admin
-  // Memoize to avoid recreating on every render
-  const navSections = useMemo(() => isSuperAdmin
-    ? [
+  // Portal Management items
+  const portalManagementSections = [
+    {
+      title: "Portal Management",
+      items: [
+        { href: "/portal-management", label: "Portal Management", icon: Settings2, isToggle: true, isBack: true },
+        { href: "/portal-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/portal-management/users", label: "Users", icon: Users },
+        { href: "/portal-management/promo-codes", label: "Promo Codes", icon: Tag },
+        { href: "/portal-management/system-entities", label: "System Entities", icon: FolderTree },
+        { href: "/portal-management/contact-forms", label: "Contact Forms", icon: Mail },
+        { href: "/portal-management/feedback", label: "Feedback", icon: Star },
+        { href: "/portal-management/plans", label: "Plans", icon: CreditCard },
+        { href: "/portal-management/subscription-services", label: "Subscription Services", icon: Settings2 },
+      ],
+    },
+  ];
+
+  // Build nav sections - toggle between normal and portal management items
+  const navSections = useMemo(() => {
+    if (!isSuperAdmin) {
+      return baseNavSections;
+    }
+
+    if (showPortalManagementItems) {
+      return portalManagementSections;
+    }
+
+    return [
         {
           title: "Portal Management",
           items: [
-            { href: "/portal-management", label: "Portal Management", icon: Settings2 },
+          { href: "/portal-management", label: "Portal Management", icon: Settings2, isToggle: true },
           ],
         },
         ...baseNavSections,
-      ]
-    : baseNavSections, [isSuperAdmin]);
+    ];
+  }, [isSuperAdmin, showPortalManagementItems]);
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
@@ -352,7 +385,122 @@ function NavComponent({ hasSubscription = true }: NavProps) {
                   )}
                   {section.items.map((item) => {
                     const Icon = item.icon;
-                    // Extract base path without query params for comparison
+                    const isToggle = (item as any).isToggle;
+                    const isBack = (item as any).isBack;
+                    
+                    // Handle Portal Management toggle button (show normal items)
+                    if (isToggle && !isBack) {
+                      const isActive = pathname.startsWith("/portal-management");
+                      
+                      if (isCollapsed) {
+                        const toggleButton = (
+                          <button
+                            onClick={() => {
+                              setShowPortalManagementItems(!showPortalManagementItems);
+                              if (!showPortalManagementItems) {
+                                router.push("/portal-management/dashboard");
+                              }
+                            }}
+                            className={cn(
+                              "flex items-center rounded-[12px] text-sm font-medium transition-all duration-200 ease-in-out justify-center px-3 py-2 w-full",
+                              isActive
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            )}
+                          >
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                          </button>
+                        );
+                        return (
+                          <Tooltip key="portal-management-toggle">
+                            <TooltipTrigger asChild>
+                              <div className="relative">
+                                {toggleButton}
+                                <TooltipContent side="right">
+                                  Portal Management
+                                </TooltipContent>
+                              </div>
+                            </TooltipTrigger>
+                          </Tooltip>
+                        );
+                      }
+                      
+                      return (
+                        <button
+                          key="portal-management-toggle"
+                          onClick={() => {
+                            setShowPortalManagementItems(!showPortalManagementItems);
+                            if (!showPortalManagementItems) {
+                              router.push("/portal-management/dashboard");
+                            }
+                          }}
+                          className={cn(
+                            "flex items-center justify-between w-full rounded-[12px] text-sm font-medium transition-all duration-200 ease-in-out px-3 py-2",
+                            isActive
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          )}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <span>{item.label}</span>
+                          </div>
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 transition-transform duration-200",
+                              showPortalManagementItems && "rotate-180"
+                            )}
+                          />
+                        </button>
+                      );
+                    }
+                    
+                    // Handle back button (show normal items again)
+                    if (isToggle && isBack) {
+                      if (isCollapsed) {
+                        const backButton = (
+                          <button
+                            onClick={() => {
+                              setShowPortalManagementItems(false);
+                              router.push("/dashboard");
+                            }}
+                            className="flex items-center rounded-[12px] text-sm font-medium transition-all duration-200 ease-in-out justify-center px-3 py-2 w-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          >
+                            <ChevronLeft className="h-5 w-5 flex-shrink-0" />
+                          </button>
+                        );
+                        return (
+                          <Tooltip key="portal-management-back">
+                            <TooltipTrigger asChild>
+                              <div className="relative">
+                                {backButton}
+                                <TooltipContent side="right">
+                                  Back to Main Menu
+                                </TooltipContent>
+                              </div>
+                            </TooltipTrigger>
+                          </Tooltip>
+                        );
+                      }
+                      
+                      return (
+                        <button
+                          key="portal-management-back"
+                          onClick={() => {
+                            setShowPortalManagementItems(false);
+                            router.push("/dashboard");
+                          }}
+                          className="flex items-center space-x-3 rounded-[12px] text-sm font-medium transition-all duration-200 ease-in-out px-3 py-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        >
+                          <ChevronLeft className="h-5 w-5 flex-shrink-0" />
+                          <span>Back to Main Menu</span>
+                        </button>
+                      );
+                    }
+                    
+                    // Handle Portal Management items (regular links now)
+                    
+                    // Regular link item
                     const basePath = item.href.split("?")[0];
                     const isActive =
                       pathname === item.href ||

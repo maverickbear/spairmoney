@@ -42,7 +42,7 @@ function getInitials(name: string | null | undefined): string {
 export default function MembersPage() {
   const perf = usePagePerformance("Members");
   const { openDialog, ConfirmDialog } = useConfirmDialog();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<HouseholdMember | undefined>(undefined);
@@ -53,32 +53,40 @@ export default function MembersPage() {
 
   useEffect(() => {
     if (!limitsLoading) {
-      loadMembers();
-      loadCurrentUserRole();
+      loadData();
     }
   }, [limitsLoading]);
 
-  async function loadCurrentUserRole() {
+  // OPTIMIZED: Single API call to get both members and user role
+  async function loadData() {
     try {
-      const { getUserRoleClient } = await import("@/lib/api/members-client");
-      const role = await getUserRoleClient();
+      setLoading(true);
+      const response = await fetch("/api/members");
+      if (!response.ok) {
+        throw new Error("Failed to fetch members data");
+      }
+      const { members: data, userRole: role } = await response.json();
+      setMembers(data || []);
       if (role) {
         setCurrentUserRole(role);
       }
-    } catch (error) {
-      console.error("Error loading user role:", error);
-    }
-  }
-
-  async function loadMembers() {
-    try {
-      setLoading(true);
-      const { getHouseholdMembersClient } = await import("@/lib/api/members-client");
-      const data = await getHouseholdMembersClient();
-      setMembers(data);
       perf.markDataLoaded();
     } catch (error) {
-      console.error("Error loading members:", error);
+      console.error("Error loading data:", error);
+      // Fallback to separate calls if consolidated endpoint fails
+      try {
+        const { getHouseholdMembersClient, getUserRoleClient } = await import("@/lib/api/members-client");
+        const [data, role] = await Promise.all([
+          getHouseholdMembersClient(),
+          getUserRoleClient(),
+        ]);
+        setMembers(data);
+        if (role) {
+          setCurrentUserRole(role);
+        }
+      } catch (fallbackError) {
+        console.error("Error in fallback loading:", fallbackError);
+      }
       perf.markDataLoaded();
     } finally {
       setLoading(false);
@@ -99,7 +107,7 @@ export default function MembersPage() {
         try {
           const { deleteMemberClient } = await import("@/lib/api/members-client");
           await deleteMemberClient(member.id);
-          loadMembers();
+          loadData();
         } catch (error) {
           console.error("Error removing member:", error);
           alert(error instanceof Error ? error.message : "Failed to remove member");
@@ -141,7 +149,7 @@ export default function MembersPage() {
   }
 
   function handleFormSuccess() {
-    loadMembers();
+    loadData();
     handleFormClose();
   }
 
@@ -150,7 +158,7 @@ export default function MembersPage() {
       <PageHeader
         title="Household Members"
       >
-        {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && members.length > 0 && (
+        {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && members.length > 0 && canWrite && (
           <Button
             size="medium"
             onClick={() => {
@@ -181,12 +189,12 @@ export default function MembersPage() {
           icon={Users}
           title="No members yet"
           description="Invite household members to share access to your financial data."
-          actionLabel="Invite Your First Member"
-          onAction={() => {
+          actionLabel={canWrite ? "Invite Your First Member" : undefined}
+          onAction={canWrite ? () => {
             if (!checkWriteAccess()) return;
             setIsFormOpen(true);
-          }}
-          actionIcon={Plus}
+          } : undefined}
+          actionIcon={canWrite ? Plus : undefined}
         />
         </div>
       ) : (
@@ -249,11 +257,11 @@ export default function MembersPage() {
                   </TableCell>
                   <TableCell className="text-xs md:text-sm">
                     {member.isOwner ? (
-                      <Badge variant="default" className="rounded-full border-gray-300 bg-white text-foreground hover:bg-white">
+                      <Badge variant="default" className="rounded-full border-gray-300 bg-white text-gray-900 hover:bg-gray-50">
                         Admin
                       </Badge>
                     ) : (
-                      <Badge variant={member.role === "admin" ? "default" : "secondary"} className={member.role === "admin" ? "rounded-full border-gray-300 bg-white text-foreground hover:bg-white" : ""}>
+                      <Badge variant={member.role === "admin" ? "default" : "secondary"} className={member.role === "admin" ? "rounded-full border-gray-300 bg-white text-gray-900 hover:bg-gray-50" : ""}>
                         {member.role === "admin" ? "Admin" : "Member"}
                       </Badge>
                     )}
@@ -277,7 +285,7 @@ export default function MembersPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {!member.isOwner && (currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && (
+                    {!member.isOwner && (currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && canWrite && (
                       <div className="flex space-x-1 md:space-x-2">
                         {member.status === "pending" && (
                           <Button
@@ -331,7 +339,7 @@ export default function MembersPage() {
       </div>
 
       {/* Mobile Floating Action Button */}
-      {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && (
+      {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && canWrite && (
         <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
           <Button
             size="large"

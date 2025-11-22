@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/components/common/money";
 import { cn } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { UserServiceSubscription } from "@/lib/api/user-subscriptions-client";
 
 interface SubscriptionsWidgetProps {
@@ -17,16 +25,6 @@ const billingFrequencyLabels: Record<string, string> = {
   weekly: "Weekly",
   semimonthly: "Semimonthly",
   daily: "Daily",
-};
-
-const dayOfWeekLabels: Record<number, string> = {
-  0: "Sunday",
-  1: "Monday",
-  2: "Tuesday",
-  3: "Wednesday",
-  4: "Thursday",
-  5: "Friday",
-  6: "Saturday",
 };
 
 export function SubscriptionsWidget({
@@ -50,18 +48,6 @@ export function SubscriptionsWidget({
   }, [subscriptions]);
 
   const activeSubscriptions = sortedSubscriptions.filter((s) => s.isActive);
-  const pausedSubscriptions = sortedSubscriptions.filter((s) => !s.isActive);
-
-  const getBillingDayLabel = (subscription: UserServiceSubscription) => {
-    if (!subscription.billingDay) return null;
-    
-    if (subscription.billingFrequency === "monthly" || subscription.billingFrequency === "semimonthly") {
-      return `Day ${subscription.billingDay}`;
-    } else if (subscription.billingFrequency === "weekly" || subscription.billingFrequency === "biweekly") {
-      return dayOfWeekLabels[subscription.billingDay] || `Day ${subscription.billingDay}`;
-    }
-    return null;
-  };
 
   const totalMonthlyAmount = useMemo(() => {
     return sortedSubscriptions
@@ -130,137 +116,82 @@ export function SubscriptionsWidget({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4 max-h-[600px] overflow-y-auto">
-          {/* Active Subscriptions */}
-          {activeSubscriptions.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">
-                Active ({activeSubscriptions.length})
-              </h3>
-              <div className="space-y-2">
-                {activeSubscriptions.map((subscription) => {
+        <div className="max-h-[600px] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[200px]">Service</TableHead>
+                <TableHead>Frequency</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedSubscriptions.map((subscription) => {
                   const frequencyLabel = billingFrequencyLabels[subscription.billingFrequency] || subscription.billingFrequency;
-                  const billingDayLabel = getBillingDayLabel(subscription);
 
                   return (
-                    <div
+                    <TableRow
                       key={subscription.id}
                       className={cn(
-                        "flex items-start justify-between gap-3 p-3 rounded-lg border",
-                        "bg-card hover:bg-accent/50 transition-colors"
+                        !subscription.isActive && "opacity-75"
                       )}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="text-sm font-medium text-foreground truncate">
-                            {subscription.serviceName}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {subscription.serviceLogo && (
+                            <img
+                              src={subscription.serviceLogo}
+                              alt={subscription.serviceName}
+                              className="h-6 w-6 object-contain rounded flex-shrink-0"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <div className="text-sm font-medium text-foreground truncate">
+                              {subscription.serviceName}
+                            </div>
+                            {subscription.description && (
+                              <div className="text-xs text-muted-foreground truncate">
+                                {subscription.description}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            {frequencyLabel}
-                          </Badge>
-                          {billingDayLabel && (
-                            <span>{billingDayLabel}</span>
-                          )}
-                          {subscription.subcategory && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className="truncate">{subscription.subcategory.name}</span>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                          <span className="truncate">{subscription.account?.name || "No account"}</span>
-                          {subscription.description && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className="truncate">{subscription.description}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-base font-semibold tabular-nums text-red-600 dark:text-red-400">
-                          {formatMoney(subscription.amount)}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
                           {frequencyLabel}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {subscription.plan ? (
+                          <span className="text-sm text-muted-foreground">
+                            {subscription.plan.planName}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="text-sm font-semibold tabular-nums">
+                          <span className={cn(
+                            subscription.isActive 
+                              ? "text-red-600 dark:text-red-400" 
+                              : "text-muted-foreground"
+                          )}>
+                            {formatMoney(subscription.amount)}
+                          </span>
                         </div>
-                      </div>
-                    </div>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* Paused Subscriptions */}
-          {pausedSubscriptions.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">
-                Paused ({pausedSubscriptions.length})
-              </h3>
-              <div className="space-y-2">
-                {pausedSubscriptions.map((subscription) => {
-                  const frequencyLabel = billingFrequencyLabels[subscription.billingFrequency] || subscription.billingFrequency;
-                  const billingDayLabel = getBillingDayLabel(subscription);
-
-                  return (
-                    <div
-                      key={subscription.id}
-                      className={cn(
-                        "flex items-start justify-between gap-3 p-3 rounded-lg border opacity-75",
-                        "bg-card hover:bg-accent/50 transition-colors"
-                      )}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="text-sm font-medium text-foreground truncate">
-                            {subscription.serviceName}
-                          </div>
-                          <Badge variant="outline" className="border-yellow-500 dark:border-yellow-400 text-yellow-600 dark:text-yellow-400 text-xs">
-                            Paused
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            {frequencyLabel}
-                          </Badge>
-                          {billingDayLabel && (
-                            <span>{billingDayLabel}</span>
-                          )}
-                          {subscription.subcategory && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className="truncate">{subscription.subcategory.name}</span>
-                            </>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                          <span className="truncate">{subscription.account?.name || "No account"}</span>
-                          {subscription.description && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className="truncate">{subscription.description}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-base font-semibold tabular-nums text-muted-foreground">
-                          {formatMoney(subscription.amount)}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {frequencyLabel}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            </TableBody>
+          </Table>
         </div>
       </CardContent>
     </Card>

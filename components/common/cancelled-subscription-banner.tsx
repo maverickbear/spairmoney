@@ -126,7 +126,7 @@ export function CancelledSubscriptionBanner({ isSidebarCollapsed = false }: Canc
       className={cn(
         "w-full rounded-none border-0",
         "bg-purple-100 dark:bg-purple-900/30",
-        "text-black dark:text-white"
+        "text-foreground dark:text-white"
       )}
     >
       <AlertCircle className="h-4 w-4" />

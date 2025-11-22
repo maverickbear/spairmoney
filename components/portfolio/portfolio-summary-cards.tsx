@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useMemo, useRef } from "react";
 import { formatMoney } from "@/components/common/money";
 import { TrendingUp, TrendingDown, Wallet, BarChart3, Plus, Upload, Plug, RefreshCw } from "lucide-react";
 import { PortfolioSummary } from "@/lib/api/portfolio";
@@ -12,6 +13,7 @@ interface PortfolioSummaryCardsProps {
   onAddClick?: () => void;
   onImportClick?: () => void;
   integrationProps?: {
+    initialStatus?: { isConnected: boolean; accountsCount: number } | null;
     onSync?: () => void;
     onDisconnect?: () => void;
     onSuccess?: () => void;
@@ -28,6 +30,79 @@ export function PortfolioSummaryCards({
   onUpdatePrices,
   isUpdatingPrices = false,
 }: PortfolioSummaryCardsProps) {
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const prevIsUpdatingRef = useRef(isUpdatingPrices);
+
+  // Update current time every minute to refresh relative time display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Update timestamp when prices finish updating
+  useEffect(() => {
+    // Set initial timestamp on mount if not set
+    if (lastUpdated === null && !isUpdatingPrices) {
+      setLastUpdated(new Date());
+    }
+    
+    // Update timestamp when refresh completes (isUpdatingPrices changes from true to false)
+    if (prevIsUpdatingRef.current === true && isUpdatingPrices === false) {
+      setLastUpdated(new Date());
+    }
+    
+    prevIsUpdatingRef.current = isUpdatingPrices;
+  }, [isUpdatingPrices, lastUpdated]);
+
+  // Function to format relative time
+  const relativeTimeText = useMemo(() => {
+    if (!lastUpdated) return null;
+    const now = currentTime;
+    const diffInSeconds = Math.floor((now.getTime() - lastUpdated.getTime()) / 1000);
+    
+    // Less than 1 minute
+    if (diffInSeconds < 60) {
+      return "Just Now";
+    }
+    
+    // Less than 1 hour
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    }
+    
+    // Less than 1 day
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    }
+    
+    // Less than 1 week
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) {
+      return `${diffInDays}d ago`;
+    }
+    
+    // Less than 1 month (approximately 4 weeks)
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInWeeks < 4) {
+      return `${diffInWeeks}w ago`;
+    }
+    
+    // Less than 1 year
+    const diffInMonths = Math.floor(diffInDays / 30);
+    if (diffInMonths < 12) {
+      return `${diffInMonths}m ago`;
+    }
+    
+    // More than 1 year
+    const diffInYears = Math.floor(diffInDays / 365);
+    return `${diffInYears}y ago`;
+  }, [lastUpdated, currentTime]);
 
   const cards = [
     {
@@ -140,7 +215,10 @@ export function PortfolioSummaryCards({
           </Button>
           {integrationProps && (
             <IntegrationDropdown
-              {...integrationProps}
+              initialStatus={integrationProps.initialStatus}
+              onSync={integrationProps.onSync}
+              onDisconnect={integrationProps.onDisconnect}
+              onSuccess={integrationProps.onSuccess}
               customTrigger={
                 <Button
                   variant="outline"
@@ -157,15 +235,22 @@ export function PortfolioSummaryCards({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Portfolio Summary</h2>
         {onUpdatePrices && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onUpdatePrices}
-            disabled={isUpdatingPrices}
-            className="h-8 w-8"
-          >
-            <RefreshCw className={cn("h-4 w-4", isUpdatingPrices && "animate-spin")} />
-          </Button>
+          <div className="flex items-center gap-2">
+            {relativeTimeText && (
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                Updated {relativeTimeText}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onUpdatePrices}
+              disabled={isUpdatingPrices}
+              className="h-8 w-8"
+            >
+              <RefreshCw className={cn("h-4 w-4", isUpdatingPrices && "animate-spin")} />
+            </Button>
+          </div>
         )}
       </div>
       {/* Mobile: Total Value + Holdings in first row, Day Change + Total Return in second row */}

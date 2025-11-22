@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { ChartSkeleton } from "@/components/ui/chart-skeleton";
 import { CardSkeleton } from "@/components/ui/card-skeleton";
+import { Button } from "@/components/ui/button";
 import { FinancialSummaryWidget } from "./widgets/financial-summary-widget";
 import { FinancialHealthScoreWidget } from "./widgets/financial-health-score-widget";
 import { calculateTotalIncome, calculateTotalExpenses } from "./utils/transaction-helpers";
@@ -112,6 +115,77 @@ export function FinancialOverviewPage({
   subscriptions,
   selectedMonthDate,
 }: FinancialOverviewPageProps) {
+  const router = useRouter();
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  // Update current time every minute to refresh relative time display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Function to format relative time
+  const relativeTimeText = useMemo(() => {
+    const now = currentTime;
+    const diffInSeconds = Math.floor((now.getTime() - lastUpdated.getTime()) / 1000);
+    
+    // Less than 1 minute
+    if (diffInSeconds < 60) {
+      return "Just Now";
+    }
+    
+    // Less than 1 hour
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    }
+    
+    // Less than 1 day
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    }
+    
+    // Less than 1 week
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) {
+      return `${diffInDays}d ago`;
+    }
+    
+    // Less than 1 month (approximately 4 weeks)
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInWeeks < 4) {
+      return `${diffInWeeks}w ago`;
+    }
+    
+    // Less than 1 year
+    const diffInMonths = Math.floor(diffInDays / 30);
+    if (diffInMonths < 12) {
+      return `${diffInMonths}m ago`;
+    }
+    
+    // More than 1 year
+    const diffInYears = Math.floor(diffInDays / 365);
+    return `${diffInYears}y ago`;
+  }, [lastUpdated, currentTime]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Refresh the router to reload all data
+      await router.refresh();
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Error refreshing dashboard:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   // Helper function to parse date from Supabase format
   const parseTransactionDate = (dateStr: string | Date): Date => {
     if (dateStr instanceof Date) {
@@ -277,8 +351,32 @@ export function FinancialOverviewPage({
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Financial Overview Title */}
-      <h2 className="text-2xl font-semibold">Financial Overview</h2>
+      {/* Financial Overview Header with Last Updated and Refresh Button */}
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold">
+          <span className="md:hidden">Overview</span>
+          <span className="hidden md:inline">Financial Overview</span>
+        </h2>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            Updated {relativeTimeText}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="h-8 w-8 flex-shrink-0"
+            title="Refresh dashboard"
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
       
       {/* Financial Summary - Full Width */}
       <FinancialSummaryWidget

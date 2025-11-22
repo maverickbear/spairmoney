@@ -6,13 +6,6 @@ import { SubscriptionCard } from "@/components/subscriptions/subscription-card";
 import { SubscriptionForm } from "@/components/forms/subscription-form";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2, Edit, Trash2, Pause, Play, MoreVertical } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/common/empty-state";
@@ -47,12 +40,11 @@ import { formatMoney } from "@/components/common/money";
 export default function SubscriptionsPage() {
   const perf = usePagePerformance("Subscriptions");
   const { openDialog, ConfirmDialog } = useConfirmDialog();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const { toast } = useToast();
   const [subscriptions, setSubscriptions] = useState<UserServiceSubscription[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<UserServiceSubscription | null>(null);
-  const [filterBy, setFilterBy] = useState<"all" | "active" | "paused">("all");
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -154,12 +146,8 @@ export default function SubscriptionsPage() {
     }
   }
 
-  // Filter subscriptions
-  const filteredSubscriptions = subscriptions.filter((sub) => {
-    if (filterBy === "active") return sub.isActive;
-    if (filterBy === "paused") return !sub.isActive;
-    return true;
-  });
+  // Show all subscriptions (filter removed)
+  const filteredSubscriptions = subscriptions;
 
   // Helper functions for formatting
   const billingFrequencyLabels: Record<string, string> = {
@@ -197,7 +185,7 @@ export default function SubscriptionsPage() {
       <PageHeader
         title="Subscriptions"
       >
-        {!(filteredSubscriptions.length === 0 && filterBy === "all") && (
+        {filteredSubscriptions.length > 0 && canWrite && (
           <Button
             size="medium"
             onClick={() => {
@@ -213,22 +201,6 @@ export default function SubscriptionsPage() {
       </PageHeader>
 
       <div className="w-full p-4 lg:p-8">
-        {subscriptions.length > 0 && (
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex gap-4 items-center">
-            <Select value={filterBy} onValueChange={(value) => setFilterBy(value as typeof filterBy)}>
-              <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Subscriptions</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
 
       {/* Mobile Card View */}
       <div className="lg:hidden">
@@ -292,23 +264,15 @@ export default function SubscriptionsPage() {
               <div className="col-span-full w-full h-full min-h-[400px]">
                 <EmptyState
                   icon={Plus}
-                  title={filterBy === "all" ? "No subscriptions created yet" : `No ${filterBy} subscriptions found`}
-                  description={
-                    filterBy === "all"
-                      ? "Create your first subscription to start tracking recurring service payments."
-                      : `Try adjusting your filters to see ${filterBy === "active" ? "paused" : "active"} subscriptions.`
-                  }
-                  actionLabel={filterBy === "all" ? "Create Your First Subscription" : undefined}
-                  onAction={
-                    filterBy === "all"
-                      ? () => {
+                  title="No subscriptions created yet"
+                  description="Create your first subscription to start tracking recurring service payments."
+                  actionLabel={canWrite ? "Create Your First Subscription" : undefined}
+                  onAction={canWrite ? () => {
                           if (!checkWriteAccess()) return;
                           setSelectedSubscription(null);
                           setIsFormOpen(true);
-                        }
-                      : undefined
-                  }
-                  actionIcon={filterBy === "all" ? Plus : undefined}
+                  } : undefined}
+                  actionIcon={canWrite ? Plus : undefined}
                 />
               </div>
             )}
@@ -369,13 +333,27 @@ export default function SubscriptionsPage() {
                 return (
                   <TableRow key={subscription.id} className={!subscription.isActive ? "opacity-75" : ""}>
                     <TableCell className="font-medium">
-                      <div className="flex flex-col gap-1">
-                        <span>{subscription.serviceName}</span>
+                      <div className="flex items-center gap-2">
+                        {subscription.serviceLogo && (
+                          <img
+                            src={subscription.serviceLogo}
+                            alt={subscription.serviceName}
+                            className="h-8 w-8 object-contain rounded flex-shrink-0"
+                            onError={(e) => {
+                              // Hide image if it fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="truncate">{subscription.serviceName}</span>
                         {subscription.description && (
                           <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                             {subscription.description}
                           </span>
                         )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="font-semibold">
@@ -397,7 +375,7 @@ export default function SubscriptionsPage() {
                       {subscription.account?.name || "N/A"}
                     </TableCell>
                     <TableCell>
-                      {subscription.subcategory?.name || "—"}
+                      {subscription.plan?.planName || subscription.subcategory?.name || "—"}
                     </TableCell>
                     <TableCell>
                       {subscription.isActive ? (
@@ -421,16 +399,18 @@ export default function SubscriptionsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              if (!checkWriteAccess()) return;
-                              setSelectedSubscription(subscription);
-                              setIsFormOpen(true);
-                            }}
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
+                          {canWrite && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (!checkWriteAccess()) return;
+                                setSelectedSubscription(subscription);
+                                setIsFormOpen(true);
+                              }}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                          )}
                           {subscription.isActive ? (
                             <DropdownMenuItem
                               onClick={() => {
@@ -481,23 +461,15 @@ export default function SubscriptionsPage() {
           <div className="w-full h-full min-h-[400px]">
             <EmptyState
               icon={Plus}
-              title={filterBy === "all" ? "No subscriptions created yet" : `No ${filterBy} subscriptions found`}
-              description={
-                filterBy === "all"
-                  ? "Create your first subscription to start tracking recurring service payments."
-                  : `Try adjusting your filters to see ${filterBy === "active" ? "paused" : "active"} subscriptions.`
-              }
-              actionLabel={filterBy === "all" ? "Create Your First Subscription" : undefined}
-              onAction={
-                filterBy === "all"
-                  ? () => {
+              title="No subscriptions created yet"
+              description="Create your first subscription to start tracking recurring service payments."
+              actionLabel={canWrite ? "Create Your First Subscription" : undefined}
+              onAction={canWrite ? () => {
                       if (!checkWriteAccess()) return;
                       setSelectedSubscription(null);
                       setIsFormOpen(true);
-                    }
-                  : undefined
-              }
-              actionIcon={filterBy === "all" ? Plus : undefined}
+              } : undefined}
+              actionIcon={canWrite ? Plus : undefined}
             />
           </div>
         )}

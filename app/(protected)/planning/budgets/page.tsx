@@ -66,7 +66,7 @@ export default function BudgetsPage() {
   const perf = usePagePerformance("Budgets");
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [macros, setMacros] = useState<Macro[]>([]);
@@ -84,6 +84,24 @@ export default function BudgetsPage() {
   async function loadData() {
     try {
       setLoading(true);
+      // OPTIMIZED: Single API call to get both groups and categories
+      const [budgetsResponse, categoriesResponse] = await Promise.all([
+        import("@/lib/api/budgets-client").then(m => m.getBudgetsClient(now)),
+        fetch("/api/categories?consolidated=true").then(r => r.ok ? r.json() : { groups: [], categories: [] }),
+      ]);
+      
+      const budgetsData = await budgetsResponse;
+      const { groups: macrosData, categories: categoriesData } = await categoriesResponse;
+      
+      setBudgets(budgetsData as Budget[]);
+      setCategories(categoriesData || []);
+      setMacros(macrosData || []);
+      setHasLoaded(true);
+      perf.markDataLoaded();
+    } catch (error) {
+      console.error("Error loading data:", error);
+      // Fallback to separate calls if consolidated endpoint fails
+      try {
       const [
         { getBudgetsClient },
         { getAllCategoriesClient },
@@ -101,10 +119,9 @@ export default function BudgetsPage() {
       setBudgets(budgetsData as Budget[]);
       setCategories(categoriesData as Category[]);
       setMacros(macrosData as Macro[]);
-      setHasLoaded(true);
-      perf.markDataLoaded();
-    } catch (error) {
-      console.error("Error loading data:", error);
+      } catch (fallbackError) {
+        console.error("Error in fallback loading:", fallbackError);
+      }
       setHasLoaded(true);
       perf.markDataLoaded();
     } finally {
@@ -171,16 +188,18 @@ export default function BudgetsPage() {
       <PageHeader
         title="Budgets"
       >
-        <Button
-          onClick={() => {
-            if (!checkWriteAccess()) return;
-            setSelectedBudget(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Budget
-        </Button>
+        {canWrite && (
+          <Button
+            onClick={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedBudget(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Budget
+          </Button>
+        )}
       </PageHeader>
 
       <div className="w-full p-4 lg:p-8">
@@ -197,13 +216,13 @@ export default function BudgetsPage() {
           icon={Wallet}
           title="No budgets yet"
           description="Create your first budget to start tracking your spending and stay on top of your finances."
-          actionLabel="Create Your First Budget"
-          onAction={() => {
+          actionLabel={canWrite ? "Create Your First Budget" : undefined}
+          onAction={canWrite ? () => {
             if (!checkWriteAccess()) return;
             setSelectedBudget(null);
             setIsFormOpen(true);
-          }}
-          actionIcon={Plus}
+          } : undefined}
+          actionIcon={canWrite ? Plus : undefined}
         />
         </div>
       ) : (
@@ -252,19 +271,21 @@ export default function BudgetsPage() {
       </div>
 
       {/* Mobile Floating Action Button */}
-      <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
-        <Button
-          size="large"
-          className="h-14 w-14 rounded-full shadow-lg"
-          onClick={() => {
-            if (!checkWriteAccess()) return;
-            setSelectedBudget(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+      {canWrite && (
+        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+          <Button
+            size="large"
+            className="h-14 w-14 rounded-full shadow-lg"
+            onClick={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedBudget(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

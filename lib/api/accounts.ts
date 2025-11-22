@@ -10,6 +10,22 @@ import { requireAccountOwnership } from "@/lib/utils/security";
 import { logger } from "@/lib/utils/logger";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 
+// Simple in-memory cache for request deduplication
+// Prevents duplicate calls within a short time window (2 seconds)
+// This helps when multiple components call getAccounts() simultaneously
+const requestCache = new Map<string, { promise: Promise<any[]>; timestamp: number }>();
+const CACHE_TTL = 2000; // 2 seconds - shorter than Questrade because accounts change more frequently
+
+// Clean up expired cache entries periodically
+function cleanAccountsCache() {
+  const now = Date.now();
+  for (const [key, value] of requestCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      requestCache.delete(key);
+    }
+  }
+}
+
 export async function getAccounts(
   accessToken?: string, 
   refreshToken?: string,
@@ -25,7 +41,43 @@ export async function getAccounts(
     return [];
   }
 
-  logger.debug("[getAccounts] Fetching accounts for user:", user.id);
+  // OPTIMIZED: Request deduplication - reuse in-flight requests within cache TTL
+  const cacheKey = `accounts:${user.id}:${includeHoldings ? 'with-holdings' : 'no-holdings'}`;
+  const cached = requestCache.get(cacheKey);
+  const now = Date.now();
+  
+  if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    // Reuse in-flight request
+    return await cached.promise;
+  }
+
+  // Clean up expired entries (1% chance to avoid overhead)
+  if (Math.random() < 0.01) {
+    cleanAccountsCache();
+  }
+
+  // Create new request promise
+  const requestPromise = fetchAccountsInternal(supabase, user.id, includeHoldings, accessToken, refreshToken);
+  
+  // Store in cache
+  requestCache.set(cacheKey, { promise: requestPromise, timestamp: now });
+  
+  // Clean up after TTL expires
+  setTimeout(() => {
+    requestCache.delete(cacheKey);
+  }, CACHE_TTL);
+
+  return await requestPromise;
+}
+
+async function fetchAccountsInternal(
+  supabase: any,
+  userId: string,
+  includeHoldings: boolean,
+  accessToken?: string,
+  refreshToken?: string
+): Promise<any[]> {
+  logger.debug("[getAccounts] Fetching accounts for user:", userId);
 
   // OPTIMIZED: Select only necessary fields instead of * to reduce payload size
   // Note: balance is calculated, not a column in the database
@@ -70,7 +122,7 @@ export async function getAccounts(
   const decryptedTransactions = decryptTransactionsBatch(transactions || []);
   
   // Map accounts to the format expected by balance calculator
-  const accountsWithInitialBalance = accounts.map(account => ({
+  const accountsWithInitialBalance = accounts.map((account: any) => ({
     ...account,
     initialBalance: (account as any).initialBalance ?? 0,
     balance: 0, // Will be calculated
@@ -84,9 +136,9 @@ export async function getAccounts(
   );
 
   // Handle investment accounts separately - calculate from holdings
-  const investmentAccounts = accounts.filter(acc => acc.type === "investment");
+  const investmentAccounts = accounts.filter((acc: any) => acc.type === "investment");
   if (investmentAccounts.length > 0) {
-    const investmentAccountIds = investmentAccounts.map(acc => acc.id);
+    const investmentAccountIds = investmentAccounts.map((acc: any) => acc.id);
     
     // 1. First, try to get values from InvestmentAccount (Questrade connected accounts)
     const { data: questradeAccounts } = await supabase
@@ -116,7 +168,7 @@ export async function getAccounts(
     
     // 2. For accounts without Questrade data, try AccountInvestmentValue (simple investments)
     const accountsWithoutQuestrade = investmentAccountIds.filter(
-      accountId => !balances.has(accountId)
+      (accountId: string) => !balances.has(accountId)
     );
     
     if (accountsWithoutQuestrade.length > 0) {
@@ -208,7 +260,7 @@ export async function getAccounts(
     }
     
     // 4. For accounts without any value, set to 0
-    investmentAccounts.forEach(account => {
+    investmentAccounts.forEach((account: any) => {
       if (!balances.has(account.id)) {
         balances.set(account.id, 0);
       }
@@ -222,7 +274,7 @@ export async function getAccounts(
 
   // Create a map: accountId -> ownerIds[]
   const accountOwnersMap = new Map<string, string[]>();
-  accountOwners?.forEach((ao) => {
+  accountOwners?.forEach((ao: any) => {
     if (!accountOwnersMap.has(ao.accountId)) {
       accountOwnersMap.set(ao.accountId, []);
     }
@@ -231,12 +283,12 @@ export async function getAccounts(
 
   // Get all unique owner IDs
   const allOwnerIds = new Set<string>();
-  accountOwners?.forEach((ao) => {
+  accountOwners?.forEach((ao: any) => {
     allOwnerIds.add(ao.ownerId);
   });
 
   // Also include userIds from accounts for backward compatibility
-  accounts.forEach((acc) => {
+  accounts.forEach((acc: any) => {
     if (acc.userId) {
       allOwnerIds.add(acc.userId);
     }
@@ -250,7 +302,7 @@ export async function getAccounts(
 
   // Create a map: ownerId -> ownerName (first name only)
   const ownerNameMap = new Map<string, string>();
-  owners?.forEach((owner) => {
+  owners?.forEach((owner: any) => {
     if (owner.id && owner.name) {
       // Extract only the first name
       const firstName = owner.name.split(' ')[0];
@@ -259,7 +311,7 @@ export async function getAccounts(
   });
 
   // Combine accounts with their balances and household names
-  const accountsWithBalances = accounts.map((account) => {
+  const accountsWithBalances = accounts.map((account: any) => {
     const ownerIds = accountOwnersMap.get(account.id) || 
       (account.userId ? [account.userId] : []);
     

@@ -205,7 +205,8 @@ export function BudgetForm({
 
   async function checkAccountsAndShowForm() {
     try {
-      const accountsRes = await fetch("/api/accounts");
+      // OPTIMIZED: Skip investment balances calculation (not needed for budget form)
+      const accountsRes = await fetch("/api/accounts?includeHoldings=false");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
         if (accountsData.length === 0) {

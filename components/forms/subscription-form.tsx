@@ -27,8 +27,11 @@ import {
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import { formatTransactionDate, parseDateInput, formatDateInput } from "@/lib/utils/timestamp";
 import { useToast } from "@/components/toast-provider";
+import { formatMoney } from "@/components/common/money";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Loader2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, Plus, Check } from "lucide-react";
 import { getAllCategoriesClient } from "@/lib/api/categories-client";
 import type { Category } from "@/lib/api/categories-client";
 import { getAccountsClient } from "@/lib/api/accounts-client";
@@ -39,6 +42,13 @@ import {
   type UserServiceSubscription,
   type UserServiceSubscriptionFormData,
 } from "@/lib/api/user-subscriptions-client";
+import {
+  getSubscriptionServicesClient,
+  getSubscriptionServicePlansClient,
+  type SubscriptionServiceCategory,
+  type SubscriptionService,
+  type SubscriptionServicePlan,
+} from "@/lib/api/subscription-services-client";
 
 interface SubscriptionFormProps {
   subscription?: UserServiceSubscription;
@@ -59,8 +69,16 @@ export function SubscriptionForm({
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Array<{ id: string; name: string; categoryId: string }>>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
   const [isAddingNewSubcategory, setIsAddingNewSubcategory] = useState(false);
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
+  
+  // New subscription services state
+  const [subscriptionServiceCategories, setSubscriptionServiceCategories] = useState<SubscriptionServiceCategory[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionServicePlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [loadingPlans, setLoadingPlans] = useState(false);
 
   // Get all subcategories from Subscriptions group for Select
   const getSubscriptionsSubcategories = () => {
@@ -109,6 +127,22 @@ export function SubscriptionForm({
       }));
   };
 
+  // Get subscription categories from new table
+  const getSubscriptionCategories = () => {
+    return subscriptionServiceCategories.filter((cat) => cat.services.length > 0);
+  };
+
+  // Get filtered subcategories based on selected category filter
+  const getFilteredSubcategories = () => {
+    if (!selectedCategoryFilter) {
+      return getSubscriptionsSubcategories();
+    }
+    
+    return getSubscriptionsSubcategories().filter(
+      (subcat) => subcat.categoryId === selectedCategoryFilter
+    );
+  };
+
   // Legacy function for backwards compatibility (if still used elsewhere)
   const getAllSubcategoriesGrouped = () => {
     const grouped: Record<string, { categoryName: string; subcategories: Array<{ id: string; name: string; categoryId: string }> }> = {};
@@ -152,6 +186,7 @@ export function SubscriptionForm({
       firstBillingDate: new Date(),
       categoryId: null,
       newSubcategoryName: null,
+      planId: null,
     },
   });
 
@@ -162,14 +197,128 @@ export function SubscriptionForm({
     setBillingFrequency(watchedBillingFrequency);
   }, [watchedBillingFrequency]);
 
-  // Load accounts and categories
+  // Load accounts, categories, and subscription services
   useEffect(() => {
     if (open) {
       loadAccounts();
       loadAllCategories();
+      loadSubscriptionServices();
     }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, subscription]);
 
+  async function loadSubscriptionServices() {
+    try {
+      const data = await getSubscriptionServicesClient();
+      setSubscriptionServiceCategories(data.categories || []);
+      
+      // If editing and we have a service name, try to find and select the service
+      if (subscription && subscription.serviceName && data.categories.length > 0) {
+        const service = data.categories
+          .flatMap((cat) => cat.services)
+          .find((s) => s.name === subscription.serviceName);
+        if (service) {
+          setSelectedServiceId(service.id);
+          loadPlansForService(service.id);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading subscription services:", error);
+    }
+  }
+
+  async function loadPlansForService(serviceId: string) {
+    setLoadingPlans(true);
+    setSelectedPlanId(null);
+    try {
+      const plans = await getSubscriptionServicePlansClient(serviceId);
+      setAvailablePlans(plans);
+      // Default to none selected - user must explicitly choose a plan
+    } catch (error) {
+      console.error("Error loading plans:", error);
+      setAvailablePlans([]);
+    } finally {
+      setLoadingPlans(false);
+    }
+  }
+
+  // Find or create subcategory for a service
+  async function findOrCreateSubcategoryForService(serviceName: string, serviceLogo?: string | null) {
+    // Find all Subscriptions categories
+    const subscriptionsCategories = allCategories.filter((category) => {
+      const groupName = category.group?.name?.toLowerCase() || "";
+      return groupName === "subscriptions" || groupName === "subscription";
+    });
+
+    if (subscriptionsCategories.length === 0) {
+      console.error("No Subscriptions category found");
+      return null;
+    }
+
+    // First, try to find existing subcategory with the same name across all Subscriptions categories
+    for (const category of subscriptionsCategories) {
+      const existingSubcategory = category.subcategories?.find(
+        (subcat) => subcat.name.toLowerCase() === serviceName.toLowerCase()
+      );
+
+      if (existingSubcategory) {
+        return existingSubcategory.id;
+      }
+    }
+
+    // If not found, create a new subcategory in the first Subscriptions category
+    const category = subscriptionsCategories[0];
+    
+    try {
+      const response = await fetch(`/api/categories/${category.id}/subcategories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: serviceName,
+          logo: serviceLogo || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Error creating subcategory:", error);
+        return null;
+      }
+
+      const newSubcategory = await response.json();
+      
+      // Reload categories to include the new subcategory
+      await loadAllCategories();
+      
+      return newSubcategory.id;
+    } catch (error) {
+      console.error("Error creating subcategory:", error);
+      return null;
+    }
+  }
+
+  // Set category filter when editing and categories are loaded
+  useEffect(() => {
+    if (open && subscription && subscription.subcategoryId && allCategories.length > 0) {
+      // Find the subcategory in the loaded categories
+      const subscriptionsCategories = allCategories.filter((category) => {
+        const groupName = category.group?.name?.toLowerCase() || "";
+        return groupName === "subscriptions" || groupName === "subscription";
+      });
+      
+      for (const category of subscriptionsCategories) {
+        if (category.subcategories) {
+          const subcategory = category.subcategories.find(
+            (sub) => sub.id === subscription.subcategoryId
+          );
+          if (subcategory) {
+            setSelectedCategoryFilter(category.id);
+            break;
+          }
+        }
+      }
+    }
+  }, [open, subscription, allCategories]);
 
   // Initialize form when editing
   useEffect(() => {
@@ -177,6 +326,7 @@ export function SubscriptionForm({
       form.reset({
         serviceName: subscription.serviceName,
         subcategoryId: subscription.subcategoryId || null,
+        planId: subscription.planId || null,
         amount: subscription.amount,
         description: subscription.description || "",
         billingFrequency: subscription.billingFrequency,
@@ -186,6 +336,10 @@ export function SubscriptionForm({
         newSubcategoryName: null,
       });
       setBillingFrequency(subscription.billingFrequency);
+      setSelectedPlanId(subscription.planId || null);
+      
+      // Try to find the service by name and load plans
+      // This will be handled in loadSubscriptionServices after categories are loaded
       
       // Load subcategory if exists
       if (subscription.subcategoryId) {
@@ -195,6 +349,7 @@ export function SubscriptionForm({
       form.reset({
         serviceName: "",
         subcategoryId: null,
+        planId: null,
         amount: 0,
         description: "",
         billingFrequency: "monthly",
@@ -205,9 +360,13 @@ export function SubscriptionForm({
       });
       setBillingFrequency("monthly");
       setSelectedCategoryId("");
+      setSelectedCategoryFilter(null);
       setSubcategories([]);
       setIsAddingNewSubcategory(false);
       setNewSubcategoryName("");
+      setSelectedServiceId(null);
+      setAvailablePlans([]);
+      setSelectedPlanId(null);
     }
   }, [open, subscription, accounts.length]);
 
@@ -298,6 +457,47 @@ export function SubscriptionForm({
     }
   }
 
+  function handleCategoryFilterClick(categoryId: string | null) {
+    setSelectedCategoryFilter(categoryId);
+    
+    // If no category is selected, clear service selection
+    if (!categoryId) {
+      setSelectedServiceId(null);
+      form.setValue("serviceName", "");
+      form.setValue("subcategoryId", null);
+      setIsAddingNewSubcategory(false);
+      setAvailablePlans([]);
+      setSelectedPlanId(null);
+      return;
+    }
+    
+    // If a category is selected and current service doesn't belong to it, clear the selection
+      const currentSubcategoryId = form.watch("subcategoryId");
+      if (currentSubcategoryId) {
+        const subcategories = getSubscriptionsSubcategories();
+        const current = subcategories.find((sub) => sub.id === currentSubcategoryId);
+        if (current && current.categoryId !== categoryId) {
+          form.setValue("subcategoryId", null);
+          form.setValue("serviceName", "");
+          setSelectedCategoryId("");
+      }
+    }
+    
+    // Clear service selection if current service doesn't belong to selected category
+    if (selectedServiceId) {
+      const category = subscriptionServiceCategories.find(
+        (cat) => cat.id === categoryId
+      );
+      const service = category?.services.find((s) => s.id === selectedServiceId);
+      if (!service) {
+        setSelectedServiceId(null);
+        form.setValue("serviceName", "");
+        setAvailablePlans([]);
+        setSelectedPlanId(null);
+      }
+    }
+  }
+
   function handleSelectChange(value: string) {
     if (value === "custom") {
       // User wants to create custom service name
@@ -313,7 +513,7 @@ export function SubscriptionForm({
         form.setValue("subcategoryId", selected.id);
         form.setValue("serviceName", selected.name);
         setSelectedCategoryId(selected.categoryId);
-      setIsAddingNewSubcategory(false);
+        setIsAddingNewSubcategory(false);
       }
     } else {
       // Cleared
@@ -371,7 +571,6 @@ export function SubscriptionForm({
     try {
       setIsSubmitting(true);
 
-
       const formData: UserServiceSubscriptionFormData = {
         ...data,
         firstBillingDate: data.firstBillingDate instanceof Date 
@@ -381,15 +580,17 @@ export function SubscriptionForm({
         newSubcategoryName: isAddingNewSubcategory ? newSubcategoryName.trim() : null,
       };
 
+      // Save subscription
+      let savedSubscription: UserServiceSubscription;
       if (subscription) {
-        await updateUserSubscriptionClient(subscription.id, formData);
+        savedSubscription = await updateUserSubscriptionClient(subscription.id, formData);
         toast({
           title: "Success",
           description: "Subscription updated successfully",
           variant: "success",
         });
       } else {
-        await createUserSubscriptionClient(formData);
+        savedSubscription = await createUserSubscriptionClient(formData);
         toast({
           title: "Success",
           description: "Subscription created successfully",
@@ -429,34 +630,126 @@ export function SubscriptionForm({
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           {/* Service Name / Subcategory */}
           <div className="space-y-2">
+            <label className="text-sm font-medium">Subscription Category</label>
+            <div className="flex flex-wrap gap-2">
+              {getSubscriptionCategories().map((category) => (
+                <Badge
+                  key={category.id}
+                  variant={selectedCategoryFilter === category.id ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => {
+                    // Toggle: if already selected, deselect to show all
+                    if (selectedCategoryFilter === category.id) {
+                      handleCategoryFilterClick(null);
+                    } else {
+                      handleCategoryFilterClick(category.id);
+                    }
+                  }}
+                >
+                  {category.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <label className="text-sm font-medium">Service Name</label>
-            <Select
-              value={form.watch("subcategoryId") || ""}
-              onValueChange={handleSelectChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select service name..." />
-              </SelectTrigger>
-              <SelectContent>
-                {getSubscriptionsCategoriesGrouped().map((category) => (
-                  <SelectGroup key={category.id}>
-                    <SelectLabel>{category.name}</SelectLabel>
-                    {category.subcategories.map((subcat) => (
-                      <SelectItem key={subcat.id} value={subcat.id}>
-                        {subcat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-                <SelectSeparator />
-                <SelectItem value="custom">
-                  <div className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span>Create New Service Name</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            {!selectedCategoryFilter ? (
+              <p className="text-sm text-muted-foreground">
+                Please select a subscription category to view available services.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {/* Custom Service Card - Always First */}
+                <Card
+                  className={`cursor-pointer transition-all hover:border-primary w-[100px] h-[100px] flex items-center justify-center ${
+                    isAddingNewSubcategory
+                      ? "border-primary border-2 bg-primary/5"
+                      : "border-border"
+                  }`}
+                  onClick={() => {
+                  setSelectedServiceId(null);
+                  form.setValue("serviceName", "");
+                  form.setValue("subcategoryId", null);
+                  setIsAddingNewSubcategory(true);
+                    setAvailablePlans([]);
+                    setSelectedPlanId(null);
+                  }}
+                >
+                  <CardContent className="p-2 flex flex-col items-center justify-center h-full">
+                    <div className="flex flex-col items-center gap-1 text-center">
+                      {isAddingNewSubcategory && (
+                        <Check className="h-4 w-4 text-primary mb-1" />
+                      )}
+                      <Plus className="h-5 w-5 text-muted-foreground mb-1" />
+                      <span className="font-medium text-xs leading-tight text-muted-foreground">
+                        Create New
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Service Cards */}
+                {(() => {
+                    const category = subscriptionServiceCategories.find(
+                      (cat) => cat.id === selectedCategoryFilter
+                    );
+                  const servicesToShow = category
+                    ? [...category.services].sort((a, b) => a.name.localeCompare(b.name))
+                    : [];
+
+                  return servicesToShow.map((service) => {
+                    const isSelected = selectedServiceId === service.id;
+                      return (
+                      <Card
+                        key={service.id}
+                        className={`cursor-pointer transition-all hover:border-primary w-[100px] h-[100px] flex items-center justify-center ${
+                          isSelected
+                            ? "border-primary border-2 bg-primary/5"
+                            : "border-border"
+                        }`}
+                        onClick={async () => {
+                          setSelectedServiceId(service.id);
+                          form.setValue("serviceName", service.name);
+                          setIsAddingNewSubcategory(false);
+                          
+                          // Find or create subcategory for this service
+                          const subcategoryId = await findOrCreateSubcategoryForService(service.name, service.logo);
+                          if (subcategoryId) {
+                            form.setValue("subcategoryId", subcategoryId);
+                          } else {
+                            form.setValue("subcategoryId", null);
+                          }
+                          
+                          // Load plans for this service
+                          loadPlansForService(service.id);
+                        }}
+                      >
+                        <CardContent className="p-2 flex flex-col items-center justify-center h-full">
+                          <div className="flex flex-col items-center gap-1 text-center">
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-primary mb-1" />
+                            )}
+                            {service.logo ? (
+                                  <img
+                                    src={service.logo}
+                                    alt={service.name}
+                                className="h-8 w-8 object-contain mb-1"
+                                  />
+                            ) : (
+                              <div className="h-8 w-8 mb-1" />
+                                )}
+                            <span className="font-medium text-xs leading-tight">
+                              {service.name}
+                            </span>
+                              </div>
+                        </CardContent>
+                      </Card>
+                      );
+                  });
+                })()}
+                      </div>
+                )}
 
             {isAddingNewSubcategory && (
               <div className="space-y-2">
@@ -497,6 +790,87 @@ export function SubscriptionForm({
                     Create
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Show available plans when a service is selected */}
+            {selectedServiceId && !isAddingNewSubcategory && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Plan (Optional)</label>
+                {loadingPlans ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading plans...</span>
+                  </div>
+                ) : availablePlans.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Card
+                      className={`cursor-pointer transition-all hover:border-primary w-[100px] h-[100px] flex items-center justify-center ${
+                        selectedPlanId === null
+                          ? "border-primary border-2 bg-primary/5"
+                          : "border-border"
+                      }`}
+                      onClick={() => {
+                        setSelectedPlanId(null);
+                        form.setValue("planId", null);
+                        // Don't change the amount, let user keep their custom value
+                      }}
+                    >
+                      <CardContent className="p-2 flex flex-col items-center justify-center h-full">
+                        <div className="flex flex-col items-center gap-1 text-center">
+                          {selectedPlanId === null && (
+                            <Check className="h-4 w-4 text-primary mb-1" />
+                          )}
+                          <span className="font-medium text-xs leading-tight text-muted-foreground">
+                            Custom
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Manual
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    {availablePlans.map((plan) => {
+                      const isSelected = selectedPlanId === plan.id;
+                      return (
+                        <Card
+                          key={plan.id}
+                          className={`cursor-pointer transition-all hover:border-primary w-[100px] h-[100px] flex items-center justify-center ${
+                            isSelected
+                              ? "border-primary border-2 bg-primary/5"
+                              : "border-border"
+                          }`}
+                          onClick={() => {
+                            setSelectedPlanId(plan.id);
+                            form.setValue("amount", plan.price);
+                            form.setValue("planId", plan.id);
+                          }}
+                        >
+                          <CardContent className="p-2 flex flex-col items-center justify-center h-full">
+                            <div className="flex flex-col items-center gap-1 text-center">
+                              {isSelected && (
+                                <Check className="h-4 w-4 text-primary mb-1" />
+                              )}
+                              <span className="font-medium text-xs leading-tight">
+                                {plan.planName}
+                              </span>
+                              <span className="text-sm font-semibold">
+                                {formatMoney(plan.price)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {plan.currency}
+                              </span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No plans available for this service. Enter amount manually.
+                  </p>
+                )}
               </div>
             )}
           </div>

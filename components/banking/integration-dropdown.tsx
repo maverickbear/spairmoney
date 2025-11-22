@@ -33,6 +33,8 @@ interface IntegrationDropdownProps {
   onDisconnect?: () => void;
   onSuccess?: () => void;
   customTrigger?: React.ReactNode;
+  // OPTIMIZED: Allow passing status to avoid duplicate API calls
+  initialStatus?: ConnectionStatus | null;
 }
 
 interface ConnectionStatus {
@@ -45,12 +47,14 @@ export function IntegrationDropdown({
   onDisconnect,
   onSuccess,
   customTrigger,
+  initialStatus,
 }: IntegrationDropdownProps) {
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess } = useWriteGuard();
-  const [questradeStatus, setQuestradeStatus] = useState<ConnectionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  // OPTIMIZED: Use initialStatus if provided to avoid duplicate API calls
+  const [questradeStatus, setQuestradeStatus] = useState<ConnectionStatus | null>(initialStatus ?? null);
+  const [loading, setLoading] = useState(initialStatus === undefined);
   const [syncing, setSyncing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
@@ -59,8 +63,15 @@ export function IntegrationDropdown({
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
+    // Only load status if not provided as prop
+    if (initialStatus === undefined) {
     loadStatus();
-  }, []);
+    } else if (initialStatus !== null) {
+      // Update local state when initialStatus prop changes
+      setQuestradeStatus(initialStatus);
+      setLoading(false);
+    }
+  }, [initialStatus]);
 
   async function loadStatus() {
     try {
@@ -143,6 +154,7 @@ export function IntegrationDropdown({
       });
 
       await loadStatus();
+      // Notify parent to update status if provided
       if (onSync) {
         onSync();
       }

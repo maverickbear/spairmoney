@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { parseTransactionAmount } from "../utils/transaction-helpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCategoryColor } from "@/lib/utils/category-colors";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface ExpensesByCategoryWidgetProps {
   selectedMonthTransactions: any[];
@@ -54,6 +55,16 @@ export function ExpensesByCategoryWidget({
       }
     });
   }, [selectedMonthTransactions, today]);
+
+  // Calculate monthly income from past transactions
+  const monthlyIncome = useMemo(() => {
+    return pastSelectedMonthTransactions
+      .filter((t) => t && t.type === "income")
+      .reduce((sum, t) => {
+        const amount = parseTransactionAmount(t.amount);
+        return sum + Math.abs(amount);
+      }, 0);
+  }, [pastSelectedMonthTransactions]);
 
   const expensesData = useMemo(() => {
     // Only include past transactions (exclude future ones)
@@ -102,13 +113,14 @@ export function ExpensesByCategoryWidget({
     // Calculate total for percentage
     const total = dataArray.reduce((sum, item) => sum + item.value, 0);
 
-    // Add percentage and color to each item
+    // Add percentage, income percentage, and color to each item
     return dataArray.map((item) => ({
       ...item,
       percentage: total > 0 ? (item.value / total) * 100 : 0,
+      incomePercentage: monthlyIncome > 0 ? (item.value / monthlyIncome) * 100 : 0,
       color: getCategoryColor(item.name),
     }));
-  }, [pastSelectedMonthTransactions, expenseFilter]);
+  }, [pastSelectedMonthTransactions, expenseFilter, monthlyIncome]);
 
   // Calculate month date range
   const monthStart = useMemo(() => {
@@ -224,34 +236,51 @@ export function ExpensesByCategoryWidget({
           </div>
 
           {/* Legend */}
-          <div className="flex-1 space-y-1 min-w-0 w-full">
-            {expensesData.slice(0, 7).map((item, index) => {
-              return (
-                <div
-                  key={index}
-                  onClick={() => handleCategoryClick(item.categoryId, item.name)}
-                  className="flex items-center justify-between gap-2 py-1 px-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <div
-                      className="h-2.5 w-2.5 rounded-sm flex-shrink-0"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-xs lg:text-sm font-medium text-foreground truncate">
-                      {item.name}
-                    </span>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <span className="text-xs lg:text-sm font-semibold text-foreground tabular-nums">
-                      {formatMoneyCompact(item.value)}
-                    </span>
-                    <span className="text-[10px] lg:text-xs text-muted-foreground ml-1">
-                      {item.percentage.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex-1 min-w-0 w-full relative">
+            <div className="space-y-1 max-h-[200px] overflow-y-auto">
+              {expensesData.map((item, index) => {
+                return (
+                  <Tooltip key={index}>
+                    <TooltipTrigger asChild>
+                      <div
+                        onClick={() => handleCategoryClick(item.categoryId, item.name)}
+                        className="flex items-center justify-between gap-2 py-1 px-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer relative"
+                      >
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <div
+                            className="h-2.5 w-2.5 rounded-sm flex-shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="text-xs lg:text-sm font-medium text-foreground truncate">
+                            {item.name}
+                          </span>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-xs lg:text-sm font-semibold text-foreground tabular-nums">
+                            {formatMoneyCompact(item.value)}
+                          </span>
+                        </div>
+                        <TooltipContent side="right" className="!bg-popover !text-popover-foreground border border-border !whitespace-normal w-[160px] !px-2.5 !py-2 !z-[9999]">
+                          <div className="space-y-1">
+                            <div className="font-medium text-xs">{item.name}</div>
+                            <div className="text-[11px] space-y-0.5">
+                              <div>
+                                <span className="font-semibold">{item.percentage.toFixed(1)}%</span> of total expenses
+                              </div>
+                              {monthlyIncome > 0 && (
+                                <div>
+                                  <span className="font-semibold">{item.incomePercentage.toFixed(1)}%</span> of monthly income
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </div>
+                    </TooltipTrigger>
+                  </Tooltip>
+                );
+              })}
+            </div>
           </div>
         </div>
       </CardContent>

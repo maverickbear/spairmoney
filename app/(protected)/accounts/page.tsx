@@ -46,7 +46,7 @@ export default function AccountsPage() {
   const perf = usePagePerformance("Accounts");
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -69,7 +69,8 @@ export default function AccountsPage() {
     try {
       setLoading(true);
       const { getAccountsClient } = await import("@/lib/api/accounts-client");
-      const data = await getAccountsClient();
+      // OPTIMIZED: Skip investment balances calculation for Accounts page (not needed, saves ~1s)
+      const data = await getAccountsClient({ includeInvestmentBalances: false });
       setAccounts(data);
       setHasLoaded(true);
       perf.markDataLoaded();
@@ -282,7 +283,7 @@ export default function AccountsPage() {
         title="Accounts"
       >
         <div className="flex gap-2">
-          {accounts.length > 0 && (
+          {accounts.length > 0 && canWrite && (
             <Button
               size="medium"
               onClick={handleAddAccount}
@@ -303,9 +304,9 @@ export default function AccountsPage() {
           icon={CreditCard}
           title="No accounts yet"
           description="Create your first account to get started tracking your finances."
-          actionLabel="Add Account"
-          onAction={handleAddAccount}
-          actionIcon={Plus}
+          actionLabel={canWrite ? "Add Account" : undefined}
+          onAction={canWrite ? handleAddAccount : undefined}
+          actionIcon={canWrite ? Plus : undefined}
         />
         </div>
       ) : (() => {
@@ -455,15 +456,17 @@ export default function AccountsPage() {
       {ConfirmDialog}
 
       {/* Mobile Floating Action Button */}
-      <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
-        <Button
-          size="large"
-          className="h-14 w-14 rounded-full shadow-lg"
-          onClick={handleAddAccount}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+      {canWrite && (
+        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+          <Button
+            size="large"
+            className="h-14 w-14 rounded-full shadow-lg"
+            onClick={handleAddAccount}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

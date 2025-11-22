@@ -219,7 +219,7 @@ function AdvancedFeatureCard({
   icon 
 }: AdvancedFeatureProps) {
   return (
-    <Card className="h-full border hover:border-primary/40 transition-all duration-300 hover:shadow-md bg-card/50">
+    <Card className="h-full border hover:border-primary/40 transition-all duration-300 hover:shadow-md">
       <CardHeader className="pb-4">
         <div className="flex items-start gap-3 mb-3">
           <div className="p-2.5 rounded-lg bg-primary/8 border border-primary/10">
@@ -262,7 +262,7 @@ interface AssistiveFeatureProps {
 
 function AssistiveFeatureCard({ title, description, icon }: AssistiveFeatureProps) {
   return (
-    <Card className="h-full border hover:border-primary/30 transition-all duration-300 bg-card/50">
+    <Card className="h-full border hover:border-primary/30 transition-all duration-300">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2.5 mb-2">
           <div className="p-2 rounded-md bg-primary/8 border border-primary/10">

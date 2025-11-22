@@ -61,10 +61,10 @@ export default async function ProtectedLayout({
 
     // If user is blocked and not super_admin, prevent access
     if (userData?.isBlocked && userData?.role !== "super_admin") {
-      log.debug("User is blocked, redirecting to login");
+      log.debug("User is blocked, redirecting to account blocked page");
       // Sign out the user
       await supabase.auth.signOut();
-      redirect("/auth/login?error=blocked");
+      redirect("/account-blocked");
     }
   } catch (error) {
     // If error checking blocked status, log but don't block access

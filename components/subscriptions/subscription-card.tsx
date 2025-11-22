@@ -75,6 +75,18 @@ export function SubscriptionCard({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
+                {subscription.serviceLogo && (
+                  <img
+                    src={subscription.serviceLogo}
+                    alt={subscription.serviceName}
+                    className="h-8 w-8 object-contain rounded flex-shrink-0"
+                    onError={(e) => {
+                      // Hide image if it fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                )}
                 <CardTitle className="text-base font-semibold truncate">
                   {subscription.serviceName}
                 </CardTitle>

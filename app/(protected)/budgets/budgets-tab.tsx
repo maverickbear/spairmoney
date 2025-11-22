@@ -10,6 +10,7 @@ import { BudgetCard } from "@/components/budgets/budget-card";
 import { useToast } from "@/components/toast-provider";
 import { formatMoney } from "@/components/common/money";
 import { EmptyState } from "@/components/common/empty-state";
+import { useWriteGuard } from "@/hooks/use-write-guard";
 
 interface Budget {
   id: string;
@@ -60,6 +61,7 @@ interface Category {
 
 export function BudgetsTab() {
   const { toast } = useToast();
+  const { canWrite } = useWriteGuard();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [macros, setMacros] = useState<Macro[]>([]);
@@ -77,6 +79,23 @@ export function BudgetsTab() {
   async function loadData() {
     try {
       setLoading(true);
+      // OPTIMIZED: Single API call to get both groups and categories
+      const [budgetsResponse, categoriesResponse] = await Promise.all([
+        import("@/lib/api/budgets-client").then(m => m.getBudgetsClient(now)),
+        fetch("/api/categories?consolidated=true").then(r => r.ok ? r.json() : { groups: [], categories: [] }),
+      ]);
+      
+      const budgetsData = await budgetsResponse;
+      const { groups: macrosData, categories: categoriesData } = await categoriesResponse;
+      
+      setBudgets(budgetsData as Budget[]);
+      setCategories(categoriesData || []);
+      setMacros(macrosData || []);
+      setHasLoaded(true);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      // Fallback to separate calls if consolidated endpoint fails
+      try {
       const [
         { getBudgetsClient },
         { getAllCategoriesClient },
@@ -94,9 +113,9 @@ export function BudgetsTab() {
       setBudgets(budgetsData as Budget[]);
       setCategories(categoriesData as Category[]);
       setMacros(macrosData as Macro[]);
-      setHasLoaded(true);
-    } catch (error) {
-      console.error("Error loading data:", error);
+      } catch (fallbackError) {
+        console.error("Error in fallback loading:", fallbackError);
+      }
       setHasLoaded(true);
     } finally {
       setLoading(false);
@@ -245,12 +264,12 @@ export function BudgetsTab() {
           icon={Wallet}
           title="No budgets yet"
           description="Create your first budget to start tracking your spending and stay on top of your finances."
-          actionLabel="Create Your First Budget"
-          onAction={() => {
+          actionLabel={canWrite ? "Create Your First Budget" : undefined}
+          onAction={canWrite ? () => {
             setSelectedBudget(null);
             setIsFormOpen(true);
-          }}
-          actionIcon={Plus}
+          } : undefined}
+          actionIcon={canWrite ? Plus : undefined}
         />
         </div>
       ) : (

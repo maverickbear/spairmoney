@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useSubscription } from "@/hooks/use-subscription";
+import { usePortfolioData } from "@/hooks/use-portfolio-data";
 import { PortfolioPerformanceChart } from "@/components/portfolio/portfolio-performance-chart";
-import type { HistoricalDataPoint } from "@/lib/api/portfolio";
 import { CardSkeleton } from "@/components/ui/card-skeleton";
-import { getCurrentUserClient } from "@/lib/api/auth-client";
 
 interface PortfolioPerformanceWidgetProps {
   savings: number; // Fallback value if no portfolio data
@@ -19,87 +17,25 @@ export function PortfolioPerformanceWidget({
   savings,
 }: PortfolioPerformanceWidgetProps) {
   const { limits, checking: limitsLoading } = useSubscription();
-  const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
-  const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Check if user has access to investments feature
   const hasInvestmentsAccess = limits.hasInvestments === true;
 
-  useEffect(() => {
-    // Skip API calls if user doesn't have access to investments
-    if (!hasInvestmentsAccess) {
-      setIsLoading(false);
-      return;
-    }
+  // OPTIMIZED: Use shared portfolio hook to avoid duplicate API calls
+  // This hook deduplicates requests and shares data between widgets
+  const { data: portfolioData, isLoading } = usePortfolioData({
+    days: 30,
+    enabled: hasInvestmentsAccess,
+  });
 
-    async function loadPortfolioData() {
-      try {
-        setIsLoading(true);
-        
-        // Check if user is authenticated before making API call
-        // This prevents unnecessary requests in demo/landing page contexts
-        const user = await getCurrentUserClient();
-        if (!user) {
-          setIsLoading(false);
-          return;
-        }
-        
-        // Use the same consolidated endpoint as the Investments page
-        // This ensures we get the same data structure and avoids inconsistencies
-        const allDataRes = await fetch("/api/portfolio/all?days=365", { cache: 'no-store' }).catch((err) => {
-          // Silently handle errors (e.g., in demo/landing page context)
-          return null;
-        });
-
-        if (!allDataRes) {
-          // Network error or fetch failed
-          setIsLoading(false);
-          return;
-        }
-
-        // If unauthorized (401), we're likely in a demo/landing page context
-        // Don't make further requests and use fallback data
-        if (allDataRes.status === 401) {
-          setIsLoading(false);
-          return;
-        }
-
-        if (!allDataRes.ok) {
-          // Silently handle other failed requests (e.g., in demo/landing page context)
-          setIsLoading(false);
-          return;
-        }
-
-        // Get all data from single response (same as Investments page)
-        const allData = await allDataRes.json();
-        const summary = allData.summary || null;
-        const historical = allData.historical || null;
-
-        if (summary) {
-          setPortfolioSummary(summary);
-        }
-
-        if (historical && Array.isArray(historical)) {
-          // Ensure data is sorted by date (ascending)
-          const sortedHistorical = [...historical].sort((a, b) => {
-            const dateA = new Date(a.date).getTime();
-            const dateB = new Date(b.date).getTime();
-            return dateA - dateB;
-          });
-          setHistoricalData(sortedHistorical);
-        } else {
-          setHistoricalData([]);
-        }
-      } catch (error) {
-        // Silently handle errors (e.g., in demo/landing page context)
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadPortfolioData();
-  }, [hasInvestmentsAccess]);
+  const portfolioSummary = portfolioData.summary as PortfolioSummary | null;
+  
+  // Ensure historical data is sorted by date (ascending)
+  const historicalData = portfolioData.historical.sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return dateA - dateB;
+  });
 
   // Show loading state while checking limits or loading data
   if (limitsLoading || isLoading) {
@@ -114,15 +50,14 @@ export function PortfolioPerformanceWidget({
   // Use portfolio data if available, otherwise fallback to savings
   const currentValue = portfolioSummary?.totalValue ?? savings;
 
-  // If no historical data and no portfolio value, don't show the chart
-  if (historicalData.length === 0 && currentValue === savings && savings === 0) {
-    return null;
-  }
-
+  // Always show the chart, even if there's no historical data
+  // The chart component will handle empty data gracefully
+  // Dashboard widget defaults to 1M (1 month) view
   return (
     <PortfolioPerformanceChart
       data={historicalData}
       currentValue={currentValue}
+      defaultPeriod="1M"
     />
   );
 }

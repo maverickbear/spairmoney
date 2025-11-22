@@ -16,10 +16,11 @@ export async function processDuePlannedPayments(): Promise<{
   today.setHours(0, 0, 0, 0);
 
   // Get all scheduled planned payments with date <= today
-  const duePayments = await getPlannedPayments({
+  const result = await getPlannedPayments({
     endDate: today,
     status: "scheduled",
   });
+  const duePayments = result.plannedPayments;
 
   if (duePayments.length === 0) {
     return { processed: 0, errors: 0 };

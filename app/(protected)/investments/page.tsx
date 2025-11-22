@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { PortfolioSummaryCards } from "@/components/portfolio/portfolio-summary-cards";
@@ -11,7 +12,7 @@ import { IntegrationDropdown } from "@/components/banking/integration-dropdown";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Button } from "@/components/ui/button";
-import { Plus, Upload, RefreshCw } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import { useToast } from "@/components/toast-provider";
@@ -43,8 +44,9 @@ interface PortfolioSummary {
 }
 
 export default function InvestmentsPage() {
+  const router = useRouter();
   const perf = usePagePerformance("Investments");
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
@@ -55,10 +57,65 @@ export default function InvestmentsPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  // OPTIMIZED: Share questrade status between IntegrationDropdown instances
+  const [questradeStatus, setQuestradeStatus] = useState<{ isConnected: boolean; accountsCount: number } | null>(null);
   
   useEffect(() => {
     loadPortfolioData();
+    loadQuestradeStatus();
   }, []);
+  
+  async function loadQuestradeStatus() {
+    try {
+      const response = await fetch("/api/questrade/accounts");
+      if (response.status === 404) {
+        setQuestradeStatus({ isConnected: false, accountsCount: 0 });
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Questrade accounts: ${response.status}`);
+      }
+      
+      // Check if response has content before parsing JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        setQuestradeStatus({ isConnected: false, accountsCount: 0 });
+        return;
+      }
+      
+      // Get text first to check if it's empty
+      const text = await response.text();
+      if (!text || text.trim().length === 0) {
+        setQuestradeStatus({ isConnected: false, accountsCount: 0 });
+        return;
+      }
+      
+      // Parse JSON only if we have valid content
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Error parsing Questrade accounts response:", parseError);
+        setQuestradeStatus({ isConnected: false, accountsCount: 0 });
+        return;
+      }
+      
+      if (data.accounts) {
+        const connectedAccounts = data.accounts.filter((acc: any) => acc.connected);
+        setQuestradeStatus({
+          isConnected: connectedAccounts.length > 0,
+          accountsCount: connectedAccounts.length,
+        });
+      } else {
+        setQuestradeStatus({ isConnected: false, accountsCount: 0 });
+      }
+    } catch (error) {
+      if (error instanceof Error && !error.message.includes("404")) {
+        console.error("Error loading Questrade connection status:", error);
+      }
+      setQuestradeStatus({ isConnected: false, accountsCount: 0 });
+    }
+  }
 
   async function loadPortfolioData() {
     try {
@@ -124,6 +181,7 @@ export default function InvestmentsPage() {
       setAccounts(accountsData && Array.isArray(accountsData) ? accountsData : []);
             setHistoricalData(historical && Array.isArray(historical) ? historical : []);
       
+      setLastUpdated(new Date());
       perf.markDataLoaded();
     } catch (error) {
       console.error("Error loading portfolio data:", error);
@@ -177,36 +235,46 @@ export default function InvestmentsPage() {
           >
           <div className="flex items-center gap-2">
             <IntegrationDropdown
+              initialStatus={questradeStatus}
               onSync={() => {
                 loadPortfolioData();
+                loadQuestradeStatus();
               }}
               onDisconnect={() => {
                 loadPortfolioData();
+                loadQuestradeStatus();
               }}
-              onSuccess={loadPortfolioData}
+              onSuccess={() => {
+                loadPortfolioData();
+                loadQuestradeStatus();
+              }}
             />
-            <Button
-              onClick={() => {
-                if (!checkWriteAccess()) return;
-                setShowImportDialog(true);
-              }}
-              variant="outline"
-              size="medium"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import File
-            </Button>
-            <Button
-              onClick={() => {
-                if (!checkWriteAccess()) return;
-                setShowTransactionForm(true);
-              }}
-              variant="default"
-              size="medium"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Transaction
-            </Button>
+            {canWrite && (
+              <>
+                <Button
+                  onClick={() => {
+                    if (!checkWriteAccess()) return;
+                    setShowImportDialog(true);
+                  }}
+                  variant="outline"
+                  size="medium"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import File
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!checkWriteAccess()) return;
+                    setShowTransactionForm(true);
+                  }}
+                  variant="default"
+                  size="medium"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Transaction
+                </Button>
+              </>
+            )}
           </div>
         </PageHeader>
 
@@ -220,7 +288,7 @@ export default function InvestmentsPage() {
 
         {/* Mobile/Tablet Tabs - Sticky at top */}
         <div 
-          className="lg:hidden sticky top-0 z-40 bg-card border-b"
+          className="lg:hidden sticky top-0 z-40 bg-card dark:bg-transparent border-b"
         >
           <div 
             className="overflow-x-auto scrollbar-hide" 
@@ -261,13 +329,19 @@ export default function InvestmentsPage() {
                     setShowImportDialog(true);
                   }}
                   integrationProps={{
+                    initialStatus: questradeStatus,
                     onSync: () => {
                       loadPortfolioData();
+                      loadQuestradeStatus();
                     },
                     onDisconnect: () => {
                       loadPortfolioData();
+                      loadQuestradeStatus();
                     },
-                    onSuccess: loadPortfolioData,
+                    onSuccess: () => {
+                      loadPortfolioData();
+                      loadQuestradeStatus();
+                    },
                   }}
                   onUpdatePrices={async () => {
                     if (!checkWriteAccess()) return;

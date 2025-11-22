@@ -593,13 +593,15 @@ export function DebtForm({
 
   async function loadDebtsCategories() {
     try {
-      const [allCategories, macros] = await Promise.all([
-        getAllCategoriesClient(),
-        getMacrosClient(),
-      ]);
+      // OPTIMIZED: Single API call to get both groups and categories
+      const response = await fetch("/api/categories?consolidated=true");
+      if (!response.ok) {
+        throw new Error("Failed to fetch categories data");
+      }
+      const { groups: macros, categories: allCategories } = await response.json();
       
       // Find the "Debts" group
-      const debtsGroup = macros.find((macro) => macro.name.toLowerCase() === "debts");
+      const debtsGroup = macros?.find((macro: any) => macro.name.toLowerCase() === "debts");
       if (!debtsGroup) {
         console.warn("Debts group not found");
         setDebtsCategories([]);
@@ -607,14 +609,31 @@ export function DebtForm({
       }
       
       // Filter categories that belong to the Debts group
-      const debtsCategoriesList = allCategories.filter(
-        (cat) => cat.groupId === debtsGroup.id
+      const debtsCategoriesList = (allCategories || []).filter(
+        (cat: any) => cat.groupId === debtsGroup.id
       );
       
       setDebtsCategories(debtsCategoriesList);
     } catch (error) {
       console.error("Error loading debts categories:", error);
+      // Fallback to separate calls if consolidated endpoint fails
+      try {
+        const { getAllCategoriesClient, getMacrosClient } = await import("@/lib/api/categories-client");
+        const [allCategories, macros] = await Promise.all([
+          getAllCategoriesClient(),
+          getMacrosClient(),
+        ]);
+        const debtsGroup = macros.find((macro) => macro.name.toLowerCase() === "debts");
+        if (debtsGroup) {
+          const debtsCategoriesList = allCategories.filter(
+            (cat) => cat.groupId === debtsGroup.id
+          );
+          setDebtsCategories(debtsCategoriesList);
+        }
+      } catch (fallbackError) {
+        console.error("Error in fallback loading:", fallbackError);
       setDebtsCategories([]);
+      }
     }
   }
 
@@ -637,7 +656,8 @@ export function DebtForm({
 
   async function checkAccountsAndShowForm() {
     try {
-      const accountsRes = await fetch("/api/accounts");
+      // OPTIMIZED: Skip investment balances calculation (not needed for debt form)
+      const accountsRes = await fetch("/api/accounts?includeHoldings=false");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
         if (accountsData.length === 0) {
@@ -664,7 +684,8 @@ export function DebtForm({
 
   async function loadAccounts() {
     try {
-      const res = await fetch("/api/accounts");
+      // OPTIMIZED: Skip investment balances calculation (not needed for debt form)
+      const res = await fetch("/api/accounts?includeHoldings=false");
       const data = await res.json();
       setAccounts(data || []);
     } catch (error) {

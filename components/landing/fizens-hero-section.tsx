@@ -29,7 +29,7 @@ export function FizensHeroSection() {
             {/* Text Content */}
             <div className="text-center space-y-6 md:space-y-8 w-full">
               {/* Headline */}
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight tracking-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
                 Stop Working Just to Pay Bills.<br />Start Building Your Future.
               </h1>
 

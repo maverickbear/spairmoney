@@ -81,7 +81,7 @@ export function InvestmentTransactionsTable({
   onTransactionChange 
 }: InvestmentTransactionsTableProps) {
   const { toast } = useToast();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<InvestmentTransaction[]>([]);
   const [accounts, setAccounts] = useState<InvestmentAccount[]>([]);
@@ -555,29 +555,31 @@ export function InvestmentTransactionsTable({
                           {transaction.notes || "-"}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleEdit(transaction)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteClick(transaction.id)}
-                              disabled={deletingId === transaction.id}
-                            >
-                              {deletingId === transaction.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
+                          {canWrite && (
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleEdit(transaction)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteClick(transaction.id)}
+                                disabled={deletingId === transaction.id}
+                              >
+                                {deletingId === transaction.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -594,10 +596,12 @@ export function InvestmentTransactionsTable({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Transaction</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
-            </DialogDescription>
           </DialogHeader>
+          <div className="px-6">
+            <DialogDescription>
+              This transaction will be permanently deleted. This action cannot be undone.
+            </DialogDescription>
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -631,10 +635,12 @@ export function InvestmentTransactionsTable({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Transactions</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete {selectedTransactionIds.size} transaction{selectedTransactionIds.size > 1 ? 's' : ''}? This action cannot be undone.
-            </DialogDescription>
           </DialogHeader>
+          <div className="px-6">
+            <DialogDescription>
+              {selectedTransactionIds.size} transaction{selectedTransactionIds.size > 1 ? 's will' : ' will'} be permanently deleted. This action cannot be undone.
+            </DialogDescription>
+          </div>
           <DialogFooter>
             <Button
               variant="outline"

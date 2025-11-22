@@ -40,7 +40,8 @@ export interface FinancialHealthData {
 async function calculateFinancialHealthInternal(
   selectedDate?: Date,
   accessToken?: string,
-  refreshToken?: string
+  refreshToken?: string,
+  accounts?: any[] // OPTIMIZED: Accept accounts to avoid duplicate getAccounts() call
 ): Promise<FinancialHealthData> {
   const date = selectedDate || new Date();
   const selectedMonth = startOfMonth(date);
@@ -314,7 +315,7 @@ async function calculateFinancialHealthInternal(
 
     if (userId) {
       // Get total debts
-      const debts = await getDebts();
+      const debts = await getDebts(accessToken, refreshToken);
       const liabilities = await getUserLiabilities(userId, accessToken, refreshToken);
 
       let totalDebts = 0;
@@ -361,16 +362,78 @@ async function calculateFinancialHealthInternal(
   }
 
   // Calculate emergency fund months
-  // OPTIMIZATION: Include holdings for accurate investment account balances in emergency fund calculation
-  // This ensures investment accounts are properly included in the emergency fund calculation
+  // Priority: Use emergency fund goal if it exists and has accountId defined
+  // Otherwise, fall back to total balance calculation
   let emergencyFundMonths = 0;
   try {
-    const accounts = await getAccounts(accessToken, refreshToken, { includeHoldings: true });
-    const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    // First, try to get emergency fund goal
+    const { createServerClient } = await import("@/lib/supabase-server");
+    const supabase = await createServerClient(accessToken, refreshToken);
+    const { data: { user } } = await supabase.auth.getUser();
     
-    // Emergency fund months = total balance / monthly expenses
-    if (monthlyExpenses > 0) {
-      emergencyFundMonths = totalBalance / monthlyExpenses;
+    if (user) {
+      // Get active household ID (pass tokens to ensure proper auth context for RLS)
+      const { getActiveHouseholdId } = await import("@/lib/utils/household");
+      const householdId = await getActiveHouseholdId(user.id, accessToken, refreshToken);
+      
+      if (householdId) {
+        const { data: emergencyFundGoal } = await supabase
+          .from("Goal")
+          .select("*")
+          .eq("householdId", householdId)
+          .eq("name", "Emergency Funds")
+          .eq("isSystemGoal", true)
+          .maybeSingle();
+        
+        // If emergency fund goal exists and has accountId, use its currentBalance
+        if (emergencyFundGoal && emergencyFundGoal.accountId) {
+          const goalBalance = emergencyFundGoal.currentBalance || 0;
+          if (monthlyExpenses > 0) {
+            emergencyFundMonths = goalBalance / monthlyExpenses;
+          }
+        } else {
+          // Fallback to total balance calculation
+          let accountsToUse = accounts;
+          
+          // Only fetch if not provided (must include holdings for accurate investment balances)
+          if (!accountsToUse || accountsToUse.length === 0) {
+            accountsToUse = await getAccounts(accessToken, refreshToken, { includeHoldings: true });
+          }
+          
+          const totalBalance = accountsToUse.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+          
+          // Emergency fund months = total balance / monthly expenses
+          if (monthlyExpenses > 0) {
+            emergencyFundMonths = totalBalance / monthlyExpenses;
+          }
+        }
+      } else {
+        // No household, use total balance calculation
+        let accountsToUse = accounts;
+        
+        if (!accountsToUse || accountsToUse.length === 0) {
+          accountsToUse = await getAccounts(accessToken, refreshToken, { includeHoldings: true });
+        }
+        
+        const totalBalance = accountsToUse.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+        
+        if (monthlyExpenses > 0) {
+          emergencyFundMonths = totalBalance / monthlyExpenses;
+        }
+      }
+    } else {
+      // No user, use total balance calculation
+      let accountsToUse = accounts;
+      
+      if (!accountsToUse || accountsToUse.length === 0) {
+        accountsToUse = await getAccounts(accessToken, refreshToken, { includeHoldings: true });
+      }
+      
+      const totalBalance = accountsToUse.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+      
+      if (monthlyExpenses > 0) {
+        emergencyFundMonths = totalBalance / monthlyExpenses;
+      }
     }
   } catch (error) {
     console.warn("⚠️ [calculateFinancialHealthInternal] Could not calculate emergency fund months:", error);
@@ -399,7 +462,8 @@ export async function calculateFinancialHealth(
   selectedDate?: Date,
   userId?: string | null,
   accessToken?: string,
-  refreshToken?: string
+  refreshToken?: string,
+  accounts?: any[] // OPTIMIZED: Accept accounts to avoid duplicate getAccounts() call
 ): Promise<FinancialHealthData> {
   const log = logger.withPrefix("calculateFinancialHealth");
   
@@ -449,7 +513,7 @@ export async function calculateFinancialHealth(
   
   try {
     const result = await unstable_cache(
-      async () => calculateFinancialHealthInternal(selectedDate, finalAccessToken, finalRefreshToken),
+      async () => calculateFinancialHealthInternal(selectedDate, finalAccessToken, finalRefreshToken, accounts),
       [cacheKey],
       { 
         revalidate: 60, // 60 seconds

@@ -70,12 +70,33 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
 
   const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null }> => {
     try {
+      // OPTIMIZED: Use shared billing cache to prevent duplicate API calls
+      const { getBillingCacheData, getOrCreateBillingPromise } = await import("@/lib/api/billing-cache");
+      
+      // Check cache first
+      const cached = getBillingCacheData();
+      if (cached) {
+        return {
+          subscription: cached.subscription ?? null,
+          plan: cached.plan ?? null,
+        };
+      }
+      
+      // Use shared cache promise to avoid duplicate calls
+      const result = await getOrCreateBillingPromise(async () => {
       const response = await fetch("/api/billing/subscription");
       
       if (!response.ok) {
         if (response.status === 401) {
           log.log("User not authenticated");
-          return { subscription: null, plan: null };
+            return {
+              subscription: null,
+              plan: null,
+              limits: null,
+              transactionLimit: null,
+              accountLimit: null,
+              interval: null,
+            };
         }
         throw new Error(`Failed to fetch subscription: ${response.status}`);
       }
@@ -84,6 +105,16 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       return {
         subscription: data.subscription ?? null,
         plan: data.plan ?? null,
+          limits: data.limits ?? null,
+          transactionLimit: data.transactionLimit ?? null,
+          accountLimit: data.accountLimit ?? null,
+          interval: data.interval ?? null,
+        };
+      });
+      
+      return {
+        subscription: result.subscription ?? null,
+        plan: result.plan ?? null,
       };
     } catch (error) {
       log.error("Error fetching subscription:", error);

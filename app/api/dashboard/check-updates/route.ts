@@ -18,7 +18,7 @@ interface UpdateCheckResult {
   executionTime?: number;
 }
 
-const CACHE_TTL = 15; // 15 segundos - increased from 5s to improve cache hit rate
+const CACHE_TTL = 120; // 120 segundos (2 minutes) - shorter than polling to avoid stale data
 const CACHE_KEY_PREFIX = "updates:";
 
 export async function GET(request: Request) {

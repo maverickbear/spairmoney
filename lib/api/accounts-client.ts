@@ -18,8 +18,32 @@ export interface Account {
 
 /**
  * Get all accounts for the current user
+ * @param options - Optional configuration
+ * @param options.includeInvestmentBalances - Whether to calculate investment account balances from holdings (default: true)
+ *                                            Set to false to skip expensive holdings fetch when balances aren't needed
  */
-export async function getAccountsClient(): Promise<Account[]> {
+export async function getAccountsClient(options?: { includeInvestmentBalances?: boolean }): Promise<Account[]> {
+  const includeInvestmentBalances = options?.includeInvestmentBalances ?? true;
+  
+  // OPTIMIZED: Use server API route when investment balances aren't needed
+  // This avoids fetching all transactions in the client, which can be very slow
+  if (!includeInvestmentBalances) {
+    try {
+      const response = await fetch("/api/accounts?includeHoldings=false");
+      if (response.ok) {
+        const accounts = await response.json();
+        // Filter out investment accounts or set their balance to 0 since we're not calculating it
+        return accounts.map((acc: any) => ({
+          ...acc,
+          balance: acc.type === "investment" ? 0 : acc.balance,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching accounts from API:", error);
+      // Fall through to client-side implementation
+    }
+  }
+  
   const { data: accounts, error } = await supabase
     .from("Account")
     .select("*")
@@ -185,14 +209,22 @@ export async function getAccountsClient(): Promise<Account[]> {
     }
     
     // 3. For accounts without Questrade or AccountInvestmentValue, calculate from holdings
+    // OPTIMIZED: Only fetch holdings if we actually have accounts that need it AND if includeInvestmentBalances is true
+    // This avoids expensive API calls when investment balances aren't needed (e.g., in Transactions page)
     const accountsWithoutValue = investmentAccountIds.filter(
       accountId => !balances.has(accountId)
     );
     
-    if (accountsWithoutValue.length > 0) {
+    if (accountsWithoutValue.length > 0 && includeInvestmentBalances) {
       try {
-        // Fetch holdings from API to calculate account values
-        const holdingsResponse = await fetch("/api/portfolio/holdings");
+        // OPTIMIZED: Use a more efficient approach - only fetch if we have accounts that need it
+        // Note: This is a fallback for accounts without Questrade or AccountInvestmentValue
+        // In most cases, accounts will have values from steps 1 or 2, so this call is rarely needed
+        // OPTIMIZED: Skip this expensive call if investment balances aren't needed
+        const holdingsResponse = await fetch("/api/portfolio/holdings", { 
+          cache: 'no-store',
+          // Add a signal to allow cancellation if component unmounts
+        });
         if (holdingsResponse.ok) {
           const holdings = await holdingsResponse.json();
           
@@ -209,8 +241,17 @@ export async function getAccountsClient(): Promise<Account[]> {
           }
         }
       } catch (error) {
-        console.error("Error fetching holdings for account values:", error);
+        // Silently handle errors - this is a fallback mechanism
+        // If holdings fetch fails, accounts will just have 0 balance
+        if (process.env.NODE_ENV === 'development') {
+          console.warn("Could not fetch holdings for account values (this is expected if accounts have no holdings):", error);
+        }
         // Continue without failing - will set to 0 below
+      }
+    } else if (accountsWithoutValue.length > 0 && !includeInvestmentBalances) {
+      // Skip holdings fetch but log in development for debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[getAccountsClient] Skipping holdings fetch for ${accountsWithoutValue.length} investment accounts (includeInvestmentBalances=false)`);
       }
     }
     

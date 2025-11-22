@@ -13,7 +13,6 @@ export interface Debt {
   interestRate: number;
   totalMonths: number | null;
   firstPaymentDate: string;
-  startDate?: string | null;
   monthlyPayment: number;
   paymentFrequency?: string;
   paymentAmount?: number | null;
@@ -31,6 +30,7 @@ export interface Debt {
   updatedAt: string;
   status?: string;
   nextDueDate?: string | null;
+  // Calculated fields
   remainingBalance?: number;
   remainingPrincipal?: number;
   monthsRemaining?: number | null;

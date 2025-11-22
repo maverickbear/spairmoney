@@ -177,7 +177,7 @@ export function ReportsContent({
 
       {/* Mobile/Tablet Tabs - Sticky at top */}
         <div 
-        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        className="lg:hidden sticky top-0 z-40 bg-card dark:bg-transparent border-b"
         >
           <div 
             className="overflow-x-auto scrollbar-hide" 

@@ -27,6 +27,7 @@ export interface AdminUser {
     trialStartDate: string | null;
     stripeSubscriptionId: string | null;
     currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd?: boolean;
   } | null;
   household: {
     hasHousehold: boolean;
@@ -118,7 +119,7 @@ export async function getAllUsers(): Promise<AdminUser[]> {
     // Get all subscriptions (not just active ones, to show all subscription statuses)
     const { data: subscriptions, error: subsError } = await supabase
       .from("Subscription")
-      .select("id, userId, planId, status, trialEndDate, trialStartDate, stripeSubscriptionId, currentPeriodEnd")
+      .select("id, userId, planId, status, trialEndDate, trialStartDate, stripeSubscriptionId, currentPeriodEnd, cancelAtPeriodEnd")
       .in("userId", userIds)
       .order("createdAt", { ascending: false });
 
@@ -148,6 +149,7 @@ export async function getAllUsers(): Promise<AdminUser[]> {
       trialStartDate: string | null;
       stripeSubscriptionId: string | null;
       currentPeriodEnd: string | null;
+      cancelAtPeriodEnd: boolean | null;
     }>();
     (subscriptions || []).forEach((s) => {
       if (!subscriptionMap.has(s.userId)) {
@@ -319,6 +321,7 @@ export async function getAllUsers(): Promise<AdminUser[]> {
               trialStartDate: subscription.trialStartDate || null,
               stripeSubscriptionId: subscription.stripeSubscriptionId || null,
               currentPeriodEnd: subscription.currentPeriodEnd || null,
+              cancelAtPeriodEnd: subscription.cancelAtPeriodEnd || false,
             }
           : null,
         household,

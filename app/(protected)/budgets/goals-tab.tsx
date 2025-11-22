@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { useWriteGuard } from "@/hooks/use-write-guard";
 
 interface Goal {
   id: string;
@@ -39,6 +40,7 @@ interface Goal {
   description?: string | null;
   expectedIncome?: number | null;
   targetMonths?: number | null;
+  isSystemGoal?: boolean;
   createdAt: string;
   updatedAt: string;
   monthlyContribution?: number;
@@ -50,6 +52,7 @@ interface Goal {
 export function GoalsTab() {
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
+  const { canWrite } = useWriteGuard();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
@@ -407,9 +410,9 @@ export function GoalsTab() {
               ? "Create your first savings goal to start tracking your progress and achieve your financial dreams."
               : `Try adjusting your filters to see ${filterBy === "active" ? "completed" : "active"} goals.`
           }
-          actionLabel={filterBy === "all" ? "Create Your First Goal" : undefined}
+          actionLabel={filterBy === "all" && canWrite ? "Create Your First Goal" : undefined}
           onAction={
-            filterBy === "all"
+            filterBy === "all" && canWrite
               ? () => {
                   setSelectedGoal(null);
                   setIsFormOpen(true);

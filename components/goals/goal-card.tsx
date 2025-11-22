@@ -37,6 +37,7 @@ export interface GoalCardProps {
     monthsToGoal?: number | null;
     progressPct?: number;
     incomeBasis?: number;
+    isSystemGoal?: boolean;
   };
   onEdit: (goal: GoalCardProps["goal"]) => void;
   onDelete: (id: string) => void;
@@ -103,13 +104,15 @@ export function GoalCard({
                 <Minus className="mr-2 h-4 w-4" />
                 Withdraw
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onDelete(goal.id)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
+              {goal.isSystemGoal !== true && (
+                <DropdownMenuItem
+                  onClick={() => onDelete(goal.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

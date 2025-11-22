@@ -33,11 +33,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body className={`${inter.className} bg-white dark:bg-background`}>
+      <body className={`${inter.className} bg-white`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
-          enableSystem
+          enableSystem={false}
           disableTransitionOnChange
         >
           <ToastProvider>

@@ -15,8 +15,12 @@ export interface Goal {
   description?: string | null;
   expectedIncome?: number | null;
   targetMonths?: number | null;
+  accountId?: string | null;
+  holdingId?: string | null;
+  isSystemGoal?: boolean;
   createdAt: string;
   updatedAt: string;
+  // Calculated fields
   monthlyContribution?: number;
   monthsToGoal?: number | null;
   progressPct?: number;
@@ -67,6 +71,21 @@ export async function updateGoalClient(id: string, data: Partial<Goal>): Promise
  * Delete a goal
  */
 export async function deleteGoalClient(id: string): Promise<void> {
+  // Check if this is a system goal (cannot be deleted)
+  const { data: goal, error: fetchError } = await supabase
+    .from("Goal")
+    .select("isSystemGoal")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) {
+    throw new Error("Goal not found");
+  }
+
+  if (goal?.isSystemGoal === true) {
+    throw new Error("System goals cannot be deleted. You can edit them instead.");
+  }
+
   const { error } = await supabase.from("Goal").delete().eq("id", id);
 
   if (error) {
@@ -141,5 +160,20 @@ export async function withdrawFromGoalClient(goalId: string, amount: number): Pr
   }
 
   return updatedGoal;
+}
+
+/**
+ * Ensure emergency fund goal exists for current user
+ */
+export async function ensureEmergencyFundGoalClient(): Promise<void> {
+  const res = await fetch("/api/goals/ensure-emergency-fund", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(errorData.error || "Failed to ensure emergency fund goal");
+  }
 }
 

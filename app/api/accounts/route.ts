@@ -6,7 +6,10 @@ import { getCurrentUserId, guardAccountLimit, throwIfNotAllowed } from "@/lib/ap
 
 export async function GET(request: NextRequest) {
   try {
-    const accounts = await getAccounts();
+    const searchParams = request.nextUrl.searchParams;
+    const includeHoldings = searchParams.get("includeHoldings") !== "false"; // Default to true for backward compatibility
+    
+    const accounts = await getAccounts(undefined, undefined, { includeHoldings });
     return NextResponse.json(accounts, { status: 200 });
   } catch (error) {
     console.error("Error fetching accounts:", error);

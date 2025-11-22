@@ -15,6 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { PageHeader } from "@/components/common/page-header";
 import Link from "next/link";
 import { useToast } from "@/components/toast-provider";
@@ -77,60 +83,85 @@ export default function HelpSupportPage() {
         title="Help & Support"
       />
 
+      <div className="w-full p-4 lg:p-8 space-y-6">
       {/* Frequently Asked Questions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Frequently Asked Questions</CardTitle>
-          <CardDescription>
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
+            <p className="text-sm text-muted-foreground mt-1">
             Find answers to the most common questions about Spare Finance
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">How do I add a transaction?</h3>
-            <p className="text-sm text-muted-foreground">
-              Navigate to the Transactions page and click the "Add Transaction" button. 
-              Fill in the details including amount, category, date, and description, then save.
             </p>
           </div>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">How do I create a budget?</h3>
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="add-transaction">
+              <AccordionTrigger className="text-left">
+                How do I add a transaction?
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm text-muted-foreground">
+                  Navigate to the Transactions page and click the "Add Transaction" button. 
+                  Fill in the details including amount, category, date, and description, then save.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="create-budget">
+              <AccordionTrigger className="text-left">
+                How do I create a budget?
+              </AccordionTrigger>
+              <AccordionContent>
             <p className="text-sm text-muted-foreground">
               Go to the Budgets page and click "Create Budget". Select a category, 
               set your monthly limit, and choose the time period. You can track your 
               spending against the budget throughout the month.
             </p>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">Can I share my account with family members?</h3>
+            <AccordionItem value="share-account">
+              <AccordionTrigger className="text-left">
+                Can I share my account with family members?
+              </AccordionTrigger>
+              <AccordionContent>
             <p className="text-sm text-muted-foreground">
               Yes! With paid plans, you can invite household members to 
               share access to your financial data. Go to Settings &gt; Members to invite 
               family members.
             </p>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">How do I upgrade my plan?</h3>
+            <AccordionItem value="upgrade-plan">
+              <AccordionTrigger className="text-left">
+                How do I upgrade my plan?
+              </AccordionTrigger>
+              <AccordionContent>
             <p className="text-sm text-muted-foreground">
               Visit Settings &gt; Billing to view your current plan and upgrade options. 
               You can upgrade at any time, and the new plan will be effective immediately.
             </p>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">How do I cancel my subscription?</h3>
+            <AccordionItem value="cancel-subscription">
+              <AccordionTrigger className="text-left">
+                How do I cancel my subscription?
+              </AccordionTrigger>
+              <AccordionContent>
             <p className="text-sm text-muted-foreground">
               Go to Settings &gt; Billing and click "Manage Subscription". You can cancel 
               your subscription at any time. You'll continue to have access until the end 
               of your current billing period.
             </p>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">Is my financial data secure?</h3>
+            <AccordionItem value="data-security">
+              <AccordionTrigger className="text-left">
+                Is my financial data secure?
+              </AccordionTrigger>
+              <AccordionContent>
             <p className="text-sm text-muted-foreground">
               Absolutely. We use bank-level encryption to protect your data. All information 
               is stored securely and we never share your financial data with third parties. 
@@ -145,26 +176,35 @@ export default function HelpSupportPage() {
               </Link>
               {" "}for more details.
             </p>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">How do I import transactions from CSV?</h3>
+            <AccordionItem value="import-csv">
+              <AccordionTrigger className="text-left">
+                How do I import transactions from CSV?
+              </AccordionTrigger>
+              <AccordionContent>
             <p className="text-sm text-muted-foreground">
               On the Transactions page, click "Import" and select your CSV file. Make sure 
               your CSV includes columns for date, amount, description, and category. Our 
               system will guide you through mapping the columns.
             </p>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">Can I export my data?</h3>
+            <AccordionItem value="export-data">
+              <AccordionTrigger className="text-left">
+                Can I export my data?
+              </AccordionTrigger>
+              <AccordionContent>
             <p className="text-sm text-muted-foreground">
               Yes, you can export your transactions, budgets, and other data at any time. 
               Go to Reports and use the export feature to download your data in CSV format.
             </p>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
           </div>
-        </CardContent>
-      </Card>
 
       {/* Contact Support */}
       <Card>
@@ -243,6 +283,7 @@ export default function HelpSupportPage() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

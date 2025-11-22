@@ -27,6 +27,9 @@ import { LimitCheckResult } from "@/lib/api/subscription";
 import { PageHeader } from "@/components/common/page-header";
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
+// OPTIMIZED: Use shared billing cache from lib/api/billing-cache.ts
+// This cache is shared across the entire application to prevent duplicate API calls
+import { billingDataCache, getBillingCacheData, getOrCreateBillingPromise, invalidateBillingCache } from "@/lib/api/billing-cache";
 
 // Lazy load PaymentHistory to improve initial load time
 const PaymentHistory = lazy(() => 
@@ -565,26 +568,6 @@ function ProfileModule() {
   );
 }
 
-// Global cache for billing data (shared across all instances)
-const billingDataCache = {
-  data: null as {
-    subscription: Subscription | null;
-    plan: Plan | null;
-    limits: PlanFeatures | null;
-    transactionLimit: LimitCheckResult | null;
-    accountLimit: LimitCheckResult | null;
-    interval: "month" | "year" | null;
-  } | null,
-  promise: null as Promise<any> | null,
-  timestamp: 0,
-  TTL: 30 * 1000, // 30 seconds cache - matches refresh interval
-};
-
-// Expose cache for preloading during login
-if (typeof window !== 'undefined') {
-  (window as any).billingDataCache = billingDataCache;
-}
-
 // Billing Module Component
 function BillingModuleContent() {
   const searchParams = useSearchParams();
@@ -599,6 +582,8 @@ function BillingModuleContent() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  // OPTIMIZED: Share household info between components to avoid duplicate calls
+  const [householdInfo, setHouseholdInfo] = useState<{ isOwner: boolean; isMember: boolean; ownerId?: string; ownerName?: string } | null>(null);
 
   const syncSubscription = useCallback(async () => {
     try {
@@ -639,12 +624,16 @@ function BillingModuleContent() {
   }, [toast]);
 
   const loadBillingData = useCallback(async (force = false) => {
+    // Don't reload if already loaded and not forced
+    if (hasLoaded && !syncing && !force) {
+      return;
+    }
+
     // Check cache first (unless forced)
     if (!force) {
-      const now = Date.now();
-      if (billingDataCache.data && (now - billingDataCache.timestamp) < billingDataCache.TTL) {
+      const cached = getBillingCacheData();
+      if (cached) {
         // Use cached data
-        const cached = billingDataCache.data;
         setSubscription(cached.subscription);
         setPlan(cached.plan);
         setLimits(cached.limits);
@@ -655,7 +644,7 @@ function BillingModuleContent() {
         return;
       }
 
-      // Reuse in-flight request if exists
+      // Reuse in-flight request if exists (CRITICAL: Check before creating new promise)
       if (billingDataCache.promise) {
         try {
           const result = await billingDataCache.promise;
@@ -674,19 +663,18 @@ function BillingModuleContent() {
       }
     }
 
-    // Don't reload if already loaded and not forced
-    if (hasLoaded && !syncing && !force) {
-      return;
-    }
-
     try {
       setLoading(true);
       
       // OPTIMIZATION: Single API call that returns everything (subscription, plan, limits, transactionLimit, accountLimit)
       // This avoids duplicate queries and reduces latency
-      const fetchPromise = fetch("/api/billing/subscription", {
+      // Use shared cache to prevent duplicate calls from SubscriptionProvider
+      // getOrCreateBillingPromise will reuse existing promise if one exists
+      const result = await getOrCreateBillingPromise(async () => {
+        const subResponse = await fetch("/api/billing/subscription", {
         cache: "no-store",
-      }).then(async (subResponse) => {
+        });
+        
         if (!subResponse.ok) {
           console.error("Failed to fetch subscription:", subResponse.status);
           return {
@@ -708,20 +696,7 @@ function BillingModuleContent() {
           accountLimit: subData.accountLimit ?? null,
           interval: subData.interval ?? null,
         };
-      }).then((result) => {
-
-        // Update cache
-        billingDataCache.data = result;
-        billingDataCache.timestamp = Date.now();
-        billingDataCache.promise = null;
-
-        return result;
       });
-
-      // Cache the promise
-      billingDataCache.promise = fetchPromise;
-
-      const result = await fetchPromise;
 
       // Update state
       setSubscription(result.subscription);
@@ -733,7 +708,6 @@ function BillingModuleContent() {
       setHasLoaded(true);
     } catch (error) {
       console.error("Error loading billing data:", error);
-      billingDataCache.promise = null;
     } finally {
       setLoading(false);
     }
@@ -761,6 +735,22 @@ function BillingModuleContent() {
       });
     }
   }, [searchParams, router, syncSubscription, loadBillingData]);
+
+  // OPTIMIZED: Load household info once and share between components
+  useEffect(() => {
+    async function loadHouseholdInfo() {
+      try {
+        const response = await fetch("/api/household/info");
+        if (response.ok) {
+          const data = await response.json();
+          setHouseholdInfo(data);
+        }
+      } catch (error) {
+        console.error("Error loading household info:", error);
+      }
+    }
+    loadHouseholdInfo();
+  }, []);
 
   // Load data on mount immediately
   useEffect(() => {
@@ -810,11 +800,10 @@ function BillingModuleContent() {
         subscription={subscription}
         plan={plan}
         interval={billingInterval}
+        householdInfo={householdInfo}
         onSubscriptionUpdated={() => {
           // Invalidate cache when subscription is updated
-          billingDataCache.data = null;
-          billingDataCache.timestamp = 0;
-          billingDataCache.promise = null;
+          invalidateBillingCache();
           loadBillingData(true);
         }}
       />
@@ -842,14 +831,56 @@ function BillingModule() {
 }
 
 // Preload billing data hook - loads data in background
-function useBillingPreload() {
+// OPTIMIZED: Only preload if billing tab is not active to avoid duplicate calls
+function useBillingPreload(activeTab: string) {
   useEffect(() => {
+    // Skip preload if billing tab is already active (will load immediately)
+    if (activeTab === "billing") {
+      return;
+    }
+    
     // Preload billing data in background when page loads
     // This ensures data is ready when user clicks on Billing tab
-    // OPTIMIZATION: Single API call returns everything (subscription, plan, limits, transactionLimit, accountLimit)
+    // OPTIMIZATION: Use shared cache to avoid duplicate calls
     const preloadBillingData = async () => {
       try {
-        await fetch("/api/billing/subscription", { cache: "no-store" });
+        // Check cache first - if already cached, no need to preload
+        if (getBillingCacheData()) {
+          return; // Already cached
+        }
+        
+        // CRITICAL: Check for in-flight promise BEFORE creating new one
+        // This prevents duplicate calls when multiple components try to fetch simultaneously
+        if (billingDataCache.promise) {
+          // Wait for existing promise to complete
+          await billingDataCache.promise;
+          return;
+        }
+        
+        // Create new request and cache it using shared cache
+        // getOrCreateBillingPromise will handle promise deduplication
+        await getOrCreateBillingPromise(async () => {
+          const response = await fetch("/api/billing/subscription", { cache: "no-store" });
+          if (!response.ok) {
+            return {
+              subscription: null,
+              plan: null,
+              limits: null,
+              transactionLimit: null,
+              accountLimit: null,
+              interval: null,
+            };
+          }
+          const data = await response.json();
+          return {
+            subscription: data.subscription ?? null,
+            plan: data.plan ?? null,
+            limits: data.limits ?? null,
+            transactionLimit: data.transactionLimit ?? null,
+            accountLimit: data.accountLimit ?? null,
+            interval: data.interval ?? null,
+          };
+        });
       } catch (error) {
         // Silently fail - data will load when tab is opened
         console.debug("Billing preload failed:", error);
@@ -859,7 +890,7 @@ function useBillingPreload() {
     // Small delay to not block initial page load
     const timer = setTimeout(preloadBillingData, 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [activeTab]);
 }
 
 // Main My Account Page
@@ -872,8 +903,8 @@ export default function MyAccountPage() {
     return tab === "billing" ? "billing" : "profile";
   });
 
-  // Preload billing data in background
-  useBillingPreload();
+  // Preload billing data in background (only if billing tab is not active)
+  useBillingPreload(activeTab);
   
   // Mark as loaded when component mounts (page structure is ready)
   useEffect(() => {
@@ -922,7 +953,7 @@ export default function MyAccountPage() {
 
       {/* Mobile/Tablet Tabs - Sticky at top */}
         <div 
-        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        className="lg:hidden sticky top-0 z-40 bg-card dark:bg-transparent border-b"
         >
           <div 
             className="overflow-x-auto scrollbar-hide" 

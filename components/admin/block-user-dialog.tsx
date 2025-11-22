@@ -90,7 +90,7 @@ export function BlockUserDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 px-6">
           <div className="space-y-2">
             <Label htmlFor="user">User</Label>
             <Input

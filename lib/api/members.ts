@@ -1169,6 +1169,75 @@ export async function getUserRole(userId: string, ownerId: string): Promise<"adm
   }
 }
 
+// Get current user's role (admin, member, or super_admin) - optimized version
+// This replicates the logic from getUserRoleClient() but runs on the server
+export async function getUserRoleOptimized(userId: string): Promise<"admin" | "member" | "super_admin" | null> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Fetch User role and HouseholdMemberNew in parallel
+    const [userResult, householdResult] = await Promise.all([
+      supabase
+        .from("User")
+        .select("role")
+        .eq("id", userId)
+        .single(),
+      // Get user's household memberships
+      supabase
+        .from("HouseholdMemberNew")
+        .select("role, userId, status, Household(type, createdBy)")
+        .eq("userId", userId)
+        .eq("status", "active")
+    ]);
+
+    const userData = userResult.data;
+    
+    // Check super_admin first (highest priority)
+    if (userData?.role === "super_admin") {
+      return "super_admin";
+    }
+
+    // Check household membership
+    const memberships = householdResult.data || [];
+    
+    // Check if user is owner of a household
+    const ownedHousehold = memberships.find(
+      (m: any) => {
+        const household = m.Household as any;
+        return household?.createdBy === userId && household?.type !== 'personal';
+      }
+    );
+    
+    if (ownedHousehold) {
+      // Owner role maps to 'admin' in old system
+      return "admin";
+    }
+
+    // Check if user is an active member (not owner)
+    const activeMember = memberships.find(
+      (m: any) => {
+        const household = m.Household as any;
+        return household?.createdBy !== userId;
+      }
+    );
+    
+    if (activeMember) {
+      // Map new roles to old: 'owner'/'admin' -> 'admin', 'member' -> 'member'
+      return activeMember.role === 'member' ? 'member' : 'admin';
+    }
+
+    // Fallback to User table role if no household member record exists
+    if (userData?.role) {
+      return userData.role as "admin" | "member" | "super_admin";
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error getting user role:", error);
+    return null;
+  }
+}
+
 // Check if user is an active household member (in any household, not their own)
 export async function isHouseholdMember(userId: string): Promise<boolean> {
   try {

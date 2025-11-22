@@ -173,14 +173,16 @@ export default function ReportsPage() {
         const hasInvestments = limits?.hasInvestments;
         if (hasInvestments === true || (typeof hasInvestments === "string" && hasInvestments === "true")) {
           try {
-            const [summaryRes, holdingsRes, historicalRes] = await Promise.all([
-              fetch("/api/portfolio/summary").then(r => r.ok ? r.json() : null),
-              fetch("/api/portfolio/holdings").then(r => r.ok ? r.json() : null),
-              fetch("/api/portfolio/historical").then(r => r.ok ? r.json() : null),
-            ]);
-            setPortfolioSummary(summaryRes);
-            setPortfolioHoldings(holdingsRes || []);
-            setPortfolioHistorical(historicalRes || []);
+            // OPTIMIZED: Use consolidated endpoint to fetch all portfolio data in one request
+            // This reduces from 3 HTTP requests to 1, and shares data between functions
+            const allDataRes = await fetch("/api/portfolio/all?days=365", { cache: 'no-store' }).catch(() => null);
+            
+            if (allDataRes?.ok) {
+              const allData = await allDataRes.json();
+              setPortfolioSummary(allData.summary || null);
+              setPortfolioHoldings(allData.holdings || []);
+              setPortfolioHistorical(allData.historical || []);
+            }
           } catch (error) {
             console.error("Error loading portfolio data:", error);
           }

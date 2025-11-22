@@ -92,6 +92,7 @@ export default function FeedbackPage() {
         title="Feedback"
       />
 
+      <div className="w-full p-4 lg:p-8">
       <Card>
         <CardHeader>
           <CardTitle>Rate Your Experience</CardTitle>
@@ -173,6 +174,7 @@ export default function FeedbackPage() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

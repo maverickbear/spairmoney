@@ -229,17 +229,32 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
   async function checkAccountsAndShowForm() {
     try {
+      // OPTIMIZED: Only fetch accounts if we don't have them yet
+      // This avoids duplicate calls when form is opened multiple times
+      if (accounts.length === 0) {
       const accountsRes = await fetch("/api/accounts");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
+          setAccounts(accountsData);
+          
         if (accountsData.length === 0) {
           // No accounts, show the dialog
           setShowAccountDialog(true);
           setShouldShowForm(false);
-        } else {
-          // Has accounts, can show the form
+            return;
+          }
+        }
+      }
+      
+      // Has accounts (either from cache or just fetched), can show the form
           setShouldShowForm(true);
+      
+      // OPTIMIZED: Only load data if accounts were just fetched or if we need to refresh
+      // This avoids duplicate calls when form is opened multiple times
+      if (accounts.length === 0) {
           loadData();
+      }
+      
           loadTransactionLimit();
           form.reset({
             date: new Date(),
@@ -250,18 +265,13 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           setSelectedCategoryId("");
           setSubcategories([]);
           setSubcategoriesMap(new Map());
-        }
-      } else {
-        // Error fetching accounts, try to show the form anyway
-        setShouldShowForm(true);
-        loadData();
-        loadTransactionLimit();
-      }
     } catch (error) {
       console.error("Error checking accounts:", error);
       // In case of error, try to show the form anyway
       setShouldShowForm(true);
+      if (accounts.length === 0) {
       loadData();
+      }
       loadTransactionLimit();
     }
   }
@@ -291,8 +301,25 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
     }
   }, [selectedCategoryId, open]);
 
+  // Keep form.categoryId in sync with selectedCategoryId
+  useEffect(() => {
+    if (open && form.watch("type") !== "transfer") {
+      const formCategoryId = form.watch("categoryId");
+      if (selectedCategoryId && selectedCategoryId !== "" && formCategoryId !== selectedCategoryId) {
+        form.setValue("categoryId", selectedCategoryId, { shouldValidate: false });
+      } else if (!selectedCategoryId && formCategoryId) {
+        // If form has categoryId but state doesn't, sync state from form
+        setSelectedCategoryId(formCategoryId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategoryId, open]);
+
   async function loadData() {
     try {
+      // OPTIMIZED: Only fetch accounts if we don't have them yet
+      // This avoids duplicate calls when form is opened multiple times
+      if (accounts.length === 0) {
       const accountsRes = await fetch("/api/accounts");
       
       if (!accountsRes.ok) {
@@ -301,10 +328,13 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       } else {
         const accountsData = await accountsRes.json().catch(() => []);
         setAccounts(accountsData);
+        }
       }
     } catch (error) {
       logger.error("Error loading data:", error);
+      if (accounts.length === 0) {
       setAccounts([]);
+      }
     }
   }
 
@@ -519,10 +549,23 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         isEditing: !!transaction, 
         transactionId: transaction?.id,
         data,
+        selectedCategoryId,
         closeDialog
       });
       
       setIsSubmitting(true);
+
+      // Sync categoryId from selectedCategoryId state if form value is missing
+      // This ensures the category is always included when selected
+      if (data.type !== "transfer" && selectedCategoryId && selectedCategoryId !== "" && !data.categoryId) {
+        data.categoryId = selectedCategoryId;
+        form.setValue("categoryId", selectedCategoryId);
+      }
+      
+      // Also sync from form value to selectedCategoryId if form has value but state doesn't
+      if (data.type !== "transfer" && data.categoryId && data.categoryId !== "" && !selectedCategoryId) {
+        setSelectedCategoryId(data.categoryId);
+      }
 
       // Check if date is in the future
       const transactionDate = data.date instanceof Date ? data.date : new Date(data.date);
@@ -614,6 +657,17 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         date: data.date instanceof Date ? toDateOnlyString(data.date) : data.date,
       };
       
+      // Ensure categoryId is included if selected (for non-transfer transactions)
+      // Use selectedCategoryId if it's set and payload doesn't have it, or if payload has empty string
+      if (data.type !== "transfer" && selectedCategoryId && selectedCategoryId !== "" && (!payload.categoryId || payload.categoryId === "")) {
+        payload.categoryId = selectedCategoryId;
+      }
+      
+      // Remove categoryId if it's an empty string (treat as no category)
+      if (payload.categoryId === "") {
+        payload.categoryId = undefined;
+      }
+      
       // Only include expenseType if type is expense
       if (data.type !== "expense") {
         delete payload.expenseType;
@@ -622,7 +676,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         delete payload.expenseType;
       }
 
-      console.log("[TransactionForm] Sending request", { url, method, payload });
+      console.log("[TransactionForm] Sending request", { url, method, payload, selectedCategoryId });
 
       const res = await fetch(url, {
         method,
@@ -657,16 +711,13 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         variant: "success",
       });
 
-      // Reload transactions after successful save
-      // Call onSuccess immediately and also after a delay to ensure cache is cleared
+      // OPTIMIZED: Call onSuccess once with a small delay to ensure server cache is cleared
+      // The delay ensures the server-side cache invalidation (revalidateTag) has time to propagate
+      // This avoids duplicate calls while ensuring fresh data
+      setTimeout(() => {
       console.log("[TransactionForm] Calling onSuccess to reload transactions");
       onSuccess?.();
-      
-      // Also call after a short delay to ensure the API cache is cleared
-      setTimeout(() => {
-        console.log("[TransactionForm] Calling onSuccess again after delay");
-        onSuccess?.();
-      }, 500);
+      }, 100);
 
       // If closeDialog is true, close the form and reset
       if (closeDialog) {

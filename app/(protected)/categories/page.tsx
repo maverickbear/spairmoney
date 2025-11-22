@@ -51,7 +51,7 @@ interface GroupedData {
 export default function CategoriesPage() {
   const perf = usePagePerformance("Categories");
   const { toast } = useToast();
-  const { checkWriteAccess } = useWriteGuard();
+  const { checkWriteAccess, canWrite } = useWriteGuard();
   const { openDialog: openDeleteCategoryDialog, ConfirmDialog: DeleteCategoryConfirmDialog } = useConfirmDialog();
   const { openDialog: openDeleteSubcategoryDialog, ConfirmDialog: DeleteSubcategoryConfirmDialog } = useConfirmDialog();
   const { openDialog: openDeleteGroupDialog, ConfirmDialog: DeleteGroupConfirmDialog } = useConfirmDialog();
@@ -86,17 +86,30 @@ export default function CategoriesPage() {
 
   async function loadData() {
     try {
+      // OPTIMIZED: Single API call to get both groups and categories
+      const response = await fetch("/api/categories?consolidated=true");
+      if (!response.ok) {
+        throw new Error("Failed to fetch categories data");
+      }
+      const { groups, categories: allCategories } = await response.json();
+      
+      setCategories(allCategories || []);
+      setMacros(groups || []);
+      perf.markDataLoaded();
+    } catch (error) {
+      logger.error("Error loading data:", error);
+      // Fallback to separate calls if consolidated endpoint fails
+      try {
       const { getAllCategoriesClient, getMacrosClient } = await import("@/lib/api/categories-client");
       const [allCategories, macrosData] = await Promise.all([
         getAllCategoriesClient(),
         getMacrosClient(),
       ]);
-      
       setCategories(allCategories);
       setMacros(macrosData);
-      perf.markDataLoaded();
-    } catch (error) {
-      logger.error("Error loading data:", error);
+      } catch (fallbackError) {
+        logger.error("Error in fallback loading:", fallbackError);
+      }
       perf.markDataLoaded();
     }
   }
@@ -411,7 +424,7 @@ export default function CategoriesPage() {
 
       {/* Mobile/Tablet Tabs - Sticky at top */}
       <div 
-        className="lg:hidden sticky top-0 z-40 bg-card border-b"
+        className="lg:hidden sticky top-0 z-40 bg-card dark:bg-transparent border-b"
       >
         <div 
           className="overflow-x-auto scrollbar-hide" 
@@ -478,19 +491,21 @@ export default function CategoriesPage() {
                                 <div key={category.id} className="space-y-2">
                                   <div className="flex items-center justify-between">
                                     <h4 className="font-medium text-sm">{category.name}</h4>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => {
-                                        if (!checkWriteAccess()) return;
-                                        setSelectedCategory(category);
-                                        setIsDialogOpen(true);
-                                      }}
-                                      title="Edit category"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
+                                    {canWrite && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => {
+                                          if (!checkWriteAccess()) return;
+                                          setSelectedCategory(category);
+                                          setIsDialogOpen(true);
+                                        }}
+                                        title="Edit category"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    )}
                                   </div>
                                   {category.subcategories && category.subcategories.length > 0 && (
                                     <div className="flex flex-wrap gap-1.5">
@@ -635,21 +650,23 @@ export default function CategoriesPage() {
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    <div className="flex space-x-1 md:space-x-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 md:h-10 md:w-10"
-                                        onClick={() => {
-                                          if (!checkWriteAccess()) return;
-                                          setSelectedCategory(category);
-                                          setIsDialogOpen(true);
-                                        }}
-                                        title="Edit category (add subcategories)"
-                                      >
-                                        <Edit className="h-3 w-3 md:h-4 md:w-4" />
-                                      </Button>
-                                    </div>
+                                    {canWrite && (
+                                      <div className="flex space-x-1 md:space-x-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 md:h-10 md:w-10"
+                                          onClick={() => {
+                                            if (!checkWriteAccess()) return;
+                                            setSelectedCategory(category);
+                                            setIsDialogOpen(true);
+                                          }}
+                                          title="Edit category (add subcategories)"
+                                        >
+                                          <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                                        </Button>
+                                      </div>
+                                    )}
                                   </TableCell>
                                 </TableRow>
                               </React.Fragment>
@@ -737,40 +754,42 @@ export default function CategoriesPage() {
                                 <div key={category.id} className="space-y-2">
                                   <div className="flex items-center justify-between">
                                     <h4 className="font-medium text-sm">{category.name}</h4>
-                                    <div className="flex gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => {
-                                          if (!checkWriteAccess()) return;
-                                          setSelectedCategory(category);
-                                          setIsDialogOpen(true);
-                                        }}
-                                        title="Edit category"
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
+                                    {canWrite && (
+                                      <div className="flex gap-1">
                                         <Button
                                           variant="ghost"
                                           size="icon"
                                           className="h-8 w-8"
                                           onClick={() => {
                                             if (!checkWriteAccess()) return;
-                                            handleDeleteCategory(category.id);
+                                            setSelectedCategory(category);
+                                            setIsDialogOpen(true);
                                           }}
-                                          title="Delete category"
-                                          disabled={deletingCategoryId === category.id}
+                                          title="Edit category"
                                         >
-                                          {deletingCategoryId === category.id ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                          ) : (
-                                            <Trash2 className="h-4 w-4" />
-                                          )}
+                                          <Edit className="h-4 w-4" />
                                         </Button>
-                                      )}
-                                    </div>
+                                        {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => {
+                                              if (!checkWriteAccess()) return;
+                                              handleDeleteCategory(category.id);
+                                            }}
+                                            title="Delete category"
+                                            disabled={deletingCategoryId === category.id}
+                                          >
+                                            {deletingCategoryId === category.id ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                   {category.subcategories && category.subcategories.length > 0 && (
                                     <div className="flex flex-wrap gap-1.5">
@@ -958,40 +977,42 @@ export default function CategoriesPage() {
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    <div className="flex space-x-1 md:space-x-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 md:h-10 md:w-10"
-                                        onClick={() => {
-                                          if (!checkWriteAccess()) return;
-                                          setSelectedCategory(category);
-                                          setIsDialogOpen(true);
-                                        }}
-                                        title="Edit category"
-                                      >
-                                        <Edit className="h-3 w-3 md:h-4 md:w-4" />
-                                      </Button>
-                                      {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
+                                    {canWrite && (
+                                      <div className="flex space-x-1 md:space-x-2">
                                         <Button
                                           variant="ghost"
                                           size="icon"
                                           className="h-7 w-7 md:h-10 md:w-10"
                                           onClick={() => {
                                             if (!checkWriteAccess()) return;
-                                            handleDeleteCategory(category.id);
+                                            setSelectedCategory(category);
+                                            setIsDialogOpen(true);
                                           }}
-                                          title="Delete category"
-                                          disabled={deletingCategoryId === category.id}
+                                          title="Edit category"
                                         >
-                                          {deletingCategoryId === category.id ? (
-                                            <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                                          ) : (
-                                            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                                          )}
+                                          <Edit className="h-3 w-3 md:h-4 md:w-4" />
                                         </Button>
-                                      )}
-                                    </div>
+                                        {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 md:h-10 md:w-10"
+                                            onClick={() => {
+                                              if (!checkWriteAccess()) return;
+                                              handleDeleteCategory(category.id);
+                                            }}
+                                            title="Delete category"
+                                            disabled={deletingCategoryId === category.id}
+                                          >
+                                            {deletingCategoryId === category.id ? (
+                                              <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                            )}
+                                          </Button>
+                                        )}
+                                      </div>
+                                    )}
                                   </TableCell>
                                 </TableRow>
                               </React.Fragment>

@@ -12,6 +12,7 @@ import { formatTransactionDate } from "@/lib/utils/timestamp";
 interface PortfolioPerformanceChartProps {
   data: HistoricalDataPoint[];
   currentValue: number;
+  defaultPeriod?: "1D" | "5D" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL";
 }
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -34,8 +35,9 @@ const CustomTooltip = ({ active, payload }: any) => {
 export function PortfolioPerformanceChart({
   data,
   currentValue,
+  defaultPeriod = "ALL",
 }: PortfolioPerformanceChartProps) {
-  const [period, setPeriod] = useState<"1D" | "5D" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">("ALL");
+  const [period, setPeriod] = useState<"1D" | "5D" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL">(defaultPeriod);
 
   const getFilteredData = () => {
     // If "ALL" is selected, return all data (no filtering)

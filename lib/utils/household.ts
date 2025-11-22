@@ -5,10 +5,17 @@ import { createServerClient } from "@/lib/supabase-server";
 /**
  * Get the active household ID for a user
  * Returns the householdId from UserActiveHousehold, or falls back to default (personal) household
+ * @param userId - The user ID to get the household for
+ * @param accessToken - Optional access token for authenticated requests
+ * @param refreshToken - Optional refresh token for authenticated requests
  */
-export async function getActiveHouseholdId(userId: string): Promise<string | null> {
+export async function getActiveHouseholdId(
+  userId: string,
+  accessToken?: string,
+  refreshToken?: string
+): Promise<string | null> {
   try {
-    const supabase = await createServerClient();
+    const supabase = await createServerClient(accessToken, refreshToken);
 
     // First try to get from UserActiveHousehold
     const { data: activeHousehold, error: activeHouseholdError } = await supabase
@@ -30,8 +37,22 @@ export async function getActiveHouseholdId(userId: string): Promise<string | nul
       .eq("status", "active")
       .maybeSingle();
 
-    if (defaultError || !defaultMember?.householdId) {
-      console.error("Error getting active household:", defaultError);
+    // Check if there's an actual error (Supabase errors have code or message)
+    // Empty error objects {} might indicate "no results found" which is valid
+    if (defaultError && (defaultError.code || defaultError.message)) {
+      console.error("Error getting active household:", {
+        userId,
+        code: defaultError.code,
+        message: defaultError.message,
+        hint: defaultError.hint,
+        details: defaultError.details
+      });
+      return null;
+    }
+
+    if (!defaultMember?.householdId) {
+      // No default household found - this is OK, user might not have one set up yet
+      // Don't log this as an error, it's a valid state
       return null;
     }
 

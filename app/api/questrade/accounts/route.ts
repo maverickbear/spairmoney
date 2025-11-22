@@ -4,6 +4,21 @@ import { getQuestradeAccounts, decryptTokens, refreshAccessToken, encryptTokens 
 import { getCurrentUserId, guardFeatureAccessReadOnly, throwIfNotAllowed } from "@/lib/api/feature-guard";
 import { formatTimestamp } from "@/lib/utils/timestamp";
 
+// Simple in-memory cache for request deduplication
+// Prevents duplicate calls within a short time window (5 seconds)
+const requestCache = new Map<string, { promise: Promise<NextResponse>; timestamp: number }>();
+const CACHE_TTL = 5000; // 5 seconds
+
+// Clean up expired cache entries periodically
+function cleanCache() {
+  const now = Date.now();
+  for (const [key, value] of requestCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      requestCache.delete(key);
+    }
+  }
+}
+
 export async function GET() {
   try {
     // Get current user
@@ -11,6 +26,45 @@ export async function GET() {
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // OPTIMIZED: Request deduplication - reuse in-flight requests within cache TTL
+    const cacheKey = `questrade-accounts:${userId}`;
+    const cached = requestCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cached && (now - cached.timestamp) < CACHE_TTL) {
+      // Reuse in-flight request
+      return await cached.promise;
+    }
+
+    // Clean up expired entries (1% chance to avoid overhead)
+    if (Math.random() < 0.01) {
+      cleanCache();
+    }
+
+    // Create new request promise
+    const requestPromise = fetchQuestradeAccounts(userId);
+    
+    // Store in cache
+    requestCache.set(cacheKey, { promise: requestPromise, timestamp: now });
+    
+    // Clean up after TTL expires
+    setTimeout(() => {
+      requestCache.delete(cacheKey);
+    }, CACHE_TTL);
+
+    return await requestPromise;
+  } catch (error: any) {
+    console.error("Error in Questrade accounts GET handler:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch Questrade accounts" },
+      { status: 500 }
+    );
+  }
+}
+
+async function fetchQuestradeAccounts(userId: string): Promise<NextResponse> {
+  try {
 
     // Check if user has access to investments (read-only - allows cancelled subscriptions)
     const guardResult = await guardFeatureAccessReadOnly(userId, "hasInvestments");

@@ -42,6 +42,8 @@ interface Goal {
   isCompleted: boolean;
   expectedIncome?: number | null;
   targetMonths?: number | null;
+  isSystemGoal?: boolean;
+  accountId?: string | null;
 }
 
 interface GoalFormProps {
@@ -72,6 +74,9 @@ export function GoalForm({
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string; type: string; balance: number }>>([]);
   const [holdings, setHoldings] = useState<Array<{ securityId: string; symbol: string; name: string; marketValue: number }>>([]);
   const [loadingHoldings, setLoadingHoldings] = useState(false);
+  // OPTIMIZED: Cache income basis to avoid repeated API calls
+  const [cachedIncomeBasis, setCachedIncomeBasis] = useState<number | null>(null);
+  const [cachedGoals, setCachedGoals] = useState<any[] | null>(null);
 
   const form = useForm<GoalFormData>({
     resolver: zodResolver(goalSchema),
@@ -86,6 +91,7 @@ export function GoalForm({
       targetMonths: undefined,
       accountId: undefined,
       holdingId: undefined,
+      isSystemGoal: false,
     },
   });
 
@@ -106,8 +112,9 @@ export function GoalForm({
       return;
     }
 
-    // Don't calculate if targetAmount is invalid
-    if (!targetAmount || targetAmount <= 0) {
+    // Don't calculate if targetAmount is invalid (allow 0 for system goals)
+    const isSystemGoal = form.watch("isSystemGoal");
+    if (!targetAmount || (targetAmount <= 0 && !isSystemGoal)) {
       setForecast(null);
       return;
     }
@@ -127,16 +134,22 @@ export function GoalForm({
         if (effectiveExpectedIncome && effectiveExpectedIncome > 0) {
           incomeBasis = effectiveExpectedIncome;
         } else {
+          // OPTIMIZED: Use cached income basis if available
+          if (cachedIncomeBasis !== null) {
+            incomeBasis = cachedIncomeBasis;
+        } else {
           // Fetch income basis from API
           const res = await fetch("/api/goals/income-basis");
           if (res.ok) {
             const data = await res.json();
             incomeBasis = data.incomeBasis || 0;
+              setCachedIncomeBasis(incomeBasis); // Cache the result
             if (incomeBasis === 0) {
               console.warn("[GOAL-FORM] Income basis is 0 - no income transactions found in last 3 months");
             }
           } else {
             console.error("[GOAL-FORM] Failed to fetch income basis:", res.status, res.statusText);
+            }
           }
         }
 
@@ -157,12 +170,17 @@ export function GoalForm({
          }
 
         // Check total allocation
+        // OPTIMIZED: Use cached goals if available
+        let goals = cachedGoals;
+        if (!goals) {
         const res = await fetch("/api/goals");
         if (!res.ok) {
           throw new Error("Failed to fetch goals");
         }
-        const goals = await res.json();
-        const otherGoals = goals.filter((g: any) => g.id !== goal?.id && !g.isCompleted);
+          goals = await res.json();
+          setCachedGoals(goals); // Cache the result
+        }
+        const otherGoals = (goals || []).filter((g: any) => g.id !== goal?.id && !g.isCompleted);
         const totalAllocation = otherGoals.reduce((sum: number, g: any) => sum + (g.incomePercentage || 0), 0) + effectiveIncomePercentage;
 
         let allocationError: string | undefined;
@@ -204,7 +222,15 @@ export function GoalForm({
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [targetAmount, currentBalance, incomePercentage, priority, expectedIncome, targetMonths, open, goal, form]);
+  }, [targetAmount, currentBalance, incomePercentage, priority, expectedIncome, targetMonths, open, goal, form, cachedIncomeBasis, cachedGoals]);
+  
+  // Clear cache when form closes
+  useEffect(() => {
+    if (!open) {
+      setCachedIncomeBasis(null);
+      setCachedGoals(null);
+    }
+  }, [open]);
 
   // Load accounts when form opens
   useEffect(() => {
@@ -270,8 +296,9 @@ export function GoalForm({
           description: goal.description || "",
           expectedIncome: goal.expectedIncome ?? undefined,
           targetMonths: goal.targetMonths ?? undefined,
-          accountId: (goal as any).accountId ?? undefined,
+          accountId: goal.accountId ?? undefined,
           holdingId: (goal as any).holdingId ?? undefined,
+          isSystemGoal: goal.isSystemGoal ?? false,
         });
       } else {
         // If creating a new goal, check if there are accounts
@@ -394,6 +421,7 @@ export function GoalForm({
             targetMonths: data.targetMonths,
             accountId: data.accountId,
             holdingId: data.holdingId,
+            isSystemGoal: data.isSystemGoal,
           }),
         });
 
@@ -417,6 +445,7 @@ export function GoalForm({
             targetMonths: data.targetMonths,
             accountId: data.accountId,
             holdingId: data.holdingId,
+            isSystemGoal: data.isSystemGoal,
           }),
         });
 

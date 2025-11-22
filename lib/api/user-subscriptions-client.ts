@@ -5,6 +5,7 @@ export interface UserServiceSubscription {
   userId: string;
   serviceName: string;
   subcategoryId?: string | null;
+  planId?: string | null;
   amount: number;
   description?: string | null;
   billingFrequency: "monthly" | "weekly" | "biweekly" | "semimonthly" | "daily";
@@ -16,6 +17,8 @@ export interface UserServiceSubscription {
   updatedAt: string;
   subcategory?: { id: string; name: string; logo?: string | null } | null;
   account?: { id: string; name: string } | null;
+  serviceLogo?: string | null; // Logo from SubscriptionService table
+  plan?: { id: string; planName: string } | null; // Plan from SubscriptionServicePlan
 }
 
 export interface UserServiceSubscriptionFormData {
@@ -29,6 +32,7 @@ export interface UserServiceSubscriptionFormData {
   firstBillingDate: Date | string;
   categoryId?: string | null;
   newSubcategoryName?: string | null;
+  planId?: string | null; // ID of the selected SubscriptionServicePlan
 }
 
 /**

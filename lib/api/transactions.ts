@@ -777,7 +777,8 @@ export async function getTransactionsInternal(
       filteredQuery = filteredQuery.eq("recurring", filters.recurring);
     }
     // Use description_search for search (much faster than decrypting everything)
-    if (filters?.search) {
+    // OPTIMIZED: Ignore search parameters that start with "_refresh_" - these are used for cache bypass only
+    if (filters?.search && !filters.search.startsWith("_refresh_")) {
       const normalizedSearch = normalizeDescription(filters.search);
       // Use ILIKE for case-insensitive search on normalized description_search
       filteredQuery = filteredQuery.ilike("description_search", `%${normalizedSearch}%`);
@@ -843,12 +844,21 @@ export async function getTransactionsInternal(
       ? supabase.from("Account").select("id, name, type, initialBalance").in("id", accountIds)
       : Promise.resolve({ data: null, error: null }),
     categoryIds.length > 0
-      ? supabase.from("Category").select("id, name, type, icon, color").in("id", categoryIds)
+      ? supabase.from("Category").select("id, name, groupId").in("id", categoryIds)
       : Promise.resolve({ data: null, error: null }),
     subcategoryIds.length > 0
-      ? supabase.from("Subcategory").select("id, name, categoryId, icon, color").in("id", subcategoryIds)
+      ? supabase.from("Subcategory").select("id, name, categoryId, logo").in("id", subcategoryIds)
       : Promise.resolve({ data: null, error: null }),
   ]);
+
+  // Log errors when fetching categories (for debugging category display issues)
+  if (categoriesResult.error) {
+    logger.error("getTransactionsInternal: Error fetching categories", {
+      error: categoriesResult.error,
+      categoryIds,
+      message: categoriesResult.error.message,
+    });
+  }
 
   // Criar maps para acesso rápido
   const accountsMap = new Map();
@@ -863,6 +873,28 @@ export async function getTransactionsInternal(
     categoriesResult.data.forEach((cat: any) => {
       categoriesMap.set(cat.id, cat);
     });
+  }
+  
+  // Log if there are categoryIds but no categories found (for debugging)
+  if (categoryIds.length > 0 && (!categoriesResult.data || categoriesResult.data.length === 0)) {
+    logger.warn("getTransactionsInternal: Found categoryIds but no categories were returned", {
+      categoryIds,
+      error: categoriesResult.error,
+      dataLength: categoriesResult.data?.length || 0,
+    });
+  }
+  
+  // Log if there are categoryIds but some are missing
+  if (categoryIds.length > 0 && categoriesResult.data) {
+    const foundIds = new Set(categoriesResult.data.map((cat: any) => cat.id));
+    const missingIds = categoryIds.filter(id => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      logger.warn("getTransactionsInternal: Some categoryIds were not found in database", {
+        missingIds,
+        foundIds: Array.from(foundIds),
+        requestedIds: categoryIds,
+      });
+    }
   }
 
   const subcategoriesMap = new Map();
@@ -883,13 +915,27 @@ export async function getTransactionsInternal(
       ? tx.amount_numeric
       : decryptAmount(tx.amount);
     
+    // Get category and subcategory from maps
+    const category = categoriesMap.get(tx.categoryId) || null;
+    const subcategory = subcategoriesMap.get(tx.subcategoryId) || null;
+    
+    // Log if categoryId exists but category is not found (for debugging)
+    if (tx.categoryId && !category) {
+      logger.warn("getTransactionsInternal: Transaction has categoryId but category not found", {
+        transactionId: tx.id,
+        categoryId: tx.categoryId,
+        availableCategoryIds: Array.from(categoriesMap.keys()),
+        allCategoryIds: categoryIds,
+      });
+    }
+    
     return {
       ...tx,
       amount: amount,
       description: decryptDescription(tx.description),
       account: accountsMap.get(tx.accountId) || null,
-      category: categoriesMap.get(tx.categoryId) || null,
-      subcategory: subcategoriesMap.get(tx.subcategoryId) || null,
+      category: category,
+      subcategory: subcategory,
     };
   });
 
@@ -964,11 +1010,12 @@ export async function getUpcomingTransactions(limit: number = 5, accessToken?: s
   endDate.setHours(23, 59, 59, 999);
 
   // Get all scheduled planned payments (from all sources: recurring, debt, manual)
-  const plannedPayments = await getPlannedPayments({
+  const result = await getPlannedPayments({
     startDate: today,
     endDate: endDate,
     status: "scheduled",
   });
+  const plannedPayments = result?.plannedPayments || [];
 
   // Convert PlannedPayments to the expected format
   const upcoming = plannedPayments.map((pp) => {

@@ -316,6 +316,13 @@ export async function signInClient(data: SignInFormData): Promise<{ user: User |
       .eq("id", authData.user.id)
       .single();
 
+    // Check if user is blocked (before creating profile if it doesn't exist)
+    if (userData?.isBlocked && userData?.role !== "super_admin") {
+      // Sign out the user
+      await supabase.auth.signOut();
+      return { user: null, error: "Your account has been blocked. Please contact support@sparefinance.com for assistance." };
+    }
+
     if (!userData) {
       // Create user profile if it doesn't exist (owners who sign in directly are admins)
       const { data: newUser, error: userError } = await supabase
@@ -394,6 +401,15 @@ export async function signInClient(data: SignInFormData): Promise<{ user: User |
 
             if (activeError) {
               console.error("Error setting active household:", activeError);
+            } else {
+              // Create emergency fund goal for new user
+              try {
+                const { ensureEmergencyFundGoal } = await import("./goals");
+                await ensureEmergencyFundGoal(userData.id, household.id);
+              } catch (goalError) {
+                console.error("Error creating emergency fund goal:", goalError);
+                // Don't fail signin if goal creation fails
+              }
             }
           }
         }
