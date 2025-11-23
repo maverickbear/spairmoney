@@ -12,14 +12,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { AccountCard } from "@/components/banking/account-card";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DeleteAccountWithTransferDialog } from "@/components/accounts/delete-account-with-transfer-dialog";
 import {
   Select,
   SelectContent,
@@ -395,63 +388,20 @@ export default function AccountsPage() {
         initialAccountLimit={accountLimit}
       />
 
-      {/* Delete Account with Transfer Dialog */}
-      <Dialog open={deleteAccountDialogOpen} onOpenChange={setDeleteAccountDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Account</DialogTitle>
-            <DialogDescription>
-              This account has associated transactions. Please select a destination account to transfer all transactions to before deleting.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Transfer transactions to:</label>
-              <Select
-                value={transferToAccountId}
-                onValueChange={setTransferToAccountId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select destination account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts
-                    .filter((account) => account.id !== accountToDelete)
-                    .map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({account.type})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              {accounts.filter((account) => account.id !== accountToDelete).length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  You need at least one other account to transfer transactions to. Please create another account first.
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteAccountDialogOpen(false);
-                setAccountToDelete(null);
-                setTransferToAccountId("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDeleteWithTransfer}
-              disabled={!transferToAccountId || accounts.filter((account) => account.id !== accountToDelete).length === 0}
-            >
-              Delete and Transfer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteAccountWithTransferDialog
+        open={deleteAccountDialogOpen}
+        onOpenChange={setDeleteAccountDialogOpen}
+        accounts={accounts}
+        accountToDelete={accountToDelete}
+        transferToAccountId={transferToAccountId}
+        onTransferToAccountIdChange={setTransferToAccountId}
+        onConfirm={handleConfirmDeleteWithTransfer}
+        onCancel={() => {
+          setDeleteAccountDialogOpen(false);
+          setAccountToDelete(null);
+          setTransferToAccountId("");
+        }}
+      />
 
       {ConfirmDialog}
 

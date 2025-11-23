@@ -220,12 +220,27 @@ export async function createCheckoutSession(
       hasStripeCustomerId: !!subscription?.stripeCustomerId 
     });
 
-    // Get user name from User table
-    const { data: userData } = await supabase
+    // Get user name and email from User table
+    const { data: userData, error: userDataError } = await supabase
       .from("User")
-      .select("name")
+      .select("name, email")
       .eq("id", userId)
       .single();
+    
+    if (userDataError) {
+      console.error("[CHECKOUT] Error fetching user data:", userDataError);
+    }
+    
+    // Use email from User table if available, otherwise fallback to authUser.email
+    const userEmail = userData?.email || authUser.email;
+    const userName = userData?.name;
+    
+    console.log("[CHECKOUT] User data retrieved:", {
+      userId,
+      email: userEmail,
+      name: userName,
+      hasUserData: !!userData,
+    });
 
     if (subscription?.stripeCustomerId) {
       customerId = subscription.stripeCustomerId;
@@ -234,16 +249,16 @@ export async function createCheckoutSession(
       // Update existing customer with current email and name
       try {
         await stripe.customers.update(customerId, {
-          email: authUser.email!,
-          name: userData?.name || undefined,
+          email: userEmail!,
+          name: userName || undefined,
           metadata: {
             userId: userId,
           },
         });
         console.log("[CHECKOUT] Updated existing Stripe customer with email and name:", { 
           customerId, 
-          email: authUser.email, 
-          name: userData?.name 
+          email: userEmail, 
+          name: userName 
         });
       } catch (updateError) {
         console.error("[CHECKOUT] Error updating existing Stripe customer:", updateError);
@@ -253,14 +268,14 @@ export async function createCheckoutSession(
       // Create Stripe customer
       console.log("[CHECKOUT] Creating new Stripe customer for user:", userId);
       const customer = await stripe.customers.create({
-        email: authUser.email!,
-        name: userData?.name || undefined,
+        email: userEmail!,
+        name: userName || undefined,
         metadata: {
           userId: userId,
         },
       });
       customerId = customer.id;
-      console.log("[CHECKOUT] Stripe customer created:", { customerId, email: authUser.email, name: userData?.name });
+      console.log("[CHECKOUT] Stripe customer created:", { customerId, email: userEmail, name: userName });
 
       // If user has an existing subscription (free), update it with customer ID
       // Otherwise, the webhook will create the subscription when payment succeeds
@@ -331,6 +346,16 @@ export async function createCheckoutSession(
           quantity: 1,
         },
       ],
+      // Pre-fill customer email and name in checkout form
+      // Note: When using 'customer', we can't use 'customer_email', but 'customer_details' will pre-fill the form
+      // This works for both new customers (just created) and existing customers
+      // customer_details will ensure the form is pre-filled with the most up-to-date information from User table
+      ...(userEmail && {
+        customer_details: {
+          email: userEmail,
+          ...(userName && { name: userName }),
+        },
+      }),
       success_url: returnUrl 
         ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
         : `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/"}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -352,14 +377,30 @@ export async function createCheckoutSession(
       sessionParams.discounts = [{ coupon: stripeCouponId }];
     }
 
+    console.log("[CHECKOUT] Session params before creation:", {
+      customer: sessionParams.customer,
+      hasCustomerDetails: !!sessionParams.customer_details,
+      customerDetailsEmail: sessionParams.customer_details?.email,
+      customerDetailsName: sessionParams.customer_details?.name,
+      mode: sessionParams.mode,
+      priceId,
+    });
+
     const session = await stripe.checkout.sessions.create(sessionParams);
 
     console.log("[CHECKOUT] Checkout session created successfully:", { 
       sessionId: session.id, 
       url: session.url,
       subscriptionId: session.subscription,
-      customerId 
+      customerId,
+      customerEmail: session.customer_details?.email,
+      customerName: session.customer_details?.name,
     });
+
+    if (!session.url) {
+      console.error("[CHECKOUT] Checkout session created but URL is null!");
+      return { url: null, error: "Checkout session URL is null" };
+    }
 
     return { url: session.url, error: null };
   } catch (error) {
@@ -1723,6 +1764,581 @@ export async function syncPlanToStripe(planId: string): Promise<{ success: boole
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
       warnings,
+    };
+  }
+}
+
+// ============================================================================
+// EMBEDDED CHECKOUT FUNCTIONS
+// ============================================================================
+
+/**
+ * Create embedded checkout session for Stripe Elements
+ * Returns client secret for PaymentElement
+ */
+export async function createEmbeddedCheckoutSession(
+  userId: string,
+  planId: string,
+  interval: "month" | "year" = "month",
+  promoCode?: string
+): Promise<{ success: boolean; subscriptionId?: string; error: string | null }> {
+  try {
+    console.log("[EMBEDDED-CHECKOUT] Starting embedded checkout session creation:", { userId, planId, interval });
+    const supabase = await createServerClient();
+    
+    // Get user
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser || authUser.id !== userId) {
+      console.error("[EMBEDDED-CHECKOUT] Unauthorized:", { authError, authUser: !!authUser, userId });
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Get user's household
+    const { data: userData } = await supabase
+      .from("User")
+      .select("householdId")
+      .eq("id", userId)
+      .single();
+    
+    const householdId = userData?.householdId;
+
+    // Get plan
+    const { data: plan, error: planError } = await supabase
+      .from("Plan")
+      .select("*")
+      .eq("id", planId)
+      .single();
+
+    if (planError || !plan) {
+      console.error("[EMBEDDED-CHECKOUT] Plan not found:", { planId, planError });
+      return { success: false, error: "Plan not found" };
+    }
+
+    const priceId = interval === "month" 
+      ? plan.stripePriceIdMonthly 
+      : plan.stripePriceIdYearly;
+
+    if (!priceId) {
+      console.error("[EMBEDDED-CHECKOUT] Stripe price ID not configured:", { planId, interval });
+      return { success: false, error: "Stripe price ID not configured for this plan" };
+    }
+
+    // Get or create Stripe customer
+    let customerId: string;
+    const { data: existingSubscription } = await supabase
+      .from("Subscription")
+      .select("stripeCustomerId")
+      .eq("userId", userId)
+      .not("stripeCustomerId", "is", null)
+      .order("createdAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSubscription?.stripeCustomerId) {
+      customerId = existingSubscription.stripeCustomerId;
+    } else {
+      // Get user data
+      const { data: userData } = await supabase
+        .from("User")
+        .select("email, name")
+        .eq("id", userId)
+        .single();
+
+      // Create Stripe customer
+      const customer = await stripe.customers.create({
+        email: userData?.email || authUser.email || undefined,
+        name: userData?.name || undefined,
+        metadata: {
+          userId: userId,
+        },
+      });
+      customerId = customer.id;
+    }
+
+    // Create subscription with trial
+    // For trial subscriptions, we use payment_behavior: "default_incomplete"
+    // This allows creating subscription without payment method - payment will be collected when trial ends
+    const subscriptionParams: Stripe.SubscriptionCreateParams = {
+      customer: customerId,
+      items: [{ price: priceId }],
+      payment_behavior: "default_incomplete",
+      payment_settings: { 
+        save_default_payment_method: "on_subscription",
+      },
+      trial_period_days: 30,
+      metadata: {
+        userId: userId,
+        planId: planId,
+        interval: interval,
+      },
+    };
+
+    // Add promo code if provided
+    if (promoCode) {
+      const { data: promo } = await supabase
+        .from("PromoCode")
+        .select("stripeCouponId")
+        .eq("code", promoCode)
+        .eq("isActive", true)
+        .single();
+      
+      if (promo?.stripeCouponId) {
+        subscriptionParams.coupon = promo.stripeCouponId;
+      }
+    }
+
+    // Create subscription in Stripe (will be in trialing state, no payment required)
+    const stripeSubscription = await stripe.subscriptions.create(subscriptionParams);
+    
+    console.log("[EMBEDDED-CHECKOUT] Stripe subscription created:", {
+      subscriptionId: stripeSubscription.id,
+      status: stripeSubscription.status,
+      trialEnd: stripeSubscription.trial_end,
+    });
+
+    // Create subscription in Supabase database
+    const subscriptionId = `${userId}-${planId}`;
+    const trialStartDate = stripeSubscription.trial_start 
+      ? new Date(stripeSubscription.trial_start * 1000)
+      : new Date();
+    const trialEndDate = stripeSubscription.trial_end 
+      ? new Date(stripeSubscription.trial_end * 1000)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    const { data: newSubscription, error: insertError } = await supabase
+      .from("Subscription")
+      .insert({
+        id: subscriptionId,
+        userId: userId,
+        householdId: householdId,
+        planId: planId,
+        status: "trialing",
+        stripeSubscriptionId: stripeSubscription.id,
+        stripeCustomerId: customerId,
+        trialStartDate: trialStartDate.toISOString(),
+        trialEndDate: trialEndDate.toISOString(),
+        currentPeriodStart: stripeSubscription.current_period_start 
+          ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
+          : trialStartDate.toISOString(),
+        currentPeriodEnd: stripeSubscription.current_period_end 
+          ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+          : trialEndDate.toISOString(),
+        cancelAtPeriodEnd: false,
+      })
+      .select()
+      .single();
+
+    if (insertError || !newSubscription) {
+      console.error("[EMBEDDED-CHECKOUT] Error creating subscription in database:", insertError);
+      // Try to cancel Stripe subscription if database insert fails
+      try {
+        await stripe.subscriptions.cancel(stripeSubscription.id);
+      } catch (cancelError) {
+        console.error("[EMBEDDED-CHECKOUT] Error canceling Stripe subscription:", cancelError);
+      }
+      return { success: false, error: "Failed to create subscription in database" };
+    }
+
+    // Invalidate subscription cache
+    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
+    await invalidateSubscriptionCache(userId);
+
+    // Also invalidate billing cache
+    const { invalidateBillingCache } = await import("@/lib/api/billing-cache");
+    invalidateBillingCache();
+
+    console.log("[EMBEDDED-CHECKOUT] Subscription created successfully:", { 
+      subscriptionId: newSubscription.id,
+      stripeSubscriptionId: stripeSubscription.id,
+      status: stripeSubscription.status,
+      householdId: householdId,
+    });
+
+    return { success: true, subscriptionId: newSubscription.id, error: null };
+  } catch (error) {
+    console.error("[EMBEDDED-CHECKOUT] Error creating embedded checkout session:", error);
+    return { 
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create embedded checkout session" 
+    };
+  }
+}
+
+/**
+ * Update subscription plan (upgrade/downgrade)
+ */
+export async function updateSubscriptionPlan(
+  userId: string,
+  newPlanId: string,
+  interval: "month" | "year" = "month"
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get user subscription
+    const { data: subscription, error: subError } = await supabase
+      .from("Subscription")
+      .select("stripeSubscriptionId, planId")
+      .eq("userId", userId)
+      .in("status", ["active", "trialing"])
+      .order("createdAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (subError || !subscription || !subscription.stripeSubscriptionId) {
+      return { success: false, error: "Active subscription not found" };
+    }
+
+    // Get new plan
+    const { data: newPlan, error: planError } = await supabase
+      .from("Plan")
+      .select("*")
+      .eq("id", newPlanId)
+      .single();
+
+    if (planError || !newPlan) {
+      return { success: false, error: "Plan not found" };
+    }
+
+    const newPriceId = interval === "month" 
+      ? newPlan.stripePriceIdMonthly 
+      : newPlan.stripePriceIdYearly;
+
+    if (!newPriceId) {
+      return { success: false, error: "Stripe price ID not configured for this plan" };
+    }
+
+    // Get current subscription from Stripe
+    const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+    
+    // Update subscription
+    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+      items: [{
+        id: stripeSubscription.items.data[0].id,
+        price: newPriceId,
+      }],
+      proration_behavior: "always_invoice",
+      metadata: {
+        ...stripeSubscription.metadata,
+        planId: newPlanId,
+        interval: interval,
+      },
+    });
+
+    // Update database
+    await supabase
+      .from("Subscription")
+      .update({ 
+        planId: newPlanId,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq("id", subscription.id);
+
+    // Invalidate cache
+    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
+    await invalidateSubscriptionCache(userId);
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("[UPDATE-SUBSCRIPTION] Error updating subscription:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to update subscription" 
+    };
+  }
+}
+
+/**
+ * Cancel subscription
+ */
+export async function cancelSubscription(
+  userId: string,
+  cancelImmediately: boolean = false
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get user subscription
+    const { data: subscription, error: subError } = await supabase
+      .from("Subscription")
+      .select("stripeSubscriptionId, id")
+      .eq("userId", userId)
+      .in("status", ["active", "trialing"])
+      .order("createdAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (subError || !subscription || !subscription.stripeSubscriptionId) {
+      return { success: false, error: "Active subscription not found" };
+    }
+
+    if (cancelImmediately) {
+      // Cancel immediately
+      await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+      
+      await supabase
+        .from("Subscription")
+        .update({ 
+          status: "cancelled",
+          cancelAtPeriodEnd: false,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", subscription.id);
+    } else {
+      // Cancel at period end
+      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+      
+      await supabase
+        .from("Subscription")
+        .update({ 
+          cancelAtPeriodEnd: true,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", subscription.id);
+    }
+
+    // Invalidate cache
+    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
+    await invalidateSubscriptionCache(userId);
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("[CANCEL-SUBSCRIPTION] Error cancelling subscription:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to cancel subscription" 
+    };
+  }
+}
+
+/**
+ * Reactivate subscription
+ */
+export async function reactivateSubscription(
+  userId: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get user subscription
+    const { data: subscription, error: subError } = await supabase
+      .from("Subscription")
+      .select("stripeSubscriptionId, id")
+      .eq("userId", userId)
+      .order("createdAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (subError || !subscription || !subscription.stripeSubscriptionId) {
+      return { success: false, error: "Subscription not found" };
+    }
+
+    // Remove cancel_at_period_end
+    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+      cancel_at_period_end: false,
+    });
+    
+    await supabase
+      .from("Subscription")
+      .update({ 
+        cancelAtPeriodEnd: false,
+        status: "active",
+        updatedAt: new Date().toISOString(),
+      })
+      .eq("id", subscription.id);
+
+    // Invalidate cache
+    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
+    await invalidateSubscriptionCache(userId);
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("[REACTIVATE-SUBSCRIPTION] Error reactivating subscription:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to reactivate subscription" 
+    };
+  }
+}
+
+/**
+ * Get payment methods for customer
+ */
+export async function getPaymentMethods(userId: string): Promise<{
+  paymentMethods: Stripe.PaymentMethod[];
+  error: string | null;
+}> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get customer ID
+    const { data: subscription } = await supabase
+      .from("Subscription")
+      .select("stripeCustomerId")
+      .eq("userId", userId)
+      .not("stripeCustomerId", "is", null)
+      .order("createdAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!subscription?.stripeCustomerId) {
+      return { paymentMethods: [], error: "No customer found" };
+    }
+
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: subscription.stripeCustomerId,
+      type: "card",
+    });
+
+    return { paymentMethods: paymentMethods.data, error: null };
+  } catch (error) {
+    console.error("[GET-PAYMENT-METHODS] Error getting payment methods:", error);
+    return { 
+      paymentMethods: [], 
+      error: error instanceof Error ? error.message : "Failed to get payment methods" 
+    };
+  }
+}
+
+/**
+ * Create setup intent for adding new payment method
+ */
+export async function createSetupIntent(userId: string): Promise<{
+  clientSecret: string | null;
+  error: string | null;
+}> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get or create customer
+    const { data: subscription } = await supabase
+      .from("Subscription")
+      .select("stripeCustomerId")
+      .eq("userId", userId)
+      .not("stripeCustomerId", "is", null)
+      .order("createdAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let customerId: string;
+    if (subscription?.stripeCustomerId) {
+      customerId = subscription.stripeCustomerId;
+    } else {
+      // Get user data
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data: userData } = await supabase
+        .from("User")
+        .select("email, name")
+        .eq("id", userId)
+        .single();
+
+      // Create Stripe customer
+      const customer = await stripe.customers.create({
+        email: userData?.email || authUser?.email || undefined,
+        name: userData?.name || undefined,
+        metadata: {
+          userId: userId,
+        },
+      });
+      customerId = customer.id;
+    }
+
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ["card"],
+    });
+
+    return { clientSecret: setupIntent.client_secret, error: null };
+  } catch (error) {
+    console.error("[CREATE-SETUP-INTENT] Error creating setup intent:", error);
+    return { 
+      clientSecret: null, 
+      error: error instanceof Error ? error.message : "Failed to create setup intent" 
+    };
+  }
+}
+
+/**
+ * Delete payment method
+ */
+export async function deletePaymentMethod(
+  userId: string,
+  paymentMethodId: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    // Verify payment method belongs to user's customer
+    const { paymentMethods } = await getPaymentMethods(userId);
+    const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
+    
+    if (!paymentMethod) {
+      return { success: false, error: "Payment method not found" };
+    }
+
+    await stripe.paymentMethods.detach(paymentMethodId);
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("[DELETE-PAYMENT-METHOD] Error deleting payment method:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to delete payment method" 
+    };
+  }
+}
+
+/**
+ * Set default payment method
+ */
+export async function setDefaultPaymentMethod(
+  userId: string,
+  paymentMethodId: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createServerClient();
+    
+    // Get customer ID
+    const { data: subscription } = await supabase
+      .from("Subscription")
+      .select("stripeCustomerId, stripeSubscriptionId")
+      .eq("userId", userId)
+      .not("stripeCustomerId", "is", null)
+      .order("createdAt", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!subscription?.stripeCustomerId) {
+      return { success: false, error: "No customer found" };
+    }
+
+    // Verify payment method belongs to customer
+    const { paymentMethods } = await getPaymentMethods(userId);
+    const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
+    
+    if (!paymentMethod) {
+      return { success: false, error: "Payment method not found" };
+    }
+
+    // Update customer default payment method
+    await stripe.customers.update(subscription.stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    // Update subscription default payment method if exists
+    if (subscription.stripeSubscriptionId) {
+      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        default_payment_method: paymentMethodId,
+      });
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("[SET-DEFAULT-PAYMENT-METHOD] Error setting default payment method:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to set default payment method" 
     };
   }
 }

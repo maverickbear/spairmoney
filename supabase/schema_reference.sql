@@ -25,10 +25,9 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 CREATE OR REPLACE FUNCTION "public"."are_users_in_same_household"("p_user1_id" "uuid", "p_user2_id" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
-    -- This function uses SECURITY DEFINER to bypass RLS when checking household membership
-    -- This prevents infinite recursion in RLS policies
     RETURN EXISTS (
         SELECT 1
         FROM "public"."HouseholdMemberNew" hm1
@@ -45,16 +44,15 @@ $$;
 ALTER FUNCTION "public"."are_users_in_same_household"("p_user1_id" "uuid", "p_user2_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."are_users_in_same_household"("p_user1_id" "uuid", "p_user2_id" "uuid") IS 'Checks if two users are active members of the same household. Uses SECURITY DEFINER to bypass RLS and prevent recursion.';
+COMMENT ON FUNCTION "public"."are_users_in_same_household"("p_user1_id" "uuid", "p_user2_id" "uuid") IS 'Checks if two users are active members of the same household. Uses SECURITY DEFINER to bypass RLS and prevent recursion. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."can_access_account_via_accountowner"("p_account_id" "text") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
-    -- This function uses SECURITY DEFINER to bypass RLS when checking AccountOwner
-    -- This prevents infinite recursion in RLS policies
     RETURN EXISTS (
         SELECT 1 
         FROM "public"."AccountOwner" ao
@@ -68,12 +66,13 @@ $$;
 ALTER FUNCTION "public"."can_access_account_via_accountowner"("p_account_id" "text") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."can_access_account_via_accountowner"("p_account_id" "text") IS 'Checks if the current user can access an account via AccountOwner relationship. Uses SECURITY DEFINER to bypass RLS and prevent recursion.';
+COMMENT ON FUNCTION "public"."can_access_account_via_accountowner"("p_account_id" "text") IS 'Checks if the current user can access an account via AccountOwner relationship. Uses SECURITY DEFINER to bypass RLS and prevent recursion. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."can_access_household_data"("p_household_id" "uuid", "p_operation" "text") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     user_role text;
@@ -126,7 +125,7 @@ $$;
 ALTER FUNCTION "public"."can_access_household_data"("p_household_id" "uuid", "p_operation" "text") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."can_access_household_data"("p_household_id" "uuid", "p_operation" "text") IS 'Checks if the current user can perform an operation (read/write/delete) on a household''s data based on their role';
+COMMENT ON FUNCTION "public"."can_access_household_data"("p_household_id" "uuid", "p_operation" "text") IS 'Checks if the current user can perform an operation (read/write/delete) on a household''s data based on their role. Uses SET search_path for security.';
 
 
 
@@ -174,6 +173,7 @@ ALTER FUNCTION "public"."check_invitation_email_match"("invitation_email" "text"
 
 CREATE OR REPLACE FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_planned_payment "public"."PlannedPayment"%ROWTYPE;
@@ -199,11 +199,6 @@ BEGIN
     
     v_user_id := v_planned_payment."userId";
     
-    -- Encrypt amount (using same logic as Transaction)
-    -- Note: This assumes amount encryption function exists
-    -- For now, we'll store as numeric and let the application layer handle encryption
-    -- The Transaction table expects encrypted text, so we need to handle this
-    
     -- Generate transaction ID
     v_transaction_id := "gen_random_uuid"()::"text";
     
@@ -218,30 +213,28 @@ BEGIN
         "subcategoryId",
         "description",
         "userId",
-        "recurring",
         "createdAt",
         "updatedAt"
     ) VALUES (
         v_transaction_id,
-        v_planned_payment."date",
+        v_planned_payment."dueDate",
         v_planned_payment."type",
-        v_planned_payment."amount"::"text", -- Will be encrypted by application layer
+        v_planned_payment."amount",
         v_planned_payment."accountId",
         v_planned_payment."categoryId",
         v_planned_payment."subcategoryId",
         v_planned_payment."description",
         v_user_id,
-        false, -- Planned payments are not recurring by default
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
+        NOW(),
+        NOW()
     );
     
-    -- Update planned payment status and link transaction
+    -- Update planned payment to mark as processed
     UPDATE "public"."PlannedPayment"
     SET 
-        "status" = 'paid'::"text",
+        "status" = 'completed'::"text",
         "linkedTransactionId" = v_transaction_id,
-        "updatedAt" = CURRENT_TIMESTAMP
+        "updatedAt" = NOW()
     WHERE "id" = p_planned_payment_id;
     
     RETURN v_transaction_id;
@@ -252,12 +245,13 @@ $$;
 ALTER FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") IS 'Converts a PlannedPayment to a Transaction. Idempotent - returns existing transaction if already converted.';
+COMMENT ON FUNCTION "public"."convert_planned_payment_to_transaction"("p_planned_payment_id" "text") IS 'Converts a planned payment to a transaction. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text" DEFAULT NULL::"text", "p_subcategory_id" "text" DEFAULT NULL::"text", "p_description" "text" DEFAULT NULL::"text", "p_description_search" "text" DEFAULT NULL::"text", "p_recurring" boolean DEFAULT false, "p_expense_type" "text" DEFAULT NULL::"text", "p_created_at" timestamp without time zone DEFAULT CURRENT_TIMESTAMP, "p_updated_at" timestamp without time zone DEFAULT CURRENT_TIMESTAMP, "p_max_transactions" integer DEFAULT '-1'::integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
   v_month_date date;
@@ -271,7 +265,7 @@ BEGIN
   -- Check limit if not unlimited
   IF p_max_transactions != -1 THEN
     SELECT COALESCE("transactions_count", 0) INTO v_current_count
-    FROM "user_monthly_usage"
+    FROM "public"."user_monthly_usage"
     WHERE "user_id" = p_user_id AND "month_date" = v_month_date;
     
     IF v_current_count >= p_max_transactions THEN
@@ -280,10 +274,10 @@ BEGIN
   END IF;
   
   -- Increment counter
-  v_new_count := "increment_transaction_count"(p_user_id, v_month_date);
+  v_new_count := "public"."increment_transaction_count"(p_user_id, v_month_date);
   
   -- Insert transaction
-  INSERT INTO "Transaction" (
+  INSERT INTO "public"."Transaction" (
     "id", "date", "type", "amount", "amount_numeric", "accountId", "userId",
     "categoryId", "subcategoryId", "description", "description_search",
     "recurring", "expenseType", "createdAt", "updatedAt"
@@ -305,12 +299,13 @@ $$;
 ALTER FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text", "p_subcategory_id" "text", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_expense_type" "text", "p_created_at" timestamp without time zone, "p_updated_at" timestamp without time zone, "p_max_transactions" integer) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text", "p_subcategory_id" "text", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_expense_type" "text", "p_created_at" timestamp without time zone, "p_updated_at" timestamp without time zone, "p_max_transactions" integer) IS 'Creates a regular transaction atomically with limit checking. All operations in one transaction.';
+COMMENT ON FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p_date" "date", "p_type" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_account_id" "text", "p_user_id" "uuid", "p_category_id" "text", "p_subcategory_id" "text", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_expense_type" "text", "p_created_at" timestamp without time zone, "p_updated_at" timestamp without time zone, "p_max_transactions" integer) IS 'Creates a regular transaction atomically with limit checking. All operations in one transaction. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text" DEFAULT NULL::"text", "p_description_search" "text" DEFAULT NULL::"text", "p_recurring" boolean DEFAULT false, "p_max_transactions" integer DEFAULT '-1'::integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
   v_outgoing_id text;
@@ -333,7 +328,7 @@ BEGIN
   -- Check limit if not unlimited
   IF p_max_transactions != -1 THEN
     SELECT COALESCE("transactions_count", 0) INTO v_current_count
-    FROM "user_monthly_usage"
+    FROM "public"."user_monthly_usage"
     WHERE "user_id" = p_user_id AND "month_date" = v_month_date;
     
     IF v_current_count >= p_max_transactions THEN
@@ -342,30 +337,30 @@ BEGIN
   END IF;
   
   -- Increment counter ONCE (transfer = 1 action, not 2)
-  v_new_count := "increment_transaction_count"(p_user_id, v_month_date);
+  v_new_count := "public"."increment_transaction_count"(p_user_id, v_month_date);
   
   -- Prepare descriptions
   v_outgoing_description := COALESCE(p_description, 'Transfer to account');
   v_incoming_description := COALESCE(p_description, 'Transfer from account');
   
-  -- Create outgoing transaction (transfer from source account)
-  INSERT INTO "Transaction" (
+  -- Create outgoing transaction (expense from source account)
+  INSERT INTO "public"."Transaction" (
     "id", "date", "type", "amount", "amount_numeric", "accountId", "userId",
     "categoryId", "subcategoryId", "description", "description_search",
     "recurring", "transferToId", "createdAt", "updatedAt"
   ) VALUES (
-    v_outgoing_id, p_date, 'transfer', p_amount, p_amount_numeric, p_from_account_id, p_user_id,
+    v_outgoing_id, p_date, 'expense', p_amount, p_amount_numeric, p_from_account_id, p_user_id,
     NULL, NULL, v_outgoing_description, p_description_search,
     p_recurring, v_incoming_id, v_now, v_now
   );
   
-  -- Create incoming transaction (transfer to destination account)
-  INSERT INTO "Transaction" (
+  -- Create incoming transaction (income to destination account)
+  INSERT INTO "public"."Transaction" (
     "id", "date", "type", "amount", "amount_numeric", "accountId", "userId",
     "categoryId", "subcategoryId", "description", "description_search",
     "recurring", "transferFromId", "createdAt", "updatedAt"
   ) VALUES (
-    v_incoming_id, p_date, 'transfer', p_amount, p_amount_numeric, p_to_account_id, p_user_id,
+    v_incoming_id, p_date, 'income', p_amount, p_amount_numeric, p_to_account_id, p_user_id,
     NULL, NULL, v_incoming_description, p_description_search,
     p_recurring, v_outgoing_id, v_now, v_now
   );
@@ -383,18 +378,17 @@ $$;
 ALTER FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) IS 'Creates a transfer (2 transactions) atomically with limit checking. Both transactions are created as type "transfer" since transfers do not affect net worth. Counts as 1 transaction. All operations in one transaction.';
+COMMENT ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) IS 'Creates a transfer (2 transactions) atomically with limit checking. Counts as 1 transaction. All operations in one transaction. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."get_account_user_id"("p_account_id" "text") RETURNS "uuid"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_user_id uuid;
 BEGIN
-    -- This function uses SECURITY DEFINER to bypass RLS when checking Account
-    -- This prevents infinite recursion in RLS policies
     SELECT "userId" INTO v_user_id
     FROM "public"."Account"
     WHERE "id" = p_account_id;
@@ -407,12 +401,13 @@ $$;
 ALTER FUNCTION "public"."get_account_user_id"("p_account_id" "text") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."get_account_user_id"("p_account_id" "text") IS 'Returns the userId of an account. Uses SECURITY DEFINER to bypass RLS and prevent recursion.';
+COMMENT ON FUNCTION "public"."get_account_user_id"("p_account_id" "text") IS 'Returns the userId of an account. Uses SECURITY DEFINER to bypass RLS and prevent recursion. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") RETURNS TABLE("table_name" "text", "last_update" bigint)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
   RETURN QUERY
@@ -421,7 +416,7 @@ BEGIN
     SELECT 
       'Transaction' as table_name,
       EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000 as last_update
-    FROM "Transaction"
+    FROM "public"."Transaction"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
     
@@ -431,7 +426,7 @@ BEGIN
     SELECT 
       'Account' as table_name,
       EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
-    FROM "Account"
+    FROM "public"."Account"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
     
@@ -441,7 +436,7 @@ BEGIN
     SELECT 
       'Budget' as table_name,
       EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
-    FROM "Budget"
+    FROM "public"."Budget"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
     
@@ -451,7 +446,7 @@ BEGIN
     SELECT 
       'Goal' as table_name,
       EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
-    FROM "Goal"
+    FROM "public"."Goal"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
     
@@ -461,7 +456,7 @@ BEGIN
     SELECT 
       'Debt' as table_name,
       EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
-    FROM "Debt"
+    FROM "public"."Debt"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
     
@@ -471,8 +466,8 @@ BEGIN
     SELECT 
       'SimpleInvestmentEntry' as table_name,
       EXTRACT(EPOCH FROM MAX(GREATEST(sie."updatedAt", sie."createdAt"))) * 1000
-    FROM "SimpleInvestmentEntry" sie
-    JOIN "Account" a ON a.id = sie."accountId"
+    FROM "public"."SimpleInvestmentEntry" sie
+    JOIN "public"."Account" a ON a.id = sie."accountId"
     WHERE a."userId" = p_user_id
       AND (sie."updatedAt" IS NOT NULL OR sie."createdAt" IS NOT NULL)
   )
@@ -484,7 +479,7 @@ $$;
 ALTER FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") IS 'Retorna timestamp da última atualização de cada tabela para um usuário. Usado pelo endpoint check-updates.';
+COMMENT ON FUNCTION "public"."get_latest_updates"("p_user_id" "uuid") IS 'Retorna timestamp da última atualização de cada tabela para um usuário. Usado pelo endpoint check-updates. Uses SET search_path for security.';
 
 
 
@@ -508,6 +503,7 @@ ALTER FUNCTION "public"."get_owner_info_for_invitation"("p_owner_id" "uuid") OWN
 
 CREATE OR REPLACE FUNCTION "public"."get_user_accessible_households"() RETURNS TABLE("household_id" "uuid")
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
     RETURN QUERY
@@ -522,12 +518,13 @@ $$;
 ALTER FUNCTION "public"."get_user_accessible_households"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."get_user_accessible_households"() IS 'Returns all household IDs that the current user can access as an active member';
+COMMENT ON FUNCTION "public"."get_user_accessible_households"() IS 'Returns all household IDs that the current user can access as an active member. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."get_user_active_household"() RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     active_household_id uuid;
@@ -557,15 +554,15 @@ $$;
 ALTER FUNCTION "public"."get_user_active_household"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."get_user_active_household"() IS 'Returns the currently active household ID for the current user, or their default personal household';
+COMMENT ON FUNCTION "public"."get_user_active_household"() IS 'Returns the currently active household ID for the current user, or their default personal household. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."get_user_admin_household_ids"() RETURNS TABLE("household_id" "uuid")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
-    -- This function uses SECURITY DEFINER to bypass RLS when checking admin/owner status
     RETURN QUERY
     SELECT hm."householdId" as household_id
     FROM "public"."HouseholdMemberNew" hm
@@ -579,16 +576,91 @@ $$;
 ALTER FUNCTION "public"."get_user_admin_household_ids"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."get_user_admin_household_ids"() IS 'Returns all household IDs where the current user is an owner or admin. Uses SECURITY DEFINER to bypass RLS and prevent recursion.';
+COMMENT ON FUNCTION "public"."get_user_admin_household_ids"() IS 'Returns all household IDs where the current user is an owner or admin. Uses SECURITY DEFINER to bypass RLS and prevent recursion. Uses SET search_path for security.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."get_user_asset_allocation"("p_user_id" "uuid" DEFAULT "auth"."uid"()) RETURNS TABLE("user_id" "uuid", "asset_type" "text", "holdings_count" bigint, "total_value" double precision, "total_pnl" double precision, "allocation_percent" double precision, "last_updated" timestamp without time zone)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  -- Verify user can only access their own data
+  IF p_user_id IS NULL OR p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Access denied: You can only access your own asset allocation';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    aav.user_id,
+    aav.asset_type,
+    aav.holdings_count,
+    aav.total_value,
+    aav.total_pnl,
+    aav.allocation_percent,
+    aav.last_updated
+  FROM "public"."asset_allocation_view" aav
+  WHERE aav.user_id = p_user_id
+  ORDER BY aav.total_value DESC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_user_asset_allocation"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_user_asset_allocation"("p_user_id" "uuid") IS 'Secure function to get user asset allocation from asset_allocation_view. Users can only access their own data. Uses SET search_path for security.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."get_user_holdings_view"("p_user_id" "uuid" DEFAULT "auth"."uid"()) RETURNS TABLE("security_id" "text", "account_id" "text", "user_id" "uuid", "symbol" "text", "name" "text", "asset_type" "text", "sector" "text", "quantity" double precision, "avg_price" double precision, "book_value" double precision, "last_price" double precision, "market_value" double precision, "unrealized_pnl" double precision, "unrealized_pnl_percent" double precision, "account_name" "text", "last_price_date" "date", "last_updated" timestamp without time zone)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  -- Verify user can only access their own data
+  IF p_user_id IS NULL OR p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Access denied: You can only access your own holdings';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    hv.security_id,
+    hv.account_id,
+    hv.user_id,
+    hv.symbol,
+    hv.name,
+    hv.asset_type,
+    hv.sector,
+    hv.quantity,
+    hv.avg_price,
+    hv.book_value,
+    hv.last_price,
+    hv.market_value,
+    hv.unrealized_pnl,
+    hv.unrealized_pnl_percent,
+    hv.account_name,
+    hv.last_price_date,
+    hv.last_updated
+  FROM "public"."holdings_view" hv
+  WHERE hv.user_id = p_user_id
+  ORDER BY hv.market_value DESC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_user_holdings_view"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_user_holdings_view"("p_user_id" "uuid") IS 'Secure function to get user holdings from holdings_view. Users can only access their own data. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."get_user_household_ids"() RETURNS TABLE("household_id" "uuid")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
-    -- This function uses SECURITY DEFINER to bypass RLS when checking membership
-    -- This prevents infinite recursion in RLS policies
     RETURN QUERY
     SELECT hm."householdId" as household_id
     FROM "public"."HouseholdMemberNew" hm
@@ -601,12 +673,13 @@ $$;
 ALTER FUNCTION "public"."get_user_household_ids"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."get_user_household_ids"() IS 'Returns all household IDs where the current user is an active member. Uses SECURITY DEFINER to bypass RLS and prevent recursion.';
+COMMENT ON FUNCTION "public"."get_user_household_ids"() IS 'Returns all household IDs where the current user is an active member. Uses SECURITY DEFINER to bypass RLS and prevent recursion. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."get_user_household_role"("p_household_id" "uuid") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     user_role text;
@@ -626,24 +699,90 @@ $$;
 ALTER FUNCTION "public"."get_user_household_role"("p_household_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."get_user_household_role"("p_household_id" "uuid") IS 'Returns the current user''s role in the specified household, or NULL if not a member';
+COMMENT ON FUNCTION "public"."get_user_household_role"("p_household_id" "uuid") IS 'Returns the current user''s role in the specified household, or NULL if not a member. Uses SET search_path for security.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."get_user_portfolio_summary"("p_user_id" "uuid" DEFAULT "auth"."uid"()) RETURNS TABLE("user_id" "uuid", "holdings_count" bigint, "total_value" double precision, "total_cost" double precision, "total_return" double precision, "total_return_percent" double precision, "last_updated" timestamp without time zone)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  -- Verify user can only access their own data
+  IF p_user_id IS NULL OR p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Access denied: You can only access your own portfolio summary';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    psv.user_id,
+    psv.holdings_count,
+    psv.total_value,
+    psv.total_cost,
+    psv.total_return,
+    psv.total_return_percent,
+    psv.last_updated
+  FROM "public"."portfolio_summary_view" psv
+  WHERE psv.user_id = p_user_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_user_portfolio_summary"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_user_portfolio_summary"("p_user_id" "uuid") IS 'Secure function to get user portfolio summary from portfolio_summary_view. Users can only access their own data. Uses SET search_path for security.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."get_user_sector_allocation"("p_user_id" "uuid" DEFAULT "auth"."uid"()) RETURNS TABLE("user_id" "uuid", "sector" "text", "holdings_count" bigint, "total_value" double precision, "total_pnl" double precision, "allocation_percent" double precision, "last_updated" timestamp without time zone)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  -- Verify user can only access their own data
+  IF p_user_id IS NULL OR p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Access denied: You can only access your own sector allocation';
+  END IF;
+
+  RETURN QUERY
+  SELECT 
+    sav.user_id,
+    sav.sector,
+    sav.holdings_count,
+    sav.total_value,
+    sav.total_pnl,
+    sav.allocation_percent,
+    sav.last_updated
+  FROM "public"."sector_allocation_view" sav
+  WHERE sav.user_id = p_user_id
+  ORDER BY sav.total_value DESC;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_user_sector_allocation"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_user_sector_allocation"("p_user_id" "uuid") IS 'Secure function to get user sector allocation from sector_allocation_view. Users can only access their own data. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") RETURNS integer
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
   v_count integer;
 BEGIN
-  INSERT INTO "user_monthly_usage" ("user_id", "month_date", "transactions_count")
+  INSERT INTO "public"."user_monthly_usage" ("user_id", "month_date", "transactions_count")
   VALUES (p_user_id, p_month_date, 1)
   ON CONFLICT ("user_id", "month_date")
   DO UPDATE SET
-    "transactions_count" = "user_monthly_usage"."transactions_count" + 1;
+    "transactions_count" = "public"."user_monthly_usage"."transactions_count" + 1;
   
   SELECT "transactions_count" INTO v_count
-  FROM "user_monthly_usage"
+  FROM "public"."user_monthly_usage"
   WHERE "user_id" = p_user_id AND "month_date" = p_month_date;
   
   RETURN v_count;
@@ -654,7 +793,7 @@ $$;
 ALTER FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") IS 'Atomically increments transaction count for a user/month. Used within transaction functions.';
+COMMENT ON FUNCTION "public"."increment_transaction_count"("p_user_id" "uuid", "p_month_date" "date") IS 'Atomically increments transaction count for a user/month. Used within transaction functions. Uses SET search_path for security.';
 
 
 
@@ -711,6 +850,7 @@ ALTER FUNCTION "public"."is_current_user_admin"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."is_household_member"("p_household_id" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
     RETURN EXISTS (
@@ -727,16 +867,16 @@ $$;
 ALTER FUNCTION "public"."is_household_member"("p_household_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."is_household_member"("p_household_id" "uuid") IS 'Returns true if the current user is an active member of the specified household';
+COMMENT ON FUNCTION "public"."is_household_member"("p_household_id" "uuid") IS 'Returns true if the current user is an active member of the specified household. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."notify_refresh_holdings"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SET "search_path" TO ''
     AS $$
 BEGIN
   -- Notificar que houve mudança (para background worker)
-  -- Não podemos usar NEW.user_id porque InvestmentTransaction não tem essa coluna
   PERFORM pg_notify('refresh_holdings', 'refresh_needed');
   RETURN COALESCE(NEW, OLD);
 END;
@@ -746,20 +886,44 @@ $$;
 ALTER FUNCTION "public"."notify_refresh_holdings"() OWNER TO "postgres";
 
 
+COMMENT ON FUNCTION "public"."notify_refresh_holdings"() IS 'Notifies that holdings need to be refreshed. Uses SET search_path for security.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."prevent_emergency_fund_deletion"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF OLD."isSystemGoal" = true THEN
+    RAISE EXCEPTION 'System goals cannot be deleted. You can edit them instead.';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."prevent_emergency_fund_deletion"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."prevent_emergency_fund_deletion"() IS 'Prevents deletion of system goals. Uses SET search_path for security.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."refresh_portfolio_views"() RETURNS "void"
     LANGUAGE "plpgsql"
+    SET "search_path" TO ''
     AS $$
 BEGIN
   -- Refresh holdings_view (tem índice único, pode usar CONCURRENTLY)
-  REFRESH MATERIALIZED VIEW CONCURRENTLY holdings_view;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."holdings_view";
   
   -- Refresh portfolio_summary_view (tem índice único, pode usar CONCURRENTLY)
-  REFRESH MATERIALIZED VIEW CONCURRENTLY portfolio_summary_view;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."portfolio_summary_view";
   
   -- Refresh outras views (sem índice único, não pode usar CONCURRENTLY)
-  -- Estas views são pequenas e rápidas, então não precisa de CONCURRENTLY
-  REFRESH MATERIALIZED VIEW asset_allocation_view;
-  REFRESH MATERIALIZED VIEW sector_allocation_view;
+  REFRESH MATERIALIZED VIEW "public"."asset_allocation_view";
+  REFRESH MATERIALIZED VIEW "public"."sector_allocation_view";
 END;
 $$;
 
@@ -767,12 +931,13 @@ $$;
 ALTER FUNCTION "public"."refresh_portfolio_views"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."refresh_portfolio_views"() IS 'Refresh manual de todas as views de portfolio. Executar via cron job ou API.';
+COMMENT ON FUNCTION "public"."refresh_portfolio_views"() IS 'Refresh manual de todas as views de portfolio. Executar via cron job ou API. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."trigger_update_subscription_cache"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
   v_household_id uuid;
@@ -820,12 +985,13 @@ $$;
 ALTER FUNCTION "public"."trigger_update_subscription_cache"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."trigger_update_subscription_cache"() IS 'Updates subscription cache when subscription changes. Supports both userId-based (backward compatibility) and householdId-based subscriptions.';
+COMMENT ON FUNCTION "public"."trigger_update_subscription_cache"() IS 'Updates subscription cache when subscription changes. Supports both userId-based (backward compatibility) and householdId-based subscriptions. Uses SET search_path for security.';
 
 
 
 CREATE OR REPLACE FUNCTION "public"."update_household_members_subscription_cache"("p_household_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
   v_member_record record;
@@ -847,7 +1013,7 @@ $$;
 ALTER FUNCTION "public"."update_household_members_subscription_cache"("p_household_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."update_household_members_subscription_cache"("p_household_id" "uuid") IS 'Updates subscription cache for all active members of a household when the household subscription changes. Uses HouseholdMemberNew.';
+COMMENT ON FUNCTION "public"."update_household_members_subscription_cache"("p_household_id" "uuid") IS 'Updates subscription cache for all active members of a household when the household subscription changes. Uses HouseholdMemberNew. Uses SET search_path for security.';
 
 
 
@@ -867,6 +1033,7 @@ ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."update_user_subscription_cache"("p_user_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
   v_household_id uuid;
@@ -1279,10 +1446,11 @@ CREATE TABLE IF NOT EXISTS "public"."Goal" (
     "accountId" "text",
     "holdingId" "text",
     "householdId" "uuid",
+    "isSystemGoal" boolean DEFAULT false NOT NULL,
     CONSTRAINT "Goal_currentBalance_check" CHECK (("currentBalance" >= (0)::double precision)),
     CONSTRAINT "Goal_priority_check" CHECK (("priority" = ANY (ARRAY['High'::"text", 'Medium'::"text", 'Low'::"text"]))),
     CONSTRAINT "Goal_targetMonths_check" CHECK ((("targetMonths" IS NULL) OR ("targetMonths" > (0)::double precision))),
-    CONSTRAINT "goal_targetamount_positive" CHECK (("targetAmount" > (0)::double precision))
+    CONSTRAINT "goal_targetamount_positive" CHECK ((("targetAmount" > (0)::double precision) OR (("isSystemGoal" = true) AND ("targetAmount" >= (0)::double precision))))
 );
 
 
@@ -1290,6 +1458,10 @@ ALTER TABLE "public"."Goal" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."Goal"."userId" IS 'User ID - obrigatório para RLS policies';
+
+
+
+COMMENT ON COLUMN "public"."Goal"."isSystemGoal" IS 'Indicates if this is a system-created goal (e.g., Emergency Funds). System goals cannot be deleted.';
 
 
 
@@ -1873,6 +2045,115 @@ COMMENT ON COLUMN "public"."Subscription"."pendingEmail" IS 'Email address for p
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."SubscriptionService" (
+    "id" "text" NOT NULL,
+    "categoryId" "text" NOT NULL,
+    "name" "text" NOT NULL,
+    "logo" "text",
+    "displayOrder" integer DEFAULT 0 NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+ALTER TABLE "public"."SubscriptionService" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."SubscriptionService" IS 'Individual subscription services (e.g., ChatGPT Team, Netflix, Spotify)';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionService"."categoryId" IS 'Category this service belongs to';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionService"."name" IS 'Service name (e.g., "ChatGPT Team", "Netflix")';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionService"."logo" IS 'URL or path to the logo/image for this service';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionService"."displayOrder" IS 'Order for displaying services within category';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionService"."isActive" IS 'Whether the service is active and visible to users';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."SubscriptionServiceCategory" (
+    "id" "text" NOT NULL,
+    "name" "text" NOT NULL,
+    "displayOrder" integer DEFAULT 0 NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL
+);
+
+
+ALTER TABLE "public"."SubscriptionServiceCategory" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."SubscriptionServiceCategory" IS 'Categories for subscription services (e.g., AI tools, Streaming Video, etc.)';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServiceCategory"."name" IS 'Category name (e.g., "AI tools", "Streaming Video")';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServiceCategory"."displayOrder" IS 'Order for displaying categories in UI';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServiceCategory"."isActive" IS 'Whether the category is active and visible to users';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."SubscriptionServicePlan" (
+    "id" "text" NOT NULL,
+    "serviceId" "text" NOT NULL,
+    "planName" "text" NOT NULL,
+    "price" numeric(15,2) NOT NULL,
+    "currency" "text" DEFAULT 'USD'::"text" NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "updatedAt" timestamp(3) without time zone NOT NULL,
+    CONSTRAINT "SubscriptionServicePlan_currency_check" CHECK (("currency" = ANY (ARRAY['USD'::"text", 'CAD'::"text"]))),
+    CONSTRAINT "SubscriptionServicePlan_price_check" CHECK (("price" >= (0)::numeric))
+);
+
+
+ALTER TABLE "public"."SubscriptionServicePlan" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."SubscriptionServicePlan" IS 'Pricing plans for subscription services (e.g., Basic, Pro, Enterprise)';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServicePlan"."serviceId" IS 'Service this plan belongs to';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServicePlan"."planName" IS 'Plan name (e.g., "Basic", "Pro", "Enterprise")';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServicePlan"."price" IS 'Price of the plan';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServicePlan"."currency" IS 'Currency code: USD or CAD';
+
+
+
+COMMENT ON COLUMN "public"."SubscriptionServicePlan"."isActive" IS 'Whether the plan is active and visible';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."SystemSettings" (
     "id" "text" DEFAULT ("gen_random_uuid"())::"text" NOT NULL,
     "maintenanceMode" boolean DEFAULT false NOT NULL,
@@ -2029,7 +2310,7 @@ CREATE TABLE IF NOT EXISTS "public"."UserBlockHistory" (
 ALTER TABLE "public"."UserBlockHistory" OWNER TO "postgres";
 
 
-COMMENT ON TABLE "public"."UserBlockHistory" IS 'Tracks history of user blocks and unblocks with reasons';
+COMMENT ON TABLE "public"."UserBlockHistory" IS 'Tracks history of user blocks and unblocks with reasons. RLS enabled to enforce access control policies.';
 
 
 
@@ -2060,6 +2341,7 @@ CREATE TABLE IF NOT EXISTS "public"."UserServiceSubscription" (
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
     "householdId" "uuid",
+    "planId" "text",
     CONSTRAINT "UserServiceSubscription_amount_check" CHECK (("amount" > (0)::numeric)),
     CONSTRAINT "UserServiceSubscription_billingDay_check" CHECK (((("billingFrequency" = 'monthly'::"text") AND ("billingDay" >= 1) AND ("billingDay" <= 31)) OR (("billingFrequency" = 'semimonthly'::"text") AND ("billingDay" >= 1) AND ("billingDay" <= 31)) OR (("billingFrequency" = 'weekly'::"text") AND ("billingDay" >= 0) AND ("billingDay" <= 6)) OR (("billingFrequency" = 'biweekly'::"text") AND ("billingDay" >= 0) AND ("billingDay" <= 6)) OR (("billingFrequency" = 'daily'::"text") AND ("billingDay" IS NULL)))),
     CONSTRAINT "UserServiceSubscription_billingFrequency_check" CHECK (("billingFrequency" = ANY (ARRAY['monthly'::"text", 'weekly'::"text", 'biweekly'::"text", 'semimonthly'::"text", 'daily'::"text"])))
@@ -2094,6 +2376,10 @@ COMMENT ON COLUMN "public"."UserServiceSubscription"."isActive" IS 'Whether the 
 
 
 COMMENT ON COLUMN "public"."UserServiceSubscription"."firstBillingDate" IS 'Date of the first billing/payment';
+
+
+
+COMMENT ON COLUMN "public"."UserServiceSubscription"."planId" IS 'ID of the selected plan from SubscriptionServicePlan (optional)';
 
 
 
@@ -2308,7 +2594,7 @@ COMMENT ON COLUMN "public"."user_monthly_usage"."transactions_count" IS 'Number 
 
 
 
-CREATE OR REPLACE VIEW "public"."vw_transactions_for_reports" AS
+CREATE OR REPLACE VIEW "public"."vw_transactions_for_reports" WITH ("security_invoker"='true') AS
  SELECT "id",
     "type",
     "amount",
@@ -2337,7 +2623,7 @@ CREATE OR REPLACE VIEW "public"."vw_transactions_for_reports" AS
 ALTER VIEW "public"."vw_transactions_for_reports" OWNER TO "postgres";
 
 
-COMMENT ON VIEW "public"."vw_transactions_for_reports" IS 'Transactions for reports, excluding transfers. Use this view for income/expense calculations to avoid double-counting transfers.';
+COMMENT ON VIEW "public"."vw_transactions_for_reports" IS 'Transactions for reports, excluding transfers. Use this view for income/expense calculations to avoid double-counting transfers. Uses SECURITY INVOKER to ensure RLS policies on Transaction table are properly enforced.';
 
 
 
@@ -2533,6 +2819,36 @@ ALTER TABLE ONLY "public"."SimpleInvestmentEntry"
 
 ALTER TABLE ONLY "public"."Subcategory"
     ADD CONSTRAINT "Subcategory_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."SubscriptionServiceCategory"
+    ADD CONSTRAINT "SubscriptionServiceCategory_name_unique" UNIQUE ("name");
+
+
+
+ALTER TABLE ONLY "public"."SubscriptionServiceCategory"
+    ADD CONSTRAINT "SubscriptionServiceCategory_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."SubscriptionServicePlan"
+    ADD CONSTRAINT "SubscriptionServicePlan_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."SubscriptionServicePlan"
+    ADD CONSTRAINT "SubscriptionServicePlan_serviceId_planName_unique" UNIQUE ("serviceId", "planName");
+
+
+
+ALTER TABLE ONLY "public"."SubscriptionService"
+    ADD CONSTRAINT "SubscriptionService_categoryId_name_unique" UNIQUE ("categoryId", "name");
+
+
+
+ALTER TABLE ONLY "public"."SubscriptionService"
+    ADD CONSTRAINT "SubscriptionService_pkey" PRIMARY KEY ("id");
 
 
 
@@ -2768,7 +3084,15 @@ CREATE UNIQUE INDEX "HouseholdMemberNew_invitationToken_idx" ON "public"."Househ
 
 
 
+CREATE INDEX "HouseholdMemberNew_invitedBy_idx" ON "public"."HouseholdMemberNew" USING "btree" ("invitedBy");
+
+
+
 CREATE INDEX "HouseholdMemberNew_userId_status_idx" ON "public"."HouseholdMemberNew" USING "btree" ("userId", "status");
+
+
+
+CREATE INDEX "Household_createdBy_idx" ON "public"."Household" USING "btree" ("createdBy");
 
 
 
@@ -2832,7 +3156,19 @@ CREATE INDEX "PlaidLiability_householdId_idx" ON "public"."PlaidLiability" USING
 
 
 
+CREATE INDEX "PlannedPayment_accountId_idx" ON "public"."PlannedPayment" USING "btree" ("accountId");
+
+
+
+CREATE INDEX "PlannedPayment_categoryId_idx" ON "public"."PlannedPayment" USING "btree" ("categoryId");
+
+
+
 CREATE INDEX "PlannedPayment_householdId_idx" ON "public"."PlannedPayment" USING "btree" ("householdId");
+
+
+
+CREATE INDEX "PlannedPayment_subcategoryId_idx" ON "public"."PlannedPayment" USING "btree" ("subcategoryId");
 
 
 
@@ -2908,10 +3244,6 @@ CREATE INDEX "Subscription_userId_idx" ON "public"."Subscription" USING "btree" 
 
 
 
-CREATE UNIQUE INDEX "SystemSettings_id_key" ON "public"."SystemSettings" USING "btree" ("id");
-
-
-
 CREATE INDEX "TransactionSync_accountId_idx" ON "public"."TransactionSync" USING "btree" ("accountId");
 
 
@@ -2964,6 +3296,10 @@ CREATE INDEX "UserActiveHousehold_householdId_idx" ON "public"."UserActiveHouseh
 
 
 
+CREATE INDEX "UserBlockHistory_blockedBy_idx" ON "public"."UserBlockHistory" USING "btree" ("blockedBy");
+
+
+
 CREATE INDEX "UserBlockHistory_createdAt_idx" ON "public"."UserBlockHistory" USING "btree" ("createdAt" DESC);
 
 
@@ -2980,7 +3316,11 @@ CREATE INDEX "User_role_idx" ON "public"."User" USING "btree" ("role");
 
 
 
-CREATE INDEX "category_learning_last_used_idx" ON "public"."category_learning" USING "btree" ("last_used_at" DESC);
+CREATE INDEX "category_learning_category_id_idx" ON "public"."category_learning" USING "btree" ("category_id");
+
+
+
+CREATE INDEX "category_learning_subcategory_id_idx" ON "public"."category_learning" USING "btree" ("subcategory_id");
 
 
 
@@ -2988,15 +3328,7 @@ CREATE INDEX "category_learning_user_type_desc_idx" ON "public"."category_learni
 
 
 
-CREATE INDEX "idx_account_isconnected" ON "public"."Account" USING "btree" ("isConnected") WHERE ("isConnected" = true);
-
-
-
 CREATE INDEX "idx_account_user_type" ON "public"."Account" USING "btree" ("userId", "type") WHERE ("type" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_account_user_updated" ON "public"."Account" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
@@ -3032,10 +3364,6 @@ CREATE INDEX "idx_budget_user_period" ON "public"."Budget" USING "btree" ("userI
 
 
 
-CREATE INDEX "idx_budget_user_updated" ON "public"."Budget" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
-
-
-
 CREATE INDEX "idx_budget_userid_period" ON "public"."Budget" USING "btree" ("userId", "period");
 
 
@@ -3056,10 +3384,6 @@ CREATE INDEX "idx_debt_user_loan_type" ON "public"."Debt" USING "btree" ("userId
 
 
 
-CREATE INDEX "idx_debt_user_updated" ON "public"."Debt" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
-
-
-
 CREATE INDEX "idx_debt_userid_firstpaymentdate" ON "public"."Debt" USING "btree" ("userId", "firstPaymentDate") WHERE ("isPaidOff" = false);
 
 
@@ -3068,15 +3392,15 @@ CREATE INDEX "idx_debt_userid_ispaidoff" ON "public"."Debt" USING "btree" ("user
 
 
 
+CREATE INDEX "idx_goal_issystemgoal" ON "public"."Goal" USING "btree" ("isSystemGoal") WHERE ("isSystemGoal" = true);
+
+
+
 CREATE INDEX "idx_goal_user_completed" ON "public"."Goal" USING "btree" ("userId", "completedAt" DESC) WHERE ("completedAt" IS NOT NULL);
 
 
 
 CREATE INDEX "idx_goal_user_status" ON "public"."Goal" USING "btree" ("userId", "isCompleted", "isPaused") WHERE ("isCompleted" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_goal_user_updated" ON "public"."Goal" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
@@ -3104,14 +3428,6 @@ CREATE INDEX "idx_holdings_view_user" ON "public"."holdings_view" USING "btree" 
 
 
 
-CREATE INDEX "idx_investment_account_questrade" ON "public"."InvestmentAccount" USING "btree" ("userId", "isQuestradeConnected") WHERE ("isQuestradeConnected" = true);
-
-
-
-CREATE INDEX "idx_investment_account_type" ON "public"."InvestmentAccount" USING "btree" ("userId", "type") WHERE ("type" IS NOT NULL);
-
-
-
 CREATE INDEX "idx_investment_transaction_account_date" ON "public"."InvestmentTransaction" USING "btree" ("accountId", "date" DESC) WHERE ("date" IS NOT NULL);
 
 
@@ -3136,19 +3452,7 @@ CREATE INDEX "idx_investment_transaction_updated" ON "public"."InvestmentTransac
 
 
 
-CREATE INDEX "idx_investmentaccount_userid" ON "public"."InvestmentAccount" USING "btree" ("userId");
-
-
-
 CREATE INDEX "idx_investmenttransaction_accountid_date" ON "public"."InvestmentTransaction" USING "btree" ("accountId", "date" DESC);
-
-
-
-CREATE INDEX "idx_plaidconnection_itemid" ON "public"."PlaidConnection" USING "btree" ("itemId");
-
-
-
-CREATE INDEX "idx_plaidconnection_userid" ON "public"."PlaidConnection" USING "btree" ("userId");
 
 
 
@@ -3208,10 +3512,6 @@ CREATE INDEX "idx_position_account_open_quantity" ON "public"."Position" USING "
 
 
 
-CREATE INDEX "idx_position_accountid" ON "public"."Position" USING "btree" ("accountId");
-
-
-
 CREATE INDEX "idx_position_last_updated" ON "public"."Position" USING "btree" ("lastUpdatedAt" DESC) WHERE ("lastUpdatedAt" IS NOT NULL);
 
 
@@ -3232,19 +3532,11 @@ CREATE INDEX "idx_security_price_date_range" ON "public"."SecurityPrice" USING "
 
 
 
-CREATE INDEX "idx_security_price_security_date" ON "public"."SecurityPrice" USING "btree" ("securityId", "date" DESC) WHERE ("date" IS NOT NULL);
-
-
-
 CREATE INDEX "idx_security_price_security_date_desc" ON "public"."SecurityPrice" USING "btree" ("securityId", "date" DESC) WHERE ("date" IS NOT NULL);
 
 
 
 CREATE INDEX "idx_simple_investment_account_date" ON "public"."SimpleInvestmentEntry" USING "btree" ("accountId", "date" DESC) WHERE ("date" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_simple_investment_account_updated" ON "public"."SimpleInvestmentEntry" USING "btree" ("accountId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
@@ -3256,7 +3548,19 @@ CREATE INDEX "idx_subcategory_userid" ON "public"."Subcategory" USING "btree" ("
 
 
 
-CREATE INDEX "idx_subscription_status_enddate" ON "public"."Subscription" USING "btree" ("status", "currentPeriodEnd") WHERE ("status" = 'active'::"text");
+CREATE INDEX "idx_subscription_service_category_display_order" ON "public"."SubscriptionServiceCategory" USING "btree" ("displayOrder", "isActive");
+
+
+
+CREATE INDEX "idx_subscription_service_category_id" ON "public"."SubscriptionService" USING "btree" ("categoryId");
+
+
+
+CREATE INDEX "idx_subscription_service_display_order" ON "public"."SubscriptionService" USING "btree" ("categoryId", "displayOrder", "isActive");
+
+
+
+CREATE INDEX "idx_subscription_service_plan_service_id" ON "public"."SubscriptionServicePlan" USING "btree" ("serviceId", "isActive");
 
 
 
@@ -3268,15 +3572,7 @@ CREATE INDEX "idx_transaction_category_date" ON "public"."Transaction" USING "bt
 
 
 
-CREATE INDEX "idx_transaction_description_gin" ON "public"."Transaction" USING "gin" ("to_tsvector"('"english"'::"regconfig", "description")) WHERE ("description" IS NOT NULL);
-
-
-
 CREATE INDEX "idx_transaction_recurring" ON "public"."Transaction" USING "btree" ("recurring", "date" DESC) WHERE ("recurring" = true);
-
-
-
-CREATE INDEX "idx_transaction_user_category" ON "public"."Transaction" USING "btree" ("userId", "categoryId") WHERE ("categoryId" IS NOT NULL);
 
 
 
@@ -3296,15 +3592,15 @@ COMMENT ON INDEX "public"."idx_transaction_user_date_type" IS 'Índice composto 
 
 
 
-CREATE INDEX "idx_transaction_user_updated" ON "public"."Transaction" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
-
-
-
 CREATE INDEX "idx_user_service_subscription_account_id" ON "public"."UserServiceSubscription" USING "btree" ("accountId");
 
 
 
 CREATE INDEX "idx_user_service_subscription_is_active" ON "public"."UserServiceSubscription" USING "btree" ("isActive") WHERE ("isActive" = true);
+
+
+
+CREATE INDEX "idx_user_service_subscription_plan_id" ON "public"."UserServiceSubscription" USING "btree" ("planId");
 
 
 
@@ -3320,11 +3616,15 @@ CREATE INDEX "idx_user_service_subscription_user_id" ON "public"."UserServiceSub
 
 
 
-CREATE INDEX "transaction_description_search_trgm_idx" ON "public"."Transaction" USING "gin" ("description_search" "public"."gin_trgm_ops") WHERE ("description_search" IS NOT NULL);
+CREATE INDEX "transaction_description_search_trgm_idx" ON "public"."Transaction" USING "gin" ("description_search" "extensions"."gin_trgm_ops") WHERE ("description_search" IS NOT NULL);
 
 
 
 CREATE INDEX "user_monthly_usage_user_month_idx" ON "public"."user_monthly_usage" USING "btree" ("user_id", "month_date");
+
+
+
+CREATE OR REPLACE TRIGGER "prevent_emergency_fund_deletion_trigger" BEFORE DELETE ON "public"."Goal" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_emergency_fund_deletion"();
 
 
 
@@ -3661,6 +3961,16 @@ ALTER TABLE ONLY "public"."Subcategory"
 
 
 
+ALTER TABLE ONLY "public"."SubscriptionServicePlan"
+    ADD CONSTRAINT "SubscriptionServicePlan_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "public"."SubscriptionService"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."SubscriptionService"
+    ADD CONSTRAINT "SubscriptionService_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "public"."SubscriptionServiceCategory"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."Subscription"
     ADD CONSTRAINT "Subscription_householdId_fkey" FOREIGN KEY ("householdId") REFERENCES "public"."Household"("id") ON DELETE CASCADE;
 
@@ -3757,6 +4067,11 @@ ALTER TABLE ONLY "public"."UserServiceSubscription"
 
 
 ALTER TABLE ONLY "public"."UserServiceSubscription"
+    ADD CONSTRAINT "UserServiceSubscription_planId_fkey" FOREIGN KEY ("planId") REFERENCES "public"."SubscriptionServicePlan"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."UserServiceSubscription"
     ADD CONSTRAINT "UserServiceSubscription_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "public"."Subcategory"("id") ON DELETE SET NULL;
 
 
@@ -3802,31 +4117,31 @@ ALTER TABLE "public"."AccountOwner" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Admins can insert block history" ON "public"."UserBlockHistory" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"]))))) OR ("auth"."role"() = 'service_role'::"text")));
-
-
-
-COMMENT ON POLICY "Admins can insert block history" ON "public"."UserBlockHistory" IS 'Allows admins and service_role to insert block history records';
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"]))))) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
 CREATE POLICY "Admins can insert securities" ON "public"."Security" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text")));
-
-
-
-COMMENT ON POLICY "Admins can insert securities" ON "public"."Security" IS 'Allows only super_admin and service_role to insert new securities';
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
 CREATE POLICY "Admins can view all block history" ON "public"."UserBlockHistory" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"]))))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"]))))));
 
 
 
-COMMENT ON POLICY "Admins can view all block history" ON "public"."UserBlockHistory" IS 'Allows admins to view all user block history for auditing purposes';
+CREATE POLICY "Anyone can view active subscription service categories" ON "public"."SubscriptionServiceCategory" FOR SELECT USING (("isActive" = true));
+
+
+
+CREATE POLICY "Anyone can view active subscription service plans" ON "public"."SubscriptionServicePlan" FOR SELECT USING (("isActive" = true));
+
+
+
+CREATE POLICY "Anyone can view active subscription services" ON "public"."SubscriptionService" FOR SELECT USING (("isActive" = true));
 
 
 
@@ -3884,20 +4199,20 @@ ALTER TABLE "public"."Order" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "Owners and admins can remove household members" ON "public"."HouseholdMemberNew" FOR DELETE USING ((("householdId" IN ( SELECT "get_user_admin_household_ids"."household_id"
-   FROM "public"."get_user_admin_household_ids"() "get_user_admin_household_ids"("household_id"))) OR ("userId" = "auth"."uid"())));
+   FROM "public"."get_user_admin_household_ids"() "get_user_admin_household_ids"("household_id"))) OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Owners and admins can update household members" ON "public"."HouseholdMemberNew" FOR UPDATE USING ((("householdId" IN ( SELECT "get_user_admin_household_ids"."household_id"
-   FROM "public"."get_user_admin_household_ids"() "get_user_admin_household_ids"("household_id"))) OR ("userId" = "auth"."uid"())));
+   FROM "public"."get_user_admin_household_ids"() "get_user_admin_household_ids"("household_id"))) OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Owners can delete their households" ON "public"."Household" FOR DELETE USING (("createdBy" = "auth"."uid"()));
+CREATE POLICY "Owners can delete their households" ON "public"."Household" FOR DELETE USING (("createdBy" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Owners can update their households" ON "public"."Household" FOR UPDATE USING (("createdBy" = "auth"."uid"()));
+CREATE POLICY "Owners can update their households" ON "public"."Household" FOR UPDATE USING (("createdBy" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -3936,27 +4251,27 @@ ALTER TABLE "public"."Security" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."SecurityPrice" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "Service role can delete plans" ON "public"."Plan" FOR DELETE USING (("auth"."role"() = 'service_role'::"text"));
+CREATE POLICY "Service role can delete plans" ON "public"."Plan" FOR DELETE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
-CREATE POLICY "Service role can delete subscriptions" ON "public"."Subscription" FOR DELETE USING (("auth"."role"() = 'service_role'::"text"));
+CREATE POLICY "Service role can delete subscriptions" ON "public"."Subscription" FOR DELETE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
-CREATE POLICY "Service role can insert plans" ON "public"."Plan" FOR INSERT WITH CHECK (("auth"."role"() = 'service_role'::"text"));
+CREATE POLICY "Service role can insert plans" ON "public"."Plan" FOR INSERT WITH CHECK ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
-CREATE POLICY "Service role can insert subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK (("auth"."role"() = 'service_role'::"text"));
+CREATE POLICY "Service role can insert subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
-CREATE POLICY "Service role can update plans" ON "public"."Plan" FOR UPDATE USING (("auth"."role"() = 'service_role'::"text"));
+CREATE POLICY "Service role can update plans" ON "public"."Plan" FOR UPDATE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text")) WITH CHECK ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
-CREATE POLICY "Service role can update subscriptions" ON "public"."Subscription" FOR UPDATE USING (("auth"."role"() = 'service_role'::"text"));
+CREATE POLICY "Service role can update subscriptions" ON "public"."Subscription" FOR UPDATE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text")) WITH CHECK ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
@@ -3969,99 +4284,132 @@ ALTER TABLE "public"."Subcategory" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."Subscription" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."SubscriptionService" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."SubscriptionServiceCategory" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."SubscriptionServicePlan" ENABLE ROW LEVEL SECURITY;
+
+
 CREATE POLICY "Super admin can delete promo codes" ON "public"."PromoCode" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can delete system categories" ON "public"."Category" FOR DELETE USING (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can delete system categories" ON "public"."Category" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can delete system groups" ON "public"."Group" FOR DELETE USING (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can delete system groups" ON "public"."Group" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can delete system subcategories" ON "public"."Subcategory" FOR DELETE USING (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can delete system subcategories" ON "public"."Subcategory" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "Super admin can insert promo codes" ON "public"."PromoCode" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can insert system categories" ON "public"."Category" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can insert system categories" ON "public"."Category" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can insert system groups" ON "public"."Group" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can insert system groups" ON "public"."Group" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can insert system subcategories" ON "public"."Subcategory" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can insert system subcategories" ON "public"."Subcategory" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
+
+
+
+CREATE POLICY "Super admin can manage subscription service categories" ON "public"."SubscriptionServiceCategory" USING ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
+
+
+
+CREATE POLICY "Super admin can manage subscription service plans" ON "public"."SubscriptionServicePlan" USING ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
+
+
+
+CREATE POLICY "Super admin can manage subscription services" ON "public"."SubscriptionService" USING ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "Super admin can read promo codes" ON "public"."PromoCode" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "Super admin can update promo codes" ON "public"."PromoCode" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can update system categories" ON "public"."Category" FOR UPDATE USING (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can update system categories" ON "public"."Category" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can update system groups" ON "public"."Group" FOR UPDATE USING (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can update system groups" ON "public"."Group" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
-CREATE POLICY "Super admin can update system subcategories" ON "public"."Subcategory" FOR UPDATE USING (((EXISTS ( SELECT 1
+CREATE POLICY "Super admin can update system subcategories" ON "public"."Subcategory" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) AND ("userId" IS NULL)));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "Super admins can update contact submissions" ON "public"."ContactForm" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "Super admins can view all contact submissions" ON "public"."ContactForm" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "Super admins can view all feedback submissions" ON "public"."Feedback" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
@@ -4070,19 +4418,19 @@ ALTER TABLE "public"."SystemSettings" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "SystemSettings_insert_super_admin" ON "public"."SystemSettings" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "SystemSettings_select_super_admin" ON "public"."SystemSettings" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
 CREATE POLICY "SystemSettings_update_super_admin" ON "public"."SystemSettings" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
 
 
@@ -4098,44 +4446,36 @@ ALTER TABLE "public"."User" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."UserActiveHousehold" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."UserBlockHistory" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."UserServiceSubscription" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "Users can be added to households" ON "public"."HouseholdMemberNew" FOR INSERT WITH CHECK ((("userId" = "auth"."uid"()) OR ("householdId" IN ( SELECT "get_user_admin_household_ids"."household_id"
+CREATE POLICY "Users can be added to households" ON "public"."HouseholdMemberNew" FOR INSERT WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR ("householdId" IN ( SELECT "get_user_admin_household_ids"."household_id"
    FROM "public"."get_user_admin_household_ids"() "get_user_admin_household_ids"("household_id")))));
 
 
 
-CREATE POLICY "Users can create households" ON "public"."Household" FOR INSERT WITH CHECK (("createdBy" = "auth"."uid"()));
+CREATE POLICY "Users can create households" ON "public"."Household" FOR INSERT WITH CHECK (("createdBy" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can delete account owners" ON "public"."AccountOwner" FOR DELETE USING ((("ownerId" = "auth"."uid"()) OR ("public"."get_account_user_id"("accountId") = "auth"."uid"())));
+CREATE POLICY "Users can delete account owners" ON "public"."AccountOwner" FOR DELETE USING ((("ownerId" = ( SELECT "auth"."uid"() AS "uid")) OR ("public"."get_account_user_id"("accountId") = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Users can delete candles for own securities" ON "public"."Candle" FOR DELETE USING ((EXISTS ( SELECT 1
-   FROM "public"."Security"
-  WHERE (("Security"."id" = "Candle"."securityId") AND (EXISTS ( SELECT 1
-           FROM "public"."Position"
-          WHERE (("Position"."securityId" = "Security"."id") AND (EXISTS ( SELECT 1
-                   FROM "public"."InvestmentAccount"
-                  WHERE (("InvestmentAccount"."id" = "Position"."accountId") AND ("InvestmentAccount"."userId" = "auth"."uid"())))))))))));
+   FROM ("public"."Position" "p"
+     JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
+  WHERE (("p"."securityId" = "Candle"."securityId") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "Users can delete household TransactionSync" ON "public"."TransactionSync" FOR DELETE USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
    FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
    FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND (EXISTS ( SELECT 1
-           FROM "public"."AccountOwner" "ao"
-          WHERE (("ao"."accountId" = "a"."id") AND ("ao"."ownerId" = "auth"."uid"())))))))));
-
-
-
-COMMENT ON POLICY "Users can delete household TransactionSync" ON "public"."TransactionSync" IS 'Allows users to delete TransactionSync records via household access, own accounts, or AccountOwner relationship';
+  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
@@ -4145,15 +4485,15 @@ CREATE POLICY "Users can delete household account investment values" ON "public"
 
 
 
-CREATE POLICY "Users can delete household accounts" ON "public"."Account" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"()) OR "public"."can_access_account_via_accountowner"("id") OR "public"."is_current_user_admin"()));
+CREATE POLICY "Users can delete household accounts" ON "public"."Account" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."can_access_account_via_accountowner"("id") OR "public"."is_current_user_admin"()));
 
 
 
-CREATE POLICY "Users can delete household budgets" ON "public"."Budget" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household budgets" ON "public"."Budget" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can delete household debts" ON "public"."Debt" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household debts" ON "public"."Debt" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4167,11 +4507,11 @@ COMMENT ON POLICY "Users can delete household executions" ON "public"."Execution
 
 
 
-CREATE POLICY "Users can delete household goals" ON "public"."Goal" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household goals" ON "public"."Goal" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can delete household investment accounts" ON "public"."InvestmentAccount" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household investment accounts" ON "public"."InvestmentAccount" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4191,7 +4531,7 @@ COMMENT ON POLICY "Users can delete household orders" ON "public"."Order" IS 'Al
 
 
 
-CREATE POLICY "Users can delete household planned payments" ON "public"."PlannedPayment" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household planned payments" ON "public"."PlannedPayment" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4201,7 +4541,7 @@ CREATE POLICY "Users can delete household positions" ON "public"."Position" FOR 
 
 
 
-CREATE POLICY "Users can delete household service subscriptions" ON "public"."UserServiceSubscription" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household service subscriptions" ON "public"."UserServiceSubscription" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4211,104 +4551,81 @@ CREATE POLICY "Users can delete household simple investment entries" ON "public"
 
 
 
-CREATE POLICY "Users can delete household subscriptions" ON "public"."Subscription" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household subscriptions" ON "public"."Subscription" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
-CREATE POLICY "Users can delete household transactions" ON "public"."Transaction" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can delete household transactions" ON "public"."Transaction" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Users can delete own budget categories" ON "public"."BudgetCategory" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
+  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("public"."can_access_household_data"("Budget"."householdId", 'delete'::"text") OR ("Budget"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
-CREATE POLICY "Users can delete own categories" ON "public"."Category" FOR DELETE USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can delete own categories" ON "public"."Category" FOR DELETE USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can delete own groups" ON "public"."Group" FOR DELETE USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can delete own groups" ON "public"."Group" FOR DELETE USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Users can delete own subcategories" ON "public"."Subcategory" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."Category"
-  WHERE (("Category"."id" = "Subcategory"."categoryId") AND ("Category"."userId" = "auth"."uid"())))));
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
 CREATE POLICY "Users can delete prices for securities they own" ON "public"."SecurityPrice" FOR DELETE USING (((EXISTS ( SELECT 1
    FROM ("public"."Position" "p"
      JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
-  WHERE (("p"."securityId" = "SecurityPrice"."securityId") AND ("ia"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+  WHERE (("p"."securityId" = "SecurityPrice"."securityId") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))) OR (EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text")));
-
-
-
-COMMENT ON POLICY "Users can delete prices for securities they own" ON "public"."SecurityPrice" IS 'Allows users to delete prices for securities they have positions in, or admins/service_role to delete any price';
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
 CREATE POLICY "Users can delete securities they own" ON "public"."Security" FOR DELETE USING (((EXISTS ( SELECT 1
    FROM ("public"."Position" "p"
      JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
-  WHERE (("p"."securityId" = "Security"."id") AND ("ia"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+  WHERE (("p"."securityId" = "Security"."id") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))) OR (EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text")));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
-COMMENT ON POLICY "Users can delete securities they own" ON "public"."Security" IS 'Allows users to delete securities they have positions in, or admins/service_role to delete any security';
-
-
-
-CREATE POLICY "Users can delete their own Plaid connections" ON "public"."PlaidConnection" FOR DELETE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can delete their own Plaid connections" ON "public"."PlaidConnection" FOR DELETE USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Users can delete their own Plaid liabilities" ON "public"."PlaidLiability" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "PlaidLiability"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
+  WHERE (("Account"."id" = "PlaidLiability"."accountId") AND (("Account"."userId" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."can_access_account_via_accountowner"("Account"."id") OR "public"."can_access_household_data"("Account"."householdId", 'delete'::"text"))))));
 
 
 
-CREATE POLICY "Users can delete their own Questrade connections" ON "public"."QuestradeConnection" FOR DELETE USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can delete their own Questrade connections" ON "public"."QuestradeConnection" FOR DELETE USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can insert account owners" ON "public"."AccountOwner" FOR INSERT WITH CHECK ((("public"."is_account_owner_by_userid"("accountId") OR "public"."is_account_owner_via_accountowner"("accountId") OR "public"."is_current_user_admin"()) AND (("auth"."uid"() = "ownerId") OR ("public"."is_account_owner_by_userid"("accountId") AND (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE ("User"."id" = "AccountOwner"."ownerId")))) OR ("public"."is_account_owner_via_accountowner"("accountId") AND "public"."are_users_in_same_household"("auth"."uid"(), "ownerId")) OR ("public"."is_current_user_admin"() AND (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE ("User"."id" = "AccountOwner"."ownerId")))))));
+CREATE POLICY "Users can insert account owners" ON "public"."AccountOwner" FOR INSERT WITH CHECK ((("ownerId" = ( SELECT "auth"."uid"() AS "uid")) OR ("public"."get_account_user_id"("accountId") = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Users can insert candles for own securities" ON "public"."Candle" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."Security"
-  WHERE (("Security"."id" = "Candle"."securityId") AND (EXISTS ( SELECT 1
-           FROM "public"."Position"
-          WHERE (("Position"."securityId" = "Security"."id") AND (EXISTS ( SELECT 1
-                   FROM "public"."InvestmentAccount"
-                  WHERE (("InvestmentAccount"."id" = "Position"."accountId") AND ("InvestmentAccount"."userId" = "auth"."uid"())))))))))));
+   FROM ("public"."Position" "p"
+     JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
+  WHERE (("p"."securityId" = "Candle"."securityId") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
-CREATE POLICY "Users can insert household TransactionSync" ON "public"."TransactionSync" FOR INSERT WITH CHECK (((("householdId" IS NOT NULL) AND ("householdId" IN ( SELECT "get_user_admin_household_ids"."household_id"
-   FROM "public"."get_user_admin_household_ids"() "get_user_admin_household_ids"("household_id")))) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can insert household TransactionSync" ON "public"."TransactionSync" FOR INSERT WITH CHECK ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
+   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
    FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND (EXISTS ( SELECT 1
-           FROM "public"."AccountOwner" "ao"
-          WHERE (("ao"."accountId" = "a"."id") AND ("ao"."ownerId" = "auth"."uid"())))) AND "public"."can_access_household_data"("a"."householdId", 'write'::"text"))))));
-
-
-
-COMMENT ON POLICY "Users can insert household TransactionSync" ON "public"."TransactionSync" IS 'Allows admins/owners to insert TransactionSync records for household accounts, own accounts, or AccountOwner accounts';
+  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
@@ -4318,15 +4635,15 @@ CREATE POLICY "Users can insert household account investment values" ON "public"
 
 
 
-CREATE POLICY "Users can insert household accounts" ON "public"."Account" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household accounts" ON "public"."Account" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can insert household budgets" ON "public"."Budget" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household budgets" ON "public"."Budget" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can insert household debts" ON "public"."Debt" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household debts" ON "public"."Debt" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4340,11 +4657,11 @@ COMMENT ON POLICY "Users can insert household executions" ON "public"."Execution
 
 
 
-CREATE POLICY "Users can insert household goals" ON "public"."Goal" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household goals" ON "public"."Goal" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can insert household investment accounts" ON "public"."InvestmentAccount" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household investment accounts" ON "public"."InvestmentAccount" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4364,7 +4681,7 @@ COMMENT ON POLICY "Users can insert household orders" ON "public"."Order" IS 'Al
 
 
 
-CREATE POLICY "Users can insert household planned payments" ON "public"."PlannedPayment" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household planned payments" ON "public"."PlannedPayment" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4374,7 +4691,7 @@ CREATE POLICY "Users can insert household positions" ON "public"."Position" FOR 
 
 
 
-CREATE POLICY "Users can insert household service subscriptions" ON "public"."UserServiceSubscription" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household service subscriptions" ON "public"."UserServiceSubscription" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4384,115 +4701,93 @@ CREATE POLICY "Users can insert household simple investment entries" ON "public"
 
 
 
-CREATE POLICY "Users can insert household subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
-CREATE POLICY "Users can insert household transactions" ON "public"."Transaction" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert household transactions" ON "public"."Transaction" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Users can insert own budget categories" ON "public"."BudgetCategory" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
+  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("public"."can_access_household_data"("Budget"."householdId", 'write'::"text") OR ("Budget"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
-CREATE POLICY "Users can insert own categories" ON "public"."Category" FOR INSERT WITH CHECK ((("userId" IS NULL) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert own categories" ON "public"."Category" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can insert own category learning" ON "public"."category_learning" FOR INSERT WITH CHECK (("user_id" = "auth"."uid"()));
+CREATE POLICY "Users can insert own category learning" ON "public"."category_learning" FOR INSERT WITH CHECK (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can insert own contact submissions" ON "public"."ContactForm" FOR INSERT WITH CHECK ((("auth"."uid"() = "userId") OR ("userId" IS NULL)));
+CREATE POLICY "Users can insert own contact submissions" ON "public"."ContactForm" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can insert own feedback submissions" ON "public"."Feedback" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert own feedback submissions" ON "public"."Feedback" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can insert own groups" ON "public"."Group" FOR INSERT WITH CHECK ((("userId" IS NULL) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can insert own groups" ON "public"."Group" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can insert own profile" ON "public"."User" FOR INSERT WITH CHECK (("id" = "auth"."uid"()));
+CREATE POLICY "Users can insert own profile" ON "public"."User" FOR INSERT WITH CHECK (("id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Users can insert own subcategories" ON "public"."Subcategory" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."Category"
-  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = "auth"."uid"()))))));
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
 CREATE POLICY "Users can insert prices for securities they own" ON "public"."SecurityPrice" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
    FROM ("public"."Position" "p"
      JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
-  WHERE (("p"."securityId" = "SecurityPrice"."securityId") AND ("ia"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+  WHERE (("p"."securityId" = "SecurityPrice"."securityId") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))) OR (EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text")));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
-COMMENT ON POLICY "Users can insert prices for securities they own" ON "public"."SecurityPrice" IS 'Allows users to insert prices for securities they have positions in, or admins/service_role to insert any price';
-
-
-
-CREATE POLICY "Users can insert their own Plaid connections" ON "public"."PlaidConnection" FOR INSERT WITH CHECK (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can insert their own Plaid connections" ON "public"."PlaidConnection" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Users can insert their own Plaid liabilities" ON "public"."PlaidLiability" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "PlaidLiability"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
+  WHERE (("Account"."id" = "PlaidLiability"."accountId") AND (("Account"."userId" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."can_access_account_via_accountowner"("Account"."id") OR "public"."can_access_household_data"("Account"."householdId", 'write'::"text"))))));
 
 
 
-CREATE POLICY "Users can insert their own Questrade connections" ON "public"."QuestradeConnection" FOR INSERT WITH CHECK (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can insert their own Questrade connections" ON "public"."QuestradeConnection" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can set their active household" ON "public"."UserActiveHousehold" USING (("userId" = "auth"."uid"())) WITH CHECK ((("userId" = "auth"."uid"()) AND ("householdId" IN ( SELECT "get_user_household_ids"."household_id"
+CREATE POLICY "Users can set their active household" ON "public"."UserActiveHousehold" USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) AND ("householdId" IN ( SELECT "get_user_household_ids"."household_id"
    FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id")))));
 
 
 
-CREATE POLICY "Users can update account owners" ON "public"."AccountOwner" FOR UPDATE USING ((("ownerId" = "auth"."uid"()) OR ("public"."get_account_user_id"("accountId") = "auth"."uid"())));
+CREATE POLICY "Users can update account owners" ON "public"."AccountOwner" FOR UPDATE USING ((("ownerId" = ( SELECT "auth"."uid"() AS "uid")) OR ("public"."get_account_user_id"("accountId") = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Users can update candles for own securities" ON "public"."Candle" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."Security"
-  WHERE (("Security"."id" = "Candle"."securityId") AND (EXISTS ( SELECT 1
-           FROM "public"."Position"
-          WHERE (("Position"."securityId" = "Security"."id") AND (EXISTS ( SELECT 1
-                   FROM "public"."InvestmentAccount"
-                  WHERE (("InvestmentAccount"."id" = "Position"."accountId") AND ("InvestmentAccount"."userId" = "auth"."uid"())))))))))));
+   FROM ("public"."Position" "p"
+     JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
+  WHERE (("p"."securityId" = "Candle"."securityId") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
 CREATE POLICY "Users can update household TransactionSync" ON "public"."TransactionSync" FOR UPDATE USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
    FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
    FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND (EXISTS ( SELECT 1
-           FROM "public"."AccountOwner" "ao"
-          WHERE (("ao"."accountId" = "a"."id") AND ("ao"."ownerId" = "auth"."uid"()))))))))) WITH CHECK ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
-   FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND (EXISTS ( SELECT 1
-           FROM "public"."AccountOwner" "ao"
-          WHERE (("ao"."accountId" = "a"."id") AND ("ao"."ownerId" = "auth"."uid"())))))))));
-
-
-
-COMMENT ON POLICY "Users can update household TransactionSync" ON "public"."TransactionSync" IS 'Allows users to update TransactionSync records via household access, own accounts, or AccountOwner relationship';
+  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
@@ -4504,19 +4799,15 @@ CREATE POLICY "Users can update household account investment values" ON "public"
 
 
 
-CREATE POLICY "Users can update household accounts" ON "public"."Account" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()) OR "public"."can_access_account_via_accountowner"("id") OR "public"."is_current_user_admin"())) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()) OR "public"."can_access_account_via_accountowner"("id") OR "public"."is_current_user_admin"()));
+CREATE POLICY "Users can update household accounts" ON "public"."Account" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."can_access_account_via_accountowner"("id") OR "public"."is_current_user_admin"()));
 
 
 
-COMMENT ON POLICY "Users can update household accounts" ON "public"."Account" IS 'Allows users to update accounts via household access, direct ownership, AccountOwner relationship, or admin role. WITH CHECK now matches USING to prevent access issues.';
+CREATE POLICY "Users can update household budgets" ON "public"."Budget" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can update household budgets" ON "public"."Budget" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
-
-
-
-CREATE POLICY "Users can update household debts" ON "public"."Debt" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can update household debts" ON "public"."Debt" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4528,11 +4819,11 @@ CREATE POLICY "Users can update household executions" ON "public"."Execution" FO
 
 
 
-CREATE POLICY "Users can update household goals" ON "public"."Goal" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can update household goals" ON "public"."Goal" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can update household investment accounts" ON "public"."InvestmentAccount" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can update household investment accounts" ON "public"."InvestmentAccount" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4552,7 +4843,7 @@ CREATE POLICY "Users can update household orders" ON "public"."Order" FOR UPDATE
 
 
 
-CREATE POLICY "Users can update household planned payments" ON "public"."PlannedPayment" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can update household planned payments" ON "public"."PlannedPayment" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4564,7 +4855,7 @@ CREATE POLICY "Users can update household positions" ON "public"."Position" FOR 
 
 
 
-CREATE POLICY "Users can update household service subscriptions" ON "public"."UserServiceSubscription" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can update household service subscriptions" ON "public"."UserServiceSubscription" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4576,123 +4867,95 @@ CREATE POLICY "Users can update household simple investment entries" ON "public"
 
 
 
-CREATE POLICY "Users can update household subscriptions" ON "public"."Subscription" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can update household subscriptions" ON "public"."Subscription" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
-CREATE POLICY "Users can update household transactions" ON "public"."Transaction" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"()))) WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can update household transactions" ON "public"."Transaction" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Users can update own budget categories" ON "public"."BudgetCategory" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("Budget"."userId" = "auth"."uid"())))));
+  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("public"."can_access_household_data"("Budget"."householdId", 'write'::"text") OR ("Budget"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
-CREATE POLICY "Users can update own categories" ON "public"."Category" FOR UPDATE USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can update own categories" ON "public"."Category" FOR UPDATE USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can update own category learning" ON "public"."category_learning" FOR UPDATE USING (("user_id" = "auth"."uid"()));
+CREATE POLICY "Users can update own category learning" ON "public"."category_learning" FOR UPDATE USING (("user_id" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can update own groups" ON "public"."Group" FOR UPDATE USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can update own groups" ON "public"."Group" FOR UPDATE USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can update own profile" ON "public"."User" FOR UPDATE USING (("id" = "auth"."uid"()));
+CREATE POLICY "Users can update own profile" ON "public"."User" FOR UPDATE USING (("id" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Users can update own subcategories" ON "public"."Subcategory" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."Category"
-  WHERE (("Category"."id" = "Subcategory"."categoryId") AND ("Category"."userId" = "auth"."uid"())))));
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
 CREATE POLICY "Users can update prices for securities they own" ON "public"."SecurityPrice" FOR UPDATE USING (((EXISTS ( SELECT 1
    FROM ("public"."Position" "p"
      JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
-  WHERE (("p"."securityId" = "SecurityPrice"."securityId") AND ("ia"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+  WHERE (("p"."securityId" = "SecurityPrice"."securityId") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))) OR (EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text"))) WITH CHECK (((EXISTS ( SELECT 1
-   FROM ("public"."Position" "p"
-     JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
-  WHERE (("p"."securityId" = "SecurityPrice"."securityId") AND ("ia"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text")));
-
-
-
-COMMENT ON POLICY "Users can update prices for securities they own" ON "public"."SecurityPrice" IS 'Allows users to update prices for securities they have positions in, or admins/service_role to update any price';
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
 CREATE POLICY "Users can update securities they own" ON "public"."Security" FOR UPDATE USING (((EXISTS ( SELECT 1
    FROM ("public"."Position" "p"
      JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
-  WHERE (("p"."securityId" = "Security"."id") AND ("ia"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
+  WHERE (("p"."securityId" = "Security"."id") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))) OR (EXISTS ( SELECT 1
    FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text"))) WITH CHECK (((EXISTS ( SELECT 1
-   FROM ("public"."Position" "p"
-     JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
-  WHERE (("p"."securityId" = "Security"."id") AND ("ia"."userId" = "auth"."uid"())))) OR (EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = "auth"."uid"()) AND ("User"."role" = 'super_admin'::"text")))) OR ("auth"."role"() = 'service_role'::"text")));
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
-COMMENT ON POLICY "Users can update securities they own" ON "public"."Security" IS 'Allows users to update securities they have positions in, or admins/service_role to update any security';
-
-
-
-CREATE POLICY "Users can update their own Plaid connections" ON "public"."PlaidConnection" FOR UPDATE USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can update their own Plaid connections" ON "public"."PlaidConnection" FOR UPDATE USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Users can update their own Plaid liabilities" ON "public"."PlaidLiability" FOR UPDATE USING ((EXISTS ( SELECT 1
    FROM "public"."Account"
-  WHERE (("Account"."id" = "PlaidLiability"."accountId") AND ("Account"."userId" = "auth"."uid"())))));
+  WHERE (("Account"."id" = "PlaidLiability"."accountId") AND (("Account"."userId" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."can_access_account_via_accountowner"("Account"."id") OR "public"."can_access_household_data"("Account"."householdId", 'write'::"text"))))));
 
 
 
-CREATE POLICY "Users can update their own Questrade connections" ON "public"."QuestradeConnection" FOR UPDATE USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can update their own Questrade connections" ON "public"."QuestradeConnection" FOR UPDATE USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can view account owners" ON "public"."AccountOwner" FOR SELECT USING ((("ownerId" = "auth"."uid"()) OR ("public"."get_account_user_id"("accountId") = "auth"."uid"())));
+CREATE POLICY "Users can view account owners" ON "public"."AccountOwner" FOR SELECT USING ((("ownerId" = ( SELECT "auth"."uid"() AS "uid")) OR ("public"."get_account_user_id"("accountId") = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
 CREATE POLICY "Users can view candles for own securities" ON "public"."Candle" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."Security"
-  WHERE (("Security"."id" = "Candle"."securityId") AND (EXISTS ( SELECT 1
-           FROM "public"."Position"
-          WHERE (("Position"."securityId" = "Security"."id") AND (EXISTS ( SELECT 1
-                   FROM "public"."InvestmentAccount"
-                  WHERE (("InvestmentAccount"."id" = "Position"."accountId") AND ("InvestmentAccount"."userId" = "auth"."uid"())))))))))));
+   FROM ("public"."Position" "p"
+     JOIN "public"."InvestmentAccount" "ia" ON (("ia"."id" = "p"."accountId")))
+  WHERE (("p"."securityId" = "Candle"."securityId") AND ("ia"."userId" = ( SELECT "auth"."uid"() AS "uid"))))));
 
 
 
-CREATE POLICY "Users can view household Plaid liabilities" ON "public"."PlaidLiability" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
-   FROM "public"."Account" "a"
-  WHERE (("a"."id" = "PlaidLiability"."accountId") AND (("a"."householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-           FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
-           FROM "public"."AccountOwner"
-          WHERE (("AccountOwner"."accountId" = "a"."id") AND ("AccountOwner"."ownerId" = "auth"."uid"()))))))))));
+CREATE POLICY "Users can view household Plaid liabilities" ON "public"."PlaidLiability" FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM "public"."Account"
+  WHERE (("Account"."id" = "PlaidLiability"."accountId") AND (("Account"."userId" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."can_access_account_via_accountowner"("Account"."id") OR "public"."can_access_household_data"("Account"."householdId", 'read'::"text"))))));
 
 
 
 CREATE POLICY "Users can view household TransactionSync" ON "public"."TransactionSync" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
    FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
    FROM "public"."Account" "a"
-  WHERE (("a"."id" = "TransactionSync"."accountId") AND (("a"."householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-           FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR (EXISTS ( SELECT 1
-           FROM "public"."AccountOwner"
-          WHERE (("AccountOwner"."accountId" = "a"."id") AND ("AccountOwner"."ownerId" = "auth"."uid"()))))))))));
+  WHERE (("a"."id" = "TransactionSync"."accountId") AND ("a"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
@@ -4704,25 +4967,21 @@ CREATE POLICY "Users can view household account investment values" ON "public"."
 
 
 
-CREATE POLICY "Users can view household accounts" ON "public"."Account" FOR SELECT USING (((("householdId" IS NOT NULL) AND ("householdId" IN ( SELECT "get_user_household_ids"."household_id"
-   FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id")))) OR ("userId" = "auth"."uid"()) OR "public"."can_access_account_via_accountowner"("id")));
+CREATE POLICY "Users can view household accounts" ON "public"."Account" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."can_access_account_via_accountowner"("id") OR "public"."is_current_user_admin"()));
 
 
 
 CREATE POLICY "Users can view household budget categories" ON "public"."BudgetCategory" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."Budget"
-  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND (("Budget"."householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-           FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("Budget"."userId" = "auth"."uid"()))))));
+  WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("public"."can_access_household_data"("Budget"."householdId", 'read'::"text") OR ("Budget"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
-CREATE POLICY "Users can view household budgets" ON "public"."Budget" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household budgets" ON "public"."Budget" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can view household debts" ON "public"."Debt" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household debts" ON "public"."Debt" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4733,13 +4992,11 @@ CREATE POLICY "Users can view household executions" ON "public"."Execution" FOR 
 
 
 
-CREATE POLICY "Users can view household goals" ON "public"."Goal" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household goals" ON "public"."Goal" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can view household investment accounts" ON "public"."InvestmentAccount" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household investment accounts" ON "public"."InvestmentAccount" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4752,7 +5009,7 @@ CREATE POLICY "Users can view household investment transactions" ON "public"."In
 
 
 CREATE POLICY "Users can view household members" ON "public"."HouseholdMemberNew" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_household_ids"."household_id"
-   FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id"))) OR ("userId" = "auth"."uid"())));
+   FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id"))) OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4763,8 +5020,7 @@ CREATE POLICY "Users can view household orders" ON "public"."Order" FOR SELECT U
 
 
 
-CREATE POLICY "Users can view household planned payments" ON "public"."PlannedPayment" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household planned payments" ON "public"."PlannedPayment" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4776,8 +5032,7 @@ CREATE POLICY "Users can view household positions" ON "public"."Position" FOR SE
 
 
 
-CREATE POLICY "Users can view household service subscriptions" ON "public"."UserServiceSubscription" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household service subscriptions" ON "public"."UserServiceSubscription" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
@@ -4789,79 +5044,69 @@ CREATE POLICY "Users can view household simple investment entries" ON "public"."
 
 
 
-CREATE POLICY "Users can view household subscriptions" ON "public"."Subscription" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household subscriptions" ON "public"."Subscription" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
 
 
 
-CREATE POLICY "Users can view household transactions" ON "public"."Transaction" FOR SELECT USING ((("householdId" IN ( SELECT "get_user_accessible_households"."household_id"
-   FROM "public"."get_user_accessible_households"() "get_user_accessible_households"("household_id"))) OR ("userId" = "auth"."uid"())));
+CREATE POLICY "Users can view household transactions" ON "public"."Transaction" FOR SELECT USING (("public"."can_access_household_data"("householdId", 'read'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can view own and household member profiles" ON "public"."User" FOR SELECT USING ((("id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
-   FROM ("public"."HouseholdMemberNew" "hm1"
-     JOIN "public"."HouseholdMemberNew" "hm2" ON (("hm1"."householdId" = "hm2"."householdId")))
-  WHERE (("hm1"."userId" = "auth"."uid"()) AND ("hm2"."userId" = "User"."id") AND ("hm1"."status" = 'active'::"text") AND ("hm2"."status" = 'active'::"text"))))));
+CREATE POLICY "Users can view own and household member profiles" ON "public"."User" FOR SELECT USING ((("id" = ( SELECT "auth"."uid"() AS "uid")) OR ("id" IN ( SELECT "HouseholdMemberNew"."userId"
+   FROM "public"."HouseholdMemberNew"
+  WHERE (("HouseholdMemberNew"."householdId" IN ( SELECT "get_user_household_ids"."household_id"
+           FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id"))) AND ("HouseholdMemberNew"."status" = 'active'::"text"))))));
 
 
 
-COMMENT ON POLICY "Users can view own and household member profiles" ON "public"."User" IS 'Allows users to view their own profile and profiles of other active members in the same household(s)';
+CREATE POLICY "Users can view own block history" ON "public"."UserBlockHistory" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can view own block history" ON "public"."UserBlockHistory" FOR SELECT USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can view own category learning" ON "public"."category_learning" FOR SELECT USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-COMMENT ON POLICY "Users can view own block history" ON "public"."UserBlockHistory" IS 'Allows users to view their own block/unblock history';
+CREATE POLICY "Users can view own contact submissions" ON "public"."ContactForm" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can view own category learning" ON "public"."category_learning" FOR SELECT USING (("user_id" = "auth"."uid"()));
+CREATE POLICY "Users can view own feedback submissions" ON "public"."Feedback" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can view own contact submissions" ON "public"."ContactForm" FOR SELECT USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can view own monthly usage" ON "public"."user_monthly_usage" FOR SELECT USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can view own feedback submissions" ON "public"."Feedback" FOR SELECT USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can view system and own categories" ON "public"."Category" FOR SELECT USING ((("userId" IS NULL) OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can view own monthly usage" ON "public"."user_monthly_usage" FOR SELECT USING (("user_id" = "auth"."uid"()));
+CREATE POLICY "Users can view system and own groups" ON "public"."Group" FOR SELECT USING ((("userId" IS NULL) OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can view system and own categories" ON "public"."Category" FOR SELECT USING ((("userId" IS NULL) OR ("userId" = "auth"."uid"())));
-
-
-
-CREATE POLICY "Users can view system and own groups" ON "public"."Group" FOR SELECT USING ((("userId" IS NULL) OR ("userId" = "auth"."uid"())));
-
-
-
-CREATE POLICY "Users can view system and own subcategories" ON "public"."Subcategory" FOR SELECT USING ((EXISTS ( SELECT 1
+CREATE POLICY "Users can view system and own subcategories" ON "public"."Subcategory" FOR SELECT USING ((("userId" IS NULL) OR (EXISTS ( SELECT 1
    FROM "public"."Category"
-  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = "auth"."uid"()))))));
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid"))))))));
 
 
 
-CREATE POLICY "Users can view their active household" ON "public"."UserActiveHousehold" FOR SELECT USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can view their active household" ON "public"."UserActiveHousehold" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
 CREATE POLICY "Users can view their households" ON "public"."Household" FOR SELECT USING ((("id" IN ( SELECT "get_user_household_ids"."household_id"
-   FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id"))) OR ("createdBy" = "auth"."uid"())));
+   FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id"))) OR ("createdBy" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
 
-CREATE POLICY "Users can view their own Plaid connections" ON "public"."PlaidConnection" FOR SELECT USING (("auth"."uid"() = "userId"));
+CREATE POLICY "Users can view their own Plaid connections" ON "public"."PlaidConnection" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can view their own Questrade connections" ON "public"."QuestradeConnection" FOR SELECT USING (("userId" = "auth"."uid"()));
+CREATE POLICY "Users can view their own Questrade connections" ON "public"."QuestradeConnection" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -4961,6 +5206,18 @@ GRANT ALL ON FUNCTION "public"."get_user_admin_household_ids"() TO "service_role
 
 
 
+GRANT ALL ON FUNCTION "public"."get_user_asset_allocation"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_asset_allocation"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_asset_allocation"("p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_user_holdings_view"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_holdings_view"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_holdings_view"("p_user_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_user_household_ids"() TO "anon";
 GRANT ALL ON FUNCTION "public"."get_user_household_ids"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_user_household_ids"() TO "service_role";
@@ -4970,6 +5227,18 @@ GRANT ALL ON FUNCTION "public"."get_user_household_ids"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."get_user_household_role"("p_household_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_user_household_role"("p_household_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_user_household_role"("p_household_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_user_portfolio_summary"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_portfolio_summary"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_portfolio_summary"("p_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."get_user_sector_allocation"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_user_sector_allocation"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_user_sector_allocation"("p_user_id" "uuid") TO "service_role";
 
 
 
@@ -5001,6 +5270,12 @@ GRANT ALL ON FUNCTION "public"."is_household_member"("p_household_id" "uuid") TO
 
 GRANT ALL ON FUNCTION "public"."notify_refresh_holdings"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."notify_refresh_holdings"() TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."prevent_emergency_fund_deletion"() TO "anon";
+GRANT ALL ON FUNCTION "public"."prevent_emergency_fund_deletion"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."prevent_emergency_fund_deletion"() TO "service_role";
 
 
 
@@ -5194,6 +5469,21 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."Subscription" TO "authentic
 
 
 
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."SubscriptionService" TO "authenticated";
+GRANT ALL ON TABLE "public"."SubscriptionService" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."SubscriptionServiceCategory" TO "authenticated";
+GRANT ALL ON TABLE "public"."SubscriptionServiceCategory" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."SubscriptionServicePlan" TO "authenticated";
+GRANT ALL ON TABLE "public"."SubscriptionServicePlan" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."SystemSettings" TO "anon";
 GRANT ALL ON TABLE "public"."SystemSettings" TO "authenticated";
 GRANT ALL ON TABLE "public"."SystemSettings" TO "service_role";
@@ -5232,12 +5522,10 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."UserServiceSubscription" TO
 
 
 GRANT ALL ON TABLE "public"."holdings_view" TO "service_role";
-GRANT SELECT ON TABLE "public"."holdings_view" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."asset_allocation_view" TO "service_role";
-GRANT SELECT ON TABLE "public"."asset_allocation_view" TO "authenticated";
 
 
 
@@ -5247,12 +5535,10 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."category_learning" TO "auth
 
 
 GRANT ALL ON TABLE "public"."portfolio_summary_view" TO "service_role";
-GRANT SELECT ON TABLE "public"."portfolio_summary_view" TO "authenticated";
 
 
 
 GRANT ALL ON TABLE "public"."sector_allocation_view" TO "service_role";
-GRANT SELECT ON TABLE "public"."sector_allocation_view" TO "authenticated";
 
 
 
@@ -5261,8 +5547,8 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."user_monthly_usage" TO "aut
 
 
 
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."vw_transactions_for_reports" TO "authenticated";
 GRANT ALL ON TABLE "public"."vw_transactions_for_reports" TO "service_role";
-GRANT SELECT ON TABLE "public"."vw_transactions_for_reports" TO "authenticated";
 
 
 

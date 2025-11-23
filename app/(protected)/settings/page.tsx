@@ -18,9 +18,11 @@ import {
 import { Save, User, CreditCard, Upload, Loader2 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ChangePasswordForm } from "@/components/profile/change-password-form";
+import { DeleteAccountSection } from "@/components/profile/delete-account-section";
 import { useToast } from "@/components/toast-provider";
 import { UsageChart } from "@/components/billing/usage-chart";
-import { SubscriptionManagement } from "@/components/billing/subscription-management";
+import { SubscriptionManagementEmbedded } from "@/components/billing/subscription-management-embedded";
+import { PaymentMethodManager } from "@/components/billing/payment-method-manager";
 import { Subscription, Plan } from "@/lib/validations/plan";
 import { PlanFeatures } from "@/lib/validations/plan";
 import { LimitCheckResult } from "@/lib/api/subscription";
@@ -796,7 +798,7 @@ function BillingModuleContent() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-      <SubscriptionManagement
+      <SubscriptionManagementEmbedded
         subscription={subscription}
         plan={plan}
         interval={billingInterval}
@@ -815,6 +817,8 @@ function BillingModuleContent() {
         />
       </div>
 
+
+      <PaymentMethodManager />
 
       <LazyPaymentHistory />
     </div>
@@ -979,6 +983,7 @@ export default function MyAccountPage() {
           <div className="space-y-6">
             <ProfileModule />
             <ChangePasswordForm />
+            <DeleteAccountSection />
           </div>
         </SimpleTabsContent>
 

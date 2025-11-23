@@ -10,11 +10,12 @@ import { useToast } from "@/components/toast-provider";
 
 interface PlansGridProps {
   currentPlanId?: string;
+  currentInterval?: "month" | "year" | null; // Current subscription interval
   subscription?: Subscription | null;
   onPlanChange?: () => void;
 }
 
-export function PlansGrid({ currentPlanId, subscription, onPlanChange }: PlansGridProps) {
+export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlanChange }: PlansGridProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [changingPlanId, setChangingPlanId] = useState<string | null>(null);
@@ -133,8 +134,10 @@ export function PlansGrid({ currentPlanId, subscription, onPlanChange }: PlansGr
   }
 
 
-  function getButtonText(plan: Plan): string {
-    if (plan.id === currentPlanId) {
+  function getButtonText(plan: Plan, interval: "month" | "year" = "month"): string {
+    // A plan is current only if both planId and interval match
+    // Note: plans-grid doesn't have interval selector, so we check if it matches currentInterval
+    if (plan.id === currentPlanId && interval === currentInterval) {
       return "Current";
     }
     if (plan.priceMonthly === 0) {
@@ -238,10 +241,12 @@ export function PlansGrid({ currentPlanId, subscription, onPlanChange }: PlansGr
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {sortedPlans.map((plan) => {
-          const isCurrent = plan.id === currentPlanId;
+          // Note: plans-grid shows monthly prices only, so we check if currentInterval is "month"
+          // A plan is current only if both planId and interval match
+          const isCurrent = plan.id === currentPlanId && currentInterval === "month";
           const price = plan.priceMonthly;
           const features = getFeatures(plan);
-          const buttonText = getButtonText(plan);
+          const buttonText = getButtonText(plan, "month");
 
           return (
             <Card

@@ -186,6 +186,10 @@ export async function signIn(data: SignInFormData): Promise<{ user: User | null;
       .eq("id", authData.user.id)
       .single();
 
+    // Note: If account was deleted, it should already be removed from auth.users
+    // This check is just a safety measure in case deletion didn't complete
+    // In normal operation, deleted accounts won't exist in User table due to CASCADE
+
     if (!userData) {
       // Create user profile if it doesn't exist (owners who sign in directly are admins)
       const { data: newUser, error: userError } = await supabase

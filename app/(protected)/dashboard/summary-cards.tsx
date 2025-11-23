@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/components/common/money";
 import { ArrowUpRight, ArrowDownRight, TrendingUp, Wallet } from "lucide-react";
 import { AccountsBreakdownModal } from "@/components/dashboard/accounts-breakdown-modal";
@@ -346,8 +347,11 @@ export function SummaryCards({
         {/* Carousel Indicators */}
         <div className="flex justify-center gap-2 mt-3">
           {cards.map((_, index) => (
-            <button
+            <Button
               key={index}
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 const carousel = carouselRef.current;
                 if (carousel) {
@@ -361,7 +365,7 @@ export function SummaryCards({
                 }
               }}
               className={cn(
-                "h-2 rounded-full transition-all",
+                "h-2 rounded-full transition-all p-0",
                 activeIndex === index
                   ? "w-6 bg-primary"
                   : "w-2 bg-muted-foreground/30"

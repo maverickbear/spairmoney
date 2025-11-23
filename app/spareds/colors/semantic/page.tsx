@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const semanticColors = {
   primary: '#4A4AF2',
@@ -44,12 +45,15 @@ export default function SemanticColorsPage() {
                 <div className="text-sm font-mono text-muted-foreground">
                   {color}
                 </div>
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="small"
                   onClick={() => copyToClipboard(color, name)}
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-primary"
                 >
                   {copied === name ? '✓ Copied' : '📋 Copy'}
-                </button>
+                </Button>
               </div>
             </CardContent>
           </Card>

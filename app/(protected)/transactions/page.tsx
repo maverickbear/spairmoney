@@ -18,7 +18,7 @@ import dynamic from "next/dynamic";
 // Lazy load heavy form components
 const TransactionForm = dynamic(() => import("@/components/forms/transaction-form").then(m => ({ default: m.TransactionForm })), { ssr: false });
 const CsvImportDialog = dynamic(() => import("@/components/forms/csv-import-dialog").then(m => ({ default: m.CsvImportDialog })), { ssr: false });
-const CategorySelectionModal = dynamic(() => import("@/components/transactions/category-selection-modal").then(m => ({ default: m.CategorySelectionModal })), { ssr: false });
+const CategorySelectionDialog = dynamic(() => import("@/components/transactions/category-selection-dialog").then(m => ({ default: m.CategorySelectionDialog })), { ssr: false });
 import { formatMoney } from "@/components/common/money";
 import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight, Filter, Calendar, Wallet, Tag, Type, XCircle } from "lucide-react";
 import { TransactionsMobileCard } from "@/components/transactions/transactions-mobile-card";
@@ -2012,8 +2012,11 @@ export default function TransactionsPage() {
                       </div>
                     </div>
                   ) : (
-                    <span 
-                      className="text-blue-600 dark:text-blue-400 underline decoration-dashed underline-offset-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="small"
+                      className="text-blue-600 dark:text-blue-400 underline decoration-dashed underline-offset-2"
                       onClick={() => {
                         setTransactionForCategory(tx);
                         setSelectedCategoryId(tx.categoryId || null);
@@ -2022,7 +2025,7 @@ export default function TransactionsPage() {
                       }}
                     >
                       Add Category
-                    </span>
+                    </Button>
                   )}
                 </TableCell>
                 <TableCell className="text-xs md:text-sm hidden lg:table-cell max-w-[150px]">
@@ -2344,13 +2347,16 @@ export default function TransactionsPage() {
                   className="h-10 w-full pl-9 pr-10"
                 />
                 {filters.search && (
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setFilters({ ...filters, search: "" })}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
                     aria-label="Clear search"
                   >
                     <XCircle className="h-4 w-4 text-muted-foreground" />
-                  </button>
+                  </Button>
                 )}
                 {searchLoading && !filters.search && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -2467,54 +2473,27 @@ export default function TransactionsPage() {
       </Dialog>
 
       {/* Category Selection Modal */}
-      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {transactionForCategory?.category?.name ? "Change Category" : "Add Category"}
-            </DialogTitle>
-            <DialogDescription>
-              Select a category for this transaction
-            </DialogDescription>
-          </DialogHeader>
-          <CategorySelectionModal
-            transaction={transactionForCategory}
-            categories={categories}
-            onSelect={(categoryId, subcategoryId) => {
-              setSelectedCategoryId(categoryId);
-              setSelectedSubcategoryId(subcategoryId);
-            }}
-            onClear={() => {
-              setSelectedCategoryId(null);
-              setSelectedSubcategoryId(null);
-            }}
-            clearTrigger={clearCategoryTrigger}
-          />
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                // Clear parent state
-                setSelectedCategoryId(null);
-                setSelectedSubcategoryId(null);
-                // Trigger clear in modal by incrementing the trigger
-                setClearCategoryTrigger(prev => prev + 1);
-              }}
-            >
-              Clear
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                handleCategoryUpdate(selectedCategoryId, selectedSubcategoryId);
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CategorySelectionDialog
+        open={isCategoryModalOpen}
+        onOpenChange={setIsCategoryModalOpen}
+        transaction={transactionForCategory}
+        categories={categories}
+        selectedCategoryId={selectedCategoryId}
+        selectedSubcategoryId={selectedSubcategoryId}
+        onCategorySelect={(categoryId, subcategoryId) => {
+          setSelectedCategoryId(categoryId);
+          setSelectedSubcategoryId(subcategoryId);
+        }}
+        onClear={() => {
+          setSelectedCategoryId(null);
+          setSelectedSubcategoryId(null);
+          setClearCategoryTrigger(prev => prev + 1);
+        }}
+        onSave={() => {
+          handleCategoryUpdate(selectedCategoryId, selectedSubcategoryId);
+        }}
+        clearTrigger={clearCategoryTrigger}
+      />
       {DeleteConfirmDialog}
       {DeleteMultipleConfirmDialog}
 

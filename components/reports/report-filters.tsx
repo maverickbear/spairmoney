@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -23,18 +22,13 @@ export type ReportPeriod =
 
 export interface ReportFiltersProps {
   period: ReportPeriod;
-  onPeriodChange: (period: ReportPeriod) => void;
-  onDateRangeChange?: (startDate: Date, endDate: Date) => void;
 }
 
-export function ReportFilters({
-  period,
-  onPeriodChange,
-  onDateRangeChange,
-}: ReportFiltersProps) {
+export function ReportFilters({ period }: ReportFiltersProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const now = new Date();
-  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
-  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>("this-month");
   
   const getDateRange = (period: ReportPeriod): { startDate: Date; endDate: Date } => {
     switch (period) {
@@ -71,66 +65,37 @@ export function ReportFilters({
     }
   };
 
-  const handleDateRangeChange = (preset: DateRangePreset | "custom", range?: DateRange) => {
-    setDateRangePreset(preset);
-    if (preset === "custom" && range) {
-      setCustomDateRange(range);
-      if (onDateRangeChange) {
-        onDateRangeChange(new Date(range.startDate), new Date(range.endDate));
-      }
-    } else if (preset !== "custom") {
-      setCustomDateRange(undefined);
-      const dateRange = getDateRange(period);
-      if (onDateRangeChange) {
-        onDateRangeChange(dateRange.startDate, dateRange.endDate);
-      }
-    }
-  };
-
   const handlePeriodChange = (newPeriod: ReportPeriod) => {
-    onPeriodChange(newPeriod);
-    if (newPeriod !== "custom") {
-      setDateRangePreset("this-month");
-      setCustomDateRange(undefined);
-      const dateRange = getDateRange(newPeriod);
-      if (onDateRangeChange) {
-        onDateRangeChange(dateRange.startDate, dateRange.endDate);
-      }
+    const params = new URLSearchParams(searchParams.toString());
+    if (newPeriod === "last-12-months") {
+      // Remove period param to use default
+      params.delete("period");
     } else {
-      setDateRangePreset("custom");
+      params.set("period", newPeriod);
     }
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
   };
 
-  const dateRange = period === "custom" && customDateRange
-    ? { startDate: new Date(customDateRange.startDate), endDate: new Date(customDateRange.endDate) }
-    : getDateRange(period);
+  const dateRange = getDateRange(period);
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
       <div className="flex items-center gap-2">
         <Calendar className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Period:</span>
-        {period === "custom" ? (
-          <DateRangePicker
-            value={dateRangePreset}
-            dateRange={customDateRange}
-            onValueChange={handleDateRangeChange}
-          />
-        ) : (
-          <Select value={period} onValueChange={(value) => handlePeriodChange(value as ReportPeriod)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current-month">Current Month</SelectItem>
-              <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-              <SelectItem value="last-6-months">Last 6 Months</SelectItem>
-              <SelectItem value="last-12-months">Last 12 Months</SelectItem>
-              <SelectItem value="year-to-date">Year to Date</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
+        <Select value={period} onValueChange={(value) => handlePeriodChange(value as ReportPeriod)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="current-month">Current Month</SelectItem>
+            <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+            <SelectItem value="last-6-months">Last 6 Months</SelectItem>
+            <SelectItem value="last-12-months">Last 12 Months</SelectItem>
+            <SelectItem value="year-to-date">Year to Date</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="text-sm text-muted-foreground">
         {format(dateRange.startDate, "MMM dd, yyyy")} - {format(dateRange.endDate, "MMM dd, yyyy")}
@@ -138,4 +103,3 @@ export function ReportFilters({
     </div>
   );
 }
-

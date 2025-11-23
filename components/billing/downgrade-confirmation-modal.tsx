@@ -4,6 +4,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -139,26 +140,23 @@ export function DowngradeConfirmationModal({
                 to subscribe to the {targetPlan.name.charAt(0).toUpperCase() + targetPlan.name.slice(1)} plan.
               </AlertDescription>
             </Alert>
-
-          <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={onConfirm}
-              disabled={loading}
-              className="flex-1"
-            >
-              {loading ? "Processing..." : "Confirm Downgrade"}
-            </Button>
-          </div>
         </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={loading}
+          >
+            {loading ? "Processing..." : "Confirm Downgrade"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from '@/components/ui/button';
+
 export function AnalyticsMockup() {
   return (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -51,9 +53,9 @@ export function AnalyticsMockup() {
           </div>
         </div>
 
-        <button className="w-full mt-4 text-xs border border-border rounded-lg py-2 hover:bg-muted transition-colors">
+        <Button variant="outline" size="small" className="w-full mt-4 text-xs">
           View all activity →
-        </button>
+        </Button>
       </div>
     </div>
   );

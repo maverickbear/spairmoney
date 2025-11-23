@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { defaultValuesTokens } from '@/spareds/tokens';
 
 interface TokenViewerProps {
@@ -344,12 +345,15 @@ export function TokenViewer({ title, description, data, level }: TokenViewerProp
                             )}
                           </TableCell>
                           <TableCell>
-                            <button
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="small"
                               onClick={() => copyToClipboard(token.value, token.fullKey)}
-                              className="text-xs text-primary hover:underline px-2 py-1 rounded hover:bg-accent"
+                              className="text-xs text-primary"
                             >
                               {copiedKey === token.fullKey ? '✓ Copied' : '📋 Copy'}
-                            </button>
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );
@@ -396,12 +400,15 @@ export function TokenViewer({ title, description, data, level }: TokenViewerProp
                         </TableCell>
                         <TableCell>
                           {token.value && (
-                            <button
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="small"
                               onClick={() => copyToClipboard(token.value, token.fullKey)}
-                              className="text-xs text-primary hover:underline"
+                              className="text-xs text-primary"
                             >
                               {copiedKey === token.fullKey ? '✓' : '📋'}
-                            </button>
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>

@@ -1002,6 +1002,15 @@ export async function getTransactions(filters?: {
 }
 
 export async function getUpcomingTransactions(limit: number = 5, accessToken?: string, refreshToken?: string) {
+  // Check authentication first to avoid RLS errors
+  const supabase = await createServerClient(accessToken, refreshToken);
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !user) {
+    // User not authenticated, return empty array
+    return [];
+  }
+
   const now = new Date();
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
@@ -1036,7 +1045,6 @@ export async function getUpcomingTransactions(limit: number = 5, accessToken?: s
 
   // Also get recurring transactions and generate planned payments for them
   // This is a temporary solution until we fully migrate to PlannedPayments
-  const supabase = await createServerClient(accessToken, refreshToken);
   const { data: recurringTransactions, error: recurringError } = await supabase
     .from("Transaction")
     .select(`

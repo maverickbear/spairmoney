@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { LayoutWrapper } from "@/components/layout-wrapper";
 import { KBarWrapper } from "@/components/kbar-wrapper";
 import { ToastProvider } from "@/components/toast-provider";
+import { StripeProvider } from "@/components/stripe-provider";
 import { ServiceWorkerRegister } from "./sw-register";
 // PlanLimitsProvider removed - SubscriptionProvider in protected layout handles this
 
@@ -33,18 +34,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
-      <body className={`${inter.className} bg-white`}>
+      <body className={`${inter.className} bg-background text-foreground`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
           enableSystem={false}
           disableTransitionOnChange
         >
+          <StripeProvider>
           <ToastProvider>
             <LayoutWrapper>{children}</LayoutWrapper>
             <KBarWrapper />
             <ServiceWorkerRegister />
           </ToastProvider>
+          </StripeProvider>
         </ThemeProvider>
       </body>
     </html>

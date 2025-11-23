@@ -7,35 +7,19 @@
 
 import React from 'react';
 import { getToken, tokens, colors } from '../tokens';
+import { Button } from '@/components/ui/button';
 
 // ============================================================================
 // Exemplo 1: Botão Primário
 // ============================================================================
 
 export function PrimaryButtonExample({ children }: { children: React.ReactNode }) {
-  const bgColor = getToken('component.button.primary.bg');
-  const textColor = getToken('component.button.primary.text');
-  const hoverBg = getToken('component.button.primary.bg-hover');
-  
-  const [isHovered, setIsHovered] = React.useState(false);
-  
+  // Note: This example demonstrates token usage, but uses the design system Button component
+  // The Button component internally uses these tokens via the design system
   return (
-    <button
-      style={{
-        backgroundColor: isHovered ? hoverBg : bgColor,
-        color: textColor,
-        padding: '12px 24px',
-        borderRadius: '8px',
-        border: 'none',
-        cursor: 'pointer',
-        transition: 'background-color 0.2s',
-        fontWeight: 500,
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <Button variant="default">
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -310,19 +294,9 @@ export function ComponentWithHook() {
       <p style={{ color: tokens.textSecondary }}>
         Texto secundário usando tokens
       </p>
-      <button
-        style={{
-          backgroundColor: tokens.button.primary.bg,
-          color: tokens.button.primary.text,
-          padding: '12px 24px',
-          borderRadius: '8px',
-          border: 'none',
-          cursor: 'pointer',
-          marginTop: '16px',
-        }}
-      >
+      <Button variant="default" className="mt-4">
         Botão Primário
-      </button>
+      </Button>
     </div>
   );
 }
@@ -364,9 +338,9 @@ export function ThemedComponent({
       }}
     >
       <div style={{ marginBottom: '16px' }}>
-        <button onClick={() => setIsDark(!isDark)}>
+        <Button type="button" variant="outline" onClick={() => setIsDark(!isDark)}>
           Toggle {isDark ? 'Light' : 'Dark'} Mode
-        </button>
+        </Button>
       </div>
       {children}
     </div>
@@ -480,18 +454,9 @@ export function DirectAccessExample() {
       <p style={{ color: primaryColor }}>
         Texto usando cor primária: {primaryColor}
       </p>
-      <button
-        style={{
-          backgroundColor: buttonBg,
-          color: 'white',
-          padding: '12px 24px',
-          borderRadius: '8px',
-          border: 'none',
-          cursor: 'pointer',
-        }}
-      >
+      <Button variant="default">
         Botão com Background: {buttonBg}
-      </button>
+      </Button>
     </div>
   );
 }

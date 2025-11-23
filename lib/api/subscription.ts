@@ -345,6 +345,7 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
               return null;
             }
             if (!data || data.length === 0) {
+              log.debug("No subscription found by householdId", { householdId, userId });
               return null;
             }
             // Prioritize: active/trialing > cancelled, then by createdAt (newest first)
@@ -353,6 +354,11 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
               const bPriority = (b.status === "active" || b.status === "trialing") ? 0 : 1;
               if (aPriority !== bPriority) return aPriority - bPriority;
               return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            });
+            log.debug("Found subscription by householdId", { 
+              subscriptionId: sorted[0].id, 
+              status: sorted[0].status,
+              householdId 
             });
             return sorted[0] as Subscription;
           })
@@ -371,6 +377,7 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
           return null;
         }
         if (!data || data.length === 0) {
+          log.debug("No subscription found by userId", { userId });
           return null;
         }
         // Prioritize: active/trialing > cancelled, then by createdAt (newest first)
@@ -379,6 +386,11 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
           const bPriority = (b.status === "active" || b.status === "trialing") ? 0 : 1;
           if (aPriority !== bPriority) return aPriority - bPriority;
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        log.debug("Found subscription by userId", { 
+          subscriptionId: sorted[0].id, 
+          status: sorted[0].status,
+          userId 
         });
         return sorted[0] as Subscription;
       })

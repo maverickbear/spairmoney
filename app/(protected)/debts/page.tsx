@@ -7,14 +7,8 @@ import { DebtForm } from "@/components/forms/debt-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, CreditCard, Loader2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { RecordPaymentDialog } from "@/components/debts/record-payment-dialog";
+import { useToast } from "@/components/toast-provider";
 import { formatMoney } from "@/components/common/money";
 import {
   Select,
@@ -71,7 +65,6 @@ export default function DebtsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [sortBy, setSortBy] = useState<"priority" | "progress" | "months_remaining">("priority");
   const [filterBy, setFilterBy] = useState<"all" | "active" | "paused" | "paid_off">("all");
   const [loading, setLoading] = useState(false);
@@ -146,31 +139,6 @@ export default function DebtsPage() {
     setIsPaymentOpen(true);
   }
 
-  async function submitPayment() {
-    if (!selectedDebt) return;
-
-    const amount = parseFloat(paymentAmount);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid amount");
-      return;
-    }
-
-    setPaymentLoading(true);
-    try {
-      const { addPaymentClient } = await import("@/lib/api/debts-client");
-      await addPaymentClient(selectedDebt.id, amount);
-
-      setIsPaymentOpen(false);
-      setPaymentAmount("");
-      setSelectedDebt(null);
-      loadDebts();
-    } catch (error) {
-      console.error("Error adding payment:", error);
-      alert(error instanceof Error ? error.message : "Failed to add payment");
-    } finally {
-      setPaymentLoading(false);
-    }
-  }
 
   // Filter and sort debts
   const filteredDebts = debts.filter((debt) => {
@@ -352,65 +320,38 @@ export default function DebtsPage() {
         }}
       />
 
-      <Dialog 
-        open={isPaymentOpen} 
+      <RecordPaymentDialog
+        open={isPaymentOpen}
         onOpenChange={(open) => {
           setIsPaymentOpen(open);
           if (!open) {
-            setPaymentAmount("");
             setSelectedDebt(null);
           }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              Record a payment for {selectedDebt?.name || "this debt"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Payment Amount</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={paymentAmount || ""}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-              />
-              {selectedDebt && (
-                <p className="text-xs text-muted-foreground">
-                  Current balance: {formatMoney(selectedDebt.currentBalance)}
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setIsPaymentOpen(false);
-                setPaymentAmount("");
-                setSelectedDebt(null);
-              }}
-              disabled={paymentLoading}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitPayment} disabled={paymentLoading}>
-              {paymentLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Recording...
-                </>
-              ) : (
-                "Record Payment"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        debt={selectedDebt}
+        onConfirm={async (amount) => {
+          if (!selectedDebt) return;
+          setPaymentLoading(true);
+          try {
+            const { addPaymentClient } = await import("@/lib/api/debts-client");
+            await addPaymentClient(selectedDebt.id, amount);
+
+            setIsPaymentOpen(false);
+            setSelectedDebt(null);
+            loadDebts();
+          } catch (error) {
+            console.error("Error adding payment:", error);
+            toast({
+              title: "Error",
+              description: error instanceof Error ? error.message : "Failed to add payment",
+              variant: "destructive",
+            });
+          } finally {
+            setPaymentLoading(false);
+          }
+        }}
+        loading={paymentLoading}
+      />
       {ConfirmDialog}
       </div>
 

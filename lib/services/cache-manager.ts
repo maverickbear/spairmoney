@@ -18,6 +18,7 @@ export const CACHE_TAGS = {
   DEBTS: 'debts',
   CATEGORIES: 'categories',
   DASHBOARD: 'dashboard',
+  REPORTS: 'reports',
   FINANCIAL_HEALTH: 'financial-health',
   INVESTMENTS: 'investments',
   LIABILITIES: 'liabilities',
@@ -103,6 +104,16 @@ export const generateCacheKey = {
     }
     return parts.join(':');
   },
+
+  /**
+   * Generate cache key for reports
+   */
+  reports: (params: { userId?: string; period?: string }) => {
+    const parts = ['reports'];
+    if (params.userId) parts.push(params.userId);
+    if (params.period) parts.push(params.period);
+    return parts.join(':');
+  },
 };
 
 /**
@@ -152,6 +163,7 @@ export function invalidateTransactionCaches(): void {
   invalidateCache(
     CACHE_TAGS.TRANSACTIONS,
     CACHE_TAGS.DASHBOARD,
+    CACHE_TAGS.REPORTS,
     CACHE_TAGS.FINANCIAL_HEALTH,
     CACHE_TAGS.ACCOUNTS, // Balance depends on transactions
   );

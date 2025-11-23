@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SimpleTabs, SimpleTabsContent, SimpleTabsList, SimpleTabsTrigger } from "@/components/ui/simple-tabs";
+import { SimpleTabsContent } from "@/components/ui/simple-tabs";
 import { format } from "date-fns/format";
 import { startOfMonth } from "date-fns/startOfMonth";
 import { endOfMonth } from "date-fns/endOfMonth";
@@ -34,7 +34,6 @@ import { SpendingPatternsSection } from "@/components/reports/spending-patterns-
 import { FinancialHealthInsights } from "@/components/reports/financial-health-insights";
 import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { CategoryExpensesChart } from "@/components/charts/category-expenses-chart";
-import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 
 interface ReportsContentProps {
   limits: PlanFeatures;
@@ -161,59 +160,7 @@ export function ReportsContent({
     : `${format(dateRange.startDate, "MMM dd, yyyy")} - ${format(dateRange.endDate, "MMM dd, yyyy")}`;
 
   return (
-    <SimpleTabs defaultValue="overview" className="w-full">
-      {/* Fixed Tabs - Desktop only */}
-      <FixedTabsWrapper>
-          <SimpleTabsList className="flex-wrap">
-            <SimpleTabsTrigger value="overview">Overview</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="income-expenses">Income & Expenses</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="investments">Investments</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="debts">Debts</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="goals">Goals</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="accounts">Accounts</SimpleTabsTrigger>
-            <SimpleTabsTrigger value="insights">Insights</SimpleTabsTrigger>
-          </SimpleTabsList>
-      </FixedTabsWrapper>
-
-      {/* Mobile/Tablet Tabs - Sticky at top */}
-        <div 
-        className="lg:hidden sticky top-0 z-40 bg-card dark:bg-transparent border-b"
-        >
-          <div 
-            className="overflow-x-auto scrollbar-hide" 
-            style={{ 
-              WebkitOverflowScrolling: 'touch',
-              scrollSnapType: 'x mandatory',
-              touchAction: 'pan-x',
-            }}
-          >
-            <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
-              <SimpleTabsTrigger value="overview" className="flex-shrink-0 whitespace-nowrap">
-                Overview
-              </SimpleTabsTrigger>
-              <SimpleTabsTrigger value="income-expenses" className="flex-shrink-0 whitespace-nowrap">
-                Income & Expenses
-              </SimpleTabsTrigger>
-              <SimpleTabsTrigger value="investments" className="flex-shrink-0 whitespace-nowrap">
-                Investments
-              </SimpleTabsTrigger>
-              <SimpleTabsTrigger value="debts" className="flex-shrink-0 whitespace-nowrap">
-                Debts
-              </SimpleTabsTrigger>
-              <SimpleTabsTrigger value="goals" className="flex-shrink-0 whitespace-nowrap">
-                Goals
-              </SimpleTabsTrigger>
-              <SimpleTabsTrigger value="accounts" className="flex-shrink-0 whitespace-nowrap">
-                Accounts
-              </SimpleTabsTrigger>
-              <SimpleTabsTrigger value="insights" className="flex-shrink-0 whitespace-nowrap">
-                Insights
-              </SimpleTabsTrigger>
-            </SimpleTabsList>
-        </div>
-      </div>
-
-      <div className="w-full">
+    <>
         {/* Overview Tab */}
         <SimpleTabsContent value="overview">
         {/* Income vs Expenses Trend */}
@@ -395,8 +342,7 @@ export function ReportsContent({
           <FinancialHealthInsights financialHealth={financialHealth} />
         </div>
       </SimpleTabsContent>
-      </div>
-    </SimpleTabs>
+    </>
   );
 }
 

@@ -46,6 +46,8 @@
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-tabs": "^1.0.4",
     "@sentry/nextjs": "^10.25.0",
+    "@stripe/react-stripe-js": "^2.9.0",
+    "@stripe/stripe-js": "^2.4.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.78.0",
     "@upstash/redis": "^1.35.6",

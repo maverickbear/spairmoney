@@ -7,16 +7,9 @@ import { GoalForm } from "@/components/forms/goal-form";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2, PiggyBank } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/components/common/money";
+import { GoalTopUpDialog } from "@/components/goals/goal-top-up-dialog";
+import { GoalWithdrawDialog } from "@/components/goals/goal-withdraw-dialog";
 import {
   Select,
   SelectContent,
@@ -60,8 +53,6 @@ export default function GoalsPage() {
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  const [topUpAmount, setTopUpAmount] = useState<string>("");
-  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [sortBy, setSortBy] = useState<"progress" | "eta">("progress");
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -165,110 +156,6 @@ export default function GoalsPage() {
     setIsWithdrawOpen(true);
   }
 
-  async function submitTopUp() {
-    if (!selectedGoal) return;
-
-    const amount = parseFloat(topUpAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a valid amount",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const goalId = selectedGoal.id;
-    const oldBalance = selectedGoal.currentBalance;
-    
-    setTopUpLoading(true);
-    // Optimistic update: update UI immediately
-    setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: g.currentBalance + amount } : g));
-
-    try {
-      const { topUpGoalClient } = await import("@/lib/api/goals-client");
-      await topUpGoalClient(goalId, amount);
-
-      toast({
-        title: "Top-up added",
-        description: `Successfully added ${formatMoney(amount)} to your goal.`,
-        variant: "success",
-      });
-
-      setIsTopUpOpen(false);
-      setTopUpAmount("");
-      setSelectedGoal(null);
-      loadGoals();
-    } catch (error) {
-      console.error("Error adding top-up:", error);
-      // Revert optimistic update on error
-      setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: oldBalance } : g));
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add top-up",
-        variant: "destructive",
-      });
-    } finally {
-      setTopUpLoading(false);
-    }
-  }
-
-  async function submitWithdraw() {
-    if (!selectedGoal) return;
-
-    const amount = parseFloat(withdrawAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a valid amount",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (amount > selectedGoal.currentBalance) {
-      toast({
-        title: "Validation Error",
-        description: "Withdrawal amount cannot exceed current balance",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const goalId = selectedGoal.id;
-    const oldBalance = selectedGoal.currentBalance;
-    
-    setWithdrawLoading(true);
-    // Optimistic update: update UI immediately
-    setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: g.currentBalance - amount } : g));
-
-    try {
-      const { withdrawFromGoalClient } = await import("@/lib/api/goals-client");
-      await withdrawFromGoalClient(goalId, amount);
-
-      toast({
-        title: "Withdrawal successful",
-        description: `Successfully withdrew ${formatMoney(amount)} from your goal.`,
-        variant: "success",
-      });
-
-      setIsWithdrawOpen(false);
-      setWithdrawAmount("");
-      setSelectedGoal(null);
-      loadGoals();
-    } catch (error) {
-      console.error("Error withdrawing:", error);
-      // Revert optimistic update on error
-      setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: oldBalance } : g));
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to withdraw",
-        variant: "destructive",
-      });
-    } finally {
-      setWithdrawLoading(false);
-    }
-  }
 
   // Sort goals
   const sortedGoals = [...goals].sort((a, b) => {
@@ -363,86 +250,85 @@ export default function GoalsPage() {
         }}
       />
 
-      <Dialog open={isTopUpOpen} onOpenChange={setIsTopUpOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Top-up</DialogTitle>
-            <DialogDescription>
-              Add money to {selectedGoal?.name || "this goal"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Amount</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={topUpAmount}
-                onChange={(e) => setTopUpAmount(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTopUpOpen(false)} disabled={topUpLoading}>
-              Cancel
-            </Button>
-            <Button onClick={submitTopUp} disabled={topUpLoading}>
-              {topUpLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                "Add Top-up"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <GoalTopUpDialog
+        open={isTopUpOpen}
+        onOpenChange={setIsTopUpOpen}
+        goal={selectedGoal}
+        onConfirm={async (amount) => {
+          if (!selectedGoal) return;
+          const goalId = selectedGoal.id;
+          const oldBalance = selectedGoal.currentBalance;
+          
+          setTopUpLoading(true);
+          setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: g.currentBalance + amount } : g));
 
-      <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Withdraw from Goal</DialogTitle>
-            <DialogDescription>
-              Withdraw money from {selectedGoal?.name || "this goal"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Amount</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-              />
-              {selectedGoal && (
-                <p className="text-xs text-muted-foreground">
-                  Current balance: {formatMoney(selectedGoal.currentBalance)}
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsWithdrawOpen(false)} disabled={withdrawLoading}>
-              Cancel
-            </Button>
-            <Button onClick={submitWithdraw} disabled={withdrawLoading}>
-              {withdrawLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Withdrawing...
-                </>
-              ) : (
-                "Withdraw"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          try {
+            const { topUpGoalClient } = await import("@/lib/api/goals-client");
+            await topUpGoalClient(goalId, amount);
+
+            toast({
+              title: "Top-up added",
+              description: `Successfully added ${formatMoney(amount)} to your goal.`,
+              variant: "success",
+            });
+
+            setIsTopUpOpen(false);
+            setSelectedGoal(null);
+            loadGoals();
+          } catch (error) {
+            console.error("Error adding top-up:", error);
+            setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: oldBalance } : g));
+            toast({
+              title: "Error",
+              description: error instanceof Error ? error.message : "Failed to add top-up",
+              variant: "destructive",
+            });
+          } finally {
+            setTopUpLoading(false);
+          }
+        }}
+        loading={topUpLoading}
+      />
+
+      <GoalWithdrawDialog
+        open={isWithdrawOpen}
+        onOpenChange={setIsWithdrawOpen}
+        goal={selectedGoal}
+        onConfirm={async (amount) => {
+          if (!selectedGoal) return;
+          const goalId = selectedGoal.id;
+          const oldBalance = selectedGoal.currentBalance;
+          
+          setWithdrawLoading(true);
+          setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: g.currentBalance - amount } : g));
+
+          try {
+            const { withdrawFromGoalClient } = await import("@/lib/api/goals-client");
+            await withdrawFromGoalClient(goalId, amount);
+
+            toast({
+              title: "Withdrawal successful",
+              description: `Successfully withdrew ${formatMoney(amount)} from your goal.`,
+              variant: "success",
+            });
+
+            setIsWithdrawOpen(false);
+            setSelectedGoal(null);
+            loadGoals();
+          } catch (error) {
+            console.error("Error withdrawing:", error);
+            setGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentBalance: oldBalance } : g));
+            toast({
+              title: "Error",
+              description: error instanceof Error ? error.message : "Failed to withdraw",
+              variant: "destructive",
+            });
+          } finally {
+            setWithdrawLoading(false);
+          }
+        }}
+        loading={withdrawLoading}
+      />
       {ConfirmDialog}
       </div>
 

@@ -705,8 +705,10 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
   const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
   const founderName = data.founderName || "Naor Tartarotti";
   
-  // Always use noreply@sparefinance.com as the sender with "Spare Finance" as display name
-  const finalFromEmail = "Spare Finance <noreply@sparefinance.com>";
+  // Use founder's email as the sender so replies go directly to the founder
+  // Default to naor@sparefinance.com if FOUNDER_EMAIL is not configured
+  const founderEmail = process.env.FOUNDER_EMAIL || "naor@sparefinance.com";
+  const finalFromEmail = `${founderName} <${founderEmail}>`;
 
   console.log("[EMAIL] Welcome email - Final from email value:", JSON.stringify(finalFromEmail));
 
@@ -791,11 +793,20 @@ function getWelcomeEmailTemplate(data: {
               <p style="margin:0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
                 Your feedback is very welcome! If you have any questions, suggestions, or just want to share your experience, feel free to reply to this email. I read and respond to every message personally.
               </p>
-              <p style="margin:0; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
-                Best regards,<br>
-                ${data.founderName}<br>
-                <span style="color: #8a8a8a; font-size: 14px;">Founder, Spare Finance</span>
-              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0;">
+                <tr>
+                  <td style="padding-right: 16px; vertical-align: top;">
+                    <img src="https://dvshwrtzazoetkbzxolv.supabase.co/storage/v1/object/public/images/founder-avatar.jpeg" alt="${data.founderName}" style="width: 64px; height: 64px; border-radius: 50%; display: block;" />
+                  </td>
+                  <td style="vertical-align: top;">
+                    <p style="margin:0; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                      Best regards,<br>
+                      ${data.founderName}<br>
+                      <span style="color: #8a8a8a; font-size: 14px;">Founder, Spare Finance</span>
+                    </p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <tr>

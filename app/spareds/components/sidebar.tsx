@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 const menuItems = [
   {
@@ -152,12 +153,14 @@ export function Sidebar() {
                 </Link>
               ) : (
                 <>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
                     onClick={() => toggleExpand(item.title)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg ${
                       expandedItems.includes(item.title)
                         ? 'bg-accent text-accent-foreground'
-                        : 'text-foreground hover:bg-accent hover:text-accent-foreground'
+                        : ''
                     }`}
                   >
                     <span className="text-xl">{item.icon}</span>
@@ -169,7 +172,7 @@ export function Sidebar() {
                     >
                       ▶
                     </span>
-                  </button>
+                  </Button>
                   {expandedItems.includes(item.title) && item.children && (
                     <ul className="ml-4 mt-1 space-y-1">
                       {item.children.map((child) => (

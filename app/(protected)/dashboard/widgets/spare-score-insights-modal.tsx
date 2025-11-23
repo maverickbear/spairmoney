@@ -5,10 +5,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -538,6 +540,15 @@ export function SpareScoreInsightsModal({
             </div>
           )}
         </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

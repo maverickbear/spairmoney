@@ -61,7 +61,7 @@ const DialogContent = React.forwardRef<
         ref={ref}
         className={cn(
           // Mobile: fullscreen
-          "fixed z-50 flex flex-col w-screen h-screen max-w-screen max-h-screen m-0 rounded-none border bg-background p-0",
+          "fixed z-50 flex flex-col w-screen h-screen max-w-screen max-h-screen m-0 rounded-none border bg-background p-0 overflow-clip",
           "left-0 top-0 translate-x-0 translate-y-0",
           "duration-200",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",

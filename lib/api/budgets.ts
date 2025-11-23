@@ -188,6 +188,14 @@ async function ensureRecurringBudgetsForPeriod(
 export async function getBudgetsInternal(period: Date, accessToken?: string, refreshToken?: string) {
     const supabase = await createServerClient(accessToken, refreshToken);
 
+  // Check authentication first to avoid RLS errors
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !user) {
+    // User not authenticated, return empty array
+    return [];
+  }
+
   // Ensure recurring budgets exist for this period (creates them on-demand)
   await ensureRecurringBudgetsForPeriod(period, supabase);
 

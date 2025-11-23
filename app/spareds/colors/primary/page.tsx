@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const primaryColors = {
   900: '#0D0D5A',
@@ -54,12 +55,15 @@ export default function PrimaryColorsPage() {
                   <div className="text-sm font-mono text-muted-foreground mb-2">
                     {color}
                   </div>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="small"
                     onClick={() => copyToClipboard(color, name)}
-                    className="text-xs text-primary hover:underline"
+                    className="text-xs text-primary"
                   >
                     {copied === name ? '✓ Copied' : '📋 Copy'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}

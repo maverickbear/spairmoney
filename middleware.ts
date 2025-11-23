@@ -182,6 +182,7 @@ export async function middleware(request: NextRequest) {
   // - The landing page (/) - users can still view it
   // - Public pages (auth, pricing, etc.)
   const isMaintenancePage = pathname === "/maintenance";
+  const isAccountDeletedPage = pathname === "/account-deleted";
   const isLandingPage = pathname === "/";
   const isPublicPage = pathname.startsWith("/auth") || 
                        pathname === "/pricing" || 
@@ -304,6 +305,9 @@ export async function middleware(request: NextRequest) {
       console.error("[MIDDLEWARE] Error checking maintenance mode:", error);
     }
   }
+
+  // Note: Account deletion is now immediate, so no need to check for deletedAt
+  // If a user is deleted, they won't exist in auth.users and won't be authenticated
 
   // Only apply rate limiting to API routes
   if (!pathname.startsWith("/api")) {

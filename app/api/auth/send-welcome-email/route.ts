@@ -33,12 +33,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { userId, email } = body;
+    const { userId, email, testMode } = body;
 
     const supabase = createServiceRoleClient();
 
     // If userId or email is provided, send to specific user
     if (userId || email) {
+      // Test mode: skip database check and send directly
+      if (testMode === true) {
+        if (!email) {
+          return NextResponse.json(
+            { error: "Email is required in test mode" },
+            { status: 400 }
+          );
+        }
+
+        console.log("[SEND-WELCOME-EMAIL] Test mode: Sending email without database check");
+        await sendWelcomeEmail({
+          to: email,
+          userName: "", // Not used anymore
+          founderName: "Naor Tartarotti",
+        });
+
+        console.log("[SEND-WELCOME-EMAIL] Welcome email sent to (test mode):", email);
+        return NextResponse.json({
+          success: true,
+          message: "Welcome email sent successfully (test mode)",
+          email: email,
+          testMode: true,
+        });
+      }
+
+      // Normal mode: check if user exists in database
       let query = supabase.from("User").select("id, email, name");
 
       if (userId) {

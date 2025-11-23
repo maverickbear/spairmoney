@@ -81,3 +81,30 @@ export async function updateProfileClient(data: Partial<Profile>): Promise<Profi
   };
 }
 
+/**
+ * Delete user account
+ * Requires password confirmation
+ */
+export async function deleteAccountClient(password: string): Promise<{
+  success: boolean;
+  error?: string;
+  scheduledDeletionAt?: string;
+}> {
+  const response = await fetch("/api/profile/delete-account", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to delete account");
+  }
+
+  return data;
+}
+
+

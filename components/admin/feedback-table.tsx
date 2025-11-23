@@ -14,6 +14,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -178,6 +179,15 @@ export function FeedbackTable({ feedbacks, loading }: FeedbackTableProps) {
               </div>
             </div>
           )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

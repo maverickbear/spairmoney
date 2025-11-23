@@ -10,6 +10,7 @@ import { useState } from "react";
 interface PlanSelectorProps {
   plans: Plan[];
   currentPlanId?: string;
+  currentInterval?: "month" | "year" | null; // Current subscription interval
   onSelectPlan: (planId: string, interval: "month" | "year") => void;
   loading?: boolean;
   showComparison?: boolean;
@@ -19,7 +20,7 @@ interface PlanSelectorProps {
   trialEndDate?: string | null; // Trial end date to check if trial is expired
 }
 
-export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, showComparison = false, isPublic = false, alreadyHadTrial = false, subscriptionStatus, trialEndDate }: PlanSelectorProps) {
+export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPlan, loading, showComparison = false, isPublic = false, alreadyHadTrial = false, subscriptionStatus, trialEndDate }: PlanSelectorProps) {
   const [interval, setInterval] = useState<"month" | "year">("month");
   const sortedPlans = [...plans].sort((a, b) => {
     const order = { essential: 1, pro: 2 };
@@ -326,7 +327,8 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
                   <td className="px-6 py-4"></td>
                   {sortedPlans.map((plan) => {
                     const price = interval === "month" ? plan.priceMonthly : plan.priceYearly;
-                    const isCurrent = plan.id === currentPlanId;
+                    // A plan is current only if both planId and interval match
+                    const isCurrent = plan.id === currentPlanId && interval === currentInterval;
                     const isTrulyActive = isCurrent && isSubscriptionActive();
                     return (
                       <td key={plan.id} className="px-6 py-4">
@@ -361,7 +363,8 @@ export function PlanSelector({ plans, currentPlanId, onSelectPlan, loading, show
             const discountedPrice = hasDiscount ? yearlyPrice * 0.9 : yearlyPrice;
             const price = interval === "month" ? monthlyPrice : discountedPrice;
             const originalYearlyPrice = interval === "year" && yearlyPrice > 0 ? yearlyPrice : null;
-            const isCurrent = plan.id === currentPlanId;
+            // A plan is current only if both planId and interval match
+            const isCurrent = plan.id === currentPlanId && interval === currentInterval;
             const isTrulyActive = isCurrent && isSubscriptionActive();
             
             // All features
