@@ -12,8 +12,7 @@ import type { Budget } from "@/lib/api/budgets";
 import type { DebtWithCalculations } from "@/lib/api/debts";
 import type { GoalWithCalculations } from "@/lib/api/goals";
 import type { FinancialHealthData } from "@/lib/api/financial-health";
-import type { PortfolioSummary, HistoricalDataPoint } from "@/lib/api/portfolio";
-import type { Holding } from "@/lib/api/investments";
+import type { PortfolioSummary, HistoricalDataPoint, Holding } from "@/lib/api/portfolio";
 import type { ReportPeriod } from "@/components/reports/report-filters";
 
 export interface ReportsData {
