@@ -197,11 +197,19 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
                     <CreditCard className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <div className="font-medium">
-                        {pm.card?.brand.charAt(0).toUpperCase() + pm.card?.brand.slice(1)} •••• {pm.card?.last4}
+                        {pm.card ? (
+                          <>
+                            {pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1)} •••• {pm.card.last4}
+                          </>
+                        ) : (
+                          "Payment Method"
+                        )}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Expires {pm.card?.expMonth}/{pm.card?.expYear}
-                      </div>
+                      {pm.card && (
+                        <div className="text-sm text-muted-foreground">
+                          Expires {pm.card.expMonth}/{pm.card.expYear}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
