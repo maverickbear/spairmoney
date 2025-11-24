@@ -211,6 +211,27 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         // Continue anyway - session might still be valid
       }
 
+      // In production, sync session with server to ensure cookies are properly set
+      // This is critical for production where cookie settings (secure, sameSite) need to match
+      try {
+        const syncResponse = await fetch("/api/auth/sync-session", {
+          method: "POST",
+          credentials: "include", // Important: include cookies
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!syncResponse.ok) {
+          console.warn("Failed to sync session with server, but continuing...");
+        } else {
+          console.log("Session synced with server successfully");
+        }
+      } catch (syncError) {
+        console.warn("Error syncing session with server:", syncError);
+        // Continue anyway - client-side session might still work
+      }
+
       // Check maintenance mode
       let isMaintenanceMode = false;
       try {
@@ -262,10 +283,30 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
 
       // Verify session is established before proceeding
       // Use getUser instead of getSession for more reliable check
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      // In production, we may need multiple attempts due to cookie propagation delays
+      let currentUser = null;
+      let userError = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts && (!currentUser || userError)) {
+        const result = await supabase.auth.getUser();
+        currentUser = result.data.user;
+        userError = result.error;
+
+        if (userError || !currentUser) {
+          attempts++;
+          if (attempts < maxAttempts) {
+            // Wait a bit longer between attempts in production
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } else {
+          break;
+        }
+      }
       
       if (userError || !currentUser) {
-        console.error("Session verification failed:", userError);
+        console.error("Session verification failed after", maxAttempts, "attempts:", userError);
         setError("Failed to establish session. Please try again.");
         return;
       }

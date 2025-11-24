@@ -128,7 +128,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind CSS
               "img-src 'self' data: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://vercel.live",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.sparefinance.com wss://app.sparefinance.com https://api.stripe.com https://js.stripe.com https://*.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://vercel.live",
               "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://cdn.plaid.com https://*.plaid.com https://vercel.live",
               "object-src 'none'",
               "base-uri 'self'",

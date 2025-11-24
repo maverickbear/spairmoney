@@ -53,12 +53,21 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   const pathname = url.pathname;
+  const origin = url.origin;
 
   // Skip external URLs (extensions, etc.)
   if (
     event.request.url.startsWith('chrome-extension://') ||
     event.request.url.startsWith('moz-extension://')
   ) {
+    return;
+  }
+
+  // Skip external domains - let them pass through without interception
+  // This prevents CSP violations for external resources (Stripe, Supabase, Plaid, etc.)
+  const isExternalDomain = !origin.startsWith(self.location.origin);
+  if (isExternalDomain) {
+    // Don't intercept external requests - let them pass through
     return;
   }
 
