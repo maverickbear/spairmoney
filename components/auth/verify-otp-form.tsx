@@ -171,11 +171,51 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
               console.warn("[OTP] Could not invalidate client cache:", error);
             }
             
-            // Wait a bit more to ensure server-side cache is updated
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait longer to ensure server-side cache and subscription lookup are updated
+            // The subscription lookup needs time to find the household subscription
+            console.log("[OTP] Waiting for subscription cache to update...");
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Verify subscription is available before redirecting
+            // This ensures the household subscription is properly inherited
+            let subscriptionFound = false;
+            let retries = 0;
+            const maxRetries = 3;
+            
+            while (!subscriptionFound && retries < maxRetries) {
+              try {
+                const subscriptionCheck = await fetch("/api/billing/subscription");
+                if (subscriptionCheck.ok) {
+                  const subscriptionData = await subscriptionCheck.json();
+                  if (subscriptionData.subscription && (subscriptionData.subscription.status === "active" || subscriptionData.subscription.status === "trialing")) {
+                    console.log("[OTP] Subscription found, redirecting to dashboard");
+                    subscriptionFound = true;
+                    break;
+                  } else {
+                    console.log(`[OTP] Subscription not found yet (attempt ${retries + 1}/${maxRetries}), waiting...`);
+                    retries++;
+                    if (retries < maxRetries) {
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                  }
+                }
+              } catch (checkError) {
+                console.warn("[OTP] Error checking subscription:", checkError);
+                retries++;
+                if (retries < maxRetries) {
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+              }
+            }
+            
+            if (!subscriptionFound) {
+              console.warn("[OTP] Subscription not found after retries, but redirecting anyway - protected layout will handle it");
+            }
             
             // Redirect to dashboard after completing invitation
-            router.push("/dashboard");
+            // Use window.location.href to force full page reload and fresh subscription check
+            // This ensures the protected layout checks subscription with fresh data
+            window.location.href = "/dashboard";
             return;
           } else {
             const errorData = await completeResponse.json();

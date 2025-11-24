@@ -121,13 +121,58 @@ function AcceptInvitationForm() {
         setStatus("success");
         setMessage("Invitation accepted successfully! You are now part of the family.");
         
-        // If we have a session, redirect to dashboard
-        // Cookies are already set by the server
+        // If we have a session, wait for subscription to be available before redirecting
+        // This ensures the household subscription is properly inherited
         if (result.session) {
-          // Redirect to dashboard after a short delay
-          setTimeout(() => {
-            window.location.href = "/";
-          }, 1500);
+          // Wait for subscription cache to update and verify subscription is available
+          setTimeout(async () => {
+            try {
+              // Wait a bit for subscription cache to update
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              
+              // Verify subscription is available
+              let subscriptionFound = false;
+              let retries = 0;
+              const maxRetries = 3;
+              
+              while (!subscriptionFound && retries < maxRetries) {
+                try {
+                  const subscriptionCheck = await fetch("/api/billing/subscription");
+                  if (subscriptionCheck.ok) {
+                    const subscriptionData = await subscriptionCheck.json();
+                    if (subscriptionData.subscription && (subscriptionData.subscription.status === "active" || subscriptionData.subscription.status === "trialing")) {
+                      console.log("[ACCEPT-INVITATION] Subscription found, redirecting to dashboard");
+                      subscriptionFound = true;
+                      break;
+                    } else {
+                      console.log(`[ACCEPT-INVITATION] Subscription not found yet (attempt ${retries + 1}/${maxRetries}), waiting...`);
+                      retries++;
+                      if (retries < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                      }
+                    }
+                  }
+                } catch (checkError) {
+                  console.warn("[ACCEPT-INVITATION] Error checking subscription:", checkError);
+                  retries++;
+                  if (retries < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  }
+                }
+              }
+              
+              if (!subscriptionFound) {
+                console.warn("[ACCEPT-INVITATION] Subscription not found after retries, but redirecting anyway - protected layout will handle it");
+              }
+              
+              // Redirect to dashboard - use window.location.href to force full page reload
+              window.location.href = "/dashboard";
+            } catch (error) {
+              console.error("[ACCEPT-INVITATION] Error waiting for subscription:", error);
+              // Redirect anyway - protected layout will handle it
+              window.location.href = "/dashboard";
+            }
+          }, 500);
         } else {
           // No session, redirect to login
           setTimeout(() => {

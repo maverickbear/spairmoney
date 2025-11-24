@@ -19,7 +19,7 @@ import {
   SelectLabel,
   SelectSeparator,
 } from "@/components/ui/select";
-import { Loader2, Info, Plus, ChevronsUpDown, Search, Check } from "lucide-react";
+import { Loader2, Info, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -118,10 +118,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAccountDialog, setShowAccountDialog] = useState(false);
   const [shouldShowForm, setShouldShowForm] = useState(false);
-  const [subcategoryComboboxOpen, setSubcategoryComboboxOpen] = useState(false);
-  const [subcategorySearchQuery, setSubcategorySearchQuery] = useState("");
-  const subcategoryButtonRef = React.useRef<HTMLButtonElement>(null);
-  const subcategoryDropdownRef = React.useRef<HTMLDivElement>(null);
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false);
   const [availableGroups, setAvailableGroups] = useState<Array<{ id: string; name: string; type?: "income" | "expense" | null }>>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -197,35 +193,9 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
     } else {
       setShouldShowForm(false);
       setShowAccountDialog(false);
-      setSubcategoryComboboxOpen(false);
-      setSubcategorySearchQuery("");
     }
   }, [open, transaction]);
 
-  // Close dropdowns when clicking outside
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      
-      if (
-        subcategoryComboboxOpen &&
-        subcategoryButtonRef.current &&
-        !subcategoryButtonRef.current.contains(target) &&
-        subcategoryDropdownRef.current &&
-        !subcategoryDropdownRef.current.contains(target)
-      ) {
-        setSubcategoryComboboxOpen(false);
-      }
-    }
-
-    if (subcategoryComboboxOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-    return undefined;
-  }, [subcategoryComboboxOpen]);
 
   async function checkAccountsAndShowForm() {
     try {
@@ -859,8 +829,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                     setSelectedCategoryId("");
                     setSubcategories([]);
                     setSubcategoriesMap(new Map());
-                    setSubcategoryComboboxOpen(false);
-                    setSubcategorySearchQuery("");
                   } else {
                     // When switching between expense and income, clear selected category if its group doesn't match the new type
                     const currentCategory = allCategories.find(c => c.id === selectedCategoryId);
@@ -881,8 +849,6 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                           form.setValue("subcategoryId", undefined);
                           setSubcategories([]);
                           setSubcategoriesMap(new Map());
-                          setSubcategoryComboboxOpen(false);
-                          setSubcategorySearchQuery("");
                         }
                       }
                     }
@@ -1087,121 +1053,52 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                   )}
                 </div>
 
-                <div className="space-y-1 relative">
+                <div className="space-y-1">
                   <label className="text-sm font-medium">
                     Subcategory <span className="text-gray-400 text-[12px]">(optional)</span>
                   </label>
-                  {(() => {
-                    const subcats = selectedCategoryId ? subcategoriesMap.get(selectedCategoryId) || [] : [];
-                    const isDisabled = !selectedCategoryId || subcats.length === 0;
-                    const selectedSubcategoryId = form.watch("subcategoryId");
-                    const selectedSubcategory = subcats.find((s) => s.id === selectedSubcategoryId);
-                    
-                    return (
-                      <>
-                        <Button
-                          type="button"
-                          ref={subcategoryButtonRef}
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={subcategoryComboboxOpen}
-                          className="h-12 w-full justify-between"
-                          onClick={() => setSubcategoryComboboxOpen(!subcategoryComboboxOpen)}
-                          disabled={isDisabled}
-                        >
-                          {selectedSubcategory
-                            ? selectedSubcategory.name
-                            : "Select a subcategory"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                        {subcategoryComboboxOpen && !selectedCategoryId && (
-                          <div 
-                            ref={subcategoryDropdownRef}
-                            className="absolute w-full mt-1 bg-popover border rounded-[12px] shadow-lg p-2"
-                            style={{ zIndex: 9999 }}
-                            onMouseDown={(e) => e.preventDefault()}
-                          >
-                            <div className="text-sm text-muted-foreground">
+                  <Select
+                    value={form.watch("subcategoryId") || ""}
+                    onValueChange={handleSubcategoryChange}
+                    disabled={!selectedCategoryId || (subcategoriesMap.get(selectedCategoryId) || []).length === 0}
+                  >
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder={
+                        !selectedCategoryId 
+                          ? "Select a category first" 
+                          : (subcategoriesMap.get(selectedCategoryId) || []).length === 0
+                          ? "No subcategories available"
+                          : "Select a subcategory"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(() => {
+                        const subcats = selectedCategoryId ? subcategoriesMap.get(selectedCategoryId) || [] : [];
+                        
+                        if (!selectedCategoryId) {
+                          return (
+                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                               Select a category first
                             </div>
-                          </div>
-                        )}
-                        {subcategoryComboboxOpen && selectedCategoryId && subcats.length === 0 && (
-                          <div 
-                            ref={subcategoryDropdownRef}
-                            className="absolute w-full mt-1 bg-popover border rounded-[12px] shadow-lg p-2"
-                            style={{ zIndex: 9999 }}
-                            onMouseDown={(e) => e.preventDefault()}
-                          >
-                            <div className="text-sm text-muted-foreground">
+                          );
+                        }
+                        
+                        if (subcats.length === 0) {
+                          return (
+                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                               No subcategories found for this category
                             </div>
-                          </div>
-                        )}
-                        {subcategoryComboboxOpen && selectedCategoryId && subcats.length > 0 && (
-                          <div 
-                            ref={subcategoryDropdownRef}
-                            className="absolute w-full mt-1 bg-popover border rounded-[12px] shadow-lg"
-                            style={{ maxHeight: '235px', display: 'flex', flexDirection: 'column', zIndex: 9999 }}
-                            onMouseDown={(e) => e.preventDefault()}
-                          >
-                            {/* Search Input */}
-                            <div className="flex items-center border-b px-3 h-11 flex-shrink-0">
-                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                              <Input
-                                placeholder="Search subcategories..."
-                                value={subcategorySearchQuery}
-                                onChange={(e) => setSubcategorySearchQuery(e.target.value)}
-                                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-full"
-                                onKeyDown={(e) => {
-                                  if (e.key === "Escape") {
-                                    setSubcategoryComboboxOpen(false);
-                                  }
-                                }}
-                                autoFocus
-                              />
-                            </div>
-                            {/* Subcategories List */}
-                            <div className="p-1 overflow-y-auto overflow-x-hidden" style={{ height: '184px' }}>
-                              <div className="space-y-1">
-                                {subcats
-                                  .filter((subcategory) => {
-                                    if (subcategorySearchQuery.trim()) {
-                                      return subcategory.name.toLowerCase().includes(subcategorySearchQuery.toLowerCase());
-                                    }
-                                    return true;
-                                  })
-                                  .map((subcategory) => (
-                                    <button
-                                      key={subcategory.id}
-                                      type="button"
-                                      onClick={() => {
-                                        handleSubcategoryChange(subcategory.id);
-                                        setSubcategoryComboboxOpen(false);
-                                        setSubcategorySearchQuery("");
-                                      }}
-                                      className={cn(
-                                        "w-full flex items-center rounded-md px-2 py-1.5 text-sm text-left cursor-pointer transition-colors",
-                                        "hover:bg-accent hover:text-accent-foreground",
-                                        selectedSubcategoryId === subcategory.id && "bg-accent text-accent-foreground"
-                                      )}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4 shrink-0",
-                                          selectedSubcategoryId === subcategory.id ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {subcategory.name}
-                                    </button>
-                                  ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                          );
+                        }
+                        
+                        return subcats.map((subcategory) => (
+                          <SelectItem key={subcategory.id} value={subcategory.id}>
+                            {subcategory.name}
+                          </SelectItem>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}

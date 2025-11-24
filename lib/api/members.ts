@@ -793,13 +793,31 @@ export async function acceptInvitation(token: string, userId: string): Promise<H
       console.warn("[MEMBERS] Error setting active household:", activeError);
     }
 
-    // Update subscription cache for the new member
+    // Update subscription cache in User table for the new member
+    // This uses the PostgreSQL function to sync cache immediately
     try {
-      const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
-      await invalidateSubscriptionCache(userId);
-      console.log("[MEMBERS] Subscription cache invalidated for new member");
+      const { error: cacheUpdateError } = await supabase.rpc(
+        "update_user_subscription_cache",
+        { p_user_id: userId }
+      );
+      
+      if (cacheUpdateError) {
+        console.warn("[MEMBERS] Could not update subscription cache via RPC:", cacheUpdateError);
+        // Fallback: invalidate cache and let it refresh on next query
+        const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
+        await invalidateSubscriptionCache(userId);
+      } else {
+        console.log("[MEMBERS] Subscription cache updated in User table for new member");
+      }
     } catch (cacheError) {
-      console.warn("[MEMBERS] Could not invalidate subscription cache:", cacheError);
+      console.warn("[MEMBERS] Could not update subscription cache:", cacheError);
+      // Fallback: invalidate cache
+      try {
+        const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
+        await invalidateSubscriptionCache(userId);
+      } catch (invalidateError) {
+        console.warn("[MEMBERS] Could not invalidate subscription cache:", invalidateError);
+      }
     }
 
     // Map to old interface
