@@ -21,7 +21,7 @@ import { supabase } from "@/lib/supabase";
 const CIRCUIT_BREAKER_CONFIG = {
   MAX_FAILURES: 5,
   TIMEOUT: 60000, // 1 minute
-  SLOW_OPERATION_THRESHOLD: 50, // 50ms
+  SLOW_OPERATION_THRESHOLD: 1000, // 1000ms (1 second) - realistic threshold for network operations
 };
 
 // Polling configuration for less critical data
@@ -81,7 +81,12 @@ export function DashboardRealtime() {
     // Performance logging for monitoring outliers
     const logPerformance = (operation: string, duration: number) => {
       if (duration > CIRCUIT_BREAKER_CONFIG.SLOW_OPERATION_THRESHOLD) {
-        console.warn(`[DashboardRealtime] Slow operation detected: ${operation} took ${duration.toFixed(2)}ms`);
+        // Log as info instead of warn - network operations can take time
+        // Only warn if it's truly slow (>1s for subscription setup)
+        console.info(`[DashboardRealtime] ${operation} took ${duration.toFixed(2)}ms`);
+      } else if (duration > 500) {
+        // Log as debug for moderate delays (500ms-1000ms)
+        console.debug(`[DashboardRealtime] ${operation} took ${duration.toFixed(2)}ms`);
       }
     };
 
