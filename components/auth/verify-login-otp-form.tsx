@@ -142,7 +142,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       setError(null);
 
       // Verify OTP with Supabase
-      // Try "email" type first (for numeric OTP), then "magiclink" as fallback
+      // Try "email" type first (for numeric OTP), then "magiclink", then "recovery" as fallbacks
       let data: any = null;
       let verifyError: any = null;
 
@@ -162,7 +162,18 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         });
 
         if (magiclinkResult.error) {
-          verifyError = magiclinkResult.error;
+          // If magiclink also fails, try recovery type (in case user requested password recovery)
+          const recoveryResult = await supabase.auth.verifyOtp({
+            email,
+            token: otpCode,
+            type: "recovery",
+          });
+
+          if (recoveryResult.error) {
+            verifyError = recoveryResult.error;
+          } else {
+            data = recoveryResult.data;
+          }
         } else {
           data = magiclinkResult.data;
         }

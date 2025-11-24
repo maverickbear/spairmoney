@@ -137,6 +137,7 @@ export function VerifyGoogleOtpForm() {
       setError(null);
 
       // Verify OTP with Supabase
+      // Try "email" type first, then "magiclink", then "recovery" as fallbacks
       let data: any = null;
       let verifyError: any = null;
 
@@ -154,7 +155,18 @@ export function VerifyGoogleOtpForm() {
         });
 
         if (magiclinkResult.error) {
-          verifyError = magiclinkResult.error;
+          // If magiclink also fails, try recovery type (in case user requested password recovery)
+          const recoveryResult = await supabase.auth.verifyOtp({
+            email,
+            token: otpCode,
+            type: "recovery",
+          });
+
+          if (recoveryResult.error) {
+            verifyError = recoveryResult.error;
+          } else {
+            data = recoveryResult.data;
+          }
         } else {
           data = magiclinkResult.data;
         }
