@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import { FeatureGuard } from "@/components/common/feature-guard";
 
 interface Budget {
   id: string;
@@ -184,6 +185,10 @@ export default function BudgetsPage() {
     : 0;
 
   return (
+    <FeatureGuard 
+      feature="hasBudgets"
+      headerTitle="Budgets"
+    >
     <div>
       <PageHeader
         title="Budgets"
@@ -287,5 +292,6 @@ export default function BudgetsPage() {
         </div>
       )}
     </div>
+    </FeatureGuard>
   );
 }

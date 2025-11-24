@@ -86,28 +86,17 @@ export async function getUserSubscriptionsInternal(
     return [];
   }
 
-  logger.info(`[getUserSubscriptions] Query executed successfully. Raw data:`, {
-    dataLength: data?.length || 0,
-    hasData: !!data,
-    userId: user.id,
-    error: error ? {
-      message: (error as any).message,
-      code: (error as any).code,
-      details: (error as any).details,
-      hint: (error as any).hint
-    } : null
-  });
-
+  // OPTIMIZED: Reduce logging verbosity - only log errors or when data is found
   if (!data || data.length === 0) {
-    logger.info(`[getUserSubscriptions] No subscriptions found for user: ${user.id}. This could be due to RLS policies or no subscriptions exist.`);
+    // Only log in debug mode to reduce noise
+    logger.debug(`[getUserSubscriptions] No subscriptions found for user: ${user.id}`);
     return [];
   }
 
-  logger.info(`[getUserSubscriptions] Found ${data.length} subscription(s) for user: ${user.id}`, {
+  // Only log when subscriptions are found (useful for debugging)
+  logger.debug(`[getUserSubscriptions] Found ${data.length} subscription(s) for user: ${user.id}`, {
     subscriptionIds: data.map(s => s.id),
     serviceNames: data.map(s => s.serviceName),
-    householdIds: data.map(s => s.householdId || 'NULL'),
-    userIds: data.map(s => s.userId)
   });
 
   // OPTIMIZED: Batch fetch all related data to avoid N+1 queries

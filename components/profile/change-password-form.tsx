@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { changePasswordSchema, ChangePasswordFormData } from "@/lib/validations/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { Lock, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
@@ -96,14 +97,16 @@ export function ChangePasswordForm() {
       <CardContent className="pt-0">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs sm:text-sm font-medium">Current Password</label>
+            <Label htmlFor="currentPassword">Current Password</Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                id="currentPassword"
                 type={showCurrentPassword ? "text" : "password"}
                 {...form.register("currentPassword")}
                 placeholder="Enter your current password"
-                className="h-9 pl-10 pr-10"
+                size="medium"
+                className="pl-10 pr-10"
                 disabled={loading}
               />
               <button
@@ -127,14 +130,16 @@ export function ChangePasswordForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs sm:text-sm font-medium">New Password</label>
+            <Label htmlFor="newPassword">New Password</Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                id="newPassword"
                 type={showNewPassword ? "text" : "password"}
                 {...form.register("newPassword")}
                 placeholder="Enter your new password"
-                className="h-9 pl-10 pr-10"
+                size="medium"
+                className="pl-10 pr-10"
                 disabled={loading}
               />
               <button
@@ -158,14 +163,16 @@ export function ChangePasswordForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs sm:text-sm font-medium">Confirm New Password</label>
+            <Label htmlFor="confirmPassword">Confirm New Password</Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                id="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
                 {...form.register("confirmPassword")}
                 placeholder="Confirm your new password"
-                className="h-9 pl-10 pr-10"
+                size="medium"
+                className="pl-10 pr-10"
                 disabled={loading}
               />
               <button

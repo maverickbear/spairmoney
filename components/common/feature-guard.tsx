@@ -4,6 +4,8 @@ import { ReactNode, useState, useEffect } from "react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { PlanFeatures } from "@/lib/validations/plan";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BlockedFeature } from "./blocked-feature";
+import { PageHeader } from "./page-header";
 
 interface FeatureGuardProps {
   feature: keyof PlanFeatures;
@@ -11,6 +13,8 @@ interface FeatureGuardProps {
   fallback?: ReactNode;
   requiredPlan?: "essential" | "pro";
   featureName?: string;
+  header?: ReactNode;
+  headerTitle?: string;
 }
 
 export function FeatureGuard({
@@ -19,6 +23,8 @@ export function FeatureGuard({
   fallback,
   requiredPlan,
   featureName,
+  header,
+  headerTitle,
 }: FeatureGuardProps) {
   const { limits, checking: loading, plan } = useSubscription();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
@@ -62,8 +68,20 @@ export function FeatureGuard({
       return <>{fallback}</>;
     }
 
-    // Feature not available - return null or empty state
-    return null;
+    // Feature not available - show blocked screen
+    const displayName = featureName || getFeatureName(feature);
+    return (
+      <>
+        {/* Show only title when blocked */}
+        {headerTitle ? (
+          <PageHeader title={headerTitle} />
+        ) : header ? (
+          // Try to extract title from header if headerTitle not provided
+          header
+        ) : null}
+        <BlockedFeature feature={feature} featureName={displayName} />
+      </>
+    );
   }
 
   return <>{children}</>;

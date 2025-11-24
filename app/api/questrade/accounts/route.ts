@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { getQuestradeAccounts, decryptTokens, refreshAccessToken, encryptTokens } from "@/lib/api/questrade";
 import { getCurrentUserId, guardFeatureAccessReadOnly, throwIfNotAllowed } from "@/lib/api/feature-guard";
 import { formatTimestamp } from "@/lib/utils/timestamp";
+import { isPlanError } from "@/lib/utils/plan-errors";
 
 // Simple in-memory cache for request deduplication
 // Prevents duplicate calls within a short time window (5 seconds)
@@ -55,6 +56,18 @@ export async function GET() {
 
     return await requestPromise;
   } catch (error: any) {
+    // Don't log plan errors as errors - they're expected behavior
+    if (error.planError || isPlanError(error)) {
+      return NextResponse.json(
+        {
+          error: error.message || "Investments are not available in your current plan",
+          code: error.code,
+          planError: error.planError || error,
+        },
+        { status: 403 }
+      );
+    }
+    
     console.error("Error in Questrade accounts GET handler:", error);
     return NextResponse.json(
       { error: error.message || "Failed to fetch Questrade accounts" },
@@ -224,20 +237,20 @@ async function fetchQuestradeAccounts(userId: string): Promise<NextResponse> {
 
     return NextResponse.json({ accounts });
   } catch (error: any) {
-    console.error("Error fetching Questrade accounts:", error);
-
-    // Check if it's a plan error
-    if (error.planError) {
+    // Check if it's a plan error - don't log these as errors
+    if (error.planError || isPlanError(error)) {
       return NextResponse.json(
         {
-          error: error.message,
+          error: error.message || "Investments are not available in your current plan",
           code: error.code,
-          planError: error.planError,
+          planError: error.planError || error,
         },
         { status: 403 }
       );
     }
 
+    // Only log actual errors, not plan restrictions
+    console.error("Error fetching Questrade accounts:", error);
     return NextResponse.json(
       { error: error.message || "Failed to fetch Questrade accounts" },
       { status: 500 }

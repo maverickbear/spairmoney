@@ -382,6 +382,61 @@ COMMENT ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p
 
 
 
+CREATE OR REPLACE FUNCTION "public"."delete_user_data"("p_user_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  -- Temporarily disable the trigger to allow deletion of system goals
+  -- This is safe because we're deleting the user, so their goals should be deleted too
+  -- Check if trigger exists before disabling (to avoid errors if trigger doesn't exist)
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger 
+    WHERE tgname = 'prevent_emergency_fund_deletion_trigger' 
+    AND tgrelid = 'public.Goal'::regclass
+  ) THEN
+    ALTER TABLE "public"."Goal" DISABLE TRIGGER "prevent_emergency_fund_deletion_trigger";
+  END IF;
+  
+  -- Delete all goals (system and non-system)
+  DELETE FROM "public"."Goal"
+  WHERE "userId" = p_user_id;
+  
+  -- Re-enable the trigger if it was disabled
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger 
+    WHERE tgname = 'prevent_emergency_fund_deletion_trigger' 
+    AND tgrelid = 'public.Goal'::regclass
+  ) THEN
+    ALTER TABLE "public"."Goal" ENABLE TRIGGER "prevent_emergency_fund_deletion_trigger";
+  END IF;
+  
+  -- Delete subscriptions (to avoid RESTRICT constraint on planId)
+  DELETE FROM "public"."Subscription"
+  WHERE "userId" = p_user_id;
+  
+  -- Delete subscriptions by household if user owns households
+  DELETE FROM "public"."Subscription"
+  WHERE "householdId" IN (
+    SELECT "id" FROM "public"."Household" WHERE "createdBy" = p_user_id
+  );
+  
+  -- Note: We cannot delete from User table here because FK constraint to auth.users
+  -- The User table will be deleted via CASCADE when auth.users is deleted
+  -- All other data (accounts, transactions, etc.) will cascade delete when User is deleted
+  
+  -- This function cleans up data that might have RESTRICT constraints or triggers
+END;
+$$;
+
+
+ALTER FUNCTION "public"."delete_user_data"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."delete_user_data"("p_user_id" "uuid") IS 'Deletes user-related data (goals, subscriptions) before user deletion. Handles system goals and RESTRICT constraints. Actual user deletion from auth.users must be done via Admin API.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_account_user_id"("p_account_id" "text") RETURNS "uuid"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -894,10 +949,23 @@ CREATE OR REPLACE FUNCTION "public"."prevent_emergency_fund_deletion"() RETURNS 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+DECLARE
+  v_user_exists boolean;
 BEGIN
   IF OLD."isSystemGoal" = true THEN
+    -- Check if user still exists in User table
+    -- If user doesn't exist, we're in a CASCADE deletion context, allow it
+    SELECT EXISTS(SELECT 1 FROM "public"."User" WHERE "id" = OLD."userId") INTO v_user_exists;
+    
+    IF NOT v_user_exists THEN
+      -- User is being deleted via CASCADE, allow goal deletion
+      RETURN OLD;
+    END IF;
+    
+    -- User still exists, prevent deletion (normal deletion attempt)
     RAISE EXCEPTION 'System goals cannot be deleted. You can edit them instead.';
   END IF;
+  
   RETURN OLD;
 END;
 $$;
@@ -906,7 +974,7 @@ $$;
 ALTER FUNCTION "public"."prevent_emergency_fund_deletion"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."prevent_emergency_fund_deletion"() IS 'Prevents deletion of system goals. Uses SET search_path for security.';
+COMMENT ON FUNCTION "public"."prevent_emergency_fund_deletion"() IS 'Prevents deletion of system goals, except when the user is being deleted (CASCADE). Uses SET search_path for security.';
 
 
 
@@ -2258,6 +2326,10 @@ CREATE TABLE IF NOT EXISTS "public"."User" (
 ALTER TABLE "public"."User" OWNER TO "postgres";
 
 
+COMMENT ON TABLE "public"."User" IS 'User accounts are deleted immediately upon request. No grace period or soft deletion.';
+
+
+
 COMMENT ON COLUMN "public"."User"."effectivePlanId" IS 'Cached plan ID - for household members, this is the owner''s plan. For owners, this is their own plan.';
 
 
@@ -3164,11 +3236,27 @@ CREATE INDEX "PlannedPayment_categoryId_idx" ON "public"."PlannedPayment" USING 
 
 
 
+CREATE INDEX "PlannedPayment_debtId_idx" ON "public"."PlannedPayment" USING "btree" ("debtId") WHERE ("debtId" IS NOT NULL);
+
+
+
 CREATE INDEX "PlannedPayment_householdId_idx" ON "public"."PlannedPayment" USING "btree" ("householdId");
 
 
 
+CREATE INDEX "PlannedPayment_linkedTransactionId_idx" ON "public"."PlannedPayment" USING "btree" ("linkedTransactionId") WHERE ("linkedTransactionId" IS NOT NULL);
+
+
+
 CREATE INDEX "PlannedPayment_subcategoryId_idx" ON "public"."PlannedPayment" USING "btree" ("subcategoryId");
+
+
+
+CREATE INDEX "PlannedPayment_subscriptionId_idx" ON "public"."PlannedPayment" USING "btree" ("subscriptionId") WHERE ("subscriptionId" IS NOT NULL);
+
+
+
+CREATE INDEX "PlannedPayment_toAccountId_idx" ON "public"."PlannedPayment" USING "btree" ("toAccountId") WHERE ("toAccountId" IS NOT NULL);
 
 
 
@@ -3312,15 +3400,19 @@ CREATE INDEX "UserServiceSubscription_householdId_idx" ON "public"."UserServiceS
 
 
 
+CREATE INDEX "UserServiceSubscription_planId_idx" ON "public"."UserServiceSubscription" USING "btree" ("planId") WHERE ("planId" IS NOT NULL);
+
+
+
 CREATE INDEX "User_role_idx" ON "public"."User" USING "btree" ("role");
 
 
 
-CREATE INDEX "category_learning_category_id_idx" ON "public"."category_learning" USING "btree" ("category_id");
+CREATE INDEX "category_learning_category_id_fkey_idx" ON "public"."category_learning" USING "btree" ("category_id");
 
 
 
-CREATE INDEX "category_learning_subcategory_id_idx" ON "public"."category_learning" USING "btree" ("subcategory_id");
+CREATE INDEX "category_learning_subcategory_id_fkey_idx" ON "public"."category_learning" USING "btree" ("subcategory_id");
 
 
 
@@ -3328,7 +3420,15 @@ CREATE INDEX "category_learning_user_type_desc_idx" ON "public"."category_learni
 
 
 
+CREATE INDEX "idx_account_isconnected" ON "public"."Account" USING "btree" ("isConnected") WHERE ("isConnected" = true);
+
+
+
 CREATE INDEX "idx_account_user_type" ON "public"."Account" USING "btree" ("userId", "type") WHERE ("type" IS NOT NULL);
+
+
+
+CREATE INDEX "idx_account_user_updated" ON "public"."Account" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
@@ -3344,10 +3444,6 @@ CREATE INDEX "idx_accountowner_ownerid" ON "public"."AccountOwner" USING "btree"
 
 
 
-CREATE INDEX "idx_asset_allocation_user" ON "public"."asset_allocation_view" USING "btree" ("user_id");
-
-
-
 CREATE INDEX "idx_budget_category" ON "public"."Budget" USING "btree" ("categoryId") WHERE ("categoryId" IS NOT NULL);
 
 
@@ -3356,15 +3452,11 @@ CREATE INDEX "idx_budget_period_categoryid" ON "public"."Budget" USING "btree" (
 
 
 
-CREATE INDEX "idx_budget_recurring" ON "public"."Budget" USING "btree" ("isRecurring", "userId") WHERE ("isRecurring" = true);
-
-
-
 CREATE INDEX "idx_budget_user_period" ON "public"."Budget" USING "btree" ("userId", "period" DESC) WHERE ("period" IS NOT NULL);
 
 
 
-CREATE INDEX "idx_budget_userid_period" ON "public"."Budget" USING "btree" ("userId", "period");
+CREATE INDEX "idx_budget_user_updated" ON "public"."Budget" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
@@ -3380,43 +3472,11 @@ CREATE INDEX "idx_category_userid_groupid" ON "public"."Category" USING "btree" 
 
 
 
-CREATE INDEX "idx_debt_user_loan_type" ON "public"."Debt" USING "btree" ("userId", "loanType") WHERE ("loanType" IS NOT NULL);
+CREATE INDEX "idx_debt_user_updated" ON "public"."Debt" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
-CREATE INDEX "idx_debt_userid_firstpaymentdate" ON "public"."Debt" USING "btree" ("userId", "firstPaymentDate") WHERE ("isPaidOff" = false);
-
-
-
-CREATE INDEX "idx_debt_userid_ispaidoff" ON "public"."Debt" USING "btree" ("userId", "isPaidOff");
-
-
-
-CREATE INDEX "idx_goal_issystemgoal" ON "public"."Goal" USING "btree" ("isSystemGoal") WHERE ("isSystemGoal" = true);
-
-
-
-CREATE INDEX "idx_goal_user_completed" ON "public"."Goal" USING "btree" ("userId", "completedAt" DESC) WHERE ("completedAt" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_goal_user_status" ON "public"."Goal" USING "btree" ("userId", "isCompleted", "isPaused") WHERE ("isCompleted" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_goal_userid_iscompleted" ON "public"."Goal" USING "btree" ("userId", "isCompleted");
-
-
-
-CREATE INDEX "idx_goal_userid_targetmonths" ON "public"."Goal" USING "btree" ("userId", "targetMonths") WHERE (("isCompleted" = false) AND ("targetMonths" IS NOT NULL));
-
-
-
-CREATE INDEX "idx_holdings_view_account" ON "public"."holdings_view" USING "btree" ("account_id");
-
-
-
-CREATE INDEX "idx_holdings_view_security" ON "public"."holdings_view" USING "btree" ("security_id");
+CREATE INDEX "idx_goal_user_updated" ON "public"."Goal" USING "btree" ("userId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
 
 
 
@@ -3424,31 +3484,11 @@ CREATE UNIQUE INDEX "idx_holdings_view_unique" ON "public"."holdings_view" USING
 
 
 
-CREATE INDEX "idx_holdings_view_user" ON "public"."holdings_view" USING "btree" ("user_id");
+CREATE INDEX "idx_investment_account_questrade" ON "public"."InvestmentAccount" USING "btree" ("userId", "isQuestradeConnected") WHERE ("isQuestradeConnected" = true);
 
 
 
-CREATE INDEX "idx_investment_transaction_account_date" ON "public"."InvestmentTransaction" USING "btree" ("accountId", "date" DESC) WHERE ("date" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_investment_transaction_date_type" ON "public"."InvestmentTransaction" USING "btree" ("date" DESC, "type") WHERE ("date" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_investment_transaction_holdings_calc" ON "public"."InvestmentTransaction" USING "btree" ("accountId", "securityId", "date") WHERE (("securityId" IS NOT NULL) AND ("date" IS NOT NULL));
-
-
-
-CREATE INDEX "idx_investment_transaction_security" ON "public"."InvestmentTransaction" USING "btree" ("securityId", "accountId", "type") WHERE ("securityId" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_investment_transaction_security_account" ON "public"."InvestmentTransaction" USING "btree" ("securityId", "accountId", "date" DESC) WHERE ("securityId" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_investment_transaction_updated" ON "public"."InvestmentTransaction" USING "btree" ("accountId", "updatedAt" DESC, "createdAt" DESC) WHERE ("updatedAt" IS NOT NULL);
+CREATE INDEX "idx_investment_account_type" ON "public"."InvestmentAccount" USING "btree" ("userId", "type") WHERE ("type" IS NOT NULL);
 
 
 
@@ -3456,43 +3496,7 @@ CREATE INDEX "idx_investmenttransaction_accountid_date" ON "public"."InvestmentT
 
 
 
-CREATE INDEX "idx_planned_payment_date" ON "public"."PlannedPayment" USING "btree" ("date");
-
-
-
 CREATE INDEX "idx_planned_payment_date_status_user" ON "public"."PlannedPayment" USING "btree" ("date", "status", "userId");
-
-
-
-CREATE INDEX "idx_planned_payment_debt_id" ON "public"."PlannedPayment" USING "btree" ("debtId") WHERE ("debtId" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_planned_payment_linked_transaction" ON "public"."PlannedPayment" USING "btree" ("linkedTransactionId") WHERE ("linkedTransactionId" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_planned_payment_source" ON "public"."PlannedPayment" USING "btree" ("source");
-
-
-
-CREATE INDEX "idx_planned_payment_status" ON "public"."PlannedPayment" USING "btree" ("status");
-
-
-
-CREATE INDEX "idx_planned_payment_subscription_id" ON "public"."PlannedPayment" USING "btree" ("subscriptionId") WHERE ("subscriptionId" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_planned_payment_to_account_id" ON "public"."PlannedPayment" USING "btree" ("toAccountId") WHERE ("toAccountId" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_planned_payment_user_date_status" ON "public"."PlannedPayment" USING "btree" ("userId", "date", "status") WHERE ("date" IS NOT NULL);
-
-
-
-COMMENT ON INDEX "public"."idx_planned_payment_user_date_status" IS 'Índice para queries de pagamentos planejados por data e status';
 
 
 
@@ -3504,39 +3508,7 @@ CREATE UNIQUE INDEX "idx_portfolio_summary_user" ON "public"."portfolio_summary_
 
 
 
-CREATE INDEX "idx_position_account_open" ON "public"."Position" USING "btree" ("accountId", "openQuantity", "lastUpdatedAt" DESC) WHERE ("openQuantity" > (0)::numeric);
-
-
-
-CREATE INDEX "idx_position_account_open_quantity" ON "public"."Position" USING "btree" ("accountId", "openQuantity" DESC) WHERE ("openQuantity" > (0)::numeric);
-
-
-
-CREATE INDEX "idx_position_last_updated" ON "public"."Position" USING "btree" ("lastUpdatedAt" DESC) WHERE ("lastUpdatedAt" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_position_security" ON "public"."Position" USING "btree" ("securityId", "accountId") WHERE ("securityId" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_sector_allocation_user" ON "public"."sector_allocation_view" USING "btree" ("user_id");
-
-
-
-CREATE INDEX "idx_security_price_date" ON "public"."SecurityPrice" USING "btree" ("date" DESC) WHERE ("date" IS NOT NULL);
-
-
-
 CREATE INDEX "idx_security_price_date_range" ON "public"."SecurityPrice" USING "btree" ("securityId", "date") WHERE ("date" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_security_price_security_date_desc" ON "public"."SecurityPrice" USING "btree" ("securityId", "date" DESC) WHERE ("date" IS NOT NULL);
-
-
-
-CREATE INDEX "idx_simple_investment_account_date" ON "public"."SimpleInvestmentEntry" USING "btree" ("accountId", "date" DESC) WHERE ("date" IS NOT NULL);
 
 
 
@@ -3552,19 +3524,7 @@ CREATE INDEX "idx_subscription_service_category_display_order" ON "public"."Subs
 
 
 
-CREATE INDEX "idx_subscription_service_category_id" ON "public"."SubscriptionService" USING "btree" ("categoryId");
-
-
-
-CREATE INDEX "idx_subscription_service_display_order" ON "public"."SubscriptionService" USING "btree" ("categoryId", "displayOrder", "isActive");
-
-
-
 CREATE INDEX "idx_subscription_service_plan_service_id" ON "public"."SubscriptionServicePlan" USING "btree" ("serviceId", "isActive");
-
-
-
-CREATE INDEX "idx_subscription_userid_status" ON "public"."Subscription" USING "btree" ("userId", "status");
 
 
 
@@ -3584,23 +3544,7 @@ COMMENT ON INDEX "public"."idx_transaction_user_date" IS 'Índice otimizado para
 
 
 
-CREATE INDEX "idx_transaction_user_date_type" ON "public"."Transaction" USING "btree" ("userId", "date" DESC, "type") WHERE (("date" IS NOT NULL) AND ("type" IS NOT NULL));
-
-
-
-COMMENT ON INDEX "public"."idx_transaction_user_date_type" IS 'Índice composto para queries com filtro de tipo adicional';
-
-
-
 CREATE INDEX "idx_user_service_subscription_account_id" ON "public"."UserServiceSubscription" USING "btree" ("accountId");
-
-
-
-CREATE INDEX "idx_user_service_subscription_is_active" ON "public"."UserServiceSubscription" USING "btree" ("isActive") WHERE ("isActive" = true);
-
-
-
-CREATE INDEX "idx_user_service_subscription_plan_id" ON "public"."UserServiceSubscription" USING "btree" ("planId");
 
 
 
@@ -3609,14 +3553,6 @@ CREATE INDEX "idx_user_service_subscription_subcategory_id" ON "public"."UserSer
 
 
 CREATE INDEX "idx_user_service_subscription_user_active" ON "public"."UserServiceSubscription" USING "btree" ("userId", "isActive");
-
-
-
-CREATE INDEX "idx_user_service_subscription_user_id" ON "public"."UserServiceSubscription" USING "btree" ("userId");
-
-
-
-CREATE INDEX "transaction_description_search_trgm_idx" ON "public"."Transaction" USING "gin" ("description_search" "extensions"."gin_trgm_ops") WHERE ("description_search" IS NOT NULL);
 
 
 
@@ -4127,24 +4063,6 @@ CREATE POLICY "Admins can insert securities" ON "public"."Security" FOR INSERT W
 
 
 
-CREATE POLICY "Admins can view all block history" ON "public"."UserBlockHistory" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"]))))));
-
-
-
-CREATE POLICY "Anyone can view active subscription service categories" ON "public"."SubscriptionServiceCategory" FOR SELECT USING (("isActive" = true));
-
-
-
-CREATE POLICY "Anyone can view active subscription service plans" ON "public"."SubscriptionServicePlan" FOR SELECT USING (("isActive" = true));
-
-
-
-CREATE POLICY "Anyone can view active subscription services" ON "public"."SubscriptionService" FOR SELECT USING (("isActive" = true));
-
-
-
 CREATE POLICY "Anyone can view securities" ON "public"."Security" FOR SELECT USING (true);
 
 
@@ -4238,7 +4156,33 @@ ALTER TABLE "public"."Position" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."PromoCode" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "Public can read active promo codes" ON "public"."PromoCode" FOR SELECT USING ((("isActive" = true) AND (("expiresAt" IS NULL) OR ("expiresAt" > "now"()))));
+CREATE POLICY "Public and super admins can access subscription service categor" ON "public"."SubscriptionServiceCategory" USING ((("isActive" = true) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))))) WITH CHECK ((("isActive" = true) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Public and super admins can access subscription service plans" ON "public"."SubscriptionServicePlan" USING ((("isActive" = true) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))))) WITH CHECK ((("isActive" = true) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Public and super admins can access subscription services" ON "public"."SubscriptionService" USING ((("isActive" = true) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))))) WITH CHECK ((("isActive" = true) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Public and super admins can read promo codes" ON "public"."PromoCode" FOR SELECT USING (((("isActive" = true) AND (("expiresAt" IS NULL) OR ("expiresAt" > "now"()))) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
 
 
 
@@ -4251,11 +4195,19 @@ ALTER TABLE "public"."Security" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."SecurityPrice" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "Service role and users can delete subscriptions" ON "public"."Subscription" FOR DELETE USING (((( SELECT "auth"."role"() AS "role") = 'service_role'::"text") OR "public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
+
+
+
+CREATE POLICY "Service role and users can insert subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK (((( SELECT "auth"."role"() AS "role") = 'service_role'::"text") OR "public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
+
+
+
+CREATE POLICY "Service role and users can update subscriptions" ON "public"."Subscription" FOR UPDATE USING (((( SELECT "auth"."role"() AS "role") = 'service_role'::"text") OR "public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")))) WITH CHECK (((( SELECT "auth"."role"() AS "role") = 'service_role'::"text") OR "public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
+
+
+
 CREATE POLICY "Service role can delete plans" ON "public"."Plan" FOR DELETE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
-
-
-
-CREATE POLICY "Service role can delete subscriptions" ON "public"."Subscription" FOR DELETE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
@@ -4263,15 +4215,7 @@ CREATE POLICY "Service role can insert plans" ON "public"."Plan" FOR INSERT WITH
 
 
 
-CREATE POLICY "Service role can insert subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
-
-
-
 CREATE POLICY "Service role can update plans" ON "public"."Plan" FOR UPDATE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text")) WITH CHECK ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
-
-
-
-CREATE POLICY "Service role can update subscriptions" ON "public"."Subscription" FOR UPDATE USING ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text")) WITH CHECK ((( SELECT "auth"."role"() AS "role") = 'service_role'::"text"));
 
 
 
@@ -4299,73 +4243,7 @@ CREATE POLICY "Super admin can delete promo codes" ON "public"."PromoCode" FOR D
 
 
 
-CREATE POLICY "Super admin can delete system categories" ON "public"."Category" FOR DELETE USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can delete system groups" ON "public"."Group" FOR DELETE USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can delete system subcategories" ON "public"."Subcategory" FOR DELETE USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
 CREATE POLICY "Super admin can insert promo codes" ON "public"."PromoCode" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can insert system categories" ON "public"."Category" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can insert system groups" ON "public"."Group" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can insert system subcategories" ON "public"."Subcategory" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can manage subscription service categories" ON "public"."SubscriptionServiceCategory" USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can manage subscription service plans" ON "public"."SubscriptionServicePlan" USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can manage subscription services" ON "public"."SubscriptionService" USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can read promo codes" ON "public"."PromoCode" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."User"
   WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
@@ -4377,37 +4255,7 @@ CREATE POLICY "Super admin can update promo codes" ON "public"."PromoCode" FOR U
 
 
 
-CREATE POLICY "Super admin can update system categories" ON "public"."Category" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can update system groups" ON "public"."Group" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admin can update system subcategories" ON "public"."Subcategory" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
 CREATE POLICY "Super admins can update contact submissions" ON "public"."ContactForm" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admins can view all contact submissions" ON "public"."ContactForm" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."User"
-  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
-
-
-
-CREATE POLICY "Super admins can view all feedback submissions" ON "public"."Feedback" FOR SELECT USING ((EXISTS ( SELECT 1
    FROM "public"."User"
   WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))));
 
@@ -4450,6 +4298,92 @@ ALTER TABLE "public"."UserBlockHistory" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."UserServiceSubscription" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "Users and admins can view block history" ON "public"."UserBlockHistory" FOR SELECT USING ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"])))))));
+
+
+
+CREATE POLICY "Users and super admins can delete categories" ON "public"."Category" FOR DELETE USING ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can delete groups" ON "public"."Group" FOR DELETE USING ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can delete subcategories" ON "public"."Subcategory" FOR DELETE USING (((EXISTS ( SELECT 1
+   FROM "public"."Category"
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can insert categories" ON "public"."Category" FOR INSERT WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can insert groups" ON "public"."Group" FOR INSERT WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can insert subcategories" ON "public"."Subcategory" FOR INSERT WITH CHECK (((EXISTS ( SELECT 1
+   FROM "public"."Category"
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can update categories" ON "public"."Category" FOR UPDATE USING ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))))) WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can update groups" ON "public"."Group" FOR UPDATE USING ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))))) WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can update subcategories" ON "public"."Subcategory" FOR UPDATE USING (((EXISTS ( SELECT 1
+   FROM "public"."Category"
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text")))))) WITH CHECK (((EXISTS ( SELECT 1
+   FROM "public"."Category"
+  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = 'super_admin'::"text"))))));
+
+
+
+CREATE POLICY "Users and super admins can view contact submissions" ON "public"."ContactForm" FOR SELECT USING ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"])))))));
+
+
+
+CREATE POLICY "Users and super admins can view feedback submissions" ON "public"."Feedback" FOR SELECT USING ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (EXISTS ( SELECT 1
+   FROM "public"."User"
+  WHERE (("User"."id" = ( SELECT "auth"."uid"() AS "uid")) AND ("User"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"])))))));
+
 
 
 CREATE POLICY "Users can be added to households" ON "public"."HouseholdMemberNew" FOR INSERT WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) OR ("householdId" IN ( SELECT "get_user_admin_household_ids"."household_id"
@@ -4551,10 +4485,6 @@ CREATE POLICY "Users can delete household simple investment entries" ON "public"
 
 
 
-CREATE POLICY "Users can delete household subscriptions" ON "public"."Subscription" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
-
-
-
 CREATE POLICY "Users can delete household transactions" ON "public"."Transaction" FOR DELETE USING (("public"."can_access_household_data"("householdId", 'delete'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
@@ -4562,20 +4492,6 @@ CREATE POLICY "Users can delete household transactions" ON "public"."Transaction
 CREATE POLICY "Users can delete own budget categories" ON "public"."BudgetCategory" FOR DELETE USING ((EXISTS ( SELECT 1
    FROM "public"."Budget"
   WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("public"."can_access_household_data"("Budget"."householdId", 'delete'::"text") OR ("Budget"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
-
-
-
-CREATE POLICY "Users can delete own categories" ON "public"."Category" FOR DELETE USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
-CREATE POLICY "Users can delete own groups" ON "public"."Group" FOR DELETE USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
-CREATE POLICY "Users can delete own subcategories" ON "public"."Subcategory" FOR DELETE USING ((EXISTS ( SELECT 1
-   FROM "public"."Category"
-  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
@@ -4701,10 +4617,6 @@ CREATE POLICY "Users can insert household simple investment entries" ON "public"
 
 
 
-CREATE POLICY "Users can insert household subscriptions" ON "public"."Subscription" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
-
-
-
 CREATE POLICY "Users can insert household transactions" ON "public"."Transaction" FOR INSERT WITH CHECK (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
@@ -4712,10 +4624,6 @@ CREATE POLICY "Users can insert household transactions" ON "public"."Transaction
 CREATE POLICY "Users can insert own budget categories" ON "public"."BudgetCategory" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM "public"."Budget"
   WHERE (("Budget"."id" = "BudgetCategory"."budgetId") AND ("public"."can_access_household_data"("Budget"."householdId", 'write'::"text") OR ("Budget"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
-
-
-
-CREATE POLICY "Users can insert own categories" ON "public"."Category" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -4731,17 +4639,7 @@ CREATE POLICY "Users can insert own feedback submissions" ON "public"."Feedback"
 
 
 
-CREATE POLICY "Users can insert own groups" ON "public"."Group" FOR INSERT WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
 CREATE POLICY "Users can insert own profile" ON "public"."User" FOR INSERT WITH CHECK (("id" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
-CREATE POLICY "Users can insert own subcategories" ON "public"."Subcategory" FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."Category"
-  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
@@ -4768,8 +4666,7 @@ CREATE POLICY "Users can insert their own Questrade connections" ON "public"."Qu
 
 
 
-CREATE POLICY "Users can set their active household" ON "public"."UserActiveHousehold" USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ((("userId" = ( SELECT "auth"."uid"() AS "uid")) AND ("householdId" IN ( SELECT "get_user_household_ids"."household_id"
-   FROM "public"."get_user_household_ids"() "get_user_household_ids"("household_id")))));
+CREATE POLICY "Users can manage their active household" ON "public"."UserActiveHousehold" USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -4867,10 +4764,6 @@ CREATE POLICY "Users can update household simple investment entries" ON "public"
 
 
 
-CREATE POLICY "Users can update household subscriptions" ON "public"."Subscription" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid")) OR (( SELECT "auth"."role"() AS "role") = 'service_role'::"text")));
-
-
-
 CREATE POLICY "Users can update household transactions" ON "public"."Transaction" FOR UPDATE USING (("public"."can_access_household_data"("householdId", 'write'::"text") OR ("userId" = ( SELECT "auth"."uid"() AS "uid"))));
 
 
@@ -4881,25 +4774,11 @@ CREATE POLICY "Users can update own budget categories" ON "public"."BudgetCatego
 
 
 
-CREATE POLICY "Users can update own categories" ON "public"."Category" FOR UPDATE USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
 CREATE POLICY "Users can update own category learning" ON "public"."category_learning" FOR UPDATE USING (("user_id" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
-CREATE POLICY "Users can update own groups" ON "public"."Group" FOR UPDATE USING (("userId" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("userId" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
 CREATE POLICY "Users can update own profile" ON "public"."User" FOR UPDATE USING (("id" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("id" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
-CREATE POLICY "Users can update own subcategories" ON "public"."Subcategory" FOR UPDATE USING ((EXISTS ( SELECT 1
-   FROM "public"."Category"
-  WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid")))))));
 
 
 
@@ -5059,19 +4938,7 @@ CREATE POLICY "Users can view own and household member profiles" ON "public"."Us
 
 
 
-CREATE POLICY "Users can view own block history" ON "public"."UserBlockHistory" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
 CREATE POLICY "Users can view own category learning" ON "public"."category_learning" FOR SELECT USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
-CREATE POLICY "Users can view own contact submissions" ON "public"."ContactForm" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
-
-
-
-CREATE POLICY "Users can view own feedback submissions" ON "public"."Feedback" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -5090,10 +4957,6 @@ CREATE POLICY "Users can view system and own groups" ON "public"."Group" FOR SEL
 CREATE POLICY "Users can view system and own subcategories" ON "public"."Subcategory" FOR SELECT USING ((("userId" IS NULL) OR (EXISTS ( SELECT 1
    FROM "public"."Category"
   WHERE (("Category"."id" = "Subcategory"."categoryId") AND (("Category"."userId" IS NULL) OR ("Category"."userId" = ( SELECT "auth"."uid"() AS "uid"))))))));
-
-
-
-CREATE POLICY "Users can view their active household" ON "public"."UserActiveHousehold" FOR SELECT USING (("userId" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -5168,6 +5031,12 @@ GRANT ALL ON FUNCTION "public"."create_transaction_with_limit"("p_id" "text", "p
 
 GRANT ALL ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) TO "service_role";
 GRANT ALL ON FUNCTION "public"."create_transfer_with_limit"("p_user_id" "uuid", "p_from_account_id" "text", "p_to_account_id" "text", "p_amount" "text", "p_amount_numeric" numeric, "p_date" "date", "p_description" "text", "p_description_search" "text", "p_recurring" boolean, "p_max_transactions" integer) TO "authenticated";
+
+
+
+GRANT ALL ON FUNCTION "public"."delete_user_data"("p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."delete_user_data"("p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."delete_user_data"("p_user_id" "uuid") TO "service_role";
 
 
 

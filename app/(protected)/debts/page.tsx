@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import { FeatureGuard } from "@/components/common/feature-guard";
 
 interface Debt {
   id: string;
@@ -167,7 +168,10 @@ export default function DebtsPage() {
 
 
   return (
-    <>
+    <FeatureGuard 
+      feature="hasDebts"
+      headerTitle="Debts"
+    >
       <PageHeader
         title="Debts"
       >
@@ -372,7 +376,7 @@ export default function DebtsPage() {
           </Button>
         </div>
       )}
-    </>
+    </FeatureGuard>
   );
 }
 

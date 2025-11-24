@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createServerClient, createServiceRoleClient } from "@/lib/supabase-server";
-import { getCurrentUserSubscriptionData, type Subscription, type Plan } from "@/lib/api/subscription";
+import { getCurrentUserSubscriptionData, invalidateSubscriptionCache, type Subscription, type Plan } from "@/lib/api/subscription";
 import { verifyUserExists } from "@/lib/utils/verify-user-exists";
 import { SubscriptionGuard } from "@/components/subscription-guard";
 import { SubscriptionProvider } from "@/contexts/subscription-context";
@@ -114,6 +114,8 @@ export default async function ProtectedLayout({
   
   try {
     // Get subscription data using unified API (already has internal caching)
+    // Note: We don't invalidate cache here to avoid performance issues
+    // If subscription is not found, it may be a real issue or cache problem
     const subscriptionData = await getCurrentUserSubscriptionData();
     subscription = subscriptionData.subscription;
     plan = subscriptionData.plan;
@@ -124,11 +126,33 @@ export default async function ProtectedLayout({
       planId: subscription?.planId,
       status: subscription?.status,
       userId: userId,
+      hasPlan: !!plan,
+      planIdFromPlan: plan?.id,
     });
     
-    // If no subscription found, user needs to select a plan
+    // If no subscription found, try to invalidate cache and check again
+    // This handles cases where cache might be stale
+    if (!subscription && userId) {
+      log.debug("No subscription found in first attempt, invalidating cache and retrying");
+      await invalidateSubscriptionCache(userId);
+      const retryData = await getCurrentUserSubscriptionData();
+      subscription = retryData.subscription;
+      plan = retryData.plan;
+      
+      log.debug("Subscription check result after cache invalidation:", {
+        hasSubscription: !!subscription,
+        subscriptionId: subscription?.id,
+        planId: subscription?.planId,
+        status: subscription?.status,
+        userId: userId,
+        hasPlan: !!plan,
+        planIdFromPlan: plan?.id,
+      });
+    }
+    
+    // If no subscription found after retry, user needs to select a plan
     if (!subscription) {
-      log.debug("No subscription found, redirecting to pricing");
+      log.debug("No subscription found after retry, redirecting to pricing");
       shouldOpenModal = true;
       reason = "no_subscription";
     } else {

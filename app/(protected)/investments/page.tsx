@@ -14,8 +14,11 @@ import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Button } from "@/components/ui/button";
 import { Plus, Upload } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import { useToast } from "@/components/toast-provider";
+import { FeatureGuard } from "@/components/common/feature-guard";
+import { useSubscription } from "@/hooks/use-subscription";
 import {
   calculateAssetTypeAllocation,
   calculateSectorAllocation,
@@ -31,6 +34,7 @@ const SectorBreakdown = dynamic(() => import("@/components/portfolio/sector-brea
 const InvestmentTransactionsTable = dynamic(() => import("@/components/portfolio/investment-transactions-table").then(m => ({ default: m.InvestmentTransactionsTable })), { ssr: false });
 const InvestmentTransactionForm = dynamic(() => import("@/components/forms/investment-transaction-form").then(m => ({ default: m.InvestmentTransactionForm })), { ssr: false });
 const InvestmentCsvImportDialog = dynamic(() => import("@/components/forms/investment-csv-import-dialog").then(m => ({ default: m.InvestmentCsvImportDialog })), { ssr: false });
+const BlockedFeature = dynamic(() => import("@/components/common/blocked-feature").then(m => ({ default: m.BlockedFeature })), { ssr: false });
 
 // Types
 interface PortfolioSummary {
@@ -48,6 +52,7 @@ export default function InvestmentsPage() {
   const perf = usePagePerformance("Investments");
   const { checkWriteAccess, canWrite } = useWriteGuard();
   const { toast } = useToast();
+  const { limits } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -55,6 +60,7 @@ export default function InvestmentsPage() {
   const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showImportUpgradeModal, setShowImportUpgradeModal] = useState(false);
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   // OPTIMIZED: Share questrade status between IntegrationDropdown instances
@@ -69,6 +75,11 @@ export default function InvestmentsPage() {
     try {
       const response = await fetch("/api/questrade/accounts");
       if (response.status === 404) {
+        setQuestradeStatus({ isConnected: false, accountsCount: 0 });
+        return;
+      }
+      // Handle 403 (plan restriction) gracefully - just set status to not connected
+      if (response.status === 403) {
         setQuestradeStatus({ isConnected: false, accountsCount: 0 });
         return;
       }
@@ -110,7 +121,8 @@ export default function InvestmentsPage() {
         setQuestradeStatus({ isConnected: false, accountsCount: 0 });
       }
     } catch (error) {
-      if (error instanceof Error && !error.message.includes("404")) {
+      // Don't log 403 errors (plan restrictions) as errors
+      if (error instanceof Error && !error.message.includes("404") && !error.message.includes("403")) {
         console.error("Error loading Questrade connection status:", error);
       }
       setQuestradeStatus({ isConnected: false, accountsCount: 0 });
@@ -136,6 +148,26 @@ export default function InvestmentsPage() {
       }
 
       if (!allDataRes.ok) {
+        // Handle 403 (plan restriction) gracefully - show empty state
+        if (allDataRes.status === 403) {
+          const defaultSummary: PortfolioSummary = {
+            totalValue: 0,
+            dayChange: 0,
+            dayChangePercent: 0,
+            totalReturn: 0,
+            totalReturnPercent: 0,
+            totalCost: 0,
+            holdingsCount: 0,
+          };
+          setPortfolioSummary(defaultSummary);
+          setHoldings([]);
+          setAccounts([]);
+          setHistoricalData([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Only log non-plan errors
         const errorText = await allDataRes.text();
         console.error("[Investments Page] Portfolio data response error:", allDataRes.status, errorText);
         setLoading(false);
@@ -227,6 +259,10 @@ export default function InvestmentsPage() {
   };
 
   return (
+    <FeatureGuard 
+      feature="hasInvestments"
+      headerTitle="Portfolio Management"
+    >
     <SimpleTabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <PageHeader
             title="Portfolio Management"
@@ -252,6 +288,12 @@ export default function InvestmentsPage() {
                 <Button
                   onClick={() => {
                     if (!checkWriteAccess()) return;
+                    // Check if user has access to CSV import
+                    const hasAccess = limits.hasCsvImport === true || String(limits.hasCsvImport) === "true";
+                    if (!hasAccess) {
+                      setShowImportUpgradeModal(true);
+                      return;
+                    }
                     setShowImportDialog(true);
                   }}
                   variant="outline"
@@ -324,6 +366,12 @@ export default function InvestmentsPage() {
                   }}
                   onImportClick={() => {
                     if (!checkWriteAccess()) return;
+                    // Check if user has access to CSV import
+                    const hasAccess = limits.hasCsvImport === true || String(limits.hasCsvImport) === "true";
+                    if (!hasAccess) {
+                      setShowImportUpgradeModal(true);
+                      return;
+                    }
                     setShowImportDialog(true);
                   }}
                   integrationProps={{
@@ -418,6 +466,19 @@ export default function InvestmentsPage() {
           loadPortfolioData();
         }}
         />
+
+      {/* CSV Import Upgrade Modal */}
+      <Dialog open={showImportUpgradeModal} onOpenChange={setShowImportUpgradeModal}>
+        <DialogContent className="max-w-5xl sm:max-w-5xl md:max-w-6xl lg:max-w-7xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Upgrade to CSV Import</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 sm:p-6 md:p-8">
+            <BlockedFeature feature="hasCsvImport" featureName="CSV Import" />
+          </div>
+        </DialogContent>
+      </Dialog>
       </SimpleTabs>
+    </FeatureGuard>
   );
 }

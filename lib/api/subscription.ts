@@ -16,6 +16,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { Plan, PlanFeatures, Subscription } from "@/lib/validations/plan";
 import { logger } from "@/lib/utils/logger";
 import { getDefaultFeatures } from "@/lib/utils/plan-features";
+import { normalizeAndValidateFeatures } from "@/lib/api/plan-features-service";
 
 // Re-export types for convenience
 export type { Subscription, Plan, PlanFeatures };
@@ -38,12 +39,17 @@ const subscriptionCache = new Map<string,
 
 const invalidationTimestamps = new Map<string, number>();
 
+// Request-level cache to prevent duplicate calls within the same request
+// This is cleared after a short timeout (1 second) to avoid memory leaks
+const requestCache = new Map<string, Promise<SubscriptionData>>();
+
 /**
  * Invalidate subscription cache for a user
  * Call this when subscriptions are created, updated, or deleted (e.g., from webhooks)
  */
 export async function invalidateSubscriptionCache(userId: string): Promise<void> {
   subscriptionCache.delete(userId);
+  requestCache.delete(`subscription:${userId}`);
   invalidationTimestamps.set(userId, Date.now());
   const log = logger.withPrefix("SUBSCRIPTION");
   log.debug("Invalidated subscription cache for user:", userId);
@@ -57,7 +63,79 @@ export async function invalidatePlansCache(): Promise<void> {
   plansCache.clear();
   plansCacheTimestamp = 0;
   const log = logger.withPrefix("SUBSCRIPTION");
-  log.debug("Invalidated plans cache");
+  log.debug("Invalidated plans cache - will refresh on next access");
+}
+
+/**
+ * Invalidate subscription cache for all users with a specific plan
+ * Call this when a plan is updated to ensure all users see the new features
+ */
+export async function invalidateSubscriptionsForPlan(planId: string): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+    const log = logger.withPrefix("SUBSCRIPTION");
+    
+    // Get all active subscriptions with this plan
+    const { data: subscriptions, error } = await supabase
+      .from("Subscription")
+      .select("userId, householdId")
+      .eq("planId", planId)
+      .in("status", ["active", "trialing"]);
+    
+    if (error) {
+      log.error("Error fetching subscriptions for plan:", { planId, error });
+      return;
+    }
+    
+    if (!subscriptions || subscriptions.length === 0) {
+      log.debug("No active subscriptions found for plan:", planId);
+      return;
+    }
+    
+    // Collect all user IDs (from userId and household members)
+    const userIds = new Set<string>();
+    
+    for (const sub of subscriptions) {
+      // Add direct userId if exists
+      if (sub.userId) {
+        userIds.add(sub.userId);
+      }
+      
+      // If household subscription, invalidate all household members
+      if (sub.householdId) {
+        const { data: members } = await supabase
+          .from("HouseholdMemberNew")
+          .select("userId")
+          .eq("householdId", sub.householdId)
+          .eq("status", "active");
+        
+        if (members) {
+          members.forEach(m => {
+            if (m.userId) {
+              userIds.add(m.userId);
+            }
+          });
+        }
+      }
+    }
+    
+    // Invalidate cache for all users
+    let invalidatedCount = 0;
+    for (const userId of userIds) {
+      subscriptionCache.delete(userId);
+      invalidationTimestamps.set(userId, Date.now());
+      invalidatedCount++;
+    }
+    
+    log.debug("Invalidated subscription cache for plan:", {
+      planId,
+      subscriptionCount: subscriptions.length,
+      userCount: userIds.size,
+      invalidatedCount,
+    });
+  } catch (error) {
+    logger.error("Error invalidating subscriptions for plan:", { planId, error });
+  }
 }
 
 /**
@@ -146,13 +224,24 @@ export async function getUserSubscriptionData(userId: string): Promise<Subscript
     const now = Date.now();
     const invalidationTime = invalidationTimestamps.get(userId) || 0;
     
-    // Check cache
+    // OPTIMIZED: Check request-level cache first (prevents duplicate calls in same request)
+    const requestKey = `subscription:${userId}`;
+    const requestCached = requestCache.get(requestKey);
+    if (requestCached) {
+      return await requestCached;
+    }
+    
+    // Check persistent cache
     const cached = subscriptionCache.get(userId);
     if (cached && cached.type === 'result') {
       const age = now - cached.timestamp;
       const isInvalidated = invalidationTime > cached.timestamp;
       
       if (!isInvalidated && age < CACHE_TTL) {
+        // Cache in request cache for reuse
+        const resultPromise = Promise.resolve(cached.data);
+        requestCache.set(requestKey, resultPromise);
+        setTimeout(() => requestCache.delete(requestKey), 1000);
         return cached.data;
       }
     }
@@ -161,6 +250,9 @@ export async function getUserSubscriptionData(userId: string): Promise<Subscript
     if (cached && cached.type === 'promise') {
       const age = now - cached.timestamp;
       if (age < 10000) { // 10 seconds max for promises
+        // Cache in request cache for reuse
+        requestCache.set(requestKey, cached.promise);
+        setTimeout(() => requestCache.delete(requestKey), 1000);
         return await cached.promise;
       }
     }
@@ -177,6 +269,7 @@ export async function getUserSubscriptionData(userId: string): Promise<Subscript
       })
       .catch((error) => {
         subscriptionCache.delete(userId);
+        requestCache.delete(requestKey);
         throw error;
       });
 
@@ -186,6 +279,10 @@ export async function getUserSubscriptionData(userId: string): Promise<Subscript
       timestamp: now,
       type: 'promise',
     });
+    
+    // Cache in request cache for reuse within the same request
+    requestCache.set(requestKey, fetchPromise);
+    setTimeout(() => requestCache.delete(requestKey), 1000);
 
     return await fetchPromise;
   } catch (error) {
@@ -219,11 +316,19 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
 
   // If we have cached subscription data and it's recent (less than 5 minutes old), use it
   if (user?.effectivePlanId && user?.effectiveSubscriptionStatus && user?.subscriptionUpdatedAt) {
-    const cacheAge = Date.now() - new Date(user.subscriptionUpdatedAt).getTime();
+    const subscriptionUpdatedAtTime = new Date(user.subscriptionUpdatedAt).getTime();
+    const now = Date.now();
+    const cacheAge = now - subscriptionUpdatedAtTime;
     const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
     
-    // If cache age is negative (future timestamp), treat as expired
-    if (cacheAge >= 0 && cacheAge < CACHE_MAX_AGE) {
+    // FIXED: Handle future timestamps and invalid dates properly
+    // If timestamp is in the future (clock skew or data issue), treat as expired
+    // If timestamp is invalid (NaN), treat as expired
+    const isValidTimestamp = !isNaN(subscriptionUpdatedAtTime) && subscriptionUpdatedAtTime > 0;
+    const isFutureTimestamp = cacheAge < 0;
+    const isRecentCache = cacheAge >= 0 && cacheAge < CACHE_MAX_AGE;
+    
+    if (isValidTimestamp && !isFutureTimestamp && isRecentCache) {
       log.debug("Using cached subscription data from User table", {
         userId,
         planId: user.effectivePlanId,
@@ -257,6 +362,7 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
           }
         }
 
+        const mappedPlan = mapPlan(plan);
         return {
           subscription: fullSubscription || (user.effectiveSubscriptionId ? {
             id: user.effectiveSubscriptionId,
@@ -264,33 +370,39 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
             planId: user.effectivePlanId,
             status: user.effectiveSubscriptionStatus as any,
           } as Subscription : null),
-          plan: mapPlan(plan),
-          limits: plan.features || getDefaultFeatures(),
+          plan: mappedPlan,
+          limits: mappedPlan.features, // Use mapped plan features (already processed from database)
         };
       }
     } else {
-      // Log if cache is expired (negative age = future timestamp, or too old)
-      if (cacheAge < 0 || cacheAge > 60 * 60 * 1000) {
-        log.debug("Cache expired, falling back to full query", {
-          userId,
-          cacheAge: `${Math.round(cacheAge / 1000)}s`,
-          reason: cacheAge < 0 ? "future_timestamp" : "too_old",
-        });
-        
-        // If cache is very stale (>1 hour), refresh it in background
-        // This helps prevent future cache misses without blocking the current request
-        if (cacheAge > 60 * 60 * 1000) {
-          void Promise.resolve(supabase.rpc('update_user_subscription_cache', { p_user_id: userId }))
-            .then(() => {
-              log.debug("Background cache refresh completed", { userId });
-            })
-            .catch((err: unknown) => {
-              log.warn("Failed to refresh stale subscription cache in background", {
-                userId,
-                error: err instanceof Error ? err.message : String(err),
-              });
+      // Log if cache is expired (negative age = future timestamp, invalid timestamp, or too old)
+      const reason = !isValidTimestamp 
+        ? "invalid_timestamp" 
+        : isFutureTimestamp 
+        ? "future_timestamp" 
+        : "too_old";
+      
+      log.debug("Cache expired, falling back to full query", {
+        userId,
+        cacheAge: `${Math.round(cacheAge / 1000)}s`,
+        reason,
+        subscriptionUpdatedAt: user.subscriptionUpdatedAt,
+        isValidTimestamp,
+      });
+      
+      // If cache is very stale (>1 hour) or invalid, refresh it in background
+      // This helps prevent future cache misses without blocking the current request
+      if (!isValidTimestamp || isFutureTimestamp || cacheAge > 60 * 60 * 1000) {
+        void Promise.resolve(supabase.rpc('update_user_subscription_cache', { p_user_id: userId }))
+          .then(() => {
+            log.debug("Background cache refresh completed", { userId });
+          })
+          .catch((err: unknown) => {
+            log.warn("Failed to refresh stale subscription cache in background", {
+              userId,
+              error: err instanceof Error ? err.message : String(err),
             });
-        }
+          });
       }
     }
   }
@@ -419,6 +531,12 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
   }
 
   if (!subscription) {
+    log.debug("No subscription found for user:", { 
+      userId, 
+      householdId,
+      subscriptionByHouseholdResult: subscriptionByHouseholdResult ? "found" : "not found",
+      subscriptionByUserIdResult: subscriptionByUserIdResult ? "found" : "not found"
+    });
     return {
       subscription: null,
       plan: null,
@@ -452,6 +570,15 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
     };
   }
 
+  // Debug: Log plan features from database
+  log.debug("Plan features from database:", {
+    planId: plan.id,
+    planName: plan.name,
+    features: JSON.stringify(plan.features),
+    hasAdvancedReports: plan.features?.hasAdvancedReports,
+    hasAdvancedReportsType: typeof plan.features?.hasAdvancedReports,
+  });
+
   // Use plan features directly from database (source of truth)
   return {
     subscription,
@@ -466,6 +593,9 @@ async function fetchUserSubscriptionData(userId: string): Promise<SubscriptionDa
 async function refreshPlansCache(): Promise<void> {
   try {
     const supabase = await createServerClient();
+    const log = logger.withPrefix("SUBSCRIPTION");
+    
+    log.debug("Refreshing plans cache from database");
     
     const { data: plans, error } = await supabase
       .from("Plan")
@@ -477,11 +607,27 @@ async function refreshPlansCache(): Promise<void> {
       return;
     }
 
+    log.debug("Plans fetched from database:", {
+      count: plans.length,
+      plans: plans.map(p => ({
+        id: p.id,
+        name: p.name,
+        features: p.features,
+        featuresType: typeof p.features,
+      })),
+    });
+
     plansCache.clear();
     
     plans.forEach(plan => {
       const mappedPlan = mapPlan(plan);
       plansCache.set(mappedPlan.id, mappedPlan);
+    });
+    
+    plansCacheTimestamp = Date.now();
+    log.debug("Plans cache refreshed:", {
+      cacheSize: plansCache.size,
+      cachedPlanIds: Array.from(plansCache.keys()),
     });
     
     plansCacheTimestamp = Date.now();
@@ -492,11 +638,24 @@ async function refreshPlansCache(): Promise<void> {
 
 /**
  * Map database plan to Plan type
+ * Uses centralized feature normalization and validation
  */
 function mapPlan(data: any): Plan {
-  // Use features directly from database - no merging with defaults
-  // The database is the source of truth
-  const features: PlanFeatures = data.features || getDefaultFeatures();
+  const log = logger.withPrefix("SUBSCRIPTION");
+  
+  // Use centralized service to normalize and validate features
+  const features = normalizeAndValidateFeatures(data.features, data.id);
+  
+  // Debug: Log what we're mapping
+  log.debug("Mapping plan features:", {
+    planId: data.id,
+    planName: data.name,
+    featuresRaw: data.features,
+    featuresType: typeof data.features,
+    featuresMapped: JSON.stringify(features),
+    hasAdvancedReports: features.hasAdvancedReports,
+    hasAdvancedReportsType: typeof features.hasAdvancedReports,
+  });
   
   return {
     id: data.id,

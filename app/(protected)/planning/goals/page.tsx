@@ -21,6 +21,7 @@ import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import { FeatureGuard } from "@/components/common/feature-guard";
 
 interface Goal {
   id: string;
@@ -171,7 +172,11 @@ export default function GoalsPage() {
   });
 
   return (
-    <div>
+    <FeatureGuard 
+      feature="hasGoals"
+      headerTitle="Goals"
+    >
+      <div>
         <PageHeader
           title="Goals"
         >
@@ -349,6 +354,7 @@ export default function GoalsPage() {
         </div>
       )}
       </div>
+    </FeatureGuard>
   );
 }
 

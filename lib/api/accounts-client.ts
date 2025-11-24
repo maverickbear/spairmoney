@@ -1,7 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { decryptAmount } from "@/lib/utils/transaction-encryption";
+import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
 import { AccountFormData } from "@/lib/validations/account";
 import { getCurrentTimestamp, formatTimestamp } from "@/lib/utils/timestamp";
 
@@ -112,7 +112,7 @@ export async function getAccountsClient(options?: { includeInvestmentBalances?: 
     const currentBalance = balances.get(tx.accountId) || 0;
     
     // Decrypt amount if encrypted
-    const decryptedAmount = decryptAmount(tx.amount);
+    const decryptedAmount = getTransactionAmount(tx.amount);
     
     // Skip transaction if amount is invalid (null, NaN, or unreasonably large)
     // Note: In browser, encrypted amounts cannot be decrypted (no access to encryption key),

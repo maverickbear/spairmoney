@@ -122,12 +122,31 @@ export async function createTrialCheckoutSession(
       // We can use it to link the subscription when user signs up
       // Using planId as part of reference for easier tracking
       client_reference_id: `trial-${planId}-${Date.now()}`,
-      success_url: returnUrl 
-        ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
-        : `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/"}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: returnUrl 
-        ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}canceled=true`
-        : `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/"}/pricing?canceled=true`,
+      success_url: (() => {
+        let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+        // Ensure baseUrl ends with /
+        if (!baseUrl.endsWith('/')) {
+          baseUrl = `${baseUrl}/`;
+        }
+        if (returnUrl) {
+          // Ensure returnUrl is absolute
+          if (returnUrl.startsWith('http')) {
+            return `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
+          }
+          // Remove leading slash from returnUrl if present, then join with baseUrl
+          const path = returnUrl.startsWith('/') ? returnUrl.slice(1) : returnUrl;
+          return `${baseUrl}${path}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
+        }
+        return `${baseUrl}subscription/success?session_id={CHECKOUT_SESSION_ID}`;
+      })(),
+      cancel_url: (() => {
+        let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+        // Ensure baseUrl ends with /
+        if (!baseUrl.endsWith('/')) {
+          baseUrl = `${baseUrl}/`;
+        }
+        return `${baseUrl}pricing?canceled=true`;
+      })(),
       metadata: {
         planId: planId,
         interval: interval,
@@ -356,12 +375,31 @@ export async function createCheckoutSession(
           ...(userName && { name: userName }),
         },
       }),
-      success_url: returnUrl 
-        ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
-        : `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/"}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: returnUrl 
-        ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}canceled=true`
-        : `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/"}/pricing?canceled=true`,
+      success_url: (() => {
+        let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+        // Ensure baseUrl ends with /
+        if (!baseUrl.endsWith('/')) {
+          baseUrl = `${baseUrl}/`;
+        }
+        if (returnUrl) {
+          // Ensure returnUrl is absolute
+          if (returnUrl.startsWith('http')) {
+            return `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
+          }
+          // Remove leading slash from returnUrl if present, then join with baseUrl
+          const path = returnUrl.startsWith('/') ? returnUrl.slice(1) : returnUrl;
+          return `${baseUrl}${path}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
+        }
+        return `${baseUrl}subscription/success?session_id={CHECKOUT_SESSION_ID}`;
+      })(),
+      cancel_url: (() => {
+        let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+        // Ensure baseUrl ends with /
+        if (!baseUrl.endsWith('/')) {
+          baseUrl = `${baseUrl}/`;
+        }
+        return `${baseUrl}pricing?canceled=true`;
+      })(),
       metadata: {
         userId: userId,
         planId: planId,
@@ -1222,6 +1260,15 @@ async function handleSubscriptionChange(
     }
   }
 
+  // Check if subscription already exists to determine if this is a new creation
+  const { data: existingSubscription } = await supabase
+    .from("Subscription")
+    .select("id")
+    .eq("id", subscriptionId)
+    .maybeSingle();
+  
+  const isNewSubscription = !existingSubscription;
+
   // Upsert the subscription
   console.log("[WEBHOOK:SUBSCRIPTION] Upserting subscription to database...");
   const { data: upsertedSub, error: upsertError } = await supabase
@@ -1238,8 +1285,38 @@ async function handleSubscriptionChange(
 
   console.log("[WEBHOOK:SUBSCRIPTION] Subscription upserted successfully:", {
     subscriptionId,
-    upsertedData: upsertedSub
+    upsertedData: upsertedSub,
+    isNewSubscription
   });
+
+  // Send welcome email when subscription is created for an existing user
+  if (isNewSubscription && userId) {
+    try {
+      // Get user email
+      const { data: userData } = await supabase
+        .from("User")
+        .select("email")
+        .eq("id", userId)
+        .single();
+
+      if (userData?.email) {
+        const { sendWelcomeEmail } = await import("@/lib/utils/email");
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+        
+        await sendWelcomeEmail({
+          to: userData.email,
+          userName: "", // Not used anymore, but keeping for interface compatibility
+          founderName: "Naor Tartarotti",
+          appUrl: appUrl,
+        });
+        
+        console.log("[WEBHOOK:SUBSCRIPTION] ✅ Welcome email sent successfully to:", userData.email);
+      }
+    } catch (welcomeEmailError) {
+      console.error("[WEBHOOK:SUBSCRIPTION] ❌ Error sending welcome email:", welcomeEmailError);
+      // Don't fail the webhook if welcome email fails
+    }
+  }
 
   // Invalidate subscription cache to ensure UI reflects changes immediately
   if (userId) {

@@ -88,7 +88,6 @@ export async function updateProfileClient(data: Partial<Profile>): Promise<Profi
 export async function deleteAccountClient(password: string): Promise<{
   success: boolean;
   error?: string;
-  scheduledDeletionAt?: string;
 }> {
   const response = await fetch("/api/profile/delete-account", {
     method: "DELETE",

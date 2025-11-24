@@ -145,6 +145,42 @@ export default function SystemEntitiesPage() {
     await loadSystemEntities();
   }
 
+  async function handleBulkDelete(items: Array<{ id: string; type: "group" | "category" | "subcategory" }>) {
+    // Delete all items in parallel, tracking which item each promise corresponds to
+    const deletePromises = items.map(async (item) => {
+      let endpoint = "";
+      switch (item.type) {
+        case "group":
+          endpoint = `/api/admin/groups?id=${item.id}`;
+          break;
+        case "category":
+          endpoint = `/api/admin/categories?id=${item.id}`;
+          break;
+        case "subcategory":
+          endpoint = `/api/admin/subcategories?id=${item.id}`;
+          break;
+      }
+
+      const response = await fetch(endpoint, { method: "DELETE" });
+      return { response, item };
+    });
+
+    const results = await Promise.all(deletePromises);
+    const errors: string[] = [];
+
+    results.forEach(({ response, item }) => {
+      if (!response.ok) {
+        errors.push(`Failed to delete ${item.type} "${item.id}"`);
+      }
+    });
+
+    if (errors.length > 0) {
+      throw new Error(errors.join("\n"));
+    }
+
+    await loadSystemEntities();
+  }
+
   // Filter system entities based on search term
   const filteredEntities = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -267,6 +303,7 @@ export default function SystemEntitiesPage() {
           onDeleteCategory={handleDeleteCategory}
           onEditSubcategory={handleEditSubcategory}
           onDeleteSubcategory={handleDeleteSubcategory}
+          onBulkDelete={handleBulkDelete}
         />
       </div>
 

@@ -136,7 +136,7 @@ Use this as a quick reference when filling out the Plaid security questionnaire 
 
 **Policy:**
 - Data retained while account is active
-- Deletion within 30 days of request
+- Immediate deletion upon request
 - Policy documented in Privacy Policy
 - Reviewed periodically for compliance
 

@@ -443,11 +443,11 @@ export default async function PrivacyPolicyPage() {
               </p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-2 ml-4">
                 <li><strong>Active Accounts:</strong> Data is retained while your account is active and needed for service provision</li>
-                <li><strong>Account Deletion:</strong> Upon account deletion request, data is deleted or anonymized within 30 days</li>
+                <li><strong>Account Deletion:</strong> Upon account deletion request, all data is permanently deleted immediately</li>
                 <li><strong>Connected Services:</strong> When you disconnect Plaid or Questrade, we retain historical data but stop collecting new data</li>
                 <li><strong>Security Logs:</strong> Security and audit logs (including account blocks and suspensions) may be retained longer for security and compliance purposes</li>
                 <li><strong>Legal Requirements:</strong> Data may be retained longer if required by law, regulation, or legitimate business purposes (e.g., tax records, dispute resolution)</li>
-                <li><strong>Backup Data:</strong> Backup copies may be retained for up to 90 days after deletion for disaster recovery purposes</li>
+                <li><strong>Backup Data:</strong> Our database provider (Supabase) maintains automatic backups for disaster recovery. Backup retention is managed by Supabase according to their service terms (typically 7-30 days depending on the service plan). We do not maintain separate backup copies beyond the provider's automatic backup system</li>
               </ul>
               <p className="text-sm text-muted-foreground mt-2">
                 You can request immediate deletion of your data by contacting us at legal@sparefinance.com. 

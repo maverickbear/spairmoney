@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { refreshAccessToken, decryptTokens, encryptTokens } from "@/lib/api/questrade";
 import { getCurrentUserId, guardFeatureAccess, throwIfNotAllowed } from "@/lib/api/feature-guard";
 import { formatTimestamp } from "@/lib/utils/timestamp";
+import { isPlanError } from "@/lib/utils/plan-errors";
 
 export async function POST() {
   try {
@@ -71,20 +72,20 @@ export async function POST() {
       expiresAt: formatTimestamp(tokenExpiresAt),
     });
   } catch (error: any) {
-    console.error("Error refreshing Questrade token:", error);
-
-    // Check if it's a plan error
-    if (error.planError) {
+    // Check if it's a plan error - don't log these as errors
+    if (error.planError || isPlanError(error)) {
       return NextResponse.json(
         {
-          error: error.message,
+          error: error.message || "Investments are not available in your current plan",
           code: error.code,
-          planError: error.planError,
+          planError: error.planError || error,
         },
         { status: 403 }
       );
     }
 
+    // Only log actual errors, not plan restrictions
+    console.error("Error refreshing Questrade token:", error);
     return NextResponse.json(
       { error: error.message || "Failed to refresh Questrade token" },
       { status: 500 }

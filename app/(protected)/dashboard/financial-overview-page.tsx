@@ -62,6 +62,14 @@ const PortfolioPerformanceWidget = dynamic(
   }
 );
 
+const InvestmentPortfolioWidget = dynamic(
+  () => import("./widgets/investment-portfolio-widget").then(m => ({ default: m.InvestmentPortfolioWidget })),
+  { 
+    ssr: false, // recharts doesn't work well with SSR
+    loading: () => <CardSkeleton />
+  }
+);
+
 const RecurringPaymentsWidget = dynamic(
   () => import("./widgets/recurring-payments-widget").then(m => ({ default: m.RecurringPaymentsWidget })),
   { 
@@ -438,7 +446,7 @@ export function FinancialOverviewPage({
               totalAssets={totalAssets}
               totalDebts={totalDebts}
             />
-            <PortfolioPerformanceWidget
+            <InvestmentPortfolioWidget
               savings={savings}
             />
           </div>

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, createServiceRoleClient } from "@/lib/supabase-server";
 import { validatePasswordAgainstHIBP } from "@/lib/utils/hibp";
 import { getActiveHouseholdId } from "@/lib/utils/household";
+import { formatTimestamp } from "@/lib/utils/timestamp";
+import { randomUUID } from "crypto";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -131,13 +133,67 @@ export async function POST(request: NextRequest) {
         // Don't fail - this is not critical
         } else {
           // Set as active household
-          await serviceRoleClient
+          const { error: activeError } = await serviceRoleClient
             .from("UserActiveHousehold")
             .insert({
               userId: userData.id,
               householdId: household.id,
               updatedAt: now,
             });
+
+          if (activeError) {
+            console.error("[CREATE-ACCOUNT] Error setting active household:", activeError);
+          } else {
+            // Create emergency fund goal for new user
+            try {
+              // Check if emergency fund goal already exists
+              const { data: existingGoals } = await serviceRoleClient
+                .from("Goal")
+                .select("*")
+                .eq("householdId", household.id)
+                .eq("name", "Emergency Funds")
+                .eq("isSystemGoal", true)
+                .limit(1);
+
+              if (!existingGoals || existingGoals.length === 0) {
+                // Create emergency fund goal
+                const goalId = randomUUID();
+                const goalNow = formatTimestamp(new Date());
+                const { error: goalError } = await serviceRoleClient
+                  .from("Goal")
+                  .insert({
+                    id: goalId,
+                    name: "Emergency Funds",
+                    targetAmount: 0.00,
+                    currentBalance: 0.00,
+                    incomePercentage: 0.00,
+                    priority: "High",
+                    description: "Emergency fund for unexpected expenses",
+                    isPaused: false,
+                    isCompleted: false,
+                    completedAt: null,
+                    expectedIncome: null,
+                    targetMonths: null,
+                    accountId: null,
+                    holdingId: null,
+                    isSystemGoal: true,
+                    userId: userData.id,
+                    householdId: household.id,
+                    createdAt: goalNow,
+                    updatedAt: goalNow,
+                  });
+
+                if (goalError) {
+                  console.error("[CREATE-ACCOUNT] Error creating emergency fund goal:", goalError);
+                } else {
+                  console.log("[CREATE-ACCOUNT] ✅ Emergency fund goal created");
+                }
+              }
+            } catch (goalError) {
+              console.error("[CREATE-ACCOUNT] Error creating emergency fund goal:", goalError);
+              // Don't fail account creation if goal creation fails
+            }
+          }
         }
       }
     }
@@ -325,6 +381,26 @@ export async function POST(request: NextRequest) {
       }
       
       console.log("[CREATE-ACCOUNT] Subscription created successfully:", subscriptionId);
+      
+      // Send welcome email when subscription is created
+      if (authData.user.email) {
+        try {
+          const { sendWelcomeEmail } = await import("@/lib/utils/email");
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+          
+          await sendWelcomeEmail({
+            to: authData.user.email,
+            userName: "", // Not used anymore, but keeping for interface compatibility
+            founderName: "Naor Tartarotti",
+            appUrl: appUrl,
+          });
+          
+          console.log("[CREATE-ACCOUNT] ✅ Welcome email sent successfully to:", authData.user.email);
+        } catch (welcomeEmailError) {
+          console.error("[CREATE-ACCOUNT] ❌ Error sending welcome email:", welcomeEmailError);
+          // Don't fail account creation if welcome email fails
+        }
+      }
     }
 
     // Invalidate cache

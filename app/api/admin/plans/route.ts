@@ -91,13 +91,18 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Validate features if provided
+    // Validate features if provided using centralized service
     if (features) {
-      const validationResult = planFeaturesSchema.safeParse(features);
-      if (!validationResult.success) {
-        console.error("[API/ADMIN/PLANS] Feature validation failed:", validationResult.error);
+      try {
+        const { validateFeaturesForSave } = await import("@/lib/api/plan-features-service");
+        validateFeaturesForSave(features);
+      } catch (error) {
+        console.error("[API/ADMIN/PLANS] Feature validation failed:", error);
         return NextResponse.json(
-          { error: "Invalid features format", details: validationResult.error },
+          { 
+            error: "Invalid features format", 
+            details: error instanceof Error ? error.message : "Unknown error"
+          },
           { status: 400 }
         );
       }
@@ -165,6 +170,11 @@ export async function PUT(request: NextRequest) {
 
     // Invalidate plans cache
     await invalidatePlansCache();
+    
+    // Invalidate subscription cache for all users with this plan
+    // This ensures users see updated features immediately
+    const { invalidateSubscriptionsForPlan } = await import("@/lib/api/subscription");
+    await invalidateSubscriptionsForPlan(id);
 
     // Sync to Stripe if plan has stripeProductId
     // Sync everything: features, prices, and product name

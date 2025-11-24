@@ -13,7 +13,7 @@ import { guardTransactionLimit, getCurrentUserId, throwIfNotAllowed } from "@/li
 import { requireTransactionOwnership } from "@/lib/utils/security";
 import { suggestCategory, updateCategoryLearning } from "@/lib/api/category-learning";
 import { logger } from "@/lib/utils/logger";
-import { encryptDescription, decryptDescription, encryptAmount, decryptAmount, normalizeDescription } from "@/lib/utils/transaction-encryption";
+import { encryptDescription, decryptDescription, decryptAmount, normalizeDescription, getTransactionAmount } from "@/lib/utils/transaction-encryption";
 import { getUserSubscriptionData } from "@/lib/api/subscription";
 import { 
   getActiveCreditCardDebt, 
@@ -51,9 +51,8 @@ export async function createTransaction(data: TransactionFormData) {
 
   // Prepare auxiliary fields
   const encryptedDescription = encryptDescription(data.description || null);
-  const encryptedAmount = encryptAmount(data.amount);
   const descriptionSearch = normalizeDescription(data.description);
-  const amountNumeric = data.amount;
+  // Amount is no longer encrypted - store directly as numeric
 
   // Get category suggestion from learning model if no category is provided
   let categorySuggestion = null;
@@ -101,8 +100,7 @@ export async function createTransaction(data: TransactionFormData) {
         p_user_id: userId,
         p_from_account_id: data.accountId,
         p_to_account_id: data.toAccountId,
-        p_amount: encryptedAmount,
-        p_amount_numeric: amountNumeric,
+        p_amount: data.amount,
         p_date: transactionDate,
         p_description: encryptedDescription,
         p_description_search: descriptionSearch,
@@ -176,7 +174,7 @@ export async function createTransaction(data: TransactionFormData) {
     try {
       const toAccount = await getCreditCardAccount(data.toAccountId);
       if (toAccount && toAccount.type === "credit") {
-        const paymentAmount = amountNumeric;
+        const paymentAmount = data.amount;
         const activeDebt = await getActiveCreditCardDebt(data.toAccountId);
 
         if (activeDebt) {
@@ -256,8 +254,7 @@ export async function createTransaction(data: TransactionFormData) {
       p_id: id,
       p_date: transactionDate,
       p_type: data.type,
-      p_amount: encryptedAmount,
-      p_amount_numeric: amountNumeric,
+      p_amount: data.amount,
       p_account_id: data.accountId,
       p_user_id: userId,
       p_category_id: finalCategoryId,
@@ -513,9 +510,8 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   }
   if (data.type !== undefined) updateData.type = data.type;
   if (data.amount !== undefined) {
-    updateData.amount = encryptAmount(data.amount);
-    // Also update amount_numeric when amount changes
-    updateData.amount_numeric = data.amount;
+    // Amount is no longer encrypted - store directly as numeric
+    updateData.amount = data.amount;
   }
   if (data.accountId !== undefined) updateData.accountId = data.accountId;
   if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
@@ -561,7 +557,8 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
     if (currentTransaction) {
       const desc = decryptDescription(currentTransaction.description || transaction.description);
       const normalizedDesc = normalizeDescription(desc);
-      const txAmount = currentTransaction.amount_numeric || decryptAmount(transaction.amount) || 0;
+      // Amount is now numeric, but support both during migration
+      const txAmount = getTransactionAmount(transaction.amount) || 0;
       const txType = transaction.type;
       
       if (data.categoryId) {
@@ -589,7 +586,8 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
     try {
       // Delete existing planned payments that match this transaction's characteristics
       // (we'll regenerate them with updated data)
-      const amount = transaction.amount_numeric ?? decryptAmount(transaction.amount);
+      // Amount is now numeric, but support both during migration
+      const amount = getTransactionAmount(transaction.amount) ?? 0;
       const { error: deleteError } = await supabase
         .from("PlannedPayment")
         .delete()
@@ -614,7 +612,8 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   } else if (wasRecurring && !isNowRecurring) {
     // If transaction was changed from recurring to non-recurring, delete related planned payments
     try {
-      const amount = transactionBeforeUpdate?.amount_numeric ?? decryptAmount(transactionBeforeUpdate?.amount ?? transaction.amount);
+      // Amount is now numeric, but support both during migration
+      const amount = getTransactionAmount(transactionBeforeUpdate?.amount ?? transaction.amount) ?? 0;
       const { error: deleteError } = await supabase
         .from("PlannedPayment")
         .delete()
@@ -634,10 +633,8 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
   }
 
   // Return transaction with decrypted fields
-  // Prefer amount_numeric if available, otherwise decrypt amount
-  const finalAmount = transaction.amount_numeric !== null && transaction.amount_numeric !== undefined
-    ? transaction.amount_numeric
-    : decryptAmount(transaction.amount);
+  // Amount is now numeric, but support both during migration
+  const finalAmount = getTransactionAmount(transaction.amount) ?? 0;
   
   return {
     ...transaction,
@@ -910,10 +907,8 @@ export async function getTransactionsInternal(
   const { decryptDescription } = await import("@/lib/utils/transaction-encryption");
   
   let transactions = (data || []).map((tx: any) => {
-    // Use amount_numeric if available, otherwise decrypt amount
-    const amount = tx.amount_numeric !== null && tx.amount_numeric !== undefined
-      ? tx.amount_numeric
-      : decryptAmount(tx.amount);
+    // Amount is now numeric, but support both during migration
+    const amount = getTransactionAmount(tx.amount) ?? 0;
     
     // Get category and subcategory from maps
     const category = categoriesMap.get(tx.categoryId) || null;
@@ -1089,7 +1084,7 @@ export async function getUpcomingTransactions(limit: number = 5, accessToken?: s
         (pp) => pp.source === "recurring" && 
         new Date(pp.date).getTime() === nextDate.getTime() &&
         pp.accountId === tx.accountId &&
-        pp.amount === decryptAmount(tx.amount)
+        pp.amount === (getTransactionAmount(tx.amount) ?? 0)
       );
 
       if (!alreadyExists) {
@@ -1112,7 +1107,7 @@ export async function getUpcomingTransactions(limit: number = 5, accessToken?: s
           id: `recurring-${tx.id}-${nextDate.toISOString()}`,
           date: nextDate,
           type: tx.type,
-          amount: decryptAmount(tx.amount) ?? 0,
+          amount: getTransactionAmount(tx.amount) ?? 0,
           description: decryptDescription(tx.description) ?? undefined,
           account: account || null,
           category: category || null,
@@ -1182,8 +1177,8 @@ export async function getAccountBalance(accountId: string) {
       continue;
     }
     
-    // Decrypt amount before using in calculation
-    const amount = decryptAmount(tx.amount);
+    // Get amount (numeric or decrypt during migration)
+    const amount = getTransactionAmount(tx.amount);
     
     // Skip transaction if amount is invalid (null, NaN, or unreasonably large)
     if (amount === null || isNaN(amount) || !isFinite(amount)) {

@@ -1,7 +1,7 @@
 import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateOnly } from "@/lib/utils/timestamp";
 import { logger } from "@/lib/utils/logger";
-import { encryptDescription, decryptDescription, decryptAmount } from "@/lib/utils/transaction-encryption";
+import { encryptDescription, decryptDescription, getTransactionAmount } from "@/lib/utils/transaction-encryption";
 import { createTransaction } from "./transactions";
 import type { TransactionFormData } from "@/lib/validations/transaction";
 import type { PlannedPayment, PlannedPaymentFormData } from "./planned-payments-types";
@@ -587,7 +587,7 @@ export async function generatePlannedPaymentsFromRecurringTransaction(
   const originalYear = originalDate.getFullYear();
 
   // Decrypt amount and description
-  const amount = decryptAmount(transaction.amount) ?? 0;
+  const amount = getTransactionAmount(transaction.amount) ?? 0;
   const description = decryptDescription(transaction.description);
 
   let createdCount = 0;

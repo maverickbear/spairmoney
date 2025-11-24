@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -11,13 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { DateRange as DateRangeType } from "react-day-picker";
+import { formatDateInput } from "@/lib/utils/timestamp";
 
 export type DateRangePreset = 
   | "all-dates"
@@ -54,22 +48,18 @@ export function DateRangePicker({
   onValueChange,
   className,
 }: DateRangePickerProps) {
-  const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
-  const [selectedRange, setSelectedRange] = React.useState<DateRangeType | undefined>(
-    dateRange ? {
-      from: new Date(dateRange.startDate),
-      to: new Date(dateRange.endDate),
-    } : undefined
+  const [startDateValue, setStartDateValue] = React.useState(
+    dateRange ? formatDateInput(new Date(dateRange.startDate)) : ""
   );
-  const [previousValue, setPreviousValue] = React.useState<DateRangePreset | "custom">("this-month");
+  const [endDateValue, setEndDateValue] = React.useState(
+    dateRange ? formatDateInput(new Date(dateRange.endDate)) : ""
+  );
 
   // Update custom dates when dateRange prop changes
   React.useEffect(() => {
     if (value === "custom" && dateRange) {
-      setSelectedRange({
-        from: new Date(dateRange.startDate),
-        to: new Date(dateRange.endDate),
-      });
+      setStartDateValue(formatDateInput(new Date(dateRange.startDate)));
+      setEndDateValue(formatDateInput(new Date(dateRange.endDate)));
     }
   }, [dateRange, value]);
 
@@ -107,111 +97,103 @@ export function DateRangePicker({
 
   const handlePresetChange = (preset: string) => {
     if (preset === "custom") {
-      // Save the current value before switching to custom
-      if (value !== "custom") {
-        setPreviousValue(value);
-      }
-      // Change to custom and open popover
+      // Change to custom mode
       onValueChange("custom");
-      setIsPopoverOpen(true);
     } else {
-      setIsPopoverOpen(false);
       onValueChange(preset as DateRangePreset);
     }
   };
 
-  const handleRangeSelect = (range: DateRangeType | undefined) => {
-    setSelectedRange(range);
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setStartDateValue(value);
     
-    // Auto-apply when both dates are selected
-    if (range?.from && range?.to) {
-      const startDate = format(range.from, "yyyy-MM-dd");
-      const endDate = format(range.to, "yyyy-MM-dd");
+    if (value && endDateValue) {
+      const startDate = value;
+      const endDate = endDateValue;
       
-      const dateRange: DateRange = {
-        startDate,
-        endDate,
-      };
-      onValueChange("custom", dateRange);
-      setIsPopoverOpen(false);
+      // Validate that start date is before end date
+      if (startDate <= endDate) {
+        const dateRange: DateRange = {
+          startDate,
+          endDate,
+        };
+        onValueChange("custom", dateRange);
+      }
     }
   };
 
-  const handleCancel = () => {
-    // Reset to previous values
-    if (dateRange) {
-      setSelectedRange({
-        from: new Date(dateRange.startDate),
-        to: new Date(dateRange.endDate),
-      });
-    } else {
-      setSelectedRange(undefined);
-    }
-    setIsPopoverOpen(false);
-    // Revert to the previous value if user cancelled
-    if (value === "custom" && !dateRange) {
-      onValueChange(previousValue);
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEndDateValue(value);
+    
+    if (startDateValue && value) {
+      const startDate = startDateValue;
+      const endDate = value;
+      
+      // Validate that start date is before end date
+      if (startDate <= endDate) {
+        const dateRange: DateRange = {
+          startDate,
+          endDate,
+        };
+        onValueChange("custom", dateRange);
+      }
     }
   };
 
-  const selectTriggerRef = React.useRef<HTMLButtonElement>(null);
 
   return (
-    <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-      <div className={cn("flex items-center gap-2", className)}>
-        <Select 
-          value={value} 
-          onValueChange={handlePresetChange}
+    <div className={cn("flex items-center gap-2", className)}>
+      <Select 
+        value={value} 
+        onValueChange={handlePresetChange}
+      >
+        <SelectTrigger 
+          className="h-9 w-auto min-w-[140px] text-xs"
         >
-          <PopoverTrigger asChild>
-            <SelectTrigger 
-              ref={selectTriggerRef}
-              className="h-9 w-auto min-w-[140px] text-xs"
-            >
-              <SelectValue>{getDisplayText()}</SelectValue>
-            </SelectTrigger>
-          </PopoverTrigger>
-          <SelectContent>
-            <SelectItem value="all-dates">All Dates</SelectItem>
-            <SelectItem value="today">Today</SelectItem>
-            <SelectItem value="past-7-days">Past 7 days</SelectItem>
-            <SelectItem value="past-15-days">Past 15 days</SelectItem>
-            <SelectItem value="past-30-days">Past 30 days</SelectItem>
-            <SelectItem value="past-90-days">Past 90 days</SelectItem>
-            <SelectItem value="last-3-months">Last 3 months</SelectItem>
-            <SelectItem value="last-month">Last month</SelectItem>
-            <SelectItem value="last-6-months">Last 6 months</SelectItem>
-            <SelectItem value="past-6-months">Past 6 months</SelectItem>
-            <SelectItem value="this-month">This month</SelectItem>
-            <SelectItem value="this-year">This year</SelectItem>
-            <SelectItem value="year-to-date">Year to date</SelectItem>
-            <SelectItem value="last-year">Last year</SelectItem>
-            <SelectItem value="custom">Custom range</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+          <SelectValue>{getDisplayText()}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all-dates">All Dates</SelectItem>
+          <SelectItem value="today">Today</SelectItem>
+          <SelectItem value="past-7-days">Past 7 days</SelectItem>
+          <SelectItem value="past-15-days">Past 15 days</SelectItem>
+          <SelectItem value="past-30-days">Past 30 days</SelectItem>
+          <SelectItem value="past-90-days">Past 90 days</SelectItem>
+          <SelectItem value="last-3-months">Last 3 months</SelectItem>
+          <SelectItem value="last-month">Last month</SelectItem>
+          <SelectItem value="last-6-months">Last 6 months</SelectItem>
+          <SelectItem value="past-6-months">Past 6 months</SelectItem>
+          <SelectItem value="this-month">This month</SelectItem>
+          <SelectItem value="this-year">This year</SelectItem>
+          <SelectItem value="year-to-date">Year to date</SelectItem>
+          <SelectItem value="last-year">Last year</SelectItem>
+          <SelectItem value="custom">Custom range</SelectItem>
+        </SelectContent>
+      </Select>
 
-      <PopoverContent className="w-auto p-4" align="start">
-        <div className="space-y-4">
-          <Calendar
-            mode="range"
-            selected={selectedRange}
-            onSelect={handleRangeSelect}
-            numberOfMonths={2}
-            className="rounded-md border"
+      {value === "custom" && (
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            value={startDateValue}
+            onChange={handleStartDateChange}
+            placeholder="Start date"
+            className="h-9 text-xs"
           />
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              size="small"
-              onClick={handleCancel}
-            >
-              Cancel
-            </Button>
-          </div>
+          <span className="text-muted-foreground text-xs">to</span>
+          <Input
+            type="date"
+            value={endDateValue}
+            onChange={handleEndDateChange}
+            placeholder="End date"
+            className="h-9 text-xs"
+            min={startDateValue || undefined}
+          />
         </div>
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   );
 }
 

@@ -375,7 +375,7 @@ export default async function TermsOfServicePage() {
                 </p>
                 <ul className="list-disc list-inside text-sm text-muted-foreground space-y-2 ml-4">
                   <li>Your right to use the Service will immediately cease</li>
-                  <li>We may delete your account and data within 30 days</li>
+                  <li>Your account and all data will be permanently deleted immediately</li>
                   <li>All connected services (Plaid, Questrade) will be disconnected</li>
                   <li>Your subscription will be cancelled and no further charges will occur</li>
                   <li>You may export your data before termination</li>

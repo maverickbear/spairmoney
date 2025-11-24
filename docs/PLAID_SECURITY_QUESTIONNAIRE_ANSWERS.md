@@ -264,14 +264,14 @@ Our organization has a defined and enforced data deletion and retention policy t
 
 **Retention Policy:**
 - **Active Accounts:** Data is retained for as long as the account is active and needed to provide services
-- **Account Deletion:** Upon account deletion request, data is deleted or anonymized within 30 days
+- **Account Deletion:** Upon account deletion request, all data is permanently deleted immediately
 - **Legal Requirements:** Data may be retained longer if required by law, regulation, or legitimate business purposes
 - **Plaid Data:** Historical transaction data from Plaid is retained after disconnection, but no new data is collected
 
 **Deletion Process:**
 1. Users can request account deletion through account settings
-2. Upon deletion request, all user data is scheduled for deletion
-3. Data is deleted or anonymized within 30 days of request
+2. Upon deletion request, all user data is permanently deleted immediately
+3. All related data (transactions, accounts, budgets, goals) is removed from the system
 4. Backup data is also deleted in accordance with retention policies
 
 **Compliance:**
@@ -285,7 +285,7 @@ Our organization has a defined and enforced data deletion and retention policy t
 - Policies are updated to reflect changes in applicable laws and regulations
 - Policy updates are communicated to users through Privacy Policy updates
 
-**Note:** You should verify the exact retention periods and ensure they comply with applicable laws (e.g., GDPR, CCPA, PIPEDA for Canadian companies). The privacy policy mentions 30 days for deletion, but you should confirm this aligns with your actual implementation and legal requirements.
+**Note:** Account deletion is immediate - all data is permanently removed from the system when a user deletes their account. This complies with applicable data protection laws (e.g., GDPR, CCPA, PIPEDA for Canadian companies).
 
 ---
 

@@ -590,30 +590,54 @@ export async function updateGoal(
 /**
  * Ensure emergency fund goal exists for a user/household
  * Creates one if it doesn't exist
+ * Prevents duplicates by checking and cleaning up any existing duplicates
  */
 export async function ensureEmergencyFundGoal(userId: string, householdId: string): Promise<Goal | null> {
   const supabase = await createServerClient();
 
   // Check if emergency fund goal already exists
-  const { data: existingGoal, error: checkError } = await supabase
+  // Use limit(1) to handle case where multiple might exist (race condition)
+  const { data: existingGoals, error: checkError } = await supabase
     .from("Goal")
     .select("*")
     .eq("householdId", householdId)
     .eq("name", "Emergency Funds")
     .eq("isSystemGoal", true)
-    .maybeSingle();
+    .limit(10); // Get up to 10 to check for duplicates
 
   if (checkError) {
     console.error("Error checking for emergency fund goal:", checkError);
     return null;
   }
 
-  // If goal already exists, return it
-  if (existingGoal) {
-    return existingGoal as Goal;
+  // If goals exist, handle duplicates
+  if (existingGoals && existingGoals.length > 0) {
+    // If there are duplicates, keep the first one and delete the rest
+    if (existingGoals.length > 1) {
+      console.warn(`[Emergency Fund] Found ${existingGoals.length} duplicate emergency fund goals. Cleaning up...`);
+      const goalToKeep = existingGoals[0];
+      const duplicateIds = existingGoals.slice(1).map(g => g.id);
+      
+      // Delete duplicates
+      const { error: deleteError } = await supabase
+        .from("Goal")
+        .delete()
+        .in("id", duplicateIds);
+      
+      if (deleteError) {
+        console.error("Error deleting duplicate emergency fund goals:", deleteError);
+      } else {
+        console.log(`[Emergency Fund] Deleted ${duplicateIds.length} duplicate emergency fund goals`);
+      }
+      
+      return goalToKeep as Goal;
+    }
+    
+    // Only one exists, return it
+    return existingGoals[0] as Goal;
   }
 
-  // Create new emergency fund goal
+  // No goal exists, create new emergency fund goal
   try {
     const goal = await createGoal({
       name: "Emergency Funds",

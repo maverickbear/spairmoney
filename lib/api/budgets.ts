@@ -4,7 +4,7 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { createServerClient } from "@/lib/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/timestamp";
 import { requireBudgetOwnership } from "@/lib/utils/security";
-import { decryptAmount } from "@/lib/utils/transaction-encryption";
+import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 
 export interface Budget {
@@ -281,7 +281,7 @@ export async function getBudgetsInternal(period: Date, accessToken?: string, ref
     for (const tx of allTransactions) {
       if (tx.categoryId) {
         // Decrypt amount if encrypted, then ensure it's a positive number (expenses should be positive)
-        const decryptedAmount = decryptAmount(tx.amount);
+        const decryptedAmount = getTransactionAmount(tx.amount);
         const amount = Math.abs(decryptedAmount || 0);
         
         // Add to category total (all transactions in this category)

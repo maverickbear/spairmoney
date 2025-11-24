@@ -248,6 +248,26 @@ export async function POST(request: NextRequest) {
     // Small delay to ensure cache invalidation is processed and database is consistent
     await new Promise(resolve => setTimeout(resolve, 100));
 
+    // Send welcome email when subscription is created
+    if (authUser.email) {
+      try {
+        const { sendWelcomeEmail } = await import("@/lib/utils/email");
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+        
+        await sendWelcomeEmail({
+          to: authUser.email,
+          userName: "", // Not used anymore, but keeping for interface compatibility
+          founderName: "Naor Tartarotti",
+          appUrl: appUrl,
+        });
+        
+        console.log("[START-TRIAL] ✅ Welcome email sent successfully to:", authUser.email);
+      } catch (welcomeEmailError) {
+        console.error("[START-TRIAL] ❌ Error sending welcome email:", welcomeEmailError);
+        // Don't fail subscription creation if welcome email fails
+      }
+    }
+
     console.log("[START-TRIAL] Trial started successfully:", {
       subscriptionId: newSubscription.id,
       stripeSubscriptionId: stripeSubscription.id,

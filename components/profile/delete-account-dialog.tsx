@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -121,9 +122,10 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Enter your password to confirm</label>
+            <Label htmlFor="delete-password">Enter your password to confirm</Label>
             <div className="relative">
               <Input
+                id="delete-password"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => {
@@ -131,6 +133,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
                   setError(null);
                 }}
                 placeholder="Enter your password"
+                size="medium"
                 className="pr-10"
                 disabled={loading}
               />

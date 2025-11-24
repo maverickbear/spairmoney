@@ -19,6 +19,7 @@ import dynamic from "next/dynamic";
 const TransactionForm = dynamic(() => import("@/components/forms/transaction-form").then(m => ({ default: m.TransactionForm })), { ssr: false });
 const CsvImportDialog = dynamic(() => import("@/components/forms/csv-import-dialog").then(m => ({ default: m.CsvImportDialog })), { ssr: false });
 const CategorySelectionDialog = dynamic(() => import("@/components/transactions/category-selection-dialog").then(m => ({ default: m.CategorySelectionDialog })), { ssr: false });
+const BlockedFeature = dynamic(() => import("@/components/common/blocked-feature").then(m => ({ default: m.BlockedFeature })), { ssr: false });
 import { formatMoney } from "@/components/common/money";
 import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight, Filter, Calendar, Wallet, Tag, Type, XCircle } from "lucide-react";
 import { TransactionsMobileCard } from "@/components/transactions/transactions-mobile-card";
@@ -182,6 +183,7 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [showImportUpgradeModal, setShowImportUpgradeModal] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -1656,7 +1658,20 @@ export default function TransactionsPage() {
               </Button>
             </>
           )}
-          <Button variant="outline" size="medium" onClick={() => setIsImportOpen(true)} className="text-xs md:text-sm">
+          <Button 
+            variant="outline" 
+            size="medium" 
+            onClick={() => {
+              // Check if user has access to CSV import
+              const hasAccess = limits.hasCsvImport === true || String(limits.hasCsvImport) === "true";
+              if (!hasAccess) {
+                setShowImportUpgradeModal(true);
+                return;
+              }
+              setIsImportOpen(true);
+            }} 
+            className="text-xs md:text-sm"
+          >
             <Upload className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
             <span className="hidden md:inline">Import CSV</span>
           </Button>
@@ -2250,6 +2265,18 @@ export default function TransactionsPage() {
         accounts={accounts}
         categories={categories}
       />
+
+      {/* CSV Import Upgrade Modal */}
+      <Dialog open={showImportUpgradeModal} onOpenChange={setShowImportUpgradeModal}>
+        <DialogContent className="max-w-5xl sm:max-w-5xl md:max-w-6xl lg:max-w-7xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Upgrade to CSV Import</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 sm:p-6 md:p-8">
+            <BlockedFeature feature="hasCsvImport" featureName="CSV Import" />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Filters Modal */}
       <Dialog open={isFiltersModalOpen} onOpenChange={setIsFiltersModalOpen}>

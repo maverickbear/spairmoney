@@ -517,36 +517,41 @@ export async function getPortfolioHistoricalDataInternal(
     }
   }
   
-  // Get all transactions to track quantity changes over time
-  // FIXED: Search from first transaction to ensure we capture initial holdings
-  // This ensures historical data is accurate even for long-term holdings
+  // OPTIMIZED: Only fetch transactions if we have accounts and securities
+  // Early return if no data to process
+  const accountIds = allAccounts.map(a => a.id);
+  
+  if (accountIds.length === 0 || securityIds.length === 0) {
+    // No accounts or securities, return minimal historical data with just today's value
+    const todayKey = new Date().toISOString().split("T")[0];
+    return [{
+      date: todayKey,
+      value: currentValue,
+    }];
+  }
+  
+  // OPTIMIZED: Only fetch transactions within the date range we need
+  // For large date ranges, we can optimize by only fetching transactions that affect holdings
   let transactionsStartDate: Date;
   
   try {
-    // Get user's investment accounts
-    const accountIds = allAccounts.map(a => a.id);
+    // Find first transaction to ensure we capture all holdings
+    // OPTIMIZED: Only query if we have accounts
+    const { data: firstTx } = await supabase
+      .from("InvestmentTransaction")
+      .select("date")
+      .in("accountId", accountIds)
+      .order("date", { ascending: true })
+      .limit(1);
     
-    if (accountIds.length > 0) {
-      // Find first transaction to ensure we capture all holdings
-      const { data: firstTx } = await supabase
-        .from("InvestmentTransaction")
-        .select("date")
-        .in("accountId", accountIds)
-        .order("date", { ascending: true })
-        .limit(1);
-      
-      if (firstTx && firstTx.length > 0 && firstTx[0].date) {
-        // Use first transaction date, but don't go before startDate
-        const firstTxDate = firstTx[0].date instanceof Date 
-          ? firstTx[0].date 
-          : new Date(firstTx[0].date);
-        transactionsStartDate = firstTxDate < startDate ? firstTxDate : startDate;
-      } else {
-        // No transactions found, use startDate
-        transactionsStartDate = startDate;
-      }
+    if (firstTx && firstTx.length > 0 && firstTx[0].date) {
+      // Use first transaction date, but don't go before startDate
+      const firstTxDate = firstTx[0].date instanceof Date 
+        ? firstTx[0].date 
+        : new Date(firstTx[0].date);
+      transactionsStartDate = firstTxDate < startDate ? firstTxDate : startDate;
     } else {
-      // No accounts, use startDate
+      // No transactions found, use startDate
       transactionsStartDate = startDate;
     }
   } catch (error) {
@@ -555,6 +560,7 @@ export async function getPortfolioHistoricalDataInternal(
     transactionsStartDate = startDate;
   }
   
+  // OPTIMIZED: Fetch transactions in parallel with price data if possible
   const transactions = await getInvestmentTransactions({
     startDate: transactionsStartDate,
     endDate,
@@ -637,22 +643,33 @@ export async function getPortfolioHistoricalDataInternal(
     }
   }
   
+  // OPTIMIZED: Pre-group transactions by date to avoid filtering in the loop
+  const transactionsByDateKey = new Map<string, any[]>();
+  for (const tx of sortedTransactions) {
+    if (!tx.securityId || (tx.type !== "buy" && tx.type !== "sell")) continue;
+    
+    const txDate = tx.date instanceof Date ? tx.date : new Date(tx.date);
+    const txDateKey = txDate.toISOString().split("T")[0];
+    
+    if (!transactionsByDateKey.has(txDateKey)) {
+      transactionsByDateKey.set(txDateKey, []);
+    }
+    transactionsByDateKey.get(txDateKey)!.push(tx);
+  }
+  
   // Process each day chronologically
+  // OPTIMIZED: Pre-calculate date keys to avoid repeated string operations
+  const todayKey = today.toISOString().split("T")[0];
+  
   for (let i = 0; i <= days; i++) {
     const date = subDays(today, days - i);
     const dateKey = date.toISOString().split("T")[0];
     
-    // Process all transactions on this date (in chronological order)
-    const transactionsOnDate = sortedTransactions.filter(tx => {
-      const txDate = tx.date instanceof Date ? tx.date : new Date(tx.date);
-      const txDateKey = txDate.toISOString().split("T")[0];
-      return txDateKey === dateKey;
-    });
+    // Process all transactions on this date (pre-grouped for O(1) lookup)
+    const transactionsOnDate = transactionsByDateKey.get(dateKey) || [];
     
     // Update holdings based on transactions on this date
     for (const tx of transactionsOnDate) {
-      if (!tx.securityId || (tx.type !== "buy" && tx.type !== "sell")) continue;
-      
       const securityId = tx.securityId;
       const quantity = tx.quantity || 0;
       const price = tx.price || 0;
@@ -684,7 +701,10 @@ export async function getPortfolioHistoricalDataInternal(
     // Calculate portfolio value for this date using current holdings
     let portfolioValue = 0;
     
-    if (pricesForDate && holdingsOverTime.size > 0) {
+    if (dateKey === todayKey) {
+      // Today - use current value from summary (includes Questrade accounts)
+      portfolioValue = currentValue;
+    } else if (pricesForDate && holdingsOverTime.size > 0) {
       // Use historical prices if available
       for (const [securityId, holding] of holdingsOverTime) {
         if (holding.quantity <= 0) continue;
@@ -697,10 +717,7 @@ export async function getPortfolioHistoricalDataInternal(
           portfolioValue += holding.quantity * holding.avgPrice;
         }
       }
-    } else if (i === days) {
-      // Today - use current value from summary (includes Questrade accounts)
-      portfolioValue = currentValue;
-    } else {
+    } else if (holdingsOverTime.size > 0) {
       // No historical prices available - use book value (cost basis) as fallback
       for (const [securityId, holding] of holdingsOverTime) {
         if (holding.quantity > 0) {

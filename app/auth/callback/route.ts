@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, createServiceRoleClient } from "@/lib/supabase-server";
 import { getUserSubscriptionData } from "@/lib/api/subscription";
+import { formatTimestamp } from "@/lib/utils/timestamp";
+import { randomUUID } from "crypto";
 
 /**
  * GET /auth/callback
@@ -222,13 +224,67 @@ export async function GET(request: NextRequest) {
             console.error("[OAUTH-CALLBACK] Error creating household member:", householdMemberError);
           } else {
             // Set as active household
-            await serviceRoleClient
+            const { error: activeError } = await serviceRoleClient
               .from("UserActiveHousehold")
               .insert({
                 userId: userData.id,
                 householdId: household.id,
                 updatedAt: now,
               });
+
+            if (activeError) {
+              console.error("[OAUTH-CALLBACK] Error setting active household:", activeError);
+            } else {
+              // Create emergency fund goal for new user
+              try {
+                // Check if emergency fund goal already exists
+                const { data: existingGoals } = await serviceRoleClient
+                  .from("Goal")
+                  .select("*")
+                  .eq("householdId", household.id)
+                  .eq("name", "Emergency Funds")
+                  .eq("isSystemGoal", true)
+                  .limit(1);
+
+                if (!existingGoals?.length) {
+                  // Create emergency fund goal
+                  const goalId = randomUUID();
+                  const goalNow = formatTimestamp(new Date());
+                  const { error: goalError } = await serviceRoleClient
+                    .from("Goal")
+                    .insert({
+                      id: goalId,
+                      name: "Emergency Funds",
+                      targetAmount: 0.00,
+                      currentBalance: 0.00,
+                      incomePercentage: 0.00,
+                      priority: "High",
+                      description: "Emergency fund for unexpected expenses",
+                      isPaused: false,
+                      isCompleted: false,
+                      completedAt: null,
+                      expectedIncome: null,
+                      targetMonths: null,
+                      accountId: null,
+                      holdingId: null,
+                      isSystemGoal: true,
+                      userId: userData.id,
+                      householdId: household.id,
+                      createdAt: goalNow,
+                      updatedAt: goalNow,
+                    });
+
+                  if (goalError) {
+                    console.error("[OAUTH-CALLBACK] Error creating emergency fund goal:", goalError);
+                  } else {
+                    console.log("[OAUTH-CALLBACK] ✅ Emergency fund goal created");
+                  }
+                }
+              } catch (goalError) {
+                console.error("[OAUTH-CALLBACK] Error creating emergency fund goal:", goalError);
+                // Don't fail account creation if goal creation fails
+              }
+            }
           }
         }
 

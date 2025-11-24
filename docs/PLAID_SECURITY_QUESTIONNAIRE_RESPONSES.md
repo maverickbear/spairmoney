@@ -391,7 +391,7 @@ Our organization obtains explicit consent from consumers for the collection, pro
 **Consent Withdrawal:**
 
 - Users can disconnect Plaid connections at any time
-- Account deletion requests are processed within 30 days
+- Account deletion requests are processed immediately
 - Data retention policies are clearly communicated
 
 ---
@@ -407,15 +407,15 @@ Our organization has a defined and enforced data deletion and retention policy t
 **Retention Policy:**
 
 - **Active Accounts:** Data is retained for as long as the account is active and needed to provide services
-- **Account Deletion:** Upon account deletion request, data is deleted or anonymized within 30 days
+- **Account Deletion:** Upon account deletion request, all data is permanently deleted immediately
 - **Legal Requirements:** Data may be retained longer if required by law, regulation, or legitimate business purposes
 - **Plaid Data:** Historical transaction data from Plaid is retained after disconnection, but no new data is collected after disconnection
 
 **Deletion Process:**
 
 1. Users can request account deletion through account settings
-2. Upon deletion request, all user data is scheduled for deletion
-3. Data is deleted or anonymized within 30 days of request
+2. Upon deletion request, all user data is permanently deleted immediately
+3. All related data (transactions, accounts, budgets, goals) is removed from the system
 4. Backup data is also deleted in accordance with retention policies
 5. Plaid connections are automatically disconnected upon account deletion
 

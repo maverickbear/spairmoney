@@ -71,11 +71,9 @@ secrets/
 .vercel
 
 # ============================================
-# Supabase local
+# Supabase
 # ============================================
-supabase/.branches
-supabase/.temp
-supabase/.env
+/supabase/
 
 # ============================================
 # Docker
@@ -155,10 +153,9 @@ lighthouse-report/
 performance-reports/
 
 # ============================================
-# Generated documentation
+# Documentation
 # ============================================
-docs/generated/
-docs/api/
+/docs/
 
 # ============================================
 # Storybook

@@ -254,7 +254,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
 
         <div className="space-y-1">
           <label htmlFor="name" className="text-sm font-medium text-foreground">
-            Name (optional)
+            Name
           </label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -265,6 +265,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
               placeholder="John Doe"
               disabled={loading}
               className="pl-10 h-11"
+              required
             />
           </div>
           {form.formState.errors.name && (

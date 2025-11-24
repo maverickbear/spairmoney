@@ -19,6 +19,7 @@ import {
   Trash2,
   Plus,
   Minus,
+  Lock,
 } from "lucide-react";
 
 export interface GoalCardProps {
@@ -71,10 +72,16 @@ export function GoalCard({
                 </Badge>
               )}
             </div>
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
               <Badge className={priorityColors[goal.priority]} variant="default">
                 {goal.priority}
               </Badge>
+              {goal.isSystemGoal && (
+                <Badge variant="outline" className="text-xs">
+                  <Lock className="mr-1 h-3 w-3" />
+                  System Goal
+                </Badge>
+              )}
               <span className="text-xs text-muted-foreground">
                 {goal.incomePercentage.toFixed(1)}% allocation
               </span>
@@ -82,6 +89,11 @@ export function GoalCard({
             {goal.description && (
               <p className="mt-2 text-sm text-muted-foreground">
                 {goal.description}
+              </p>
+            )}
+            {goal.isSystemGoal && (
+              <p className="mt-2 text-xs text-muted-foreground italic">
+                This is a system goal and cannot be removed. You can edit it to customize your emergency fund target.
               </p>
             )}
           </div>

@@ -95,36 +95,35 @@ export function EmbeddedCheckout({
         <DialogHeader>
           <DialogTitle>Start Your Free Trial</DialogTitle>
           <DialogDescription>
-            {plan && (
-              <>
-                <div className="mt-4 space-y-2">
-                  <p className="text-lg font-semibold">
-                    {plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} Plan
-                  </p>
-                  <p className="text-2xl font-bold">
-                    ${price?.toFixed(2)}/{interval === "month" ? "month" : "year"}
-                    {interval === "year" && (
-                      <span className="text-base font-normal text-muted-foreground ml-2">
-                        (${monthlyPrice?.toFixed(2)}/month)
-                      </span>
-                    )}
-                  </p>
-                  <div className="pt-4 space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      ✓ 30-day free trial - No charge until trial ends
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      ✓ Cancel anytime during trial
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      ✓ Full access to all features
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
+            {plan && `You're about to start your 30-day free trial for the ${plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} Plan.`}
           </DialogDescription>
         </DialogHeader>
+        {plan && (
+          <div className="px-6 pb-4 space-y-2">
+            <p className="text-lg font-semibold">
+              {plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} Plan
+            </p>
+            <p className="text-2xl font-bold">
+              ${price?.toFixed(2)}/{interval === "month" ? "month" : "year"}
+              {interval === "year" && (
+                <span className="text-base font-normal text-muted-foreground ml-2">
+                  (${monthlyPrice?.toFixed(2)}/month)
+                </span>
+              )}
+            </p>
+            <div className="pt-4 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                ✓ 30-day free trial - No charge until trial ends
+              </p>
+              <p className="text-sm text-muted-foreground">
+                ✓ Cancel anytime during trial
+              </p>
+              <p className="text-sm text-muted-foreground">
+                ✓ Full access to all features
+              </p>
+            </div>
+          </div>
+        )}
 
         <DialogFooter>
           <Button

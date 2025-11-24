@@ -223,6 +223,27 @@ function isNodeCryptoAvailable(): boolean {
 }
 
 /**
+ * Get transaction amount (supports both numeric and encrypted during migration)
+ * After migration, amounts will always be numeric, so this function will just return the value
+ * @param amount - The amount value (can be number, encrypted string, or null)
+ * @returns The numeric amount, or null if invalid
+ */
+export function getTransactionAmount(amount: string | number | null | undefined): number | null {
+  if (amount === null || amount === undefined) return null;
+  
+  // If it's already a number, return it (new format after migration)
+  if (typeof amount === 'number') {
+    if (!isFinite(amount) || isNaN(amount)) {
+      return null;
+    }
+    return amount;
+  }
+  
+  // Otherwise, try to decrypt (old encrypted format during migration)
+  return decryptAmount(amount);
+}
+
+/**
  * Batch decrypt transaction amounts
  * More efficient than decrypting one by one
  * @param encryptedAmounts - Array of encrypted amounts

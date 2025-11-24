@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { profileSchema, ProfileFormData } from "@/lib/validations/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -490,8 +491,8 @@ function ProfileModule() {
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-medium">Name</label>
-                  <Input {...form.register("name")} className="h-9" />
+                  <Label htmlFor="name">Name</Label>
+                  <Input {...form.register("name")} id="name" size="medium" />
                   {form.formState.errors.name && (
                     <p className="text-xs text-destructive">
                       {form.formState.errors.name.message}
@@ -500,12 +501,13 @@ function ProfileModule() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-medium">Email</label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     {...form.register("email")}
+                    id="email"
                     type="email"
                     placeholder="user@example.com"
-                    className="h-9"
+                    size="medium"
                   />
                   {form.formState.errors.email && (
                     <p className="text-xs text-destructive">
@@ -515,12 +517,13 @@ function ProfileModule() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-medium">Phone Number</label>
+                  <Label htmlFor="phoneNumber">Phone Number</Label>
                   <Input
                     {...form.register("phoneNumber")}
+                    id="phoneNumber"
                     type="tel"
                     placeholder="+1 (555) 123-4567"
-                    className="h-9"
+                    size="medium"
                   />
                   {form.formState.errors.phoneNumber && (
                     <p className="text-xs text-destructive">
@@ -530,14 +533,14 @@ function ProfileModule() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-medium">Date of Birth</label>
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
                   <DatePicker
                     date={form.watch("dateOfBirth") ? new Date(form.watch("dateOfBirth") as string) : undefined}
                     onDateChange={(date) => {
                       form.setValue("dateOfBirth", date ? date.toISOString().split("T")[0] : "");
                     }}
-                    placeholder="Select date of birth"
-                    className="h-9"
+                    placeholder="YYYY-MM-DD"
+                    size="medium"
                   />
                   {form.formState.errors.dateOfBirth && (
                     <p className="text-xs text-destructive">

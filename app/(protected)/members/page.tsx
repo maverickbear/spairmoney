@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Button } from "@/components/ui/button";
+import { FeatureGuard } from "@/components/common/feature-guard";
 import {
   Card,
   CardContent,
@@ -154,6 +155,10 @@ export default function MembersPage() {
   }
 
   return (
+    <FeatureGuard 
+      feature="hasHousehold"
+      headerTitle="Household Members"
+    >
     <div>
       <PageHeader
         title="Household Members"
@@ -354,5 +359,6 @@ export default function MembersPage() {
         </div>
       )}
       </div>
+    </FeatureGuard>
   );
 }

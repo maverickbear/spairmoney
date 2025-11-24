@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -10,9 +10,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Edit, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import type { SystemGroup, SystemCategory, SystemSubcategory } from "@/lib/api/admin";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+
+interface SelectedItem {
+  id: string;
+  type: "group" | "category" | "subcategory";
+}
 
 interface UnifiedEntitiesTableProps {
   groups: SystemGroup[];
@@ -25,6 +31,7 @@ interface UnifiedEntitiesTableProps {
   onDeleteCategory: (id: string) => void;
   onEditSubcategory: (subcategory: SystemSubcategory) => void;
   onDeleteSubcategory: (id: string) => void;
+  onBulkDelete?: (items: SelectedItem[]) => void;
 }
 
 interface ExpandedState {
@@ -43,6 +50,7 @@ export function UnifiedEntitiesTable({
   onDeleteCategory,
   onEditSubcategory,
   onDeleteSubcategory,
+  onBulkDelete,
 }: UnifiedEntitiesTableProps) {
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const [expanded, setExpanded] = useState<ExpandedState>({
@@ -51,6 +59,7 @@ export function UnifiedEntitiesTable({
   });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingType, setDeletingType] = useState<"group" | "category" | "subcategory" | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   const toggleGroup = (groupId: string) => {
     const newExpanded = { ...expanded };
@@ -105,6 +114,12 @@ export function UnifiedEntitiesTable({
         setDeletingType(type);
         try {
           await deleteHandlers[type](id);
+          // Remove from selection if it was selected
+          setSelectedItems((prev) => {
+            const next = new Set(prev);
+            next.delete(`${type}:${id}`);
+            return next;
+          });
         } catch (error) {
           console.error(`Error deleting ${type}:`, error);
           alert(error instanceof Error ? error.message : `Failed to delete ${typeLabels[type]}`);
@@ -115,6 +130,116 @@ export function UnifiedEntitiesTable({
       }
     );
   };
+
+  const toggleSelection = (id: string, type: "group" | "category" | "subcategory") => {
+    const key = `${type}:${id}`;
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const isSelected = (id: string, type: "group" | "category" | "subcategory") => {
+    return selectedItems.has(`${type}:${id}`);
+  };
+
+  // Get all visible items for select all functionality
+  const allVisibleItems = useMemo(() => {
+    const items: SelectedItem[] = [];
+    groups.forEach((group) => {
+      items.push({ id: group.id, type: "group" });
+      if (expanded.groups.has(group.id)) {
+        const groupCategories = categories.filter((c) => c.macroId === group.id);
+        groupCategories.forEach((category) => {
+          items.push({ id: category.id, type: "category" });
+          if (expanded.categories.has(category.id)) {
+            const categorySubcategories = subcategories.filter((s) => s.categoryId === category.id);
+            categorySubcategories.forEach((subcategory) => {
+              items.push({ id: subcategory.id, type: "subcategory" });
+            });
+          }
+        });
+      }
+    });
+    return items;
+  }, [groups, categories, subcategories, expanded]);
+
+  const allVisibleSelected = useMemo(() => {
+    return allVisibleItems.every((item) => selectedItems.has(`${item.type}:${item.id}`));
+  }, [allVisibleItems, selectedItems]);
+
+  const someVisibleSelected = useMemo(() => {
+    return allVisibleItems.some((item) => selectedItems.has(`${item.type}:${item.id}`));
+  }, [allVisibleItems, selectedItems]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const newSelected = new Set(selectedItems);
+      allVisibleItems.forEach((item) => {
+        newSelected.add(`${item.type}:${item.id}`);
+      });
+      setSelectedItems(newSelected);
+    } else {
+      const newSelected = new Set(selectedItems);
+      allVisibleItems.forEach((item) => {
+        newSelected.delete(`${item.type}:${item.id}`);
+      });
+      setSelectedItems(newSelected);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (!onBulkDelete || selectedItems.size === 0) return;
+
+    const itemsToDelete: SelectedItem[] = Array.from(selectedItems).map((key) => {
+      const [type, id] = key.split(":");
+      return { id, type: type as "group" | "category" | "subcategory" };
+    });
+
+    const count = itemsToDelete.length;
+    const typeLabels = {
+      group: "groups",
+      category: "categories",
+      subcategory: "subcategories",
+    };
+
+    const counts = itemsToDelete.reduce(
+      (acc, item) => {
+        acc[item.type] = (acc[item.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    const descriptionParts = Object.entries(counts)
+      .map(([type, count]) => `${count} ${typeLabels[type as keyof typeof typeLabels]}`)
+      .join(", ");
+
+    openDialog(
+      {
+        title: `Delete ${count} item${count > 1 ? "s" : ""}`,
+        description: `Are you sure you want to delete ${descriptionParts}? This action cannot be undone.`,
+        variant: "destructive",
+        confirmLabel: "Delete",
+      },
+      async () => {
+        try {
+          await onBulkDelete(itemsToDelete);
+          setSelectedItems(new Set());
+        } catch (error) {
+          console.error("Error deleting items:", error);
+          alert(error instanceof Error ? error.message : "Failed to delete items");
+        }
+      }
+    );
+  };
+
+  const selectedCount = selectedItems.size;
 
 
   if (loading) {
@@ -145,10 +270,33 @@ export function UnifiedEntitiesTable({
 
   return (
     <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
+      {selectedCount > 0 && onBulkDelete && (
+        <div className="flex items-center justify-between p-4 bg-muted/50 border-b">
+          <span className="text-sm text-muted-foreground">
+            {selectedCount} item{selectedCount > 1 ? "s" : ""} selected
+          </span>
+          <Button
+            variant="destructive"
+            size="small"
+            onClick={handleBulkDelete}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[50px]">
+              {onBulkDelete && (
+                <Checkbox
+                  checked={allVisibleSelected}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                />
+              )}
+            </TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Parent</TableHead>
@@ -158,7 +306,7 @@ export function UnifiedEntitiesTable({
         <TableBody>
           {totalItems === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={onBulkDelete ? 5 : 4} className="text-center py-8 text-muted-foreground">
                 <div className="flex flex-col items-center gap-2">
                   <p>No entities found</p>
                 </div>
@@ -174,20 +322,29 @@ export function UnifiedEntitiesTable({
                   {/* Group Row */}
                   <TableRow className="bg-muted/50">
                     <TableCell>
-                      {groupCategories.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => toggleGroup(group.id)}
-                        >
-                          {isGroupExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {onBulkDelete && (
+                          <Checkbox
+                            checked={isSelected(group.id, "group")}
+                            onCheckedChange={() => toggleSelection(group.id, "group")}
+                            aria-label={`Select ${group.name}`}
+                          />
+                        )}
+                        {groupCategories.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => toggleGroup(group.id)}
+                          >
+                            {isGroupExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -247,6 +404,13 @@ export function UnifiedEntitiesTable({
                           <TableRow className="bg-background">
                             <TableCell>
                               <div className="flex items-center gap-2">
+                                {onBulkDelete && (
+                                  <Checkbox
+                                    checked={isSelected(category.id, "category")}
+                                    onCheckedChange={() => toggleSelection(category.id, "category")}
+                                    aria-label={`Select ${category.name}`}
+                                  />
+                                )}
                                 <span className="w-4 text-xs font-semibold text-muted-foreground">
                                   {category.name.charAt(0).toUpperCase()}
                                 </span>
@@ -311,6 +475,13 @@ export function UnifiedEntitiesTable({
                               <TableRow key={subcategory.id} className="bg-muted/30">
                                 <TableCell>
                                   <div className="flex items-center gap-2 pl-4">
+                                    {onBulkDelete && (
+                                      <Checkbox
+                                        checked={isSelected(subcategory.id, "subcategory")}
+                                        onCheckedChange={() => toggleSelection(subcategory.id, "subcategory")}
+                                        aria-label={`Select ${subcategory.name}`}
+                                      />
+                                    )}
                                     <span className="w-4 text-xs font-semibold text-muted-foreground">
                                       {subcategory.name.charAt(0).toUpperCase()}
                                     </span>

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { formatTimestamp } from "@/lib/utils/timestamp";
+import { randomUUID } from "crypto";
 
 /**
  * POST /api/auth/create-household-member
@@ -50,6 +52,7 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
     let householdId = existingHousehold?.id;
+    const isNewHousehold = !householdId;
 
     // Create personal household if it doesn't exist
     if (!householdId) {
@@ -119,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Set as active household if not already set
-    await serviceRoleClient
+    const { error: activeError } = await serviceRoleClient
       .from("UserActiveHousehold")
       .upsert({
         userId: memberId || ownerId,
@@ -128,6 +131,60 @@ export async function POST(request: NextRequest) {
       }, {
         onConflict: "userId"
       });
+
+    if (activeError) {
+      console.error("[CREATE-HOUSEHOLD-MEMBER] Error setting active household:", activeError);
+    } else if (isNewHousehold) {
+      // Create emergency fund goal for new household
+      try {
+        // Check if emergency fund goal already exists
+        const { data: existingGoals } = await serviceRoleClient
+          .from("Goal")
+          .select("*")
+          .eq("householdId", householdId)
+          .eq("name", "Emergency Funds")
+          .eq("isSystemGoal", true)
+          .limit(1);
+
+        if (!existingGoals || existingGoals.length === 0) {
+          // Create emergency fund goal
+          const goalId = randomUUID();
+          const goalNow = formatTimestamp(new Date());
+          const { error: goalError } = await serviceRoleClient
+            .from("Goal")
+            .insert({
+              id: goalId,
+              name: "Emergency Funds",
+              targetAmount: 0.00,
+              currentBalance: 0.00,
+              incomePercentage: 0.00,
+              priority: "High",
+              description: "Emergency fund for unexpected expenses",
+              isPaused: false,
+              isCompleted: false,
+              completedAt: null,
+              expectedIncome: null,
+              targetMonths: null,
+              accountId: null,
+              holdingId: null,
+              isSystemGoal: true,
+              userId: memberId || ownerId,
+              householdId: householdId,
+              createdAt: goalNow,
+              updatedAt: goalNow,
+            });
+
+          if (goalError) {
+            console.error("[CREATE-HOUSEHOLD-MEMBER] Error creating emergency fund goal:", goalError);
+          } else {
+            console.log("[CREATE-HOUSEHOLD-MEMBER] ✅ Emergency fund goal created");
+          }
+        }
+      } catch (goalError) {
+        console.error("[CREATE-HOUSEHOLD-MEMBER] Error creating emergency fund goal:", goalError);
+        // Don't fail if goal creation fails
+      }
+    }
 
     return NextResponse.json({ 
       success: true,
