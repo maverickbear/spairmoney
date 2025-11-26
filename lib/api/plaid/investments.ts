@@ -272,10 +272,10 @@ export async function syncInvestmentAccounts(
             const currentPrice = holdingValue > 0 && holdingQuantity > 0 
               ? holdingValue / holdingQuantity 
               : (security as any).close_price || 0;
-            const averagePrice = holding.cost_basis?.amount 
-              ? holding.cost_basis.amount / (holdingQuantity || 1)
+            const averagePrice = holding.cost_basis && holdingQuantity > 0
+              ? holding.cost_basis / holdingQuantity
               : currentPrice;
-            const totalCost = holding.cost_basis?.amount || (averagePrice * holdingQuantity);
+            const totalCost = holding.cost_basis ?? (averagePrice * holdingQuantity);
             const openPnl = holdingValue - totalCost;
 
             // Store or update Position (holding) in database
