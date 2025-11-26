@@ -724,7 +724,11 @@ export default function TransactionsPage() {
       // Add pagination parameters
       // For mobile infinite scroll, always use 10 items per page
       // OPTIMIZED: Use cached mobile detection state
-      const limit = isMobile ? 10 : itemsPerPage;
+      // IMPORTANT: Always use itemsPerPage when explicitly set by user (desktop pagination controls)
+      // Only force 10 on mobile when using infinite scroll (mobile doesn't show pagination controls)
+      // Check if we're actually on mobile by verifying window width at call time, not just state
+      const isActuallyMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+      const limit = isActuallyMobile ? 10 : itemsPerPage;
       params.append("page", currentPage.toString());
       params.append("limit", limit.toString());
 
