@@ -314,10 +314,14 @@ export async function getCurrentUser(): Promise<User | null> {
     // Silently handle expected auth errors (invalid refresh tokens, etc.)
     // These are normal when user is not authenticated
     if (authError) {
-      const isExpectedError = authError.message?.includes("refresh_token_not_found") ||
-        authError.message?.includes("Invalid refresh token") ||
-        authError.message?.includes("JWT expired") ||
-        authError.message?.includes("Auth session missing");
+      const errorMessage = authError.message?.toLowerCase() || "";
+      const errorCode = (authError as any)?.code?.toLowerCase() || "";
+      const isExpectedError = errorCode === "refresh_token_not_found" ||
+        errorMessage.includes("refresh_token_not_found") ||
+        errorMessage.includes("refresh token not found") ||
+        errorMessage.includes("invalid refresh token") ||
+        errorMessage.includes("jwt expired") ||
+        errorMessage.includes("auth session missing");
       
       // Don't log expected errors - they're normal for unauthenticated users
       if (!isExpectedError) {
@@ -353,10 +357,14 @@ export async function getCurrentUser(): Promise<User | null> {
     return mapUser(userData);
   } catch (error: any) {
     // Silently handle expected auth errors
-    const isExpectedError = error?.message?.includes("refresh_token_not_found") ||
-      error?.message?.includes("Invalid refresh token") ||
-      error?.message?.includes("JWT expired") ||
-      error?.message?.includes("Auth session missing");
+    const errorMessage = error?.message?.toLowerCase() || "";
+    const errorCode = error?.code?.toLowerCase() || "";
+    const isExpectedError = errorCode === "refresh_token_not_found" ||
+      errorMessage.includes("refresh_token_not_found") ||
+      errorMessage.includes("refresh token not found") ||
+      errorMessage.includes("invalid refresh token") ||
+      errorMessage.includes("jwt expired") ||
+      errorMessage.includes("auth session missing");
     
     // Only log unexpected errors
     if (!isExpectedError) {

@@ -4,8 +4,9 @@ import { Nav } from "@/components/nav";
 import { BottomNav } from "@/components/bottom-nav";
 import { MobileHeader } from "@/components/mobile-header";
 import { CancelledSubscriptionBanner } from "@/components/common/cancelled-subscription-banner";
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { useFixedElementsHeight } from "@/hooks/use-fixed-elements-height";
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo, useMemo } from "react";
 import { useSubscriptionContext } from "@/contexts/subscription-context";
 import { usePathname } from "next/navigation";
 import { logger } from "@/lib/utils/logger";
@@ -33,7 +34,7 @@ function useProfilePreload() {
   }, []);
 }
 
-export function LayoutWrapper({ children }: { children: React.ReactNode }) {
+export const LayoutWrapper = memo(function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // Try to get subscription context, but handle case where it might not be available (public pages)
   let subscription = null;
@@ -54,22 +55,34 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   // Preload profile data in background
   useProfilePreload();
   
-  // Determine route types
-  const isApiRoute = pathname?.startsWith("/api");
-  const isAuthPage = pathname?.startsWith("/auth");
-  const isAcceptPage = pathname?.startsWith("/members/accept");
-  const isSelectPlanPage = pathname === "/select-plan";
-  const isWelcomePage = pathname === "/welcome";
-  const isLandingPage = pathname === "/";
-  const isPricingPage = pathname === "/pricing";
-  const isPrivacyPolicyPage = pathname === "/privacy-policy";
-  const isTermsOfServicePage = pathname === "/terms-of-service";
-  const isFAQPage = pathname === "/faq";
-  const isSubscriptionSuccessPage = pathname === "/subscription/success";
-  const isMaintenancePage = pathname === "/maintenance";
-  const isSpareDSPage = pathname?.startsWith("/spareds");
-  const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPricingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage || isMaintenancePage || isSpareDSPage;
-  const isDashboardRoute = !isPublicPage && !isApiRoute && !isSelectPlanPage && !isWelcomePage;
+  // Determine route types - memoized to avoid recalculation
+  const routeInfo = useMemo(() => {
+    const isApiRoute = pathname?.startsWith("/api");
+    const isAuthPage = pathname?.startsWith("/auth");
+    const isAcceptPage = pathname?.startsWith("/members/accept");
+    const isSelectPlanPage = pathname === "/select-plan";
+    const isWelcomePage = pathname === "/welcome";
+    const isLandingPage = pathname === "/";
+    const isPricingPage = pathname === "/pricing";
+    const isPrivacyPolicyPage = pathname === "/privacy-policy";
+    const isTermsOfServicePage = pathname === "/terms-of-service";
+    const isFAQPage = pathname === "/faq";
+    const isSubscriptionSuccessPage = pathname === "/subscription/success";
+    const isMaintenancePage = pathname === "/maintenance";
+    const isSpareDSPage = pathname?.startsWith("/spareds");
+    const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPricingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage || isMaintenancePage || isSpareDSPage;
+    const isDashboardRoute = !isPublicPage && !isApiRoute && !isSelectPlanPage && !isWelcomePage;
+    
+    return {
+      isApiRoute,
+      isPublicPage,
+      isSelectPlanPage,
+      isWelcomePage,
+      isDashboardRoute,
+    };
+  }, [pathname]);
+  
+  const { isApiRoute, isPublicPage, isSelectPlanPage, isWelcomePage, isDashboardRoute } = routeInfo;
   
   const log = logger.withPrefix("LAYOUT-WRAPPER");
 
@@ -199,7 +212,10 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       
       {/* Bottom Navigation - Fixed Bottom (mobile only) */}
       <BottomNav hasSubscription={showNav} />
+      
+      {/* PWA Install Prompt - Mobile only */}
+      <PWAInstallPrompt />
     </div>
   );
-}
+});
 

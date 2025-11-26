@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+// Bundle analyzer
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
 const nextConfig: NextConfig = {
   /* config options here */
   // Improve compatibility with React 19 and Next.js 16
@@ -24,7 +29,21 @@ const nextConfig: NextConfig = {
   
   // Experimental features for better performance
   experimental: {
-    optimizePackageImports: ['lucide-react', 'recharts', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover', '@radix-ui/react-select', '@radix-ui/react-tabs'],
+    optimizePackageImports: [
+      'lucide-react', 
+      'recharts', 
+      '@radix-ui/react-dialog', 
+      '@radix-ui/react-dropdown-menu', 
+      '@radix-ui/react-popover', 
+      '@radix-ui/react-select', 
+      '@radix-ui/react-tabs',
+      'date-fns',
+      'zod',
+    ],
+    // Enable server actions optimization
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
   },
   
   // Compiler optimizations
@@ -162,7 +181,7 @@ const nextConfig: NextConfig = {
 };
 
 // Wrap with Sentry if DSN is configured
-const configWithSentry = process.env.NEXT_PUBLIC_SENTRY_DSN
+let configWithSentry = process.env.NEXT_PUBLIC_SENTRY_DSN
   ? withSentryConfig(nextConfig, {
       // For all available options, see:
       // https://github.com/getsentry/sentry-webpack-plugin#options
@@ -174,5 +193,6 @@ const configWithSentry = process.env.NEXT_PUBLIC_SENTRY_DSN
     })
   : nextConfig;
 
-export default configWithSentry;
+// Wrap with bundle analyzer if enabled
+export default withBundleAnalyzer(configWithSentry);
 

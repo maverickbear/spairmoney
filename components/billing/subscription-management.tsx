@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Subscription, Plan } from "@/lib/validations/plan";
@@ -45,6 +46,8 @@ export function SubscriptionManagement({
   householdInfo: initialHouseholdInfo,
   onSubscriptionUpdated,
 }: SubscriptionManagementProps) {
+  const breakpoint = useBreakpoint();
+  const isMobile = !breakpoint || breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   // OPTIMIZED: Use provided householdInfo or load it if not provided
@@ -285,6 +288,7 @@ export function SubscriptionManagement({
                   onClick={handleManageSubscription}
                   disabled={loading}
                   variant="default"
+                  size={isMobile ? "small" : "medium"}
                   className="w-full"
                 >
                   {loading ? (
@@ -305,6 +309,7 @@ export function SubscriptionManagement({
                   onClick={handleManageSubscription}
                   disabled={loading}
                   variant="outline"
+                  size={isMobile ? "small" : "medium"}
                   className="w-full"
                 >
                   {loading ? (

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 
-export function MainFooter() {
+export function LandingMainFooter() {
   return (
     <footer className="bg-background border-t border-border">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">

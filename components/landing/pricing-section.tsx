@@ -13,32 +13,29 @@ export function PricingSection() {
   const [selectedPlan, setSelectedPlan] = useState<{ plan: Plan | null; interval: "month" | "year" } | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [currentPlanId, setCurrentPlanId] = useState<string | undefined>(undefined);
-  const [currentInterval, setCurrentInterval] = useState<"month" | "year" | null>(null);
+  // Don't load currentPlanId/currentInterval on landing page - not needed for unauthenticated users
+  // These will be loaded lazily only if user is authenticated and selects a plan
 
-  useEffect(() => {
-    // Check authentication and load current plan info
-    async function checkAuth() {
+  async function handleSelectPlan(planId: string, interval: "month" | "year") {
+    // Lazy authentication check - only when user clicks a plan
+    if (isAuthenticated === null) {
       try {
-        // Try to access subscription endpoint (requires auth)
         const response = await fetch("/api/billing/subscription");
         setIsAuthenticated(response.ok);
         
-        // Also fetch plans to get currentPlanId and currentInterval
-        const plansResponse = await fetch("/api/billing/plans");
-        if (plansResponse.ok) {
-          const plansData = await plansResponse.json();
-          setCurrentPlanId(plansData.currentPlanId);
-          setCurrentInterval(plansData.currentInterval);
+        // If authenticated, also get current plan info
+        if (response.ok) {
+          const plansResponse = await fetch("/api/billing/plans");
+          if (plansResponse.ok) {
+            const plansData = await plansResponse.json();
+            // Store for potential future use, but not needed for landing page display
+          }
         }
       } catch {
         setIsAuthenticated(false);
       }
     }
-    checkAuth();
-  }, []);
 
-  async function handleSelectPlan(planId: string, interval: "month" | "year") {
     // Check if user is authenticated
     if (!isAuthenticated) {
       // Redirect to signup with plan selected
@@ -46,7 +43,7 @@ export function PricingSection() {
       return;
     }
 
-    // Load plan details
+    // Load plan details (only if authenticated)
     try {
       const response = await fetch("/api/billing/plans");
       if (response.ok) {
@@ -76,19 +73,22 @@ export function PricingSection() {
             Pricing
           </p>
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-            Start Organizing Your Finances<br />Try It Free Today
+            Try Spare Finance free for 30 days.
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Track expenses, understand spending, and learn to save together as a family. Choose the plan that fits your needs. Start your 30-day free trial today.
-          </p>
+          <div className="text-lg text-muted-foreground max-w-2xl mx-auto space-y-2">
+            <p>Explore every feature.</p>
+            <p>Build your first budget.</p>
+            <p>Add your household if you want.</p>
+            <p>Decide later if you want to continue.</p>
+          </div>
         </div>
 
         {/* Dynamic Pricing Table */}
         <div className="max-w-7xl mx-auto flex justify-center">
           <div className="w-full max-w-4xl">
             <DynamicPricingTable
-              currentPlanId={currentPlanId}
-              currentInterval={currentInterval}
+              currentPlanId={undefined}
+              currentInterval={null}
               onSelectPlan={handleSelectPlan}
               showTrial={true}
             />

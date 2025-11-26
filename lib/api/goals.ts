@@ -176,10 +176,14 @@ export async function getGoalsInternal(
   if (authError || !user) {
     // Silently handle expected auth errors (invalid tokens, expired sessions, etc.)
     // These are normal when user is not authenticated or tokens are invalid
-    const isExpectedError = authError?.message?.includes("refresh_token_not_found") ||
-      authError?.message?.includes("Invalid refresh token") ||
-      authError?.message?.includes("JWT expired") ||
-      authError?.message?.includes("Auth session missing");
+    const errorMessage = authError?.message?.toLowerCase() || "";
+    const errorCode = (authError as any)?.code?.toLowerCase() || "";
+    const isExpectedError = errorCode === "refresh_token_not_found" ||
+      errorMessage.includes("refresh_token_not_found") ||
+      errorMessage.includes("refresh token not found") ||
+      errorMessage.includes("invalid refresh token") ||
+      errorMessage.includes("jwt expired") ||
+      errorMessage.includes("auth session missing");
     
     if (!isExpectedError) {
       logger.warn("[GOALS] Unexpected authentication error:", authError?.message);

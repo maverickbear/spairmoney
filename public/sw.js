@@ -1,9 +1,13 @@
-// Service Worker for caching static assets
-// Version: 2.0.0
+// Service Worker for caching static assets and PWA support
+// Version: 3.0.0
 
-const CACHE_NAME = 'spare-finance-v2';
+const CACHE_NAME = 'spare-finance-v3';
 const STATIC_ASSETS = [
   '/icon.svg',
+  '/icon-192x192.png',
+  '/icon-512x512.png',
+  '/apple-touch-icon.png',
+  '/manifest.json',
 ];
 
 // Routes that should NEVER be cached (always fetch from network)
@@ -24,24 +28,37 @@ const NO_CACHE_ROUTES = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      // Try to cache all static assets, but don't fail if some are missing
+      return Promise.allSettled(
+        STATIC_ASSETS.map((asset) => 
+          cache.add(asset).catch((err) => {
+            console.warn(`Failed to cache ${asset}:`, err);
+            return null;
+          })
+        )
+      );
     })
   );
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+          .map((name) => {
+            console.log('Deleting old cache:', name);
+            return caches.delete(name);
+          })
       );
+    }).then(() => {
+      // Claim all clients immediately
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
 });
 
 // Fetch event - serve from cache, fallback to network
@@ -107,10 +124,11 @@ self.addEventListener('fetch', (event) => {
         // Clone the response
         const responseToCache = response.clone();
 
-        // Only cache static assets (images, fonts, icons) - never cache HTML pages
+        // Only cache static assets (images, fonts, icons, manifest) - never cache HTML pages
         if (
-          event.request.url.match(/\.(jpg|jpeg|png|gif|svg|webp|woff|woff2|ttf|eot|ico)$/i) &&
-          !pathname.match(/\.html?$/i)
+          (event.request.url.match(/\.(jpg|jpeg|png|gif|svg|webp|woff|woff2|ttf|eot|ico|json)$/i) &&
+          !pathname.match(/\.html?$/i)) ||
+          pathname === '/manifest.json'
         ) {
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
@@ -121,5 +139,12 @@ self.addEventListener('fetch', (event) => {
       });
     })
   );
+});
+
+// Message event - handle updates and skip waiting
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 

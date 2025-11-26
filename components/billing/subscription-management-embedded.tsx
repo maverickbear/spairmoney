@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Subscription, Plan } from "@/lib/validations/plan";
@@ -34,6 +35,8 @@ export function SubscriptionManagementEmbedded({
   householdInfo: initialHouseholdInfo,
   onSubscriptionUpdated,
 }: SubscriptionManagementEmbeddedProps) {
+  const breakpoint = useBreakpoint();
+  const isMobile = !breakpoint || breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [loading, setLoading] = useState(false);
   const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(initialHouseholdInfo ?? null);
   const { toast } = useToast();
@@ -226,7 +229,8 @@ export function SubscriptionManagementEmbedded({
                 onClick={handleOpenStripePortal}
                 disabled={loading}
                 variant="outline"
-                className="w-full"
+                size={isMobile ? "small" : "medium"}
+                className="w-full md:w-auto"
               >
                 {loading ? (
                   <>

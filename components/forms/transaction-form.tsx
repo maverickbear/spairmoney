@@ -19,7 +19,7 @@ import {
   SelectLabel,
   SelectSeparator,
 } from "@/components/ui/select";
-import { Loader2, Info, Plus } from "lucide-react";
+import { Loader2, Info, Plus, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -39,6 +39,8 @@ import { AccountRequiredDialog } from "@/components/common/account-required-dial
 import { parseDateInput, formatDateInput } from "@/lib/utils/timestamp";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DatePicker } from "@/components/ui/date-picker";
+import { ReceiptScanner } from "@/components/receipt-scanner/receipt-scanner";
+import { useBreakpoint } from "@/hooks/use-breakpoint";
 
 /**
  * Converts a Date object to YYYY-MM-DD string format
@@ -123,6 +125,25 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
   const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
+  const breakpoint = useBreakpoint();
+  const isMobile = !breakpoint || breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
+
+  // Listen for custom event to open receipt scanner (from mobile FAB)
+  useEffect(() => {
+    const handleOpenReceiptScanner = () => {
+      if (open && !transaction) {
+        setIsReceiptScannerOpen(true);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('openReceiptScanner', handleOpenReceiptScanner);
+      return () => {
+        window.removeEventListener('openReceiptScanner', handleOpenReceiptScanner);
+      };
+    }
+  }, [open, transaction]);
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -134,6 +155,39 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       recurringFrequency: undefined,
     },
   });
+
+  // Check for receipt data from bottom sheet
+  useEffect(() => {
+    if (open && !transaction && typeof window !== 'undefined') {
+      const receiptData = (window as any).__receiptData;
+      if (receiptData) {
+        // Pre-fill form with receipt data
+        if (receiptData.amount) {
+          form.setValue("amount", receiptData.amount);
+        }
+        if (receiptData.description) {
+          form.setValue("description", receiptData.description);
+        }
+        if (receiptData.merchant && !receiptData.description) {
+          form.setValue("description", receiptData.merchant);
+        }
+        if (receiptData.date) {
+          try {
+            const date = new Date(receiptData.date);
+            if (!isNaN(date.getTime())) {
+              form.setValue("date", date);
+            }
+          } catch (e) {
+            // Invalid date, ignore
+          }
+        }
+        // Set type to expense by default for receipts
+        form.setValue("type", "expense");
+        // Clear receipt data after using it
+        delete (window as any).__receiptData;
+      }
+    }
+  }, [open, transaction, form]);
 
   useEffect(() => {
     if (open) {
@@ -795,6 +849,37 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
               type="transactions"
             />
           )}
+          
+          {/* Receipt Scanner Button - Primary on Mobile */}
+          {!transaction && (
+            <div className={cn(
+              "space-y-2",
+              isMobile ? "order-first" : ""
+            )}>
+              {isMobile ? (
+                <Button
+                  type="button"
+                  onClick={() => setIsReceiptScannerOpen(true)}
+                  className="w-full"
+                  size="large"
+                >
+                  <Receipt className="h-5 w-5 mr-2" />
+                  Scan Receipt
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsReceiptScannerOpen(true)}
+                  className="w-full"
+                >
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Scan Receipt to Auto-fill
+                </Button>
+              )}
+            </div>
+          )}
+          
           <div className="space-y-4">
             {/* Date and Type row */}
             <div className="grid gap-4 md:grid-cols-2">
@@ -1393,6 +1478,36 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Receipt Scanner */}
+      <ReceiptScanner
+        open={isReceiptScannerOpen}
+        onOpenChange={setIsReceiptScannerOpen}
+        onScanComplete={(data) => {
+          // Pre-fill form with receipt data
+          if (data.amount) {
+            form.setValue("amount", data.amount);
+          }
+          if (data.description) {
+            form.setValue("description", data.description);
+          }
+          if (data.merchant && !data.description) {
+            form.setValue("description", data.merchant);
+          }
+          if (data.date) {
+            try {
+              const date = new Date(data.date);
+              if (!isNaN(date.getTime())) {
+                form.setValue("date", date);
+              }
+            } catch (e) {
+              // Invalid date, ignore
+            }
+          }
+          // Set type to expense by default for receipts
+          form.setValue("type", "expense");
+        }}
+      />
     </>
   );
 }

@@ -48,12 +48,12 @@ export function BenefitsSection() {
           <p className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wide">
             Why Families Choose Spare Finance
           </p>
-          <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
             Stop Living Paycheck to Paycheck.<br />Start Building Your Future.
           </h2>
         </div>
 
-        {/* First Benefit with Activity Card - Fizens Style */}
+        {/* First Benefit with Activity Card */}
         <div className="max-w-5xl mx-auto mb-12">
           <div className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary/5 to-background p-8 md:p-12 border border-primary/20 relative overflow-hidden">
             {/* Grid Pattern Background */}

@@ -48,18 +48,77 @@ export async function syncInvestmentAccounts(
     const holdings = holdingsResponse.data.holdings || [];
     const securities = holdingsResponse.data.securities || [];
 
-    // Get investment transactions
+    // Get investment transactions with pagination support
+    // Plaid's investmentsTransactionsGet may return paginated results for large datasets
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 730); // Last 2 years
 
-    const transactionsResponse = await plaidClient.investmentsTransactionsGet({
-      access_token: accessToken,
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0],
-    });
+    let allInvestmentTransactions: any[] = [];
+    let hasMoreTransactions = true;
+    let offset = 0;
+    const pageSize = 500; // Plaid's default page size
 
-    const investmentTransactions = transactionsResponse.data.investment_transactions || [];
+    // Fetch all investment transactions with pagination
+    while (hasMoreTransactions) {
+      try {
+        const transactionsResponse = await plaidClient.investmentsTransactionsGet({
+          access_token: accessToken,
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          options: {
+            offset: offset,
+            count: pageSize,
+          },
+        });
+
+        const transactions = transactionsResponse.data.investment_transactions || [];
+        const totalTransactions = (transactionsResponse.data as any).total_investment_transactions || transactions.length;
+
+        allInvestmentTransactions.push(...transactions);
+
+        // Check if there are more transactions to fetch
+        if (transactions.length < pageSize || allInvestmentTransactions.length >= totalTransactions) {
+          hasMoreTransactions = false;
+        } else {
+          offset += pageSize;
+        }
+
+        // Safety check to prevent infinite loops
+        if (offset > 10000) {
+          console.warn('[PLAID INVESTMENTS] Reached maximum offset limit, stopping pagination');
+          hasMoreTransactions = false;
+        }
+      } catch (error: any) {
+        // If pagination options are not supported, fall back to single request
+        if (error.message?.includes('options') || error.code === 'INVALID_REQUEST' || offset === 0) {
+          console.log('[PLAID INVESTMENTS] Pagination not supported or error on first request, using single request');
+          try {
+            const transactionsResponse = await plaidClient.investmentsTransactionsGet({
+              access_token: accessToken,
+              start_date: startDate.toISOString().split('T')[0],
+              end_date: endDate.toISOString().split('T')[0],
+            });
+            allInvestmentTransactions = transactionsResponse.data.investment_transactions || [];
+          } catch (fallbackError: any) {
+            console.error('[PLAID INVESTMENTS] Error in fallback transaction fetch:', fallbackError);
+            throw fallbackError;
+          }
+        } else {
+          console.error('[PLAID INVESTMENTS] Error fetching transactions:', error);
+          // If we already have some transactions, use them and continue
+          if (allInvestmentTransactions.length > 0) {
+            console.warn(`[PLAID INVESTMENTS] Using ${allInvestmentTransactions.length} transactions fetched before error`);
+          } else {
+            throw error;
+          }
+        }
+        hasMoreTransactions = false;
+      }
+    }
+
+    const investmentTransactions = allInvestmentTransactions;
+    console.log(`[PLAID INVESTMENTS] Fetched ${investmentTransactions.length} investment transactions`);
 
     // Process each investment account
     for (const plaidAccount of investmentAccounts) {
@@ -88,6 +147,9 @@ export async function syncInvestmentAccounts(
         const accountHoldings = holdings.filter(
           (holding) => holding.account_id === plaidAccount.account_id
         );
+
+        // Calculate total account value by summing all holdings
+        let totalAccountValue = 0;
 
         for (const holding of accountHoldings) {
           try {
@@ -152,40 +214,51 @@ export async function syncInvestmentAccounts(
               }
             }
 
-            // Store or update holding in AccountInvestmentValue
-            // Note: We're storing the total value here, not individual holdings
-            // For detailed holdings tracking, we'd need a separate Holdings table
-            const totalValue = holding.institution_value || 0;
-
-            const { data: existingValue } = await supabase
-              .from('AccountInvestmentValue')
-              .select('id')
-              .eq('accountId', accountId)
-              .single();
-
-            if (existingValue) {
-              await supabase
-                .from('AccountInvestmentValue')
-                .update({
-                  totalValue: totalValue,
-                  updatedAt: formatTimestamp(new Date()),
-                })
-                .eq('id', existingValue.id);
-            } else {
-              await supabase.from('AccountInvestmentValue').insert({
-                id: crypto.randomUUID(),
-                accountId: accountId,
-                totalValue: totalValue,
-                createdAt: formatTimestamp(new Date()),
-                updatedAt: formatTimestamp(new Date()),
-              });
-            }
+            // Sum the holding value to total account value
+            const holdingValue = holding.institution_value || 0;
+            totalAccountValue += holdingValue;
 
             holdingsSynced++;
           } catch (error) {
             console.error('Error processing holding:', error);
             errors++;
           }
+        }
+
+        // Fallback: If holdings sum is 0 or very low, use account balance from Plaid
+        // This ensures we have a balance even if holdings aren't properly synced
+        if (totalAccountValue === 0 || totalAccountValue < 0.01) {
+          const plaidBalance = plaidAccount.balances?.current ?? plaidAccount.balances?.available ?? null;
+          if (plaidBalance !== null && plaidBalance > 0) {
+            console.log(`[PLAID INVESTMENTS] Using Plaid account balance as fallback for account ${plaidAccount.account_id}: ${plaidBalance}`);
+            totalAccountValue = plaidBalance;
+          }
+        }
+
+        // Store or update total account value in AccountInvestmentValue
+        // This is the sum of all holdings for this account (or Plaid balance as fallback)
+        const { data: existingValue } = await supabase
+          .from('AccountInvestmentValue')
+          .select('id')
+          .eq('accountId', accountId)
+          .single();
+
+        if (existingValue) {
+          await supabase
+            .from('AccountInvestmentValue')
+            .update({
+              totalValue: totalAccountValue,
+              updatedAt: formatTimestamp(new Date()),
+            })
+            .eq('id', existingValue.id);
+        } else {
+          await supabase.from('AccountInvestmentValue').insert({
+            id: crypto.randomUUID(),
+            accountId: accountId,
+            totalValue: totalAccountValue,
+            createdAt: formatTimestamp(new Date()),
+            updatedAt: formatTimestamp(new Date()),
+          });
         }
 
         // Process investment transactions for this account

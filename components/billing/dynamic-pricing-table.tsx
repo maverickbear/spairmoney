@@ -26,29 +26,39 @@ export function DynamicPricingTable({
   const [interval, setInterval] = useState<"month" | "year">("month");
 
   useEffect(() => {
-    loadPlans();
-  }, []);
-
-  async function loadPlans() {
-    try {
-      setLoading(true);
-      // Try /api/billing/plans first (works for both authenticated and public)
-      // Falls back to /api/billing/plans/public if needed
-      let response = await fetch("/api/billing/plans");
-      if (!response.ok && response.status === 401) {
-        // If 401, try public endpoint
-        response = await fetch("/api/billing/plans/public");
+    async function loadPlans() {
+      try {
+        setLoading(true);
+        // If currentPlanId is undefined, user is likely not authenticated
+        // Use public endpoint directly to avoid unnecessary auth attempts
+        const usePublicEndpoint = currentPlanId === undefined && currentInterval === null;
+        
+        let response;
+        if (usePublicEndpoint) {
+          // Use public endpoint directly for unauthenticated users (landing page)
+          response = await fetch("/api/billing/plans/public");
+        } else {
+          // Try authenticated endpoint first (for authenticated users)
+          response = await fetch("/api/billing/plans");
+          if (!response.ok && response.status === 401) {
+            // If 401, fallback to public endpoint
+            response = await fetch("/api/billing/plans/public");
+          }
+        }
+        
+        if (response.ok) {
+          const data = await response.json();
+          setPlans((data.plans || []).sort((a: Plan, b: Plan) => a.priceMonthly - b.priceMonthly));
+        }
+      } catch (error) {
+        console.error("Error loading plans:", error);
+      } finally {
+        setLoading(false);
       }
-      if (response.ok) {
-        const data = await response.json();
-        setPlans((data.plans || []).sort((a: Plan, b: Plan) => a.priceMonthly - b.priceMonthly));
-      }
-    } catch (error) {
-      console.error("Error loading plans:", error);
-    } finally {
-      setLoading(false);
     }
-  }
+    
+    loadPlans();
+  }, [currentPlanId, currentInterval]);
 
   function getPrice(plan: Plan): number {
     return interval === "month" ? plan.priceMonthly : plan.priceYearly;
@@ -119,7 +129,8 @@ export function DynamicPricingTable({
       </div>
 
       {/* Plans Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Mobile: 1 column, MD: 2 columns with proper spacing, LG+: 2 columns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         {plans.map((plan) => {
           // A plan is current only if both planId and interval match
           const isCurrent = plan.id === currentPlanId && interval === currentInterval;

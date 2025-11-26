@@ -7,46 +7,13 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Receipt,
-  Wallet,
   FileText,
-  PiggyBank,
-  CreditCard,
-  TrendingUp,
-  FolderTree,
-  Users,
-  Settings,
   MoreHorizontal,
-  Target,
-  Calendar,
-  Repeat,
+  Plus,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-// Main navigation items (always visible - 5 items + More button)
-const mainNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: Receipt },
-  { href: "/planning/budgets", label: "Budgets", icon: Target },
-  { href: "/accounts", label: "Accounts", icon: Wallet },
-  { href: "/reports", label: "Reports", icon: FileText },
-];
-
-// Additional navigation items (shown in "More" submenu)
-const moreNavItems = [
-  { href: "/planned-payment", label: "Planned Payment", icon: Calendar },
-  { href: "/planning/goals", label: "Goals", icon: PiggyBank },
-  { href: "/debts", label: "Debts", icon: CreditCard },
-  { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
-  { href: "/investments", label: "Investments", icon: TrendingUp },
-  { href: "/categories", label: "Categories", icon: FolderTree },
-  { href: "/members", label: "Members", icon: Users },
-  { href: "/settings", label: "My Account", icon: Settings },
-];
+import { AddTransactionSheet } from "@/components/bottom-nav/add-transaction-sheet";
+import { MoreMenuSheet } from "@/components/bottom-nav/more-menu-sheet";
+import { useState } from "react";
 
 interface BottomNavProps {
   hasSubscription?: boolean;
@@ -55,18 +22,13 @@ interface BottomNavProps {
 export function BottomNav({ hasSubscription = true }: BottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
   // Don't render BottomNav if user doesn't have subscription
   if (!hasSubscription) {
     return null;
   }
-
-  const handleItemClick = (href: string) => {
-    if (!hasSubscription) {
-      router.push("/dashboard");
-      return;
-    }
-  };
 
   const isActive = (href: string) => {
     const basePath = href.split("?")[0];
@@ -78,80 +40,112 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
   };
 
   return (
+    <>
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card lg:hidden">
       <div className="flex h-16 items-center justify-around">
-        {mainNavItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={true}
-              onClick={(e) => {
-                if (!hasSubscription) {
-                  e.preventDefault();
-                  router.push("/dashboard");
-                }
-              }}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 px-2 py-2 min-h-[44px] min-w-[44px] text-xs font-medium transition-colors",
-                !hasSubscription && "opacity-50 cursor-not-allowed",
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Icon className={cn("h-5 w-5", active && "text-primary")} />
-              <span className={cn("text-[10px] leading-tight", active && "text-primary")}>{item.label}</span>
-            </Link>
-          );
-        })}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="flex flex-col items-center justify-center gap-1 h-auto min-h-[44px] min-w-[44px] py-2 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              <MoreHorizontal className="h-5 w-5" />
-              <span className="text-[10px] leading-tight">More</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="end"
-            sideOffset={8}
-            className="mb-2 w-56"
+          {/* Dashboard */}
+          <Link
+            href="/dashboard"
+            prefetch={true}
+            onClick={(e) => {
+              if (!hasSubscription) {
+                e.preventDefault();
+                router.push("/dashboard");
+              }
+            }}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 px-2 py-2 min-h-[44px] min-w-[44px] text-xs font-medium transition-colors",
+              !hasSubscription && "opacity-50 cursor-not-allowed",
+              isActive("/dashboard") ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            {moreNavItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              return (
-                <DropdownMenuItem key={item.href} asChild>
-                  <Link
-                    href={item.href}
-                    prefetch={true}
-                    onClick={(e) => {
-                      if (!hasSubscription) {
-                        e.preventDefault();
-                        router.push("/dashboard");
-                      } else {
-                        handleItemClick(item.href);
-                      }
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 cursor-pointer",
-                      active && "text-primary"
-                    )}
-                  >
-                    <Icon className={cn("h-4 w-4", active && "text-primary")} />
-                    <span>{item.label}</span>
-                  </Link>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <LayoutDashboard className={cn("h-5 w-5", isActive("/dashboard") && "text-primary")} />
+            <span className={cn("text-[10px] leading-tight", isActive("/dashboard") && "text-primary")}>Dashboard</span>
+          </Link>
+
+          {/* Transactions */}
+          <Link
+            href="/transactions"
+            prefetch={true}
+            onClick={(e) => {
+              if (!hasSubscription) {
+                e.preventDefault();
+                router.push("/dashboard");
+              }
+            }}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 px-2 py-2 min-h-[44px] min-w-[44px] text-xs font-medium transition-colors",
+              !hasSubscription && "opacity-50 cursor-not-allowed",
+              isActive("/transactions") ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Receipt className={cn("h-5 w-5", isActive("/transactions") && "text-primary")} />
+            <span className={cn("text-[10px] leading-tight", isActive("/transactions") && "text-primary")}>Transactions</span>
+          </Link>
+
+          {/* Add Button - Circle only */}
+          <Button
+            variant="ghost"
+            onClick={() => {
+              if (hasSubscription) {
+                setIsAddSheetOpen(true);
+              }
+            }}
+            disabled={!hasSubscription}
+            size="icon"
+            className={cn(
+              "rounded-full h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90",
+              !hasSubscription && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+
+          {/* Reports */}
+          <Link
+            href="/reports"
+            prefetch={true}
+            onClick={(e) => {
+              if (!hasSubscription) {
+                e.preventDefault();
+                router.push("/dashboard");
+              }
+            }}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 px-2 py-2 min-h-[44px] min-w-[44px] text-xs font-medium transition-colors",
+              !hasSubscription && "opacity-50 cursor-not-allowed",
+              isActive("/reports") ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <FileText className={cn("h-5 w-5", isActive("/reports") && "text-primary")} />
+            <span className={cn("text-[10px] leading-tight", isActive("/reports") && "text-primary")}>Reports</span>
+          </Link>
+
+          {/* More */}
+          <Button
+            variant="ghost"
+            onClick={() => setIsMoreSheetOpen(true)}
+            className="flex flex-col items-center justify-center gap-1 h-auto min-h-[44px] min-w-[44px] py-2 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            <span className="text-[10px] leading-tight">More</span>
+          </Button>
       </div>
     </nav>
+
+    {/* Add Transaction Sheet */}
+    <AddTransactionSheet
+      open={isAddSheetOpen}
+      onOpenChange={setIsAddSheetOpen}
+    />
+
+    {/* More Menu Sheet */}
+    <MoreMenuSheet
+      open={isMoreSheetOpen}
+      onOpenChange={setIsMoreSheetOpen}
+      hasSubscription={hasSubscription}
+    />
+    </>
   );
 }
 

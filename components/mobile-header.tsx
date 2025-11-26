@@ -1,20 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Menu, LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, Settings, LogOut, CreditCard, PiggyBank, Users, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar, Repeat } from "lucide-react";
+import { LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, Settings, LogOut, CreditCard, PiggyBank, Users, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/common/logo";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,36 +17,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logger } from "@/lib/utils/logger";
 
-// Base nav sections (without Portal Management)
-const baseNavSections = [
-  {
-    title: "Overview",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/reports", label: "Reports", icon: FileText },
-    ],
-  },
-  {
-    title: "Money Management",
-    items: [
-      { href: "/accounts", label: "Bank Accounts", icon: Wallet },
-      { href: "/transactions", label: "Transactions", icon: Receipt },
-      { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
-      { href: "/planned-payment", label: "Planned Payments", icon: Calendar },
-      { href: "/categories", label: "Categories", icon: FolderTree },
-      { href: "/members", label: "Household", icon: Users },
-    ],
-  },
-  {
-    title: "Planning",
-    items: [
-      { href: "/planning/budgets", label: "Budgets", icon: Target },
-      { href: "/planning/goals", label: "Goals", icon: PiggyBank },
-      { href: "/debts", label: "Debts", icon: CreditCard },
-      { href: "/investments", label: "Investments", icon: TrendingUp },
-    ],
-  },
-];
 
 interface UserData {
   user: {
@@ -115,7 +78,6 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
 
   const log = logger.withPrefix("MOBILE-HEADER");
 
@@ -256,23 +218,6 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
 
   const user = userData?.user;
 
-  // Build nav sections dynamically - add Portal Management if super_admin
-  const navSections = useMemo(() => isSuperAdmin
-    ? [
-        {
-          title: "Portal Management",
-          items: [
-            { href: "/portal-management", label: "Portal Management", icon: Settings2 },
-          ],
-        },
-        ...baseNavSections,
-      ]
-    : baseNavSections, [isSuperAdmin]);
-
-  const handleNavClick = () => {
-    setIsOpen(false);
-  };
-
   // Get page title based on pathname
   const getPageTitle = () => {
     // Special case for dashboard - show personalized welcome
@@ -326,7 +271,7 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
       } as React.CSSProperties}
     >
       <div className="flex items-center justify-between px-4 py-3 border-b">
-        <div className="flex items-center gap-3 min-h-[44px]">
+        <div className="flex items-center gap-3 min-h-[44px] flex-1">
           <Link href="/dashboard" prefetch={true} className="p-0 flex items-center">
             <Logo variant="icon" color="auto" width={32} height={32} />
           </Link>
@@ -334,181 +279,6 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
             {getPageTitle()}
           </h1>
         </div>
-        
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="min-h-[44px] min-w-[44px]"
-              aria-label="Open menu"
-            >
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-80 p-0">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Navigation Menu</SheetTitle>
-            </SheetHeader>
-            <div className="flex flex-col h-screen overflow-y-auto">
-              <nav className="flex-1 space-y-6 px-3 py-4">
-                {navSections.map((section) => (
-                  <div key={section.title} className="space-y-1">
-                    <h3 className="px-3 pb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {section.title}
-                    </h3>
-                    {section.items.map((item) => {
-                      const Icon = item.icon;
-                      // Extract base path without query params for comparison
-                      const basePath = item.href.split("?")[0];
-                      const isActive =
-                        pathname === item.href ||
-                        pathname === basePath ||
-                        (basePath !== "/" && pathname.startsWith(basePath));
-                      
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          prefetch={true}
-                          onClick={handleNavClick}
-                          className={cn(
-                            "flex items-center space-x-3 rounded-[12px] px-3 py-2 text-sm font-medium transition-all duration-200 ease-in-out",
-                            isActive
-                              ? "bg-primary text-primary-foreground"
-                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                          )}
-                        >
-                          <Icon className="h-5 w-5 flex-shrink-0" />
-                          <span>{item.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ))}
-              </nav>
-
-              <div className="p-3 border-t">
-                {loading ? (
-                  <div className="flex items-center space-x-3 px-3 py-2">
-                    <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-                    <div className="flex-1 space-y-1">
-                      <div className="h-3 w-20 bg-muted rounded-[12px] animate-pulse" />
-                      <div className="h-2 w-16 bg-muted rounded-[12px] animate-pulse" />
-                    </div>
-                  </div>
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="w-full h-auto p-2 border border-border shadow justify-start"
-                      >
-                        <div className="flex items-center space-x-3 w-full">
-                          <div className="relative flex-shrink-0">
-                            {user?.avatarUrl ? (
-                              <>
-                                <img
-                                  src={user.avatarUrl}
-                                  alt={user.name || "User"}
-                                  className="h-10 w-10 rounded-full object-cover border"
-                                  loading="eager"
-                                  decoding="async"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                    const initialsContainer =
-                                      e.currentTarget.nextElementSibling;
-                                    if (initialsContainer) {
-                                      (initialsContainer as HTMLElement).style.display =
-                                        "flex";
-                                    }
-                                  }}
-                                />
-                                <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border">
-                                  {getInitials(user?.name)}
-                                </div>
-                              </>
-                            ) : user?.name ? (
-                              <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border">
-                                {getInitials(user.name)}
-                              </div>
-                            ) : (
-                              <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <div className="text-sm font-medium truncate">
-                              {user?.name || "User"}
-                            </div>
-                            {user?.email && (
-                              <div className="mt-0.5 text-xs text-muted-foreground truncate">
-                                {user.email}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem asChild className="mb-1">
-                        <Link href="/settings" prefetch={true} className="cursor-pointer" onClick={handleNavClick}>
-                          <Settings className="mr-2 h-4 w-4" />
-                          <span>My Account</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild className="mb-1">
-                        <Link href="/feedback" prefetch={true} className="cursor-pointer" onClick={handleNavClick}>
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          <span>Feedback</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="mb-1">
-                        <Link href="/help-support" prefetch={true} className="cursor-pointer" onClick={handleNavClick}>
-                          <HelpCircle className="mr-2 h-4 w-4" />
-                          <span>Help & Support</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="mb-1">
-                        <Link href="/privacy-policy" prefetch={true} target="_blank" rel="noopener noreferrer" className="cursor-pointer" onClick={handleNavClick}>
-                          <Shield className="mr-2 h-4 w-4" />
-                          <span>Privacy Policy</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="mb-1">
-                        <Link href="/terms-of-service" prefetch={true} target="_blank" rel="noopener noreferrer" className="cursor-pointer" onClick={handleNavClick}>
-                          <FileTextIcon className="mr-2 h-4 w-4" />
-                          <span>Terms of Service</span>
-        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() =>
-                          setTheme(theme === "dark" ? "light" : "dark")
-                        }
-                        className="mb-1"
-                      >
-                        <div className="relative mr-2 h-4 w-4">
-                          <Sun className="absolute h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                        </div>
-                        <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive cursor-pointer"
-                        onClick={handleLogout}
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Log out</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
     </header>
   );

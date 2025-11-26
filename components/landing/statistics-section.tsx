@@ -31,7 +31,8 @@ export function StatisticsSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-16 max-w-5xl mx-auto">
+        {/* Mobile: 1 column, MD: 2 columns (avoid overlap), LG+: 3 columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12 lg:gap-16 max-w-5xl mx-auto">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
               <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">

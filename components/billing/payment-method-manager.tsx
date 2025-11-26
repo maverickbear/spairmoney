@@ -175,12 +175,12 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <CardTitle>Payment Methods</CardTitle>
               <CardDescription>Your payment methods are safely managed by Stripe</CardDescription>
             </div>
-            <Button onClick={handleAddPaymentMethod} size="small">
+            <Button onClick={handleAddPaymentMethod} size="small" className="w-full md:w-auto">
               Add Payment Method
             </Button>
           </div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/components/common/money";
 import { formatTransactionDate, formatShortDate } from "@/lib/utils/timestamp";
-import { Loader2, Repeat, Clock, Check, X } from "lucide-react";
+import { Loader2, Repeat, Clock, Check, X, Wallet, ShoppingCart, UtensilsCrossed, Car, Home, Heart, GraduationCap, Gamepad2, Plane, Dumbbell, Shirt, Laptop, Music, BookOpen, Gift, CreditCard, Building2, Briefcase, PiggyBank, TrendingUp, Coffee, Receipt as ReceiptIcon, Tag, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/lib/api/transactions-client";
 
@@ -23,25 +23,139 @@ interface TransactionsMobileCardProps {
   processingSuggestion?: boolean;
 }
 
-// Helper function to get initial from description
-function getInitial(description: string | null | undefined): string {
-  if (!description) return "T";
-  const words = description.trim().split(/\s+/);
-  if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase();
+// Helper function to get category icon
+function getCategoryIcon(categoryName: string | null | undefined) {
+  if (!categoryName) return Tag;
+  
+  const normalized = categoryName.toLowerCase().trim();
+  
+  // Map category names to icons
+  const iconMap: Record<string, any> = {
+    // Housing
+    "rent": Home,
+    "rent / mortgage": Home,
+    "utilities": Home,
+    "home maintenance": Home,
+    "home insurance": Home,
+    
+    // Transportation
+    "vehicle": Car,
+    "public transit": Car,
+    
+    // Food
+    "groceries": ShoppingCart,
+    "restaurants": UtensilsCrossed,
+    "snacks & drinks": Coffee,
+    
+    // Health & Personal
+    "medical": Heart,
+    "healthcare": Heart,
+    "personal care": Heart,
+    "fitness": Dumbbell,
+    
+    // Family & Kids
+    "baby essentials": Gift,
+    "child/baby": Gift,
+    "education": GraduationCap,
+    "activities": Gamepad2,
+    
+    // Insurance
+    "insurance payments": Shield,
+    
+    // Debts
+    "loans": CreditCard,
+    "credit cards": CreditCard,
+    "other debts": CreditCard,
+    
+    // Shopping
+    "clothing": Shirt,
+    "electronics": Laptop,
+    "home & lifestyle": Home,
+    
+    // Entertainment & Leisure
+    "streaming": Music,
+    "gaming": Gamepad2,
+    "events": Music,
+    "travel": Plane,
+    
+    // Education & Work
+    "courses & certificates": GraduationCap,
+    "books": BookOpen,
+    "software & tools": Laptop,
+    
+    // Pets
+    "pet care": Heart,
+    
+    // Gifts & Donations
+    "gifts": Gift,
+    "donations": Gift,
+    
+    // Business Expenses
+    "home office": Briefcase,
+    "software": Laptop,
+    "professional services": Briefcase,
+    "marketing": Briefcase,
+    "office": Briefcase,
+    
+    // Subscriptions
+    "subscriptions": Music,
+    
+    // Savings
+    "emergency fund": PiggyBank,
+    "rrsp": PiggyBank,
+    "fhsa": PiggyBank,
+    "tfsa": PiggyBank,
+    
+    // Investments
+    "stocks": TrendingUp,
+    "crypto": TrendingUp,
+    "investment income": TrendingUp,
+    "rental income": TrendingUp,
+    
+    // Income
+    "salary & wages": Wallet,
+    "extra compensation": Wallet,
+    "business income": Wallet,
+    "benefits": Wallet,
+    "gig work": Wallet,
+    "sales": Wallet,
+    "content creation": Wallet,
+    "family support": Wallet,
+    "reimbursements": Wallet,
+    
+    // Misc
+    "bank fees": ReceiptIcon,
+    "overdraft": CreditCard,
+    "unexpected": Tag,
+    "uncategorized": Tag,
+    "other": Tag,
+  };
+  
+  // Check exact match
+  if (iconMap[normalized]) {
+    return iconMap[normalized];
   }
-  return description[0].toUpperCase();
+  
+  // Check partial match
+  for (const [key, icon] of Object.entries(iconMap)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return icon;
+    }
+  }
+  
+  // Default icon
+  return Tag;
 }
 
-// Helper function to get color for avatar based on description
-function getAvatarColor(description: string | null | undefined): string {
-  if (!description) return "bg-gray-500";
+// Helper function to get color for avatar based on category
+function getCategoryColor(categoryName: string | null | undefined): string {
+  if (!categoryName) return "bg-gray-500";
   const colors = [
     "bg-green-500", "bg-blue-500", "bg-purple-500", "bg-pink-500",
     "bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-indigo-500",
     "bg-teal-500", "bg-cyan-500"
   ];
-  const hash = description.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = categoryName.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return colors[hash % colors.length];
 }
 
@@ -57,48 +171,36 @@ export function TransactionsMobileCard({
   onRejectSuggestion,
   processingSuggestion,
 }: TransactionsMobileCardProps) {
-  const [logoError, setLogoError] = useState(false);
   const plaidMeta = transaction.plaidMetadata as any;
-  const subcategory = transaction.subcategory as { id: string; name: string; logo?: string | null } | null | undefined;
-  const logoUrl = (subcategory as any)?.logo;
   const description = transaction.description || "Transaction";
   const displayName = transaction.description || transaction.category?.name || "Transaction";
   const date = formatTransactionDate(transaction.date);
   const isIncome = transaction.type === "income";
   const isExpense = transaction.type === "expense";
+  const categoryName = transaction.category?.name;
+  const CategoryIcon = getCategoryIcon(categoryName);
 
   return (
     <Card 
       className="overflow-hidden cursor-pointer transition-colors hover:bg-accent/50 active:bg-accent border-0 border-b border-border rounded-none shadow-none"
       onClick={onEdit}
     >
-      <CardContent className="px-0 py-4">
+      <CardContent className="px-4 py-4">
         <div className="flex items-center gap-3">
-          {/* Avatar/Logo */}
+          {/* Avatar - Category Icon */}
           <div className="flex-shrink-0">
-            {logoUrl && !logoError ? (
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                <img
-                  src={logoUrl}
-                  alt={displayName}
-                  className="w-full h-full object-cover"
-                  onError={() => setLogoError(true)}
-                />
-              </div>
-            ) : (
-              <div className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-sm",
-                getAvatarColor(description)
-              )}>
-                {getInitial(description)}
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center text-white",
+              getCategoryColor(categoryName)
+            )}>
+              <CategoryIcon className="h-5 w-5" />
             </div>
-                )}
-            </div>
+          </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-foreground truncate">{displayName}</h3>
-            <p className="text-sm text-muted-foreground mt-0.5">{date}</p>
+            <h3 className="font-medium text-foreground truncate text-[14px]">{displayName}</h3>
+            <p className="text-muted-foreground mt-0.5 text-[12px]">{date}</p>
           </div>
 
           {/* Amount */}

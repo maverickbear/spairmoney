@@ -549,7 +549,7 @@ export function RefactoredFeaturesSection() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
               <a
-                href="#pricing"
+                href="/auth/signup"
                 className="inline-flex items-center gap-2 px-7 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 Get Started Free

@@ -16,7 +16,7 @@ const FinancialOverviewPage = nextDynamic(() => import("./financial-overview-pag
 const OnboardingWidget = nextDynamic(() => import("@/components/dashboard/onboarding-widget").then(m => ({ default: m.OnboardingWidget })), { ssr: true });
 
 interface DashboardProps {
-  searchParams: Promise<{ month?: string }> | { month?: string };
+  searchParams: Promise<{ month?: string }>;
 }
 
 async function DashboardContent({ selectedMonthDate }: { selectedMonthDate: Date }) {

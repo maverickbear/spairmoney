@@ -15,7 +15,21 @@ const TabsList = React.forwardRef<
     ref={ref}
     suppressHydrationWarning
     className={cn(
-      "inline-flex h-10 items-center justify-center rounded-[12px] bg-muted p-1 text-muted-foreground border border-border/50",
+      // Base styles using design tokens
+      "inline-flex items-center justify-center",
+      // Background and border using design tokens
+      "bg-muted text-muted-foreground",
+      "border border-border/50",
+      // Border radius using design token
+      "rounded-[var(--radius)]",
+      // Padding using design tokens - responsive
+      "p-1",
+      // Height - responsive for mobile touch targets (min 44px) and desktop
+      "h-11 md:h-10",
+      // Smooth transitions
+      "transition-colors duration-200",
+      // Focus styles for accessibility
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       className
     )}
     {...props}
@@ -31,7 +45,33 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     suppressHydrationWarning
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-[12px] px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50",
+      // Base layout
+      "inline-flex items-center justify-center",
+      "whitespace-nowrap",
+      // Border radius using design token
+      "rounded-[calc(var(--radius)-2px)]",
+      // Padding - responsive for better mobile touch targets
+      "px-3 py-2 md:px-3 md:py-1.5",
+      // Typography - responsive font sizes
+      "text-sm font-medium",
+      // Minimum touch target size for mobile (44px)
+      "min-h-[44px] md:min-h-0",
+      // Transitions for smooth state changes
+      "transition-all duration-200 ease-in-out",
+      // Ring offset for focus
+      "ring-offset-background",
+      // Focus styles for accessibility
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      // Disabled state
+      "disabled:pointer-events-none disabled:opacity-50",
+      // Active state using design tokens
+      "data-[state=active]:bg-background",
+      "data-[state=active]:text-foreground",
+      "data-[state=active]:shadow-sm",
+      "data-[state=active]:border data-[state=active]:border-border/50",
+      // Hover state for better UX
+      "hover:text-foreground/80",
+      "data-[state=active]:hover:text-foreground",
       className
     )}
     {...props}
@@ -47,7 +87,14 @@ const TabsContent = React.forwardRef<
     ref={ref}
     suppressHydrationWarning
     className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      // Spacing
+      "mt-2",
+      // Ring offset for focus
+      "ring-offset-background",
+      // Focus styles for accessibility
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      // Animation for content appearance
+      "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:zoom-in-95",
       className
     )}
     {...props}

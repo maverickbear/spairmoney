@@ -21,7 +21,7 @@ const CsvImportDialog = dynamic(() => import("@/components/forms/csv-import-dial
 const CategorySelectionDialog = dynamic(() => import("@/components/transactions/category-selection-dialog").then(m => ({ default: m.CategorySelectionDialog })), { ssr: false });
 const BlockedFeature = dynamic(() => import("@/components/common/blocked-feature").then(m => ({ default: m.BlockedFeature })), { ssr: false });
 import { formatMoney } from "@/components/common/money";
-import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight, Filter, Calendar, Wallet, Tag, Type, XCircle } from "lucide-react";
+import { Plus, Download, Upload, Search, Trash2, Edit, Repeat, Check, Loader2, X, ChevronLeft, ChevronRight, Filter, Calendar, Wallet, Tag, Type, XCircle, Receipt } from "lucide-react";
 import { TransactionsMobileCard } from "@/components/transactions/transactions-mobile-card";
 import {
   Select,
@@ -1694,14 +1694,17 @@ export default function TransactionsPage() {
             )}
           </Button>
           {canWrite && (
-            <Button size="medium" onClick={() => {
-              // Check if user can perform write operations
-              if (!checkWriteAccess()) {
-                return;
-              }
-              setSelectedTransaction(null);
-              setIsFormOpen(true);
-            }} className="text-xs md:text-sm">
+            <Button 
+              size="medium" 
+              onClick={() => {
+                if (!checkWriteAccess()) {
+                  return;
+                }
+                setSelectedTransaction(null);
+                setIsFormOpen(true);
+              }} 
+              className="text-xs md:text-sm hidden lg:flex"
+            >
               <Plus className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
               <span className="hidden md:inline">Add Transaction</span>
             </Button>
@@ -1746,30 +1749,10 @@ export default function TransactionsPage() {
             </SimpleTabsTrigger>
           </SimpleTabsList>
         </div>
-        
-        {/* Filter Button - Mobile only, shown when there are transactions */}
-        {transactions.length > 0 && (
-          <div className="flex items-center justify-end px-4 py-2 border-t">
-            <Button 
-              variant="outline"
-              size="small"
-              onClick={() => setIsFiltersModalOpen(true)}
-              className="text-xs"
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-              {(filters.accountId !== "all" || filters.search || filters.recurring !== "all" || dateRange !== "all-dates" || customDateRange || filters.categoryId !== "all") && (
-                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
-                  Active
-                </Badge>
-              )}
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Content Container */}
-      <div className="w-full p-4 lg:p-8">
+      <div className="w-full lg:p-8">
         {/* Mobile Card View */}
         <div className="lg:hidden" ref={pullToRefreshRef}>
         {/* Pull to refresh indicator */}
@@ -2524,24 +2507,26 @@ export default function TransactionsPage() {
       {DeleteConfirmDialog}
       {DeleteMultipleConfirmDialog}
 
-      {/* Mobile Floating Action Button */}
-      {canWrite && (
-        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
-          <Button
-            size="large"
-            className="h-14 w-14 rounded-full shadow-lg"
-            onClick={() => {
-              if (!checkWriteAccess()) {
-                return;
-              }
-              setSelectedTransaction(null);
-              setIsFormOpen(true);
-            }}
+      {/* Filter Button - Fixed above bottom nav on mobile */}
+      {transactions.length > 0 && (
+        <div className="fixed bottom-[64px] left-0 right-0 z-[50] lg:hidden bg-card border-t shadow-sm">
+          <Button 
+            variant="default"
+            size="small"
+            onClick={() => setIsFiltersModalOpen(true)}
+            className="w-full rounded-none text-xs h-12"
           >
-            <Plus className="h-6 w-6" />
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {(filters.accountId !== "all" || filters.search || filters.recurring !== "all" || dateRange !== "all-dates" || customDateRange || filters.categoryId !== "all") && (
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                Active
+              </Badge>
+            )}
           </Button>
         </div>
       )}
+
     </SimpleTabs>
   );
 }

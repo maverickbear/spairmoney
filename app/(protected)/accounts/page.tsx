@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import { DeleteAccountWithTransferDialog } from "@/components/accounts/delete-account-with-transfer-dialog";
 import { AccountCard } from "@/components/banking/account-card";
+import { AddAccountSheet } from "@/components/accounts/add-account-sheet";
 import {
   Select,
   SelectContent,
@@ -79,6 +80,7 @@ export default function AccountsPage() {
   const [checkingTransactions, setCheckingTransactions] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [isAddAccountSheetOpen, setIsAddAccountSheetOpen] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -119,10 +121,9 @@ export default function AccountsPage() {
 
   async function handleAddAccount() {
     if (!checkWriteAccess()) return;
-    setSelectedAccount(null);
-    // Load limit before opening modal for immediate display
+    // Load limit before opening sheet for immediate display
     await loadAccountLimit();
-    setIsFormOpen(true);
+    setIsAddAccountSheetOpen(true);
   }
 
   async function handleDelete(id: string) {
@@ -378,7 +379,7 @@ export default function AccountsPage() {
         <div className="space-y-4">
           {/* Filters - Only show when we have accounts or are loading */}
           {(accounts.length > 0 || loading) && (
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex flex-row gap-2 sm:gap-4 items-center">
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="h-9 w-auto min-w-[140px]">
                   <SelectValue placeholder="Account Type" />
@@ -800,18 +801,30 @@ export default function AccountsPage() {
 
       {ConfirmDialog}
 
-      {/* Mobile Floating Action Button */}
+      {/* Mobile Fixed Button - Above bottom nav */}
       {canWrite && (
-        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+        <div className="fixed bottom-20 left-0 right-0 z-[60] lg:hidden px-4">
           <Button
-            size="large"
-            className="h-14 w-14 rounded-full shadow-lg"
+            size="small"
+            className="w-full"
             onClick={handleAddAccount}
           >
-            <Plus className="h-6 w-6" />
+            <Plus className="h-4 w-4 mr-2" />
+            Add Account
           </Button>
         </div>
       )}
+
+      {/* Add Account Sheet */}
+      <AddAccountSheet
+        open={isAddAccountSheetOpen}
+        onOpenChange={setIsAddAccountSheetOpen}
+        onSuccess={() => {
+          loadAccounts();
+          loadAccountLimit();
+        }}
+        canWrite={canWrite}
+      />
     </div>
   );
 }

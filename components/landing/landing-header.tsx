@@ -108,9 +108,9 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
       }`}
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative flex items-center justify-center md:justify-between h-16 md:h-20">
-          {/* Logo - Centralizado no mobile, à esquerda no desktop */}
-          <Link href="/" className="flex items-center gap-3 absolute left-1/2 -translate-x-1/2 md:relative md:left-0 md:translate-x-0 md:flex-1">
+        <div className="relative flex items-center justify-between h-16 md:h-20">
+          {/* Logo - À esquerda (mobile e desktop) */}
+          <Link href="/" className="flex items-center gap-3 flex-1">
             {(() => {
               // When not scrolled, header is transparent over dark background - use white logo
               if (!isScrolled) {
@@ -139,13 +139,13 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
           </Link>
 
           {/* Desktop Navigation - Centralizado */}
-          <div className="hidden md:flex items-center justify-center flex-1">
-            <div className="flex items-center gap-8">
+          <div className="hidden md:flex items-center justify-center flex-1 h-full">
+            <nav className="flex items-center gap-8">
               {navItems.map((item) => (
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`text-base font-medium transition-colors ${
+                  className={`text-base font-medium transition-colors flex items-center ${
                     isScrolled
                       ? "text-muted-foreground hover:text-foreground"
                       : "text-white/90 hover:text-white"
@@ -154,17 +154,18 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                   {item.label}
                 </Link>
               ))}
-            </div>
+            </nav>
           </div>
 
-          {/* CTA Buttons - À direita */}
-          <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
+          {/* CTA Buttons - À direita (Desktop e Mobile) */}
+          <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end">
             {isAuthenticated ? (
               <>
                 <Button
                   asChild
                   variant="ghost"
-                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white"}
+                  size="small"
+                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white text-sm" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white text-sm"}
                 >
                   <Link href="/dashboard">Dashboard</Link>
                 </Button>
@@ -173,7 +174,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`relative rounded-full ${isScrolled 
+                    className={`relative rounded-full h-9 w-9 md:h-10 md:w-10 ${isScrolled 
                       ? "hover:bg-muted" 
                       : "hover:bg-white/10"
                     }`}
@@ -183,7 +184,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                         <img
                           src={user.avatarUrl}
                           alt={user.name || "User"}
-                          className="h-10 w-10 rounded-full object-cover border"
+                          className="h-9 w-9 md:h-10 md:w-10 rounded-full object-cover border"
                           loading="eager"
                           decoding="async"
                           onError={(e) => {
@@ -196,7 +197,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                             }
                           }}
                         />
-                        <div className={`h-10 w-10 rounded-full hidden items-center justify-center text-xs font-semibold border ${
+                        <div className={`h-9 w-9 md:h-10 md:w-10 rounded-full hidden items-center justify-center text-xs font-semibold border ${
                           isScrolled 
                             ? "bg-primary text-primary-foreground" 
                             : "bg-white text-primary"
@@ -205,7 +206,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                         </div>
                       </>
                     ) : user?.name ? (
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-xs font-semibold border ${
+                      <div className={`h-9 w-9 md:h-10 md:w-10 rounded-full flex items-center justify-center text-xs font-semibold border ${
                         isScrolled 
                           ? "bg-primary text-primary-foreground" 
                           : "bg-white text-primary"
@@ -213,7 +214,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                         {getInitials(user.name)}
                       </div>
                     ) : (
-                      <div className={`h-10 w-10 rounded-full ${
+                      <div className={`h-9 w-9 md:h-10 md:w-10 rounded-full ${
                         isScrolled ? "bg-muted" : "bg-white/20"
                       } animate-pulse`} />
                     )}
@@ -236,19 +237,20 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                   variant="ghost"
                   size="icon"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className={`relative ${isScrolled 
+                  className={`relative h-9 w-9 md:h-10 md:w-10 ${isScrolled 
                     ? "text-foreground hover:bg-muted" 
                     : "text-white hover:bg-white/10"
                   }`}
                   aria-label="Toggle theme"
                 >
-                  <Sun className="absolute h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                  <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                  <Sun className="absolute h-4 w-4 md:h-5 md:w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                  <Moon className="absolute h-4 w-4 md:h-5 md:w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                 </Button>
                 <Button
                   asChild
                   variant="ghost"
-                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white"}
+                  size="small"
+                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white text-sm" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white text-sm"}
                 >
                   <Link href="/auth/login">Sign In</Link>
                 </Button>

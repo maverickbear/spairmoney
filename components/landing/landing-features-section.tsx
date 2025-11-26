@@ -114,7 +114,7 @@ export function LandingFeaturesSection() {
         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center mb-20">
           <div>
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
-              Discover the <span className="text-primary">unmatched</span> benefits
+              Everything you need to <span className="text-primary">take control</span>
             </h2>
           </div>
           <div>

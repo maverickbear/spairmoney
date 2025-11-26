@@ -45,9 +45,13 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
       // Verify the session was set correctly
       if (sessionError) {
         // Only log if it's not an expected token error
-        const isExpectedError = sessionError.message?.includes("refresh_token_not_found") ||
-          sessionError.message?.includes("Invalid refresh token") ||
-          sessionError.message?.includes("JWT expired");
+        const errorMessage = sessionError.message?.toLowerCase() || "";
+        const errorCode = (sessionError as any)?.code?.toLowerCase() || "";
+        const isExpectedError = errorCode === "refresh_token_not_found" ||
+          errorMessage.includes("refresh_token_not_found") ||
+          errorMessage.includes("refresh token not found") ||
+          errorMessage.includes("invalid refresh token") ||
+          errorMessage.includes("jwt expired");
         if (!isExpectedError) {
           logger.warn("[createServerClient] setSession error:", sessionError.message);
         }
@@ -57,9 +61,13 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
       const { data: { user }, error: userError } = await client.auth.getUser();
       if (userError || !user) {
         // Only log if it's not an expected token error
-        const isExpectedError = userError?.message?.includes("refresh_token_not_found") ||
-          userError?.message?.includes("Invalid refresh token") ||
-          userError?.message?.includes("JWT expired");
+        const errorMessage = userError?.message?.toLowerCase() || "";
+        const errorCode = (userError as any)?.code?.toLowerCase() || "";
+        const isExpectedError = errorCode === "refresh_token_not_found" ||
+          errorMessage.includes("refresh_token_not_found") ||
+          errorMessage.includes("refresh token not found") ||
+          errorMessage.includes("invalid refresh token") ||
+          errorMessage.includes("jwt expired");
         if (!isExpectedError) {
           logger.warn("[createServerClient] getUser error after setSession:", {
             userError: userError?.message,
@@ -70,9 +78,13 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
       // Removed verbose success logging - authentication is expected and happens frequently
     } catch (error: any) {
       // Handle refresh token errors gracefully - don't log expected errors
-      const isExpectedError = error?.message?.includes("refresh_token_not_found") || 
-          error?.message?.includes("Invalid refresh token") ||
-          error?.message?.includes("JWT expired");
+      const errorMessage = error?.message?.toLowerCase() || "";
+      const errorCode = error?.code?.toLowerCase() || "";
+      const isExpectedError = errorCode === "refresh_token_not_found" ||
+        errorMessage.includes("refresh_token_not_found") ||
+        errorMessage.includes("refresh token not found") ||
+        errorMessage.includes("invalid refresh token") ||
+        errorMessage.includes("jwt expired");
       if (!isExpectedError) {
         logger.warn("[createServerClient] Unexpected error:", error?.message);
       }
@@ -137,12 +149,19 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
     const { data: { user }, error: authError } = await client.auth.getUser();
     
     // If we get a refresh token error, clear invalid cookies silently
-    if (authError && (
-      authError.message?.includes("refresh_token_not_found") || 
-      authError.message?.includes("Invalid refresh token") ||
-      authError.message?.includes("JWT expired") ||
-      authError.message?.includes("Auth session missing")
-    )) {
+    // Check both error code and message (case-insensitive) to catch all variations
+    const errorMessage = authError?.message?.toLowerCase() || "";
+    const errorCode = (authError as any)?.code?.toLowerCase() || "";
+    const isExpectedError = authError && (
+      errorCode === "refresh_token_not_found" ||
+      errorMessage.includes("refresh_token_not_found") ||
+      errorMessage.includes("refresh token not found") ||
+      errorMessage.includes("invalid refresh token") ||
+      errorMessage.includes("jwt expired") ||
+      errorMessage.includes("auth session missing")
+    );
+    
+    if (isExpectedError) {
       // Clear all Supabase auth cookies silently (expected error)
       const authCookieNames = [
         "sb-access-token",
@@ -165,9 +184,16 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
     }
   } catch (error: any) {
     // If there's an error, clear cookies and return unauthenticated client
-    if (error?.message?.includes("refresh_token_not_found") || 
-        error?.message?.includes("Invalid refresh token") ||
-        error?.message?.includes("JWT expired")) {
+    // Check both error code and message (case-insensitive) to catch all variations
+    const errorMessage = error?.message?.toLowerCase() || "";
+    const errorCode = error?.code?.toLowerCase() || "";
+    const isExpectedError = errorMessage.includes("refresh_token_not_found") ||
+      errorMessage.includes("refresh token not found") ||
+      errorMessage.includes("invalid refresh token") ||
+      errorMessage.includes("jwt expired") ||
+      errorCode === "refresh_token_not_found";
+    
+    if (isExpectedError) {
       const authCookieNames = [
         "sb-access-token",
         "sb-refresh-token",

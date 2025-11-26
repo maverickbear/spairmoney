@@ -80,7 +80,7 @@ async function ReportsContentWrapper({ period }: { period: ReportPeriod }) {
 }
 
 interface ReportsProps {
-  searchParams: Promise<{ period?: string }> | { period?: string };
+  searchParams: Promise<{ period?: string }>;
 }
 
 export default async function ReportsPage({ searchParams }: ReportsProps) {

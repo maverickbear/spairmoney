@@ -42,7 +42,7 @@ export function HeroSection() {
               asChild
               className="bg-white text-[#1A1A8F] hover:bg-white/90 text-lg font-medium px-8 h-12 rounded-full transition-all"
             >
-              <Link href="#pricing">Get Started</Link>
+              <Link href="/auth/signup">Get Started</Link>
             </Button>
             <Button
               asChild

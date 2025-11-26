@@ -12,7 +12,8 @@ export function FeaturesSection() {
     <section id="features" className="pt-32 md:pt-40 pb-20 md:pb-32 bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Statistics - Apple Style */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 max-w-6xl mx-auto">
+        {/* Mobile: 2 columns, MD: 2 columns (avoid overlap), LG+: 4 columns */}
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 lg:gap-12 max-w-6xl mx-auto">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
               <div className="flex flex-col items-center justify-center gap-3 mb-3">

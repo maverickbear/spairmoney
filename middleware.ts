@@ -214,11 +214,15 @@ export async function middleware(request: NextRequest) {
           const { data: { user }, error: authError } = await supabase.auth.getUser();
 
           // Silently ignore expected auth errors (invalid refresh tokens, etc.)
+          const errorMessage = authError?.message?.toLowerCase() || "";
+          const errorCode = (authError as any)?.code?.toLowerCase() || "";
           if (authError && (
-            authError.message?.includes("refresh_token_not_found") ||
-            authError.message?.includes("Invalid refresh token") ||
-            authError.message?.includes("JWT expired") ||
-            authError.message?.includes("Auth session missing")
+            errorCode === "refresh_token_not_found" ||
+            errorMessage.includes("refresh_token_not_found") ||
+            errorMessage.includes("refresh token not found") ||
+            errorMessage.includes("invalid refresh token") ||
+            errorMessage.includes("jwt expired") ||
+            errorMessage.includes("auth session missing")
           )) {
             // Expected error - user is not authenticated
             return NextResponse.redirect(new URL("/", request.url));
@@ -233,9 +237,13 @@ export async function middleware(request: NextRequest) {
           }
         } catch (authError: any) {
           // Silently ignore expected auth errors
-          if (authError?.message?.includes("refresh_token_not_found") ||
-              authError?.message?.includes("Invalid refresh token") ||
-              authError?.message?.includes("JWT expired")) {
+          const errorMessage = authError?.message?.toLowerCase() || "";
+          const errorCode = authError?.code?.toLowerCase() || "";
+          if (errorCode === "refresh_token_not_found" ||
+              errorMessage.includes("refresh_token_not_found") ||
+              errorMessage.includes("refresh token not found") ||
+              errorMessage.includes("invalid refresh token") ||
+              errorMessage.includes("jwt expired")) {
             // Expected error - redirect to landing page
             return NextResponse.redirect(new URL("/", request.url));
           }
@@ -252,11 +260,15 @@ export async function middleware(request: NextRequest) {
           const { data: { user }, error: authError } = await supabase.auth.getUser();
 
           // Silently ignore expected auth errors (invalid refresh tokens, etc.)
+          const errorMessage2 = authError?.message?.toLowerCase() || "";
+          const errorCode2 = (authError as any)?.code?.toLowerCase() || "";
           if (authError && (
-            authError.message?.includes("refresh_token_not_found") ||
-            authError.message?.includes("Invalid refresh token") ||
-            authError.message?.includes("JWT expired") ||
-            authError.message?.includes("Auth session missing")
+            errorCode2 === "refresh_token_not_found" ||
+            errorMessage2.includes("refresh_token_not_found") ||
+            errorMessage2.includes("refresh token not found") ||
+            errorMessage2.includes("invalid refresh token") ||
+            errorMessage2.includes("jwt expired") ||
+            errorMessage2.includes("auth session missing")
           )) {
             // Expected error - user is not authenticated, redirect to maintenance
             return NextResponse.redirect(new URL("/maintenance", request.url));
@@ -290,9 +302,13 @@ export async function middleware(request: NextRequest) {
           }
         } catch (authError: any) {
           // Silently ignore expected auth errors
-          if (authError?.message?.includes("refresh_token_not_found") ||
-              authError?.message?.includes("Invalid refresh token") ||
-              authError?.message?.includes("JWT expired")) {
+          const errorMessage3 = authError?.message?.toLowerCase() || "";
+          const errorCode3 = authError?.code?.toLowerCase() || "";
+          if (errorCode3 === "refresh_token_not_found" ||
+              errorMessage3.includes("refresh_token_not_found") ||
+              errorMessage3.includes("refresh token not found") ||
+              errorMessage3.includes("invalid refresh token") ||
+              errorMessage3.includes("jwt expired")) {
             // Expected error - redirect to maintenance
             return NextResponse.redirect(new URL("/maintenance", request.url));
           }
