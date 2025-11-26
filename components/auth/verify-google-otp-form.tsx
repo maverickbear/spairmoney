@@ -364,8 +364,40 @@ export function VerifyGoogleOtpForm() {
         localStorage.setItem("lastAuthMethod", "google");
       }
 
+      // Wait additional time to ensure session is fully propagated to Supabase backend
+      // This is critical to avoid "Session not found" errors when calling getUserClient()
+      console.log("[GOOGLE-OTP] Waiting for session to propagate to Supabase backend...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Verify session one more time before preloading data
+      const { data: { user: verifyUser }, error: verifyError } = await supabase.auth.getUser();
+      if (verifyError || !verifyUser) {
+        console.warn("[GOOGLE-OTP] Session verification failed before preload, retrying...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       // Preload user and plan data
-      await preloadUserData();
+      // Wrap in try-catch to handle "Session not found" errors gracefully
+      try {
+        await preloadUserData();
+      } catch (preloadError: any) {
+        // If it's a session error, wait a bit more and try again
+        if (preloadError?.message?.includes("Session not found") || 
+            preloadError?.message?.includes("session") ||
+            preloadError?.status === 401) {
+          console.warn("[GOOGLE-OTP] Session not ready for preload, waiting and retrying...");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            await preloadUserData();
+          } catch (retryError) {
+            console.warn("[GOOGLE-OTP] Preload failed on retry, but continuing with redirect:", retryError);
+            // Continue anyway - data will be loaded on the dashboard
+          }
+        } else {
+          console.warn("[GOOGLE-OTP] Preload error (non-session):", preloadError);
+          // Continue anyway - data will be loaded on the dashboard
+        }
+      }
 
       // Wait a bit more to ensure cookies are fully persisted before redirect
       // This is especially important in production where cookie settings are stricter

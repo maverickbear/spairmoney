@@ -36,19 +36,55 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Create server client with proper cookie handling for PKCE
+    // The code verifier should be in cookies if using @supabase/ssr correctly
+    // The createServerClient function reads cookies automatically via @supabase/ssr
     const supabase = await createServerClient();
+
+    // Debug: Check if code verifier cookie exists (for troubleshooting)
+    // The cookie name format is: sb-{project-ref}-auth-code-verifier
+    const cookieStore = await import("next/headers").then(m => m.cookies());
+    const allCookies = cookieStore.getAll();
+    const hasCodeVerifierCookie = allCookies.some(cookie => 
+      cookie.name.includes("auth-code-verifier") || 
+      cookie.name.includes("code-verifier")
+    );
+    
+    if (!hasCodeVerifierCookie) {
+      console.warn("[OAUTH-CALLBACK] Code verifier cookie not found in request cookies");
+      console.log("[OAUTH-CALLBACK] Available cookies:", allCookies.map(c => c.name).join(", "));
+    }
 
     // Exchange the code for a session temporarily to get user info
     // We'll sign out and require OTP verification before final login
+    // Note: exchangeCodeForSession requires the code verifier from cookies for PKCE flow
+    // The @supabase/ssr package should automatically read the code verifier from cookies
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError || !data.session || !data.user) {
-      console.error("[OAUTH-CALLBACK] Error exchanging code for session:", exchangeError);
+      console.error("[OAUTH-CALLBACK] Error exchanging code for session:", {
+        error: exchangeError?.message,
+        code: exchangeError?.code,
+        status: exchangeError?.status,
+        // Log if it's a PKCE error
+        isPkceError: exchangeError?.message?.includes("code verifier") || exchangeError?.message?.includes("pkce"),
+      });
+      
+      // If it's a PKCE error, the code verifier might not be in cookies
+      // This can happen if the OAuth flow was initiated from a different domain or session
+      const isPkceError = exchangeError?.message?.includes("code verifier") || 
+                         exchangeError?.message?.includes("pkce") ||
+                         exchangeError?.message?.includes("non-empty");
+      
       const redirectUrl = new URL("/auth/login", requestUrl.origin);
       redirectUrl.searchParams.set("error", "exchange_failed");
-      if (exchangeError?.message) {
+      
+      if (isPkceError) {
+        redirectUrl.searchParams.set("error_description", "Authentication session expired. Please try signing in again.");
+      } else if (exchangeError?.message) {
         redirectUrl.searchParams.set("error_description", exchangeError.message);
       }
+      
       return NextResponse.redirect(redirectUrl);
     }
 

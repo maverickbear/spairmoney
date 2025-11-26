@@ -16,7 +16,37 @@ export async function getUserClient(): Promise<{
     trialStartDate?: string | null;
   } | null;
 }> {
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  // Retry logic for session establishment (handles "Session not found" errors)
+  let authUser = null;
+  let authError = null;
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts && (!authUser || authError)) {
+    const result = await supabase.auth.getUser();
+    authUser = result.data.user;
+    authError = result.error;
+
+    // If it's a session error, retry after a delay
+    if (authError && (
+      authError.message?.includes("Session not found") ||
+      authError.message?.includes("session") ||
+      authError.status === 401
+    )) {
+      attempts++;
+      if (attempts < maxAttempts) {
+        console.warn(`[getUserClient] Session not ready (attempt ${attempts}/${maxAttempts}), retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+    } else if (authError || !authUser) {
+      // Non-session error or no user, don't retry
+      break;
+    } else {
+      // Success, break out of loop
+      break;
+    }
+  }
 
   if (authError || !authUser) {
     return { user: null, plan: null, subscription: null };

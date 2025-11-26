@@ -311,8 +311,40 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         return;
       }
 
+      // Wait additional time to ensure session is fully propagated to Supabase backend
+      // This is critical to avoid "Session not found" errors when calling getUserClient()
+      console.log("[LOGIN-OTP] Waiting for session to propagate to Supabase backend...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Verify session one more time before preloading data
+      const { data: { user: verifyUser }, error: verifyError } = await supabase.auth.getUser();
+      if (verifyError || !verifyUser) {
+        console.warn("[LOGIN-OTP] Session verification failed before preload, retrying...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       // Preload user and plan data while showing loading
-      await preloadUserData();
+      // Wrap in try-catch to handle "Session not found" errors gracefully
+      try {
+        await preloadUserData();
+      } catch (preloadError: any) {
+        // If it's a session error, wait a bit more and try again
+        if (preloadError?.message?.includes("Session not found") || 
+            preloadError?.message?.includes("session") ||
+            preloadError?.status === 401) {
+          console.warn("[LOGIN-OTP] Session not ready for preload, waiting and retrying...");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            await preloadUserData();
+          } catch (retryError) {
+            console.warn("[LOGIN-OTP] Preload failed on retry, but continuing with redirect:", retryError);
+            // Continue anyway - data will be loaded on the dashboard
+          }
+        } else {
+          console.warn("[LOGIN-OTP] Preload error (non-session):", preloadError);
+          // Continue anyway - data will be loaded on the dashboard
+        }
+      }
 
       // Always redirect to dashboard after login
       // Use window.location.replace with cache-busting to ensure fresh page load
