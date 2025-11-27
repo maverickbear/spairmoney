@@ -1,12 +1,34 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Bundle analyzer
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
 
+// Get version from package.json
+let appVersion = '0.0.0';
+try {
+  const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'));
+  appVersion = packageJson.version;
+} catch (error) {
+  console.warn('Could not read version from package.json:', error);
+}
+
+// Generate build number from timestamp (unique for each build)
+const buildTimestamp = new Date().toISOString();
+const buildNumber = Math.floor(Date.now() / 1000); // Unix timestamp as build number
+
 const nextConfig: NextConfig = {
+  // Inject version and build metadata as environment variables
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_BUILD_NUMBER: buildNumber.toString(),
+    NEXT_PUBLIC_BUILD_TIMESTAMP: buildTimestamp,
+    NEXT_PUBLIC_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || '',
+  },
   /* config options here */
   // Improve compatibility with React 19 and Next.js 16
   reactStrictMode: true,

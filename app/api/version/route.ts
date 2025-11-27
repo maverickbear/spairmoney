@@ -1,0 +1,27 @@
+import { NextResponse } from 'next/server';
+import { getVersionInfo } from '@/lib/utils/version';
+
+/**
+ * API route to get the current application version and build metadata
+ * GET /api/version
+ */
+export async function GET() {
+  try {
+    const versionInfo = getVersionInfo();
+    
+    return NextResponse.json({
+      success: true,
+      ...versionInfo,
+    });
+  } catch (error) {
+    console.error('Error getting version info:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to get version information',
+      },
+      { status: 500 }
+    );
+  }
+}
+
