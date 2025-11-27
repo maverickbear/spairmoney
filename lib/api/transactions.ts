@@ -24,16 +24,36 @@ import {
 import { createDebt } from "@/lib/api/debts";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 
-export async function createTransaction(data: TransactionFormData) {
+export async function createTransaction(data: TransactionFormData, providedUserId?: string) {
     const supabase = await createServerClient();
 
   // Get current user and validate transaction limit
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error("Unauthorized");
-  }
+  // If userId is provided (for server-side operations like Plaid sync), use it directly
+  // Otherwise, get it from the authenticated session
+  let userId: string;
   
-  const userId = user.id;
+  if (providedUserId) {
+    // Server-side operation (e.g., Plaid sync, background jobs)
+    // Validate that the account belongs to this user for security
+    const { data: account } = await supabase
+      .from('Account')
+      .select('userId')
+      .eq('id', data.accountId)
+      .single();
+    
+    if (!account || account.userId !== providedUserId) {
+      throw new Error("Unauthorized: Account does not belong to user");
+    }
+    
+    userId = providedUserId;
+  } else {
+    // Client-side operation - require authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
+    userId = user.id;
+  }
 
   // Check transaction limit before creating (still check here for early validation)
   const limitGuard = await guardTransactionLimit(userId, data.date instanceof Date ? data.date : new Date(data.date));

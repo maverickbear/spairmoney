@@ -48,9 +48,10 @@ export async function syncAccountTransactions(
     // We need itemId to update the cursor, and we get it from the account
     // Also get account type to determine transaction type correctly
     // Get householdId for TransactionSync records
+    // Get userId to pass to createTransaction for server-side operations
     const { data: account } = await supabase
       .from('Account')
-      .select('plaidItemId, type, householdId')
+      .select('plaidItemId, type, householdId, userId')
       .eq('id', accountId)
       .single();
 
@@ -557,7 +558,8 @@ export async function syncAccountTransactions(
         });
 
         // Create transaction
-        const transaction = await createTransaction(transactionData);
+        // Pass userId for server-side operations (bypasses auth check)
+        const transaction = await createTransaction(transactionData, account?.userId || undefined);
         
         // Handle case where createTransaction returns { outgoing, incoming } for transfers
         // or a single transaction object
@@ -698,7 +700,8 @@ export async function syncAccountTransactions(
             recurring: false,
           };
 
-          const transaction = await createTransaction(transactionData);
+          // Pass userId for server-side operations (bypasses auth check)
+          const transaction = await createTransaction(transactionData, account?.userId || undefined);
           const transactionId = (transaction as any).id || (transaction as any).outgoing?.id || null;
           
           if (transactionId) {

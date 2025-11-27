@@ -214,7 +214,7 @@ async function processPlaidSyncJob(supabase: any, job: any) {
 }
 
 async function processCsvImportJob(supabase: any, job: any) {
-  const { metadata } = job;
+  const { metadata, userId } = job;
   const transactions = metadata?.transactions || [];
 
   if (!transactions || transactions.length === 0) {
@@ -246,7 +246,8 @@ async function processCsvImportJob(supabase: any, job: any) {
         };
 
         const validatedData = transactionSchema.parse(data);
-        await createTransaction(validatedData);
+        // Pass userId for server-side operations (bypasses auth check)
+        await createTransaction(validatedData, userId);
         synced++;
       } catch (error) {
         errors++;

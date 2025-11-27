@@ -394,7 +394,8 @@ async function processTransaction(
   };
 
   // Create transaction
-  const transaction = await createTransaction(transactionData);
+  // Pass userId for server-side operations (bypasses auth check)
+  const transaction = await createTransaction(transactionData, userId || undefined);
   const transactionId = (transaction as any).id || (transaction as any).outgoing?.id || null;
   
   if (!transactionId) {
