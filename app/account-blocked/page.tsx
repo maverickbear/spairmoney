@@ -3,6 +3,8 @@ import { Shield, Mail, AlertCircle } from "lucide-react";
 import { getCurrentUser } from "@/lib/api/auth";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: "Account Blocked - Spare Finance",
   description: "Your account has been blocked. Please contact support for assistance.",

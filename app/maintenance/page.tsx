@@ -2,6 +2,8 @@ import { LandingHeader } from "@/components/landing/landing-header";
 import { Wrench, Clock } from "lucide-react";
 import { getCurrentUser } from "@/lib/api/auth";
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: "Maintenance - Spare Finance",
   description: "We are currently under maintenance. We'll be back soon.",
