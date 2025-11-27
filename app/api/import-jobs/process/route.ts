@@ -11,7 +11,7 @@ const MAX_JOBS_PER_RUN = 5;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_BASE_MS = 60000; // 1 minute base delay
 
-export async function POST(req: NextRequest) {
+async function processImportJobs(req: NextRequest) {
   try {
     // Security: Check for secret header, cron job authentication, or authenticated user
     const authHeader = req.headers.get('authorization');
@@ -153,6 +153,15 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Support both GET (for Vercel cron jobs) and POST (for manual triggers)
+export async function GET(req: NextRequest) {
+  return processImportJobs(req);
+}
+
+export async function POST(req: NextRequest) {
+  return processImportJobs(req);
 }
 
 async function processPlaidSyncJob(supabase: any, job: any) {
