@@ -10,6 +10,7 @@ import { BaseSubscription, BasePlan, BaseSubscriptionData, BaseLimitCheckResult,
 import { SUBSCRIPTION_CACHE_TTL, PLANS_CACHE_TTL } from "../../domain/subscriptions/subscriptions.constants";
 import { getDefaultFeatures } from "@/lib/utils/plan-features";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { createServerClient } from "../../infrastructure/database/supabase-server";
 
 // In-memory caches
 const plansCache = new Map<string, BasePlan>();
@@ -164,7 +165,6 @@ export class SubscriptionsService {
    */
   async getCurrentUserSubscriptionData(): Promise<BaseSubscriptionData> {
     try {
-      const { createServerClient } = await import("../../infrastructure/database/supabase-server");
       const supabase = await createServerClient();
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
@@ -193,7 +193,6 @@ export class SubscriptionsService {
   async checkTransactionLimit(userId: string, month: Date = new Date()): Promise<BaseLimitCheckResult> {
     try {
       const { limits } = await this.getUserSubscriptionData(userId);
-      const { createServerClient } = await import("../../infrastructure/database/supabase-server");
       const supabase = await createServerClient();
       
       const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -257,7 +256,6 @@ export class SubscriptionsService {
   async checkAccountLimit(userId: string): Promise<BaseLimitCheckResult> {
     try {
       const { limits } = await this.getUserSubscriptionData(userId);
-      const { createServerClient } = await import("../../infrastructure/database/supabase-server");
       const supabase = await createServerClient();
       
       const [accountOwnersResult, directAccountsResult] = await Promise.all([
@@ -386,7 +384,6 @@ export class SubscriptionsService {
           let fullSubscription: BaseSubscription | null = null;
           if (userCache.effectiveSubscriptionId) {
             // Fetch full subscription if needed
-            const { createServerClient } = await import("../../infrastructure/database/supabase-server");
             const supabase = await createServerClient();
             const { data: subscriptionData } = await supabase
               .from("Subscription")
