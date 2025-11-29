@@ -260,7 +260,7 @@ export function ExpensesByCategoryWidget({
                             {formatMoneyCompact(item.value)}
                           </span>
                         </div>
-                        <TooltipContent side="right" className="!bg-popover !text-popover-foreground border border-border !whitespace-normal w-[160px] !px-2.5 !py-2 !z-[9999]">
+                        <TooltipContent side="left" className="!bg-popover !text-popover-foreground border border-border !whitespace-normal w-[160px] !px-2.5 !py-2 !z-[9999]">
                           <div className="space-y-1">
                             <div className="font-medium text-xs">{item.name}</div>
                             <div className="text-[11px] space-y-0.5">

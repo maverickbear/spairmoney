@@ -192,8 +192,12 @@ export class AccountsRepository {
   /**
    * Get account owners
    */
-  async getAccountOwners(accountId: string): Promise<AccountOwnerRow[]> {
-    const supabase = await createServerClient();
+  async getAccountOwners(
+    accountId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<AccountOwnerRow[]> {
+    const supabase = await createServerClient(accessToken, refreshToken);
 
     const { data: owners, error } = await supabase
       .from("AccountOwner")
@@ -248,13 +252,18 @@ export class AccountsRepository {
   /**
    * Get transactions for account balance calculation
    */
-  async getTransactionsForBalance(accountIds: string[], endDate: Date): Promise<Array<{
+  async getTransactionsForBalance(
+    accountIds: string[],
+    endDate: Date,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<{
     accountId: string;
     type: string;
     amount: unknown;
     date: string;
   }>> {
-    const supabase = await createServerClient();
+    const supabase = await createServerClient(accessToken, refreshToken);
 
     const { data: transactions, error } = await supabase
       .from("Transaction")

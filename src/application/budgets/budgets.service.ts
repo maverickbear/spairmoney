@@ -29,7 +29,7 @@ export class BudgetsService {
     const supabase = await createServerClient(accessToken, refreshToken);
 
     // Ensure recurring budgets are created for this period
-    await this.ensureRecurringBudgetsForPeriod(period, supabase);
+    await this.ensureRecurringBudgetsForPeriod(period, supabase, accessToken, refreshToken);
 
     // Fetch budgets
     const rows = await this.repository.findAllByPeriod(period, accessToken, refreshToken);
@@ -293,7 +293,9 @@ export class BudgetsService {
    */
   private async ensureRecurringBudgetsForPeriod(
     period: Date,
-    supabase: any
+    supabase: any,
+    accessToken?: string,
+    refreshToken?: string
   ): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -302,7 +304,7 @@ export class BudgetsService {
     const targetPeriodStr = formatTimestamp(targetPeriod);
 
     // Get recurring budgets before this period
-    const recurringBudgets = await this.repository.findRecurringBudgetsBeforePeriod(targetPeriod, user.id);
+    const recurringBudgets = await this.repository.findRecurringBudgetsBeforePeriod(targetPeriod, user.id, accessToken, refreshToken);
 
     if (recurringBudgets.length === 0) {
       return;

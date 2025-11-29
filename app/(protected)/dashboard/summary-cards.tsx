@@ -147,7 +147,7 @@ export function SummaryCards({
 
   return (
     <>
-      <div className="grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-4">
         {/* Primary Color Card - Left Side */}
         <Card 
           className="md:col-span-1 bg-primary border-primary text-primary-foreground cursor-pointer transition-all"
@@ -189,10 +189,53 @@ export function SummaryCards({
           </CardContent>
         </Card>
 
-        {/* Three White Cards - Right Side */}
-        <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-          {/* Total Income Card */}
-          <Card className="cursor-pointer transition-all" onClick={() => {
+        {/* Total Savings Card */}
+        <Card className="cursor-pointer transition-all">
+            <CardContent className="p-4 md:p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <Wallet className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="text-xs text-muted-foreground">Total Savings</div>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground">
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => router.push("/goals")}>
+                      View Goals
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              
+              {/* Amount */}
+              <div className="text-xl md:text-2xl font-bold mb-2">
+                {formatMoney(savings)}
+              </div>
+
+              {/* Percentage Change Tag */}
+              <div className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium mb-1",
+                savingsChange >= 0 
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              )}>
+                <TrendingUp className={cn(
+                  "h-3 w-3",
+                  savingsChange >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400 rotate-180"
+                )} />
+                {savingsChange >= 0 ? "+" : ""}{savingsChange.toFixed(2)}%
+              </div>
+            </CardContent>
+          </Card>
+
+        {/* Total Income Card */}
+        <Card className="cursor-pointer transition-all" onClick={() => {
             router.push(`/transactions?type=income&startDate=${startDateStr}&endDate=${endDateStr}`);
           }}>
             <CardContent className="p-4 md:p-5">
@@ -254,8 +297,8 @@ export function SummaryCards({
             </CardContent>
           </Card>
 
-          {/* Total Expense Card */}
-          <Card className="cursor-pointer transition-all" onClick={() => {
+        {/* Total Expense Card */}
+        <Card className="cursor-pointer transition-all" onClick={() => {
             router.push(`/transactions?type=expense&startDate=${startDateStr}&endDate=${endDateStr}`);
           }}>
             <CardContent className="p-4 md:p-5">
@@ -311,52 +354,6 @@ export function SummaryCards({
               )}
             </CardContent>
           </Card>
-
-          {/* Total Savings Card */}
-          <Card className="cursor-pointer transition-all">
-            <CardContent className="p-4 md:p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                    <Wallet className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="text-xs text-muted-foreground">Total Savings</div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="text-muted-foreground hover:text-foreground">
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => router.push("/goals")}>
-                      View Goals
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              
-              {/* Amount */}
-              <div className="text-xl md:text-2xl font-bold mb-2">
-                {formatMoney(savings)}
-              </div>
-
-              {/* Percentage Change Tag */}
-              <div className={cn(
-                "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium mb-1",
-                savingsChange >= 0 
-                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-              )}>
-                <TrendingUp className={cn(
-                  "h-3 w-3",
-                  savingsChange >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400 rotate-180"
-                )} />
-                {savingsChange >= 0 ? "+" : ""}{savingsChange.toFixed(2)}%
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       <AccountsBreakdownModal

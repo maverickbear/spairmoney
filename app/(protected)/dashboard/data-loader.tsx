@@ -37,19 +37,28 @@ interface DashboardData {
 }
 
 async function loadDashboardDataInternal(
-  selectedMonthDate: Date, 
+  selectedMonthDate: Date,
+  startDate: Date,
+  endDate: Date,
   userId: string | null,
   accessToken?: string,
   refreshToken?: string
 ): Promise<DashboardData> {
-  // Ensure we're working with the start of the month
-  const selectedMonth = startOfMonth(selectedMonthDate);
-  const selectedMonthEnd = endOfMonth(selectedMonth);
-  const lastMonth = subMonths(selectedMonth, 1);
+  // Use provided date range for selected period
+  const selectedMonth = startDate;
+  const selectedMonthEnd = endDate;
+  
+  // Calculate last month for comparison
+  // For month-based ranges, use the previous month
+  // For day-based ranges (60/90 days), use the month before the start date
+  const startMonth = startOfMonth(selectedMonthDate);
+  const lastMonth = subMonths(startMonth, 1);
   const lastMonthEnd = endOfMonth(lastMonth);
-  const sixMonthsAgo = subMonths(selectedMonth, 5);
+  
+  // For chart, use 6 months back from the end date
+  const sixMonthsAgo = subMonths(endDate, 5);
   const chartStart = startOfMonth(sixMonthsAgo);
-  const chartEnd = endOfMonth(selectedMonth);
+  const chartEnd = endDate;
 
   // Import internal functions that accept tokens
   const { getTransactionsInternal } = await import('@/lib/api/transactions');
@@ -420,7 +429,11 @@ async function loadDashboardDataInternal(
 
 // Load dashboard data with caching
 // Cache is invalidated when transactions, budgets, goals, or accounts change
-export async function loadDashboardData(selectedMonthDate: Date): Promise<DashboardData> {
+export async function loadDashboardData(
+  selectedMonthDate: Date,
+  startDate: Date,
+  endDate: Date
+): Promise<DashboardData> {
   // Get userId and session tokens BEFORE caching (cookies can't be accessed inside unstable_cache)
   const userId = await getCurrentUserId();
   
@@ -451,13 +464,16 @@ export async function loadDashboardData(selectedMonthDate: Date): Promise<Dashbo
   
   try {
     // Use centralized cache manager with proper tags
+    // Include date range in cache key to ensure different ranges are cached separately
     const cacheKey = generateCacheKey.dashboard({
       userId: userId || undefined,
       month: selectedMonthDate,
+      startDate: startDate,
+      endDate: endDate,
     });
     
     return await withCache(
-      async () => loadDashboardDataInternal(selectedMonthDate, userId, accessToken, refreshToken),
+      async () => loadDashboardDataInternal(selectedMonthDate, startDate, endDate, userId, accessToken, refreshToken),
       {
         key: cacheKey,
         tags: [

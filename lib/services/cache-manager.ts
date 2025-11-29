@@ -84,11 +84,29 @@ export const generateCacheKey = {
   /**
    * Generate cache key for dashboard
    */
-  dashboard: (params: { userId?: string; month?: Date }) => {
+  dashboard: (params: { 
+    userId?: string; 
+    month?: Date;
+    startDate?: string | Date;
+    endDate?: string | Date;
+  }) => {
     const parts = ['dashboard'];
     if (params.userId) parts.push(params.userId);
     if (params.month) {
       parts.push(`${params.month.getFullYear()}-${params.month.getMonth()}`);
+    }
+    // Include date range if provided (for 60/90 days ranges)
+    if (params.startDate) {
+      const startDateStr = params.startDate instanceof Date 
+        ? params.startDate.toISOString().split('T')[0]
+        : params.startDate.split('T')[0];
+      parts.push(`start:${startDateStr}`);
+    }
+    if (params.endDate) {
+      const endDateStr = params.endDate instanceof Date 
+        ? params.endDate.toISOString().split('T')[0]
+        : params.endDate.split('T')[0];
+      parts.push(`end:${endDateStr}`);
     }
     return parts.join(':');
   },

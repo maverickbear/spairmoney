@@ -103,7 +103,7 @@ export class AccountsService {
 
     // Get transactions for balance calculation
     const accountIds = accountRows.map(row => row.id);
-    const transactions = await this.repository.getTransactionsForBalance(accountIds, todayEnd);
+    const transactions = await this.repository.getTransactionsForBalance(accountIds, todayEnd, accessToken, refreshToken);
 
     // Calculate balances using optimized service
     const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
@@ -142,7 +142,7 @@ export class AccountsService {
     // Get account owners
     const accountOwnersMap = new Map<string, string[]>();
     for (const account of accountRows) {
-      const owners = await this.repository.getAccountOwners(account.id);
+      const owners = await this.repository.getAccountOwners(account.id, accessToken, refreshToken);
       accountOwnersMap.set(account.id, owners.map(o => o.ownerId));
     }
 

@@ -8,6 +8,7 @@ import { DashboardRealtime } from "@/components/dashboard/dashboard-realtime";
 import { DashboardUpdateChecker } from "@/components/dashboard/dashboard-update-checker";
 import { UrlCleanup } from "@/components/common/url-cleanup";
 import { startServerPagePerformance } from "@/lib/utils/performance";
+import { startOfMonth, endOfMonth, subMonths, subDays } from "date-fns";
 
 // Force dynamic rendering since this page uses cookies for authentication
 export const dynamic = 'force-dynamic';
@@ -16,12 +17,65 @@ export const dynamic = 'force-dynamic';
 const FinancialOverviewPage = nextDynamic(() => import("./financial-overview-page").then(m => ({ default: m.FinancialOverviewPage })), { ssr: true });
 const OnboardingWidget = nextDynamic(() => import("@/components/dashboard/onboarding-widget").then(m => ({ default: m.OnboardingWidget })), { ssr: true });
 
+type DateRange = "this-month" | "last-month" | "last-60-days" | "last-90-days";
+
 interface DashboardProps {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; range?: string }>;
 }
 
-async function DashboardContent({ selectedMonthDate }: { selectedMonthDate: Date }) {
-  const data = await loadDashboardData(selectedMonthDate);
+function calculateDateRange(range: DateRange): { startDate: Date; endDate: Date; selectedMonthDate: Date } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  let startDate: Date;
+  let endDate: Date;
+  let selectedMonthDate: Date;
+  
+  switch (range) {
+    case "this-month":
+      startDate = startOfMonth(today);
+      endDate = endOfMonth(today);
+      selectedMonthDate = startDate;
+      break;
+    case "last-month":
+      const lastMonth = subMonths(today, 1);
+      startDate = startOfMonth(lastMonth);
+      endDate = endOfMonth(lastMonth);
+      selectedMonthDate = startDate;
+      break;
+    case "last-60-days":
+      endDate = new Date(today);
+      endDate.setHours(23, 59, 59, 999);
+      startDate = subDays(today, 59);
+      startDate.setHours(0, 0, 0, 0);
+      selectedMonthDate = startDate; // Use start date for compatibility
+      break;
+    case "last-90-days":
+      endDate = new Date(today);
+      endDate.setHours(23, 59, 59, 999);
+      startDate = subDays(today, 89);
+      startDate.setHours(0, 0, 0, 0);
+      selectedMonthDate = startDate; // Use start date for compatibility
+      break;
+    default:
+      startDate = startOfMonth(today);
+      endDate = endOfMonth(today);
+      selectedMonthDate = startDate;
+  }
+  
+  return { startDate, endDate, selectedMonthDate };
+}
+
+async function DashboardContent({ 
+  selectedMonthDate, 
+  startDate, 
+  endDate 
+}: { 
+  selectedMonthDate: Date;
+  startDate: Date;
+  endDate: Date;
+}) {
+  const data = await loadDashboardData(selectedMonthDate, startDate, endDate);
 
   return (
     <>
@@ -55,19 +109,15 @@ async function DashboardContent({ selectedMonthDate }: { selectedMonthDate: Date
 export default async function Dashboard({ searchParams }: DashboardProps) {
   const perf = startServerPagePerformance("Dashboard");
   
-  // Get selected month from URL or use current month
+  // Get selected range from URL or default to "this-month"
   const params = await Promise.resolve(searchParams);
-  const selectedMonthParam = params?.month;
-  const selectedMonthDate = selectedMonthParam 
-    ? (() => {
-        // Parse YYYY-MM-DD format and create date in local timezone
-        const [year, month, day] = selectedMonthParam.split('-').map(Number);
-        return new Date(year, month - 1, day);
-      })()
-    : new Date();
-
-  // Ensure we're using the start of the month for consistency
-  const selectedMonth = new Date(selectedMonthDate.getFullYear(), selectedMonthDate.getMonth(), 1);
+  const rangeParam = params?.range as DateRange | undefined;
+  const validRange: DateRange = rangeParam && ["this-month", "last-month", "last-60-days", "last-90-days"].includes(rangeParam)
+    ? rangeParam
+    : "this-month";
+  
+  // Calculate date range based on selection
+  const { startDate, endDate, selectedMonthDate } = calculateDateRange(validRange);
   
   // Get user profile to personalize the header
   const profile = await getProfile();
@@ -90,7 +140,11 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
 
       <div className="w-full p-4 lg:p-8">
         <Suspense fallback={null}>
-          <DashboardContent selectedMonthDate={selectedMonth} />
+          <DashboardContent 
+            selectedMonthDate={selectedMonthDate}
+            startDate={startDate}
+            endDate={endDate}
+          />
         </Suspense>
       </div>
     </div>

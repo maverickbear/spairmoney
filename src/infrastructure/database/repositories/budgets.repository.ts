@@ -173,9 +173,11 @@ export class BudgetsRepository {
    */
   async findRecurringBudgetsBeforePeriod(
     period: Date,
-    userId: string
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
   ): Promise<BudgetRow[]> {
-    const supabase = await createServerClient();
+    const supabase = await createServerClient(accessToken, refreshToken);
 
     const periodStr = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}-01 00:00:00`;
 

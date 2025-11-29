@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
 import { TrendingUp, Shield, Zap } from "lucide-react";
 import { Logo } from "@/components/common/logo";
@@ -16,7 +17,9 @@ function LoginFormWrapper() {
         <div className="relative z-10 space-y-8">
           <div className="space-y-4">
             <div className="flex items-center">
-              <Logo variant="wordmark" color="auto" width={150} height={40} priority />
+              <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
+                <Logo variant="wordmark" color="auto" width={150} height={40} priority />
+              </Link>
             </div>
             <p className="text-lg text-muted-foreground max-w-md">
               Manage your personal finances intelligently and make more informed decisions about your money.
@@ -69,7 +72,9 @@ function LoginFormWrapper() {
           {/* Mobile header */}
           <div className="lg:hidden text-center space-y-2">
             <div className="flex items-center justify-center mb-4">
-              <Logo variant="wordmark" color="auto" height={40} priority />
+              <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
+                <Logo variant="wordmark" color="auto" height={40} priority />
+              </Link>
             </div>
             <p className="text-muted-foreground text-sm">
               Sign in to your account to continue
