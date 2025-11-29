@@ -74,6 +74,9 @@ async function ReportsContentWrapper({ period }: { period: ReportPeriod }) {
       portfolioSummary={data.portfolioSummary}
       portfolioHoldings={data.portfolioHoldings}
       portfolioHistorical={data.portfolioHistorical}
+      netWorth={data.netWorth}
+      cashFlow={data.cashFlow}
+      trends={data.trends}
       now={now}
       period={period}
       dateRange={dateRange}
@@ -164,6 +167,7 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
         <FixedTabsWrapper>
           <SimpleTabsList className="flex-wrap">
             <SimpleTabsTrigger value="overview">Overview</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="net-worth">Net Worth</SimpleTabsTrigger>
             <SimpleTabsTrigger value="income-expenses">Income & Expenses</SimpleTabsTrigger>
             <SimpleTabsTrigger value="investments">Investments</SimpleTabsTrigger>
             <SimpleTabsTrigger value="debts">Debts</SimpleTabsTrigger>
@@ -188,6 +192,9 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
             <SimpleTabsList className="min-w-max px-4" style={{ scrollSnapAlign: 'start' }}>
               <SimpleTabsTrigger value="overview" className="flex-shrink-0 whitespace-nowrap">
                 Overview
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="net-worth" className="flex-shrink-0 whitespace-nowrap">
+                Net Worth
               </SimpleTabsTrigger>
               <SimpleTabsTrigger value="income-expenses" className="flex-shrink-0 whitespace-nowrap">
                 Income & Expenses

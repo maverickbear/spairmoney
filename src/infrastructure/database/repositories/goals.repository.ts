@@ -223,5 +223,34 @@ export class GoalsRepository {
 
     return goal as GoalRow;
   }
+
+  /**
+   * Find emergency fund goal by household ID
+   */
+  async findEmergencyFundGoal(
+    householdId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<GoalRow | null> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: goal, error } = await supabase
+      .from("Goal")
+      .select("*")
+      .eq("householdId", householdId)
+      .eq("name", "Emergency Funds")
+      .eq("isSystemGoal", true)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      logger.error("[GoalsRepository] Error fetching emergency fund goal:", error);
+      return null;
+    }
+
+    return goal as GoalRow | null;
+  }
 }
 

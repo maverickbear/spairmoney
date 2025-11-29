@@ -518,6 +518,7 @@ function mapPlan(data: any): Plan {
       hasBankIntegration: mergedFeatures.hasBankIntegration === true || mergedFeatures.hasBankIntegration === "true",
       hasHousehold: mergedFeatures.hasHousehold === true || mergedFeatures.hasHousehold === "true",
       hasBudgets: mergedFeatures.hasBudgets === true || mergedFeatures.hasBudgets === "true",
+      hasReceiptScanner: mergedFeatures.hasReceiptScanner === true || mergedFeatures.hasReceiptScanner === "true",
     };
   } catch {
     features = getDefaultFeatures();

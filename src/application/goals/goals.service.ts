@@ -456,5 +456,170 @@ export class GoalsService {
 
     return GoalsMapper.toDomain(goalRow);
   }
+
+  /**
+   * Calculate monthly expenses from last 3 months of expense transactions
+   */
+  async calculateMonthlyExpenses(
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<number> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+    const now = new Date();
+    const currentMonth = startOfMonth(now);
+    
+    // Get last 3 months
+    const months = eachMonthOfInterval({
+      start: subMonths(currentMonth, 3),
+      end: currentMonth,
+    });
+
+    const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
+
+    const monthlyExpenses = await Promise.all(
+      months.map(async (month) => {
+        const monthStart = startOfMonth(month);
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0, 23, 59, 59);
+
+        const { data: transactions } = await supabase
+          .from("Transaction")
+          .select("amount")
+          .eq("type", "expense")
+          .gte("date", formatDateStart(monthStart))
+          .lte("date", formatDateEnd(monthEnd));
+
+        if (!transactions) return 0;
+
+        const decryptedTransactions = decryptTransactionsBatch(transactions);
+        const monthExpenses = decryptedTransactions.reduce((sum: number, tx: any) => {
+          const amount = getTransactionAmount(tx.amount) || 0;
+          return sum + Math.abs(amount); // Ensure expenses are positive
+        }, 0);
+        
+        return monthExpenses;
+      })
+    );
+
+    // Calculate average
+    const totalExpenses = monthlyExpenses.reduce((sum, expenses) => sum + expenses, 0);
+    return monthlyExpenses.length > 0 ? totalExpenses / monthlyExpenses.length : 0;
+  }
+
+  /**
+   * Automatically calculate and update emergency fund goal based on income and expenses
+   * Uses predicted income if available, otherwise calculates from transactions
+   * Follows financial best practices: 6 months of expenses as target, 10-20% of income for savings
+   */
+  async calculateAndUpdateEmergencyFund(
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<BaseGoal | null> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      throw new Error("Unauthorized");
+    }
+
+    const householdId = await getActiveHouseholdId(user.id, accessToken, refreshToken);
+    if (!householdId) {
+      logger.warn("[GoalsService] No active household found for emergency fund calculation");
+      return null;
+    }
+
+    // Get or create emergency fund goal
+    let emergencyFundGoal = await this.repository.findEmergencyFundGoal(householdId, accessToken, refreshToken);
+    
+    if (!emergencyFundGoal) {
+      // Create emergency fund goal if it doesn't exist
+      const id = crypto.randomUUID();
+      const now = formatTimestamp(new Date());
+      
+      emergencyFundGoal = await this.repository.create({
+        id,
+        name: "Emergency Funds",
+        targetAmount: 0,
+        currentBalance: 0,
+        incomePercentage: 0,
+        priority: "High",
+        description: "Emergency fund for unexpected expenses",
+        isPaused: false,
+        isCompleted: false,
+        completedAt: null,
+        expectedIncome: null,
+        targetMonths: null,
+        accountId: null,
+        holdingId: null,
+        isSystemGoal: true,
+        userId: user.id,
+        householdId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // Calculate monthly income (use predicted/expected income if available)
+    const monthlyIncome = await this.calculateIncomeBasis(undefined, accessToken, refreshToken);
+    
+    // Calculate monthly expenses
+    const monthlyExpenses = await this.calculateMonthlyExpenses(accessToken, refreshToken);
+
+    // If we don't have enough data, return the goal as-is
+    if (monthlyIncome <= 0 && monthlyExpenses <= 0) {
+      logger.info("[GoalsService] Insufficient data to calculate emergency fund - income and expenses are both 0");
+      return GoalsMapper.toDomain(emergencyFundGoal);
+    }
+
+    // Use expenses to calculate target if available, otherwise use income as fallback
+    const targetMonthlyAmount = monthlyExpenses > 0 ? monthlyExpenses : monthlyIncome * 0.8; // Assume 80% of income as expenses if no expense data
+    const targetAmount = targetMonthlyAmount * 6; // 6 months of expenses (financial best practice)
+
+    // Calculate income percentage for savings
+    // Best practice: 10-20% of income for emergency fund savings, but ensure it's sustainable
+    // If income is low, use a smaller percentage to avoid hurting cost of living
+    let incomePercentage = 0;
+    
+    if (monthlyIncome > 0) {
+      // Calculate how much we need to save per month to reach target in reasonable time
+      const remainingAmount = Math.max(0, targetAmount - (emergencyFundGoal.currentBalance || 0));
+      
+      // Target: reach goal in 2-3 years (24-36 months) if not already reached
+      const targetMonths = remainingAmount > 0 ? 30 : 0; // 30 months average
+      const monthlyContributionNeeded = remainingAmount > 0 ? remainingAmount / targetMonths : 0;
+      
+      // Calculate percentage, but cap it at 20% to avoid hurting cost of living
+      // Also ensure minimum of 5% if income allows
+      const calculatedPercentage = (monthlyContributionNeeded / monthlyIncome) * 100;
+      
+      // Apply best practice constraints: 5% minimum, 20% maximum
+      // If calculated is too high, cap at 20%
+      // If calculated is too low but we have room, use at least 5%
+      incomePercentage = Math.max(5, Math.min(20, calculatedPercentage));
+      
+      // If the goal is already reached or very close, set to 0 or minimal amount
+      if (remainingAmount <= 0 || (emergencyFundGoal.currentBalance || 0) >= targetAmount * 0.95) {
+        incomePercentage = 0;
+      }
+    }
+
+    // Update the goal
+    const isCompleted = (emergencyFundGoal.currentBalance || 0) >= targetAmount;
+    
+    const updatedGoal = await this.repository.update(emergencyFundGoal.id, {
+      targetAmount,
+      incomePercentage,
+      targetMonths: 6, // 6 months target
+      isCompleted,
+      completedAt: isCompleted && !emergencyFundGoal.completedAt ? formatTimestamp(new Date()) : emergencyFundGoal.completedAt,
+      updatedAt: formatTimestamp(new Date()),
+    });
+
+    // Invalidate cache
+    invalidateGoalCaches();
+
+    logger.info(`[GoalsService] Updated emergency fund goal: target=${targetAmount.toFixed(2)}, incomePercentage=${incomePercentage.toFixed(2)}%, monthlyIncome=${monthlyIncome.toFixed(2)}, monthlyExpenses=${monthlyExpenses.toFixed(2)}`);
+
+    return GoalsMapper.toDomain(updatedGoal);
+  }
 }
 

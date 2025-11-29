@@ -23,9 +23,16 @@ function calculateTrialDaysRemaining(trialEndDate: string | null | undefined): n
 
 function calculateTrialProgress(trialStartDate: string | null | undefined, trialEndDate: string | null | undefined): number {
   if (!trialStartDate || !trialEndDate) return 0;
+  
   const startDate = new Date(trialStartDate);
   const endDate = new Date(trialEndDate);
   const now = new Date();
+  
+  // Validate dates
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return 0;
+  }
+  
   const totalDuration = endDate.getTime() - startDate.getTime();
   
   if (totalDuration <= 0) return 0;
@@ -33,11 +40,17 @@ function calculateTrialProgress(trialStartDate: string | null | undefined, trial
   // Calculate remaining time
   const remainingTime = endDate.getTime() - now.getTime();
   
+  // If trial has already ended, return 0
+  if (remainingTime <= 0) return 0;
+  
   // Calculate progress as percentage of remaining time
   // This way the slider starts at 100% and decreases as days pass
   const progress = (remainingTime / totalDuration) * 100;
   
-  return Math.min(100, Math.max(0, progress));
+  const clampedProgress = Math.min(100, Math.max(0, progress));
+  
+  // Return 0 if result is invalid
+  return isNaN(clampedProgress) ? 0 : clampedProgress;
 }
 
 export function TrialWidget({ 
@@ -48,7 +61,7 @@ export function TrialWidget({
   onUpgrade,
   planName 
 }: TrialWidgetProps) {
-  const [currentProgress, setCurrentProgress] = useState(initialProgress);
+  const [currentProgress, setCurrentProgress] = useState(initialProgress || 0);
   const router = useRouter();
 
   // Update progress dynamically
@@ -57,18 +70,33 @@ export function TrialWidget({
     const updateProgress = () => {
       if (trialStartDate && trialEndDate) {
         const newProgress = calculateTrialProgress(trialStartDate, trialEndDate);
-        setCurrentProgress(newProgress);
+        // Only update if we got a valid progress value (> 0)
+        // If calculation fails or returns 0 but initialProgress is valid, keep initialProgress
+        if (newProgress > 0) {
+          setCurrentProgress(newProgress);
+        } else if (initialProgress > 0) {
+          // Keep initialProgress if calculation fails
+          setCurrentProgress(initialProgress);
+        }
+      } else {
+        // Use initialProgress if dates are not available
+        setCurrentProgress(initialProgress || 0);
       }
     };
 
-    // Update immediately
+    // Initialize with initialProgress first
+    if (initialProgress !== undefined && initialProgress !== null) {
+      setCurrentProgress(initialProgress);
+    }
+
+    // Then try to recalculate if dates are available
     updateProgress();
 
     // Update every minute to keep it dynamic
     const interval = setInterval(updateProgress, 60000); // 60000ms = 1 minute
 
     return () => clearInterval(interval);
-  }, [trialStartDate, trialEndDate]);
+  }, [trialStartDate, trialEndDate, initialProgress]);
 
   const handleClick = () => {
     if (onUpgrade) {

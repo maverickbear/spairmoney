@@ -64,6 +64,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Recalculate emergency fund goal based on new income
+    try {
+      const accessToken = request.cookies.get("sb-access-token")?.value;
+      const refreshToken = request.cookies.get("sb-refresh-token")?.value;
+      
+      const { makeGoalsService } = await import("@/src/application/goals/goals.factory");
+      const goalsService = makeGoalsService();
+      await goalsService.calculateAndUpdateEmergencyFund(accessToken, refreshToken);
+    } catch (error) {
+      // Log but don't fail the request if emergency fund calculation fails
+      console.error("Error recalculating emergency fund:", error);
+    }
+
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error saving expected income:", error);

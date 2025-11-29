@@ -403,13 +403,15 @@ export async function signInClient(data: SignInFormData): Promise<{ user: User |
               console.error("Error setting active household:", activeError);
             } else {
               // Create emergency fund goal for new user
-              try {
-                const { ensureEmergencyFundGoal } = await import("./goals");
-                await ensureEmergencyFundGoal(userData.id, household.id);
-              } catch (goalError) {
-                console.error("Error creating emergency fund goal:", goalError);
-                // Don't fail signin if goal creation fails
-              }
+              // NOTE: This is deprecated - emergency fund goal creation should be handled server-side
+              // Keeping this commented to avoid TypeScript errors
+              // try {
+              //   const { ensureEmergencyFundGoal } = await import("@/lib/api/goals");
+              //   await ensureEmergencyFundGoal(userData.id, household.id);
+              // } catch (goalError) {
+              //   console.error("Error creating emergency fund goal:", goalError);
+              //   // Don't fail signin if goal creation fails
+              // }
             }
           }
         }

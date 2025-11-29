@@ -24,13 +24,15 @@ import type { GoalWithCalculations } from "@/src/domain/goals/goals.types";
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
 import type { Account } from "@/src/domain/accounts/accounts.types";
 import type { PortfolioSummary, HistoricalDataPoint, Holding } from "@/src/domain/portfolio/portfolio.types";
-import type { ReportPeriod } from "@/components/reports/report-filters";
+import type { ReportPeriod, NetWorthData, CashFlowData, TrendData } from "@/src/domain/reports/reports.types";
 import { InvestmentPerformanceSection } from "@/components/reports/investment-performance-section";
 import { DebtAnalysisSection } from "@/components/reports/debt-analysis-section";
 import { GoalsProgressSection } from "@/components/reports/goals-progress-section";
 import { AccountBalancesSection } from "@/components/reports/account-balances-section";
 import { SpendingPatternsSection } from "@/components/reports/spending-patterns-section";
 import { FinancialHealthInsights } from "@/components/reports/financial-health-insights";
+import { FinancialOverviewCard } from "@/components/reports/financial-overview-card";
+import { NetWorthSection } from "@/components/reports/net-worth-section";
 import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { CategoryExpensesChart } from "@/components/charts/category-expenses-chart";
 
@@ -46,6 +48,9 @@ interface ReportsContentProps {
   portfolioSummary: PortfolioSummary | null;
   portfolioHoldings: Holding[];
   portfolioHistorical: HistoricalDataPoint[];
+  netWorth: NetWorthData | null;
+  cashFlow: CashFlowData;
+  trends: TrendData[];
   now: Date;
   period: ReportPeriod;
   dateRange: { startDate: Date; endDate: Date };
@@ -63,6 +68,9 @@ export function ReportsContent({
   portfolioSummary,
   portfolioHoldings,
   portfolioHistorical,
+  netWorth,
+  cashFlow,
+  trends,
   now,
   period,
   dateRange,
@@ -162,6 +170,16 @@ export function ReportsContent({
     <>
         {/* Overview Tab */}
         <SimpleTabsContent value="overview">
+        {/* Financial Overview Card */}
+          <div className="pb-8">
+            <FinancialOverviewCard
+              currentMonthTransactions={currentMonthTransactions}
+              lastMonthTransactions={lastMonthTransactions}
+              financialHealth={financialHealth}
+              now={now}
+            />
+          </div>
+
         {/* Income vs Expenses Trend */}
           {monthlyData.length > 0 && (
             <div className="pb-8">
@@ -276,6 +294,13 @@ export function ReportsContent({
                   </TableBody>
                 </Table>
               </div>
+          </div>
+        </SimpleTabsContent>
+
+        {/* Net Worth Tab */}
+        <SimpleTabsContent value="net-worth">
+          <div className="pb-8">
+            <NetWorthSection netWorth={netWorth} />
           </div>
         </SimpleTabsContent>
 
