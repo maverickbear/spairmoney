@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { loadDashboardData } from "../dashboard/data-loader";
 import { startOfMonth } from "date-fns/startOfMonth";
+import { endOfMonth } from "date-fns/endOfMonth";
 import { SpareScoreInsightsPage } from "./insights-content";
 import { PageHeader } from "@/components/common/page-header";
 import { Loader2 } from "lucide-react";
@@ -11,7 +12,9 @@ export const dynamic = 'force-dynamic';
 
 async function InsightsContent() {
   const selectedMonthDate = startOfMonth(new Date());
-  const data = await loadDashboardData(selectedMonthDate);
+  const startDate = startOfMonth(selectedMonthDate);
+  const endDate = endOfMonth(selectedMonthDate);
+  const data = await loadDashboardData(selectedMonthDate, startDate, endDate);
 
   // Calculate current income and expenses
   const today = new Date();
