@@ -4,9 +4,78 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, AlertCircle, Mail, CheckCircle2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Loader2, AlertCircle, Mail, HelpCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
+import { setTrustedBrowser } from "@/lib/utils/trusted-browser";
+
+/**
+ * Preloads user, profile, and billing data into global caches
+ */
+async function preloadUserData() {
+  try {
+    const preloadPromises = [
+      // Preload user data and role for Nav using API routes
+      Promise.all([
+        fetch("/api/v2/user"),
+        fetch("/api/v2/members"),
+      ]).then(async ([userResponse, membersResponse]) => {
+        if (!userResponse.ok || !membersResponse.ok) return null;
+        const [userData, membersData] = await Promise.all([
+          userResponse.json(),
+          membersResponse.json(),
+        ]);
+        const userDataFormatted = {
+          user: userData.user,
+          plan: userData.plan,
+          subscription: userData.subscription,
+        };
+        const role = membersData.userRole;
+        if (typeof window !== 'undefined' && (window as any).navUserDataCache) {
+          (window as any).navUserDataCache.data = userDataFormatted;
+          (window as any).navUserDataCache.timestamp = Date.now();
+          (window as any).navUserDataCache.role = role;
+          (window as any).navUserDataCache.roleTimestamp = Date.now();
+        }
+        return userDataFormatted;
+      }).catch(() => null),
+      // Preload profile data using API route
+      fetch("/api/v2/profile").then(async (r) => {
+        if (!r.ok) return null;
+        const profile = await r.json();
+        if (typeof window !== 'undefined' && (window as any).profileDataCache) {
+          (window as any).profileDataCache.data = profile;
+          (window as any).profileDataCache.timestamp = Date.now();
+        }
+        return profile;
+      }).catch(() => null),
+      fetch("/api/billing/subscription", { cache: "no-store" }).then(async (r) => {
+        if (!r.ok) return null;
+        const subData = await r.json();
+        if (!subData) return null;
+        
+        const billingData = {
+          subscription: subData.subscription,
+          plan: subData.plan,
+          limits: subData.limits,
+          transactionLimit: null,
+          accountLimit: null,
+          interval: subData.interval || null,
+        };
+        if (typeof window !== 'undefined' && (window as any).billingDataCache) {
+          (window as any).billingDataCache.data = billingData;
+          (window as any).billingDataCache.timestamp = Date.now();
+        }
+        return billingData;
+      }).catch(() => null),
+    ];
+    await Promise.allSettled(preloadPromises);
+  } catch (preloadError) {
+    console.debug("Preload failed:", preloadError);
+  }
+}
 
 interface VerifyOtpFormProps {
   email?: string;
@@ -21,6 +90,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
+  const [trustBrowser, setTrustBrowser] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Get email from props or search params
@@ -31,6 +101,19 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
   const fromInvitation = searchParams.get("from_invitation") === "true";
   const invitationId = searchParams.get("invitationId") || undefined;
   const userId = searchParams.get("userId") || undefined;
+  
+  // Detect if this is a Google OAuth login
+  const oauthDataStr = searchParams.get("oauth_data") || "";
+  let oauthData: { name: string | null; avatarUrl: string | null; userId: string } | null = null;
+  const isGoogleOAuth = !!oauthDataStr;
+  
+  try {
+    if (oauthDataStr) {
+      oauthData = JSON.parse(decodeURIComponent(oauthDataStr));
+    }
+  } catch (e) {
+    console.error("Error parsing OAuth data:", e);
+  }
 
   // Note: Supabase automatically sends OTP when email confirmation is enabled
   // So we don't need to send it automatically on mount
@@ -124,15 +207,60 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       setError(null);
 
       // Verify OTP with Supabase
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token: otpCode,
-        type: "signup",
-      });
+      // For Google OAuth login, try multiple types. For signup, use "signup" type.
+      let data: any = null;
+      let verifyError: any = null;
+
+      if (isGoogleOAuth) {
+        // Try "email" type first, then "magiclink", then "recovery" as fallbacks
+        const emailResult = await supabase.auth.verifyOtp({
+          email,
+          token: otpCode,
+          type: "email",
+        });
+
+        if (emailResult.error) {
+          const magiclinkResult = await supabase.auth.verifyOtp({
+            email,
+            token: otpCode,
+            type: "magiclink",
+          });
+
+          if (magiclinkResult.error) {
+            const recoveryResult = await supabase.auth.verifyOtp({
+              email,
+              token: otpCode,
+              type: "recovery",
+            });
+
+            if (recoveryResult.error) {
+              verifyError = recoveryResult.error;
+            } else {
+              data = recoveryResult.data;
+            }
+          } else {
+            data = magiclinkResult.data;
+          }
+        } else {
+          data = emailResult.data;
+        }
+      } else {
+        // Signup flow - use "signup" type
+        const signupResult = await supabase.auth.verifyOtp({
+          email,
+          token: otpCode,
+          type: "signup",
+        });
+
+        if (signupResult.error) {
+          verifyError = signupResult.error;
+        } else {
+          data = signupResult.data;
+        }
+      }
 
       if (verifyError) {
         setError(verifyError.message || "Invalid verification code. Please try again.");
-        // Clear OTP on error
         setOtp(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
         return;
@@ -143,14 +271,208 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         return;
       }
 
-      // Check if email is confirmed
-      if (!data.user.email_confirmed_at) {
+      // For signup, check if email is confirmed
+      if (!isGoogleOAuth && !data.user.email_confirmed_at) {
         setError("Email verification failed. Please try again.");
         return;
       }
 
-      // Update user_metadata in Supabase Auth with name from User table
-      // This ensures Display name appears correctly in Supabase Auth dashboard
+      // For Google OAuth login, ensure session exists
+      if (isGoogleOAuth && !data.session) {
+        setError("Verification failed. Please try again.");
+        return;
+      }
+
+      // Handle Google OAuth login flow
+      if (isGoogleOAuth) {
+        // Wait a moment to ensure session is fully established
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Refresh session to ensure cookies are set correctly
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError) {
+          console.warn("Error refreshing session after OTP verification:", refreshError);
+        }
+
+        // Sync session with server
+        try {
+          const syncResponse = await fetch("/api/auth/sync-session", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (!syncResponse.ok) {
+            console.warn("Failed to sync session with server, but continuing...");
+          }
+        } catch (syncError) {
+          console.warn("Error syncing session with server:", syncError);
+        }
+
+        // Verify session is established
+        let currentUser = null;
+        let userError = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts && (!currentUser || userError)) {
+          const result = await supabase.auth.getUser();
+          currentUser = result.data.user;
+          userError = result.error;
+
+          if (userError || !currentUser) {
+            attempts++;
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } else {
+            break;
+          }
+        }
+        
+        if (userError || !currentUser) {
+          console.error("Session verification failed after", maxAttempts, "attempts:", userError);
+          setError("Failed to establish session. Please try again.");
+          return;
+        }
+
+        // Create or update user profile and household if OAuth data is available
+        if (oauthData && oauthData.userId === currentUser.id) {
+          try {
+            const createResponse = await fetch("/api/auth/create-user-profile", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                userId: oauthData.userId,
+                email: currentUser.email,
+                name: oauthData.name,
+                avatarUrl: oauthData.avatarUrl,
+              }),
+            });
+
+            if (createResponse.ok) {
+              // Create household and member if needed
+              try {
+                await fetch("/api/auth/create-household-member", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    ownerId: oauthData.userId,
+                    memberId: oauthData.userId,
+                    email: currentUser.email,
+                    name: oauthData.name,
+                  }),
+                });
+              } catch (householdError) {
+                console.error("Error creating household:", householdError);
+              }
+            }
+          } catch (profileError) {
+            console.error("Error creating user profile:", profileError);
+          }
+        }
+
+        // Check if user is blocked
+        try {
+          const { data: userData, error: userError } = await supabase
+            .from("User")
+            .select("isBlocked, role")
+            .eq("id", currentUser.id)
+            .single();
+
+          if (!userError && userData?.isBlocked && userData?.role !== "super_admin") {
+            await supabase.auth.signOut();
+            router.push("/account-blocked");
+            return;
+          }
+        } catch (blockedError) {
+          console.error("Error checking user blocked status:", blockedError);
+        }
+
+        // Check maintenance mode
+        let isMaintenanceMode = false;
+        try {
+          const maintenanceResponse = await fetch("/api/system-settings/public");
+          if (maintenanceResponse.ok) {
+            const maintenanceData = await maintenanceResponse.json();
+            isMaintenanceMode = maintenanceData.maintenanceMode || false;
+          }
+        } catch (maintenanceError) {
+          console.error("Error checking maintenance mode:", maintenanceError);
+        }
+
+        if (isMaintenanceMode) {
+          const response = await fetch("/api/v2/members");
+          if (!response.ok) {
+            throw new Error("Failed to fetch user role");
+          }
+          const { userRole: role } = await response.json();
+
+          if (role !== "super_admin") {
+            router.push("/maintenance");
+            return;
+          }
+        }
+
+        // Store that Google was the last used authentication method
+        if (typeof window !== "undefined") {
+          localStorage.setItem("lastAuthMethod", "google");
+        }
+
+        // Store trusted browser if user checked the option
+        if (trustBrowser && email) {
+          setTrustedBrowser(email);
+        }
+
+        // Wait for session to propagate
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Verify session one more time before preloading data
+        const { data: { user: verifyUser }, error: verifySessionError } = await supabase.auth.getUser();
+        if (verifySessionError || !verifyUser) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Preload user and plan data
+        try {
+          await preloadUserData();
+        } catch (preloadError: any) {
+          if (preloadError?.message?.includes("Session not found") || 
+              preloadError?.message?.includes("session") ||
+              preloadError?.status === 401) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+              await preloadUserData();
+            } catch (retryError) {
+              console.warn("Preload failed on retry, but continuing with redirect:", retryError);
+            }
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verify one more time that session is still valid
+        const { data: { user: finalUserCheck }, error: finalCheckError } = await supabase.auth.getUser();
+        
+        if (finalCheckError || !finalUserCheck) {
+          setError("Session verification failed. Please try again.");
+          return;
+        }
+
+        // Redirect to dashboard
+        const timestamp = Date.now();
+        window.location.replace(`/dashboard?_t=${timestamp}`);
+        return;
+      }
+
+      // Signup flow - Update user_metadata in Supabase Auth with name from User table
       try {
         const updateResponse = await fetch("/api/auth/update-user-metadata", {
           method: "POST",
@@ -166,7 +488,6 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         }
       } catch (error) {
         console.warn("[OTP] Error updating user metadata (non-critical):", error);
-        // Don't fail verification if metadata update fails
       }
 
       // Success! Handle post-verification flow
@@ -352,8 +673,9 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       setError(null);
       setSuccessMessage(null);
 
-      // Use API route to send OTP (more reliable)
-      const response = await fetch("/api/auth/send-otp", {
+      // Use different API route for Google OAuth login vs signup
+      const apiEndpoint = isGoogleOAuth ? "/api/auth/resend-login-otp" : "/api/auth/send-otp";
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -372,7 +694,6 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         setTimeRemaining(300); // Reset timer to 5 minutes
         setTimeout(() => setSuccessMessage(null), 5000);
       } else {
-        // If API route fails, show error (don't use fallback to avoid duplicate emails)
         setError(data.error || "Failed to resend code. Please try again.");
       }
     } catch (error) {
@@ -442,20 +763,58 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         </div>
       </div>
 
-      <Button 
-        onClick={handleVerify}
-        className="w-full h-11 text-base font-medium" 
-        disabled={loading || otp.join("").length !== 6}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Verifying...
-          </>
-        ) : (
-          "Verify Email"
+      <div className="space-y-4">
+        {/* Show "trust browser" checkbox only for Google OAuth login */}
+        {isGoogleOAuth && (
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="trust-browser"
+              checked={trustBrowser}
+              onCheckedChange={(checked) => setTrustBrowser(checked === true)}
+              disabled={loading}
+              className="mt-0.5"
+            />
+            <div className="flex items-center gap-1.5 flex-1">
+              <label
+                htmlFor="trust-browser"
+                className="text-sm text-foreground cursor-pointer select-none"
+              >
+                Don't ask again for this browser
+              </label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    disabled={loading}
+                    tabIndex={-1}
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-[280px] whitespace-normal">
+                  Only enable this on personal or trusted devices. We'll still ask for your password on future logins, but we won't require a verification code on this browser for a while.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
         )}
-      </Button>
+
+        <Button 
+          onClick={handleVerify}
+          className="w-full h-11 text-base font-medium" 
+          disabled={loading || otp.join("").length !== 6}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Verifying...
+            </>
+          ) : (
+            isGoogleOAuth ? "Verify and Sign In" : "Verify Email"
+          )}
+        </Button>
+      </div>
 
       <div className="text-center space-y-2">
         <p className="text-sm text-muted-foreground">
@@ -481,6 +840,19 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           )}
         </Button>
       </div>
+
+      {/* Show "Back to login" button only for Google OAuth login */}
+      {isGoogleOAuth && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => router.push("/auth/login")}
+          disabled={loading || resending}
+          className="w-full text-sm"
+        >
+          Back to login
+        </Button>
+      )}
     </div>
   );
 }

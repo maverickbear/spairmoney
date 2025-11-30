@@ -138,7 +138,8 @@ export async function GET(request: NextRequest) {
     };
 
     // Redirect to OTP verification page with OAuth data
-    const otpUrl = new URL("/auth/verify-google-otp", requestUrl.origin);
+    // Using unified verify-otp route that detects Google OAuth via oauth_data param
+    const otpUrl = new URL("/auth/verify-otp", requestUrl.origin);
     otpUrl.searchParams.set("email", userEmail);
     otpUrl.searchParams.set("oauth_data", encodeURIComponent(JSON.stringify(oauthData)));
     
