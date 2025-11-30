@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Save, Search, Globe, Twitter, Building2, Smartphone, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Loader2, Save, Search, Globe, Twitter, Building2, Smartphone, Upload, X, Image as ImageIcon, BarChart3 } from "lucide-react";
 
 interface SEOSettings {
   title: string;
@@ -52,6 +52,7 @@ interface SEOSettings {
     priceCurrency: string;
     offersUrl: string;
   };
+  googleTagId?: string;
 }
 
 export function SEOSettingsForm() {
@@ -441,6 +442,10 @@ export function SEOSettingsForm() {
           <TabsTrigger value="application">
             <Smartphone className="mr-2 h-4 w-4" />
             Application
+          </TabsTrigger>
+          <TabsTrigger value="googleTag">
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Google Tag
           </TabsTrigger>
         </TabsList>
 
@@ -1014,6 +1019,53 @@ export function SEOSettingsForm() {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="googleTag" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Google Tag (gtag.js)</CardTitle>
+              <CardDescription>
+                Configure Google Analytics tracking ID. The tag will be automatically added to all pages.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="googleTagId">Google Tag ID</Label>
+                <Input
+                  id="googleTagId"
+                  value={settings.googleTagId || ""}
+                  onChange={(e) => updateField(["googleTagId"], e.target.value)}
+                  placeholder="G-Q18BGJ6WNT"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter your Google Analytics tracking ID (e.g., G-XXXXXXXXXX). Leave empty to disable tracking.
+                </p>
+              </div>
+              {settings.googleTagId && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm font-medium mb-2">Preview:</p>
+                  <code className="text-xs text-muted-foreground">
+                    {`<!-- Google tag (gtag.js) -->`}
+                    <br />
+                    {`<script async src="https://www.googletagmanager.com/gtag/js?id=${settings.googleTagId}"></script>`}
+                    <br />
+                    {`<script>`}
+                    <br />
+                    {`  window.dataLayer = window.dataLayer || [];`}
+                    <br />
+                    {`  function gtag(){dataLayer.push(arguments);}`}
+                    <br />
+                    {`  gtag('js', new Date());`}
+                    <br />
+                    {`  gtag('config', '${settings.googleTagId}');`}
+                    <br />
+                    {`</script>`}
+                  </code>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

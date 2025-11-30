@@ -23,8 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/components/common/money";
-import { type Goal as GoalType } from "@/src/domain/goals/goals.types";
-import { calculateProgress, calculateIncomePercentageFromTargetMonths } from "@/lib/utils/goals";
+import { calculateProgress, calculateIncomePercentageFromTargetMonths, type GoalForCalculation } from "@/lib/utils/goals";
 import { useToast } from "@/components/toast-provider";
 import { Loader2 } from "lucide-react";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
@@ -189,7 +188,7 @@ export function GoalForm({
         }
 
         // Calculate progress
-        const goalForCalculation: GoalType = {
+        const goalForCalculation: GoalForCalculation = {
           id: goal?.id || "",
           name: "",
           targetAmount: effectiveTargetAmount,

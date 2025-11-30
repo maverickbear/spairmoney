@@ -215,6 +215,7 @@ function getDefaultSEOSettings() {
       priceCurrency: "USD",
       offersUrl: "/pricing",
     },
+    googleTagId: "",
   };
 }
 

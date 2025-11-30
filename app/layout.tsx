@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LayoutWrapper } from "@/components/layout-wrapper";
@@ -12,6 +11,7 @@ import { ServiceWorkerRegister } from "./sw-register";
 import { BreakpointLogger } from "@/components/breakpoint-logger";
 import { CookieConsentBanner } from "@/components/cookie/CookieConsentBanner";
 import { SpeedInsightsWrapper } from "@/components/speed-insights-wrapper";
+import { GoogleTag } from "@/components/common/google-tag";
 // PlanLimitsProvider removed - SubscriptionProvider in protected layout handles this
 
 const inter = Inter({ 
@@ -79,19 +79,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className={`${inter.className} bg-background text-foreground`}>
-        {/* Google tag (gtag.js) */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-Q18BGJ6WNT"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-Q18BGJ6WNT');
-          `}
-        </Script>
+        <GoogleTag />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
