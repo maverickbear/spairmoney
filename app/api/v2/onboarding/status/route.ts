@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeOnboardingService } from "@/src/application/onboarding/onboarding.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { checkOnboardingStatus } from "@/lib/api/onboarding";
-import { OnboardingStatusExtended } from "@/src/domain/onboarding/onboarding.types";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * GET /api/v2/onboarding/status
@@ -15,28 +14,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get existing onboarding status
-    const existingStatus = await checkOnboardingStatus();
-
-    // Check income onboarding status
     const service = makeOnboardingService();
-    const hasExpectedIncome = await service.checkIncomeOnboardingStatus(userId);
+    const status = await service.getOnboardingStatus(userId);
 
-    // Build extended status
-    const extendedStatus: OnboardingStatusExtended = {
-      ...existingStatus,
-      hasExpectedIncome,
-      totalCount: existingStatus.totalCount + 1, // Add income step
-      completedCount: existingStatus.completedCount + (hasExpectedIncome ? 1 : 0),
-    };
-
-    return NextResponse.json(extendedStatus, {
+    return NextResponse.json(status, {
       headers: {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
       },
     });
   } catch (error) {
     console.error("Error checking onboarding status:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal server error" },
       { status: 500 }

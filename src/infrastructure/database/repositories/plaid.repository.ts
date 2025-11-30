@@ -155,5 +155,35 @@ export class PlaidRepository {
       throw new Error(`Failed to delete Plaid connection: ${error.message}`);
     }
   }
+
+  /**
+   * Get institution name and logo by item ID
+   */
+  async getInstitutionInfoByItemId(itemId: string): Promise<{ institutionName: string | null; institutionLogo: string | null } | null> {
+    const supabase = await createServerClient();
+
+    const { data: connection, error } = await supabase
+      .from("PlaidConnection")
+      .select("institutionName, institutionLogo")
+      .eq("itemId", itemId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return null; // Not found
+      }
+      logger.error("[PlaidRepository] Error fetching institution info:", error);
+      return null;
+    }
+
+    if (!connection) {
+      return null;
+    }
+
+    return {
+      institutionName: connection.institutionName || null,
+      institutionLogo: connection.institutionLogo || null,
+    };
+  }
 }
 

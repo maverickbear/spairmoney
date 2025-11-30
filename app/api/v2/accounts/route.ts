@@ -3,9 +3,15 @@ import { makeAccountsService } from "@/src/application/accounts/accounts.factory
 import { AccountFormData } from "@/src/domain/accounts/accounts.validations";
 import { ZodError } from "zod";
 import { getCurrentUserId, guardAccountLimit, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const includeHoldings = searchParams.get("includeHoldings") !== "false"; // Default to true for backward compatibility
     
@@ -20,6 +26,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching accounts:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch accounts" },
       { status: 500 }
@@ -46,6 +60,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(account, { status: 201 });
   } catch (error) {
     console.error("Error creating account:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     // Handle validation errors
     if (error instanceof ZodError) {

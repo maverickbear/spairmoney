@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export interface Toast {
   id: string;
@@ -27,47 +28,23 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
     return () => clearTimeout(timer);
   }, [id, onClose]);
 
-  const variantStyles = {
-    default: "bg-background border-border",
-    success: "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800",
-    destructive: "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800",
-  };
-
-  const iconStyles = {
-    default: "text-foreground",
-    success: "text-green-600 dark:text-green-400",
-    destructive: "text-red-600 dark:text-red-400",
-  };
-
   return (
-    <div
-      className={cn(
-        "relative flex items-start gap-3 rounded-lg border p-4 shadow-lg transition-all animate-in slide-in-from-top-5 fade-in-0 duration-300",
-        variantStyles[variant]
-      )}
+    <div className="relative shadow-lg transition-all animate-in slide-in-from-top-5 fade-in-0 duration-300">
+      <Alert
+        variant={variant === "destructive" ? "destructive" : "default"}
+        className="pr-10"
     >
-      {variant === "success" && (
-        <CheckCircle2 className={cn("h-5 w-5 flex-shrink-0 mt-0.5", iconStyles[variant])} />
-      )}
-      {variant === "destructive" && (
-        <AlertCircle className={cn("h-5 w-5 flex-shrink-0 mt-0.5", iconStyles[variant])} />
-      )}
-      <div className="flex-1 space-y-1">
-        <p className={cn("text-sm font-medium", variant === "success" && "text-green-900 dark:text-green-100", variant === "destructive" && "text-red-900 dark:text-red-100")}>
-          {title}
-        </p>
-        {description && (
-          <p className={cn("text-sm opacity-90", variant === "success" && "text-green-800 dark:text-green-200", variant === "destructive" && "text-red-800 dark:text-red-200")}>
-            {description}
-          </p>
-        )}
-      </div>
+        {variant === "success" && <CheckCircle2 className="h-4 w-4" />}
+        {variant === "destructive" && <AlertCircle className="h-4 w-4" />}
+        <AlertTitle>{title}</AlertTitle>
+        {description && <AlertDescription>{description}</AlertDescription>}
+      </Alert>
       <button
         onClick={() => onClose(id)}
         className={cn(
-          "rounded-md p-1 opacity-70 hover:opacity-100 transition-opacity",
-          variant === "success" && "text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900",
-          variant === "destructive" && "text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900"
+          "absolute top-4 right-4 rounded-md p-1 opacity-70 hover:opacity-100 transition-opacity",
+          variant === "destructive" && "text-destructive hover:bg-destructive/10",
+          "text-muted-foreground hover:bg-accent"
         )}
       >
         <X className="h-4 w-4" />

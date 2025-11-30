@@ -39,7 +39,7 @@ export default function DashboardPage() {
   async function loadDashboard() {
     try {
       setLoadingDashboard(true);
-      const response = await fetch("/api/admin/dashboard");
+      const response = await fetch("/api/v2/admin/dashboard");
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to load dashboard data";
@@ -59,7 +59,7 @@ export default function DashboardPage() {
 
   async function loadSystemSettings() {
     try {
-      const response = await fetch("/api/admin/system-settings");
+      const response = await fetch("/api/v2/admin/system-settings");
       if (response.ok) {
         const data = await response.json();
         setSystemSettings(data);

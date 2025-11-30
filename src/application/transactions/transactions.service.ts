@@ -4,6 +4,8 @@
  */
 
 import { TransactionsRepository } from "@/src/infrastructure/database/repositories/transactions.repository";
+import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
+import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
 import { TransactionsMapper } from "./transactions.mapper";
 import { TransactionFormData, TransactionUpdateData } from "../../domain/transactions/transactions.validations";
 import { BaseTransaction, TransactionWithRelations, TransactionFilters, TransactionQueryResult } from "../../domain/transactions/transactions.types";
@@ -16,6 +18,7 @@ import { logger } from "@/src/infrastructure/utils/logger";
 import { invalidateTransactionCaches } from "@/src/infrastructure/cache/cache.manager";
 import { encryptDescription, decryptDescription, normalizeDescription } from "@/src/infrastructure/utils/transaction-encryption";
 import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
+import { AppError } from "../shared/app-error";
 
 // Helper function to get user subscription data
 async function getUserSubscriptionData(userId: string) {
@@ -55,42 +58,36 @@ export class TransactionsService {
     const categoryIds = [...new Set(decryptedRows.map(t => t.categoryId).filter(Boolean) as string[])];
     const subcategoryIds = [...new Set(decryptedRows.map(t => t.subcategoryId).filter(Boolean) as string[])];
 
-    // Fetch accounts
+    // Fetch accounts using repository
     const accountsMap = new Map<string, { id: string; name: string; type: string }>();
     if (accountIds.length > 0) {
-      const { data: accounts } = await supabase
-        .from("Account")
-        .select("id, name, type")
-        .in("id", accountIds);
+      const accountsRepository = new AccountsRepository();
+      const accounts = await accountsRepository.findByIds(accountIds, accessToken, refreshToken);
 
-      accounts?.forEach(account => {
-        accountsMap.set(account.id, account);
+      accounts.forEach(account => {
+        accountsMap.set(account.id, { id: account.id, name: account.name, type: account.type });
       });
     }
 
-    // Fetch categories
+    // Fetch categories using repository
     const categoriesMap = new Map<string, { id: string; name: string; macroId?: string }>();
     if (categoryIds.length > 0) {
-      const { data: categories } = await supabase
-        .from("Category")
-        .select("id, name, groupId")
-        .in("id", categoryIds);
+      const categoriesRepository = new CategoriesRepository();
+      const categories = await categoriesRepository.findCategoriesByIds(categoryIds, accessToken, refreshToken);
 
-      categories?.forEach(category => {
+      categories.forEach(category => {
         categoriesMap.set(category.id, { id: category.id, name: category.name, macroId: category.groupId });
       });
     }
 
-    // Fetch subcategories
+    // Fetch subcategories using repository
     const subcategoriesMap = new Map<string, { id: string; name: string; logo?: string | null }>();
     if (subcategoryIds.length > 0) {
-      const { data: subcategories } = await supabase
-        .from("Subcategory")
-        .select("id, name, logo")
-        .in("id", subcategoryIds);
+      const categoriesRepository = new CategoriesRepository();
+      const subcategories = await categoriesRepository.findSubcategoriesByIds(subcategoryIds, accessToken, refreshToken);
 
-      subcategories?.forEach(subcategory => {
-        subcategoriesMap.set(subcategory.id, subcategory);
+      subcategories.forEach(subcategory => {
+        subcategoriesMap.set(subcategory.id, { id: subcategory.id, name: subcategory.name, logo: subcategory.logo });
       });
     }
 
@@ -183,11 +180,11 @@ export class TransactionsService {
         .single();
 
       if (!account) {
-        throw new Error("Account not found");
+        throw new AppError("Account not found", 404);
       }
 
       if (account.userId !== null && account.userId !== providedUserId) {
-        throw new Error("Unauthorized: Account does not belong to user");
+        throw new AppError("Unauthorized: Account does not belong to user", 401);
       }
 
       userId = providedUserId;
@@ -195,7 +192,7 @@ export class TransactionsService {
       // Client-side operation
       const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
-        throw new Error("User not authenticated");
+        throw new AppError("User not authenticated", 401);
       }
       userId = currentUserId;
     }
@@ -247,19 +244,51 @@ export class TransactionsService {
         maxTransactions: limits.maxTransactions,
       });
 
-      if (!result) {
-        throw new Error("Failed to create transfer");
+      if (!result || !result.id) {
+        throw new AppError("Failed to create transfer", 500);
       }
 
-      // Fetch the created transaction
-      const created = await this.repository.findById(result.id);
+      // Try to fetch the created transaction
+      // If not found (due to RLS or timing), construct it from the data we have
+      let created = await this.repository.findById(result.id);
+      
       if (!created) {
-        throw new Error("Transaction created but not found");
+        // Transaction was created but not immediately visible (RLS/timing issue)
+        // Construct the transaction row from the data we passed to the function
+        logger.warn("[TransactionsService] Transfer created but not immediately fetchable, constructing from data", {
+          id: result.id,
+          userId,
+        });
+        
+        created = {
+          id: result.id,
+          date: transactionDate,
+          type: 'transfer' as const,
+          amount: data.amount,
+          accountId: data.accountId,
+          categoryId: null,
+          subcategoryId: null,
+          description: encryptedDescription,
+          recurring: data.recurring ?? false,
+          expenseType: null,
+          transferToId: data.toAccountId || null,
+          transferFromId: null,
+          createdAt: now,
+          updatedAt: now,
+          suggestedCategoryId: null,
+          suggestedSubcategoryId: null,
+          plaidMetadata: null,
+          userId,
+          householdId,
+          tags: null,
+        };
       }
+      
       transactionRow = created;
     } else {
       // Regular transaction or transfer with transferFromId
       const result = await this.repository.createTransactionWithLimit({
+        id,
         userId,
         accountId: data.accountId,
         amount: data.amount,
@@ -272,17 +301,50 @@ export class TransactionsService {
         recurring: data.recurring ?? false,
         expenseType: data.type === "expense" ? (data.expenseType || null) : null,
         maxTransactions: limits.maxTransactions,
+        createdAt: now,
+        updatedAt: now,
       });
 
-      if (!result) {
-        throw new Error("Failed to create transaction");
+      if (!result || !result.id) {
+        throw new AppError("Failed to create transaction", 500);
       }
 
-      // Fetch the created transaction
-      const created = await this.repository.findById(result.id);
+      // Try to fetch the created transaction
+      // If not found (due to RLS or timing), construct it from the data we have
+      let created = await this.repository.findById(result.id);
+      
       if (!created) {
-        throw new Error("Transaction created but not found");
+        // Transaction was created but not immediately visible (RLS/timing issue)
+        // Construct the transaction row from the data we passed to the function
+        logger.warn("[TransactionsService] Transaction created but not immediately fetchable, constructing from data", {
+          id: result.id,
+          userId,
+        });
+        
+        created = {
+          id: result.id,
+          date: transactionDate,
+          type: data.type as 'income' | 'expense' | 'transfer',
+          amount: data.amount,
+          accountId: data.accountId,
+          categoryId: finalCategoryId,
+          subcategoryId: finalSubcategoryId,
+          description: encryptedDescription,
+          recurring: data.recurring ?? false,
+          expenseType: data.type === "expense" ? (data.expenseType || null) : null,
+          transferToId: data.type === "transfer" && data.toAccountId ? data.toAccountId : null,
+          transferFromId: null, // Will be set below if needed
+          createdAt: now,
+          updatedAt: now,
+          suggestedCategoryId: null,
+          suggestedSubcategoryId: null,
+          plaidMetadata: null,
+          userId,
+          householdId,
+          tags: null,
+        };
       }
+      
       transactionRow = created;
 
       // Handle transferFromId for incoming transfers (e.g., credit card payments)
@@ -411,6 +473,93 @@ export class TransactionsService {
     );
 
     return balances.get(accountId) || initialBalance;
+  }
+
+  /**
+   * Import multiple transactions (for CSV import)
+   */
+  async importTransactions(
+    userId: string,
+    transactions: Array<{
+      date: string | Date;
+      type: "expense" | "income" | "transfer";
+      amount: number;
+      accountId: string;
+      toAccountId?: string;
+      categoryId?: string | null;
+      subcategoryId?: string | null;
+      description?: string | null;
+      recurring?: boolean;
+      expenseType?: "fixed" | "variable" | null;
+    }>
+  ): Promise<{
+    imported: number;
+    errors: number;
+    errorDetails: Array<{ rowIndex: number; fileName?: string; error: string }>;
+  }> {
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+      throw new AppError("No transactions provided", 400);
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: Array<{ rowIndex: number; fileName?: string; error: string }> = [];
+
+    // Process transactions in batches to avoid rate limiting
+    const batchSize = 20;
+    for (let i = 0; i < transactions.length; i += batchSize) {
+      const batch = transactions.slice(i, i + batchSize);
+      
+      // Process batch with a small delay between batches to avoid rate limiting
+      await Promise.allSettled(
+        batch.map(async (tx, index) => {
+          try {
+            // Convert date string to Date object if needed
+            const data: TransactionFormData = {
+              date: tx.date instanceof Date ? tx.date : new Date(tx.date),
+              type: tx.type,
+              amount: tx.amount,
+              accountId: tx.accountId,
+              toAccountId: tx.toAccountId,
+              categoryId: tx.categoryId || undefined,
+              subcategoryId: tx.subcategoryId || undefined,
+              description: tx.description || undefined,
+              recurring: tx.recurring || false,
+              expenseType: tx.expenseType || undefined,
+            };
+            
+            await this.createTransaction(data, userId);
+            successCount++;
+          } catch (error) {
+            errorCount++;
+            let errorMessage = "Unknown error";
+            
+            if (error instanceof AppError) {
+              errorMessage = error.message;
+            } else if (error instanceof Error) {
+              errorMessage = error.message;
+            }
+            
+            errors.push({
+              rowIndex: i + index,
+              error: errorMessage,
+            });
+            logger.error("[TransactionsService] Error importing transaction:", error);
+          }
+        })
+      );
+
+      // Add a small delay between batches to avoid rate limiting
+      if (i + batchSize < transactions.length) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay between batches
+      }
+    }
+
+    return {
+      imported: successCount,
+      errors: errorCount,
+      errorDetails: errors,
+    };
   }
 }
 

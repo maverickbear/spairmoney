@@ -311,7 +311,28 @@ async function fetchAccountsInternal(
       ownerNameMap.set(owner.id, firstName);
     }
     if (owner.id) {
-      ownerAvatarMap.set(owner.id, owner.avatarUrl || null);
+      // Validate and sanitize avatarUrl
+      let avatarUrl: string | null = null;
+      if (owner.avatarUrl && typeof owner.avatarUrl === "string") {
+        const trimmed = owner.avatarUrl.trim();
+        // Filter out invalid values
+        if (trimmed !== "" && 
+            trimmed.toLowerCase() !== "na" && 
+            trimmed.toLowerCase() !== "null" &&
+            trimmed.toLowerCase() !== "undefined") {
+          // Check if it's a valid URL format
+          try {
+            new URL(trimmed);
+            avatarUrl = trimmed;
+          } catch {
+            // If not a full URL, check if it's a relative path or data URI
+            if (trimmed.startsWith("/") || trimmed.startsWith("data:")) {
+              avatarUrl = trimmed;
+            }
+          }
+        }
+      }
+      ownerAvatarMap.set(owner.id, avatarUrl);
     }
   });
 

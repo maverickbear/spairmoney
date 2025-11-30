@@ -5,13 +5,16 @@
 
 import { HouseholdRepository } from "@/src/infrastructure/database/repositories/household.repository";
 import { OnboardingMapper } from "./onboarding.mapper";
-import { ExpectedIncomeRange } from "../../domain/onboarding/onboarding.types";
+import { ExpectedIncomeRange, OnboardingStatusExtended } from "../../domain/onboarding/onboarding.types";
 import { expectedIncomeRangeSchema } from "../../domain/onboarding/onboarding.validations";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { BudgetGenerator } from "./budget-generator";
 import { CategoryHelper } from "./category-helper";
 import { FinancialHealthData } from "../shared/financial-health";
+import { makeAccountsService } from "../accounts/accounts.factory";
+import { makeProfileService } from "../profile/profile.factory";
+import { AppError } from "../shared/app-error";
 
 // Income range to monthly income conversion (using midpoint of range)
 const INCOME_RANGE_TO_MONTHLY: Record<NonNullable<ExpectedIncomeRange>, number> = {
@@ -28,6 +31,56 @@ export class OnboardingService {
     private budgetGenerator: BudgetGenerator,
     private categoryHelper: CategoryHelper
   ) {}
+
+  /**
+   * Get complete onboarding status including accounts, profile, and income
+   */
+  async getOnboardingStatus(
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<OnboardingStatusExtended> {
+    try {
+      // Check accounts
+      const accountsService = makeAccountsService();
+      const accounts = await accountsService.getAccounts(accessToken, refreshToken, { includeHoldings: false });
+      const hasAccount = accounts.length > 0;
+      const totalBalance = hasAccount
+        ? accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0)
+        : undefined;
+
+      // Check profile
+      const profileService = makeProfileService();
+      const profile = await profileService.getProfile(accessToken, refreshToken);
+      const hasCompleteProfile = profile !== null && profile.name !== null && profile.name.trim() !== "";
+
+      // Check income onboarding status
+      const hasExpectedIncome = await this.checkIncomeOnboardingStatus(userId, accessToken, refreshToken);
+
+      // Calculate counts
+      const completedCount = [hasAccount, hasCompleteProfile, hasExpectedIncome].filter(Boolean).length;
+      const totalCount = 3;
+
+      return {
+        hasAccount,
+        hasCompleteProfile,
+        hasExpectedIncome,
+        completedCount,
+        totalCount,
+        totalBalance,
+      };
+    } catch (error) {
+      logger.error("[OnboardingService] Error getting onboarding status:", error);
+      // Return default status on error
+      return {
+        hasAccount: false,
+        hasCompleteProfile: false,
+        hasExpectedIncome: false,
+        completedCount: 0,
+        totalCount: 3,
+      };
+    }
+  }
 
   /**
    * Check if user has completed income onboarding
@@ -70,7 +123,7 @@ export class OnboardingService {
 
     const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
     if (!householdId) {
-      throw new Error("Active household not found");
+      throw new AppError("Active household not found", 400);
     }
 
     // Get current settings
@@ -139,12 +192,12 @@ export class OnboardingService {
     refreshToken?: string
   ): Promise<void> {
     if (!incomeRange) {
-      throw new Error("Income range is required to generate budgets");
+      throw new AppError("Income range is required to generate budgets", 400);
     }
 
     const monthlyIncome = this.getMonthlyIncomeFromRange(incomeRange);
     if (monthlyIncome === 0) {
-      throw new Error("Invalid income range");
+      throw new AppError("Invalid income range", 400);
     }
 
     await this.budgetGenerator.generateInitialBudgets(

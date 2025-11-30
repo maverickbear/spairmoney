@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeDebtsService } from "@/src/application/debts/debts.factory";
 import { DebtFormData } from "@/src/domain/debts/debts.validations";
 import { ZodError } from "zod";
+import { AppError } from "@/src/application/shared/app-error";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     
     const service = makeDebtsService();
@@ -23,6 +30,14 @@ export async function GET(
     return NextResponse.json(debt, { status: 200 });
   } catch (error) {
     console.error("Error fetching debt:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch debt" },
       { status: 500 }
@@ -56,6 +71,13 @@ export async function PATCH(
   } catch (error) {
     console.error("Error updating debt:", error);
     
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
@@ -86,6 +108,14 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting debt:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete debt" },
       { status: 400 }

@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { 
-  updateInvestmentTransaction,
-  deleteInvestmentTransaction,
-  createSecurity,
-  createSecurityPrice
-} from "@/lib/api/investments";
+import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 import { InvestmentTransactionFormData } from "@/src/domain/investments/investments.validations";
 import { ZodError } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { isPlanError } from "@/lib/utils/plan-errors";
-import { invalidatePortfolioCache } from "@/lib/api/portfolio";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function PUT(
   request: NextRequest,
@@ -37,11 +31,13 @@ export async function PUT(
     const body = await request.json();
     const { id: transactionId } = await params;
     
+    const service = makeInvestmentsService();
+    
     // Handle security creation if needed
     let securityId = body.securityId;
     if (!securityId && body.security) {
       // Create security if it doesn't exist
-      const security = await createSecurity({
+      const security = await service.createSecurity({
         symbol: body.security.symbol,
         name: body.security.name,
         class: body.security.class,
@@ -62,12 +58,12 @@ export async function PUT(
     if (body.fees !== undefined) transactionData.fees = body.fees || 0;
     if (body.notes !== undefined) transactionData.notes = body.notes;
 
-    const transaction = await updateInvestmentTransaction(transactionId, transactionData);
+    const transaction = await service.updateInvestmentTransaction(transactionId, transactionData);
 
     // Handle price update if provided
     if (securityId && body.currentPrice && transactionData.date) {
       try {
-        await createSecurityPrice({
+        await service.createSecurityPrice({
           securityId,
           date: transactionData.date instanceof Date ? transactionData.date : new Date(transactionData.date),
           price: body.currentPrice,
@@ -78,26 +74,14 @@ export async function PUT(
       }
     }
 
-    // Invalidate portfolio cache to ensure fresh data
-    try {
-      await invalidatePortfolioCache();
-    } catch (error) {
-      console.error("Error invalidating portfolio cache:", error);
-      // Don't fail the transaction if cache invalidation fails
-    }
-
     return NextResponse.json(transaction);
   } catch (error) {
     console.error("Error updating investment transaction:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
@@ -108,12 +92,9 @@ export async function PUT(
       );
     }
     
-    const errorMessage = error instanceof Error ? error.message : "Failed to update investment transaction";
-    const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;
-    
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : "Failed to update investment transaction" },
+      { status: 500 }
     );
   }
 }
@@ -142,37 +123,24 @@ export async function DELETE(
     }
 
     const { id: transactionId } = await params;
-    await deleteInvestmentTransaction(transactionId);
-
-    // Invalidate portfolio cache to ensure fresh data
-    try {
-      await invalidatePortfolioCache();
-    } catch (error) {
-      console.error("Error invalidating portfolio cache:", error);
-      // Don't fail the transaction if cache invalidation fails
-    }
+    
+    const service = makeInvestmentsService();
+    await service.deleteInvestmentTransaction(transactionId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting investment transaction:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
-    const errorMessage = error instanceof Error ? error.message : "Failed to delete investment transaction";
-    const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;
-    
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : "Failed to delete investment transaction" },
+      { status: 500 }
     );
   }
 }

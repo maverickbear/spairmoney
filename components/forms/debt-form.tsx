@@ -663,7 +663,7 @@ export function DebtForm({
   async function checkAccountsAndShowForm() {
     try {
       // OPTIMIZED: Skip investment balances calculation (not needed for debt form)
-      const accountsRes = await fetch("/api/accounts?includeHoldings=false");
+      const accountsRes = await fetch("/api/v2/accounts?includeHoldings=false");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
         if (accountsData.length === 0) {
@@ -691,7 +691,7 @@ export function DebtForm({
   async function loadAccounts() {
     try {
       // OPTIMIZED: Skip investment balances calculation (not needed for debt form)
-      const res = await fetch("/api/accounts?includeHoldings=false");
+      const res = await fetch("/api/v2/accounts?includeHoldings=false");
       const data = await res.json();
       setAccounts(data || []);
     } catch (error) {
@@ -872,7 +872,7 @@ export function DebtForm({
         }
       } else {
         // Create new debt
-        const res = await fetch("/api/debts", {
+        const res = await fetch("/api/v2/debts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

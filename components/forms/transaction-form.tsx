@@ -263,7 +263,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       // OPTIMIZED: Only fetch accounts if we don't have them yet
       // This avoids duplicate calls when form is opened multiple times
       if (accounts.length === 0) {
-      const accountsRes = await fetch("/api/accounts");
+      const accountsRes = await fetch("/api/v2/accounts");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
           setAccounts(accountsData);
@@ -351,7 +351,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       // OPTIMIZED: Only fetch accounts if we don't have them yet
       // This avoids duplicate calls when form is opened multiple times
       if (accounts.length === 0) {
-      const accountsRes = await fetch("/api/accounts");
+      const accountsRes = await fetch("/api/v2/accounts");
       
       if (!accountsRes.ok) {
         logger.error("Error fetching accounts:", accountsRes.status, accountsRes.statusText);
@@ -371,7 +371,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
   async function loadAllCategories() {
     try {
-      const res = await fetch("/api/categories?all=true");
+      const res = await fetch("/api/v2/categories?all=true");
       if (!res.ok) {
         throw new Error("Failed to fetch categories");
       }
@@ -450,7 +450,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
     setIsCreatingCategory(true);
     try {
-      const res = await fetch("/api/categories", {
+      const res = await fetch("/api/v2/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -612,7 +612,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       // If date is in the future and it's a new transaction, automatically save as Planned Payment
       if (isFutureDate && !transaction) {
         // Create as PlannedPayment
-        const response = await fetch("/api/planned-payments", {
+        const response = await fetch("/api/v2/planned-payments", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

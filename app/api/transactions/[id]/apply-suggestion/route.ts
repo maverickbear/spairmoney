@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateTransaction } from "@/lib/api/transactions";
+import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
+import { AppError } from "@/src/application/shared/app-error";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
-import { requireTransactionOwnership } from "@/src/infrastructure/utils/security";
 
 /**
+ * POST /api/transactions/[id]/apply-suggestion
  * Apply suggested category to a transaction
  * This endpoint moves the suggested category to the actual category
  */
@@ -14,9 +14,6 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    
-    // Verify ownership
-    await requireTransactionOwnership(id);
     
     const supabase = await createServerClient();
     
@@ -28,39 +25,43 @@ export async function POST(
       .single();
     
     if (fetchError || !transaction) {
-      return NextResponse.json(
-        { error: "Transaction not found" },
-        { status: 404 }
-      );
+      throw new AppError("Transaction not found", 404);
     }
     
     if (!transaction.suggestedCategoryId) {
-      return NextResponse.json(
-        { error: "No suggested category found for this transaction" },
-        { status: 400 }
-      );
+      throw new AppError("No suggested category found for this transaction", 400);
     }
     
     // Apply the suggestion by moving it to the actual category
-    const updateData = {
+    const service = makeTransactionsService();
+    const updatedTransaction = await service.updateTransaction(id, {
       categoryId: transaction.suggestedCategoryId,
-      subcategoryId: transaction.suggestedSubcategoryId || null,
-      suggestedCategoryId: null,
-      suggestedSubcategoryId: null,
-    };
+      subcategoryId: transaction.suggestedSubcategoryId || undefined,
+    });
     
-    const updatedTransaction = await updateTransaction(id, updateData);
+    // Clear suggested fields
+    await supabase
+      .from("Transaction")
+      .update({
+        suggestedCategoryId: null,
+        suggestedSubcategoryId: null,
+      })
+      .eq("id", id);
     
     return NextResponse.json(updatedTransaction, { status: 200 });
   } catch (error) {
     console.error("Error applying suggestion:", error);
     
-    const errorMessage = error instanceof Error ? error.message : "Failed to apply suggestion";
-    const statusCode = errorMessage.includes("Unauthorized") || errorMessage.includes("not found") ? 401 : 400;
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : "Failed to apply suggestion" },
+      { status: 500 }
     );
   }
 }

@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
 import { TransactionFormData, transactionSchema } from "@/src/domain/transactions/transactions.validations";
+import { AppError } from "@/src/application/shared/app-error";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { ZodError } from "zod";
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     
     // Parse filters from query parameters
@@ -71,9 +78,17 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching transactions:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch transactions" },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
@@ -99,6 +114,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error creating transaction:", error);
     
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     // Handle validation errors
     if (error instanceof ZodError) {
       return NextResponse.json(
@@ -107,13 +129,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Handle other errors
-    const errorMessage = error instanceof Error ? error.message : "Failed to create transaction";
-    const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;
-    
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : "Failed to create transaction" },
+      { status: 500 }
     );
   }
 }

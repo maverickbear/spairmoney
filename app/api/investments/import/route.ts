@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createInvestmentTransaction, createSecurity, getSecurities } from "@/lib/api/investments";
+import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { isPlanError } from "@/lib/utils/plan-errors";
+import { AppError } from "@/src/application/shared/app-error";
 import { InvestmentTransactionInput } from "@/lib/csv/investment-import";
 import { normalizeAssetType } from "@/lib/utils/portfolio-utils";
 
@@ -39,8 +39,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const service = makeInvestmentsService();
+    
     // Get existing securities to avoid duplicates
-    const existingSecurities = await getSecurities();
+    const existingSecurities = await service.getSecurities();
     const securityMap = new Map<string, string>(); // symbol -> id
     existingSecurities.forEach((s) => {
       securityMap.set(s.symbol.toUpperCase(), s.id);
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
               } else {
                 // Create new security
                 try {
-                  const security = await createSecurity({
+                  const security = await service.createSecurity({
                     symbol: tx.securitySymbol,
                     name: tx.securityName || tx.securitySymbol,
                     class: normalizeAssetType(tx.securityClass) || "Stock",
@@ -104,7 +106,7 @@ export async function POST(request: NextRequest) {
               transactionData.price = tx.price;
             }
             
-            await createInvestmentTransaction(transactionData);
+            await service.createInvestmentTransaction(transactionData);
             successCount++;
           } catch (error) {
             errorCount++;
@@ -128,6 +130,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error in investment import:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : "Failed to import transactions",

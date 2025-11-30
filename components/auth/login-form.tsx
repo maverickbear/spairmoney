@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
 import { VerifyLoginOtpForm } from "./verify-login-otp-form";
 import { isTrustedBrowser } from "@/lib/utils/trusted-browser";
@@ -307,12 +308,13 @@ function LoginFormContent() {
   return (
     <div className="space-y-6">
       {invitationInfo && (
-        <div className="rounded-[12px] bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4">
-          <p className="text-sm text-blue-900 dark:text-blue-100">
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
             <strong>{invitationInfo.ownerName}</strong> invited you to join their household. 
             Sign in to accept the invitation.
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
       )}
       
       <GoogleSignInButton variant="signin" />
@@ -330,12 +332,11 @@ function LoginFormContent() {
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {error && (
-          <div className="rounded-[12px] bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            </div>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         <div className="space-y-1">

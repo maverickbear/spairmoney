@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { AdminUser } from "@/lib/api/admin";
 
 interface UnblockUserDialogProps {
@@ -45,7 +46,7 @@ export function UnblockUserDialog({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/admin/users/unblock", {
+      const response = await fetch("/api/v2/admin/users/unblock", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -53,6 +54,7 @@ export function UnblockUserDialog({
         body: JSON.stringify({
           userId: user.id,
           reason: reason.trim(),
+          pauseSubscription: true,
         }),
       });
 
@@ -115,9 +117,10 @@ export function UnblockUserDialog({
           </div>
 
           {error && (
-            <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">
-              {error}
-            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
         </div>
 

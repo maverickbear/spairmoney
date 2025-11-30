@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Institution {
   id: string;
@@ -67,17 +68,18 @@ export function RemovePlaidDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4 px-6">
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 space-y-2">
-            <p className="text-sm font-medium text-destructive">
-              Warning: This action cannot be undone
-            </p>
-            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Warning: This action cannot be undone</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc list-inside space-y-1 mt-2">
               <li>All {accountCount} connected bank account{accountCount !== 1 ? 's' : ''} will be disconnected</li>
               <li>All {connectionCount} Plaid connection{connectionCount !== 1 ? 's' : ''} will be removed</li>
               <li>You will need to reconnect from scratch if you want to use Plaid again</li>
               <li>Account data and transactions will remain, but automatic syncing will stop</li>
             </ul>
-          </div>
+            </AlertDescription>
+          </Alert>
 
           {institutions.length > 0 && (
             <div className="space-y-2">

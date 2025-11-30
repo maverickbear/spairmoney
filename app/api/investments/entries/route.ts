@@ -5,7 +5,7 @@ import {
 } from "@/lib/api/simple-investments";
 import { z } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { isPlanError } from "@/lib/utils/plan-errors";
+import { AppError } from "@/src/application/shared/app-error";
 
 const createEntrySchema = z.object({
   accountId: z.string().min(1),
@@ -39,11 +39,23 @@ export async function GET(request: Request) {
     const accountId = searchParams.get("accountId") || undefined;
 
     const entries = await getSimpleInvestmentEntries(accountId);
-    return NextResponse.json(entries);
+    return NextResponse.json(entries, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=300',
+      },
+    });
   } catch (error) {
     console.error("Error fetching simple investment entries:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch entries" },
+      { error: error instanceof Error ? error.message : "Failed to fetch entries" },
       { status: 500 }
     );
   }
@@ -79,20 +91,24 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating simple investment entry:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
-    const message =
-      error instanceof Error ? error.message : "Failed to create entry";
-    return NextResponse.json({ error: message }, { status: 400 });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
+        { status: 400 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create entry" },
+      { status: 500 }
+    );
   }
 }
 

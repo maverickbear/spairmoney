@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, createContext, useContext, memo, useMemo, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { getInitials, isValidAvatarUrl } from "@/lib/utils/avatar";
 import { LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, User, Settings, LogOut, CreditCard, PiggyBank, Users, ChevronLeft, ChevronRight, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar, Repeat, Tag, Mail, Star, ChevronDown, Search } from "lucide-react";
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
@@ -87,14 +88,6 @@ interface UserData {
   } | null;
 }
 
-function getInitials(name: string | undefined | null): string {
-  if (!name) return "U";
-  const parts = name.trim().split(" ");
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-  return name[0].toUpperCase();
-}
 
 // Context for sidebar collapsed state
 const SidebarContext = createContext<{
@@ -143,7 +136,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [showPortalManagementItems, setShowPortalManagementItems] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   const log = logger.withPrefix("NAV");
@@ -155,13 +147,6 @@ function NavComponent({ hasSubscription = true }: NavProps) {
       setIsCollapsed(saved === "true");
     }
   }, []);
-
-  // Auto-show Portal Management items if on portal-management page
-  useEffect(() => {
-    if (pathname.startsWith("/portal-management")) {
-      setShowPortalManagementItems(true);
-    }
-  }, [pathname]);
 
   // Save collapsed state to localStorage
   useEffect(() => {
@@ -266,12 +251,17 @@ function NavComponent({ hasSubscription = true }: NavProps) {
     const handleProfileUpdate = (event: CustomEvent) => {
       const updatedProfile = event.detail;
       
+      // Validate avatarUrl before updating
+      const validAvatarUrl = isValidAvatarUrl(updatedProfile.avatarUrl) 
+        ? updatedProfile.avatarUrl 
+        : null;
+      
       // Update cache directly if we have cached data
       if (navUserDataCache.data && navUserDataCache.data.user) {
         navUserDataCache.data.user = {
           ...navUserDataCache.data.user,
           name: updatedProfile.name,
-          avatarUrl: updatedProfile.avatarUrl,
+          avatarUrl: validAvatarUrl,
         };
         navUserDataCache.timestamp = Date.now();
         // Update state immediately
@@ -330,45 +320,34 @@ function NavComponent({ hasSubscription = true }: NavProps) {
 
   const user = userData?.user;
 
-  // Portal Management items
-  const portalManagementSections: NavSection[] = [
-    {
-      title: "Portal Management",
-      items: [
-        { href: "/portal-management", label: "Portal Management", icon: Settings2, isToggle: true, isBack: true },
-        { href: "/portal-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/portal-management/users", label: "Users", icon: Users },
-        { href: "/portal-management/promo-codes", label: "Promo Codes", icon: Tag },
-        { href: "/portal-management/system-entities", label: "System Entities", icon: FolderTree },
-        { href: "/portal-management/contact-forms", label: "Contact Forms", icon: Mail },
-        { href: "/portal-management/feedback", label: "Feedback", icon: Star },
-        { href: "/portal-management/plans", label: "Plans", icon: CreditCard },
-        { href: "/portal-management/subscription-services", label: "Subscription Services", icon: Settings2 },
-        { href: "/portal-management/seo", label: "SEO Settings", icon: Search },
-      ],
-    },
+  // Portal Management items (without the toggle button)
+  const portalManagementItems = [
+    { href: "/portal-management/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/portal-management/users", label: "Users", icon: Users },
+    { href: "/portal-management/promo-codes", label: "Promo Codes", icon: Tag },
+    { href: "/portal-management/system-entities", label: "System Entities", icon: FolderTree },
+    { href: "/portal-management/contact-forms", label: "Contact Forms", icon: Mail },
+    { href: "/portal-management/feedback", label: "Feedback", icon: Star },
+    { href: "/portal-management/plans", label: "Plans", icon: CreditCard },
+    { href: "/portal-management/subscription-services", label: "Subscription Services", icon: Settings2 },
+    { href: "/portal-management/seo", label: "SEO Settings", icon: Search },
   ];
 
-  // Build nav sections - toggle between normal and portal management items
+  // Build nav sections - add portal management items directly to base sections
   const navSections = useMemo((): NavSection[] => {
     if (!isSuperAdmin) {
       return baseNavSections;
     }
 
-    if (showPortalManagementItems) {
-      return portalManagementSections;
-    }
-
+    // Always show portal management items as a regular section when super admin
     return [
-        {
-          title: "Portal Management",
-          items: [
-          { href: "/portal-management", label: "Portal Management", icon: Settings2, isToggle: true },
-          ],
-        },
-        ...baseNavSections,
+      {
+        title: "Portal Management",
+        items: portalManagementItems,
+      },
+      ...baseNavSections,
     ];
-  }, [isSuperAdmin, showPortalManagementItems]);
+  }, [isSuperAdmin]);
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
@@ -665,34 +644,33 @@ function NavComponent({ hasSubscription = true }: NavProps) {
                         )}
                       >
                         <div className="relative flex-shrink-0">
-                          {user?.avatarUrl ? (
+                          {loading ? (
+                            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+                          ) : isValidAvatarUrl(user?.avatarUrl) ? (
                             <>
                               <img
-                                src={user.avatarUrl}
+                                src={user.avatarUrl!}
                                 alt={user.name || "User"}
                                 className="h-10 w-10 rounded-full object-cover border"
                                 loading="eager"
                                 decoding="async"
                                 onError={(e) => {
-                                  e.currentTarget.style.display = "none";
-                                  const initialsContainer =
-                                    e.currentTarget.nextElementSibling;
+                                  const img = e.currentTarget;
+                                  img.style.display = "none";
+                                  const initialsContainer = img.nextElementSibling as HTMLElement;
                                   if (initialsContainer) {
-                                    (initialsContainer as HTMLElement).style.display =
-                                      "flex";
+                                    initialsContainer.style.display = "flex";
                                   }
                                 }}
                               />
-                              <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border">
+                              <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border absolute top-0 left-0">
                                 {getInitials(user?.name)}
                               </div>
                             </>
-                          ) : user?.name ? (
-                            <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border">
-                              {getInitials(user.name)}
-                            </div>
                           ) : (
-                            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+                            <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border">
+                              {getInitials(user?.name)}
+                            </div>
                           )}
                         </div>
                         {!isCollapsed && (

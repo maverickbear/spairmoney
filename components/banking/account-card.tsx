@@ -8,26 +8,7 @@ import { Edit, Trash2, Loader2, RefreshCw, Unlink } from "lucide-react";
 import { formatMoney } from "@/components/common/money";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-
-// Helper function to get initials from name
-function getInitials(name: string | null | undefined): string {
-  try {
-    if (!name) return "?";
-    const trimmed = name.trim();
-    if (!trimmed) return "?";
-    const parts = trimmed.split(/\s+/).filter(p => p.length > 0);
-    if (parts.length === 0) return "?";
-    if (parts.length === 1) {
-      return parts[0].substring(0, 2).toUpperCase();
-    }
-    const first = parts[0][0] || "";
-    const last = parts[parts.length - 1][0] || "";
-    return (first + last).toUpperCase() || "?";
-  } catch (error) {
-    console.error("Error getting initials:", error);
-    return "?";
-  }
-}
+import { getInitials, isValidAvatarUrl } from "@/lib/utils/avatar";
 
 export interface AccountCardProps {
   account: {
@@ -175,29 +156,32 @@ export function AccountCard({
           </Badge>
           {account.householdName && (
             <div className="flex items-center">
-              {account.ownerAvatarUrl ? (
-                <>
-                  <img
-                    src={account.ownerAvatarUrl}
-                    alt={account.ownerName || account.householdName || "Owner"}
-                    className="h-8 w-8 rounded-full object-cover border"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                      const initialsContainer = e.currentTarget.nextElementSibling;
-                      if (initialsContainer) {
-                        (initialsContainer as HTMLElement).style.display = "flex";
-                      }
-                    }}
-                  />
-                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border">
+              <div className="relative flex-shrink-0">
+                {isValidAvatarUrl(account.ownerAvatarUrl) ? (
+                  <>
+                    <img
+                      src={account.ownerAvatarUrl!}
+                      alt={account.ownerName || account.householdName || "Owner"}
+                      className="h-8 w-8 rounded-full object-cover border"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        img.style.display = "none";
+                        const initialsContainer = img.nextElementSibling as HTMLElement;
+                        if (initialsContainer) {
+                          initialsContainer.style.display = "flex";
+                        }
+                      }}
+                    />
+                    <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border absolute top-0 left-0">
+                      {getInitials(account.ownerName || account.householdName)}
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border">
                     {getInitials(account.ownerName || account.householdName)}
                   </div>
-                </>
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border">
-                  {getInitials(account.ownerName || account.householdName)}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
           {account.isConnected && (

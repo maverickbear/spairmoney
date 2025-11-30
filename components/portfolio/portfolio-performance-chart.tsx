@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ChartCard } from "@/components/charts/chart-card";
 import { formatMoney } from "@/components/common/money";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HistoricalDataPoint } from "@/lib/api/portfolio";
+import { HistoricalDataPoint } from "@/src/domain/portfolio/portfolio.types";
 import { subDays, parseISO, format } from "date-fns";
 import { formatTransactionDate } from "@/src/infrastructure/utils/timestamp";
 

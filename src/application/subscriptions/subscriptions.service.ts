@@ -378,21 +378,27 @@ export class SubscriptionsService {
       const isRecentCache = cacheAge >= 0 && cacheAge < CACHE_MAX_AGE;
       const isVeryOldCache = cacheAge > 60 * 60 * 1000;
       
+      // Log warning if timestamp is in the future (timezone/skew issue)
+      if (isFutureTimestamp) {
+        logger.warn(
+          `[SubscriptionsService] Subscription cache timestamp is in the future for user ${userId}. ` +
+          `This may indicate timezone differences or clock skew. ` +
+          `Cache age: ${Math.round(cacheAge / 1000)}s, ` +
+          `Timestamp: ${userCache.subscriptionUpdatedAt}, ` +
+          `Current time: ${new Date(now).toISOString()}`
+        );
+      }
+      
       if (isValidTimestamp && (isRecentCache || isFutureTimestamp || !isVeryOldCache)) {
         const plan = await this.getPlanById(userCache.effectivePlanId);
         if (plan) {
           let fullSubscription: BaseSubscription | null = null;
           if (userCache.effectiveSubscriptionId) {
-            // Fetch full subscription if needed
-            const supabase = await createServerClient();
-            const { data: subscriptionData } = await supabase
-              .from("Subscription")
-              .select("*")
-              .eq("id", userCache.effectiveSubscriptionId)
-              .maybeSingle();
+            // Fetch full subscription if needed using repository
+            const subscriptionRow = await this.repository.findById(userCache.effectiveSubscriptionId);
             
-            if (subscriptionData) {
-              fullSubscription = SubscriptionsMapper.subscriptionToDomain(subscriptionData as any);
+            if (subscriptionRow) {
+              fullSubscription = SubscriptionsMapper.subscriptionToDomain(subscriptionRow as any);
             }
           }
 

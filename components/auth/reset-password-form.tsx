@@ -9,6 +9,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 function ResetPasswordFormContent() {
   const router = useRouter();
@@ -131,17 +132,13 @@ function ResetPasswordFormContent() {
   if (isValidToken === false) {
     return (
       <div className="space-y-6">
-        <div className="rounded-[12px] bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-destructive">
-              Invalid or expired reset link
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Invalid or expired reset link</AlertTitle>
+          <AlertDescription>
               This password reset link is invalid or has expired. Please request a new one.
-            </p>
-          </div>
-        </div>
+          </AlertDescription>
+        </Alert>
 
         <div className="text-center space-y-2">
           <Link
@@ -164,17 +161,11 @@ function ResetPasswordFormContent() {
   if (success) {
     return (
       <div className="space-y-6">
-        <div className="rounded-[12px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 p-4 flex items-start gap-3">
-          <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-green-900 dark:text-green-100">
-              Password reset successfully!
-            </p>
-            <p className="text-sm text-green-700 dark:text-green-300 mt-2">
-              Redirecting to login...
-            </p>
-          </div>
-        </div>
+        <Alert>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>Password reset successfully!</AlertTitle>
+          <AlertDescription>Redirecting to login...</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -183,12 +174,11 @@ function ResetPasswordFormContent() {
     <div className="space-y-6">
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {error && (
-          <div className="rounded-[12px] bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            </div>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         <div className="space-y-1">

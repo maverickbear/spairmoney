@@ -13,6 +13,7 @@ import { getActiveHouseholdId } from "@/lib/utils/household";
 import { guardHouseholdMembers, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { sendInvitationEmail } from "@/lib/utils/email";
+import { AppError } from "../shared/app-error";
 
 export class MembersService {
   constructor(private repository: MembersRepository) {}
@@ -124,7 +125,7 @@ export class MembersService {
     // Get the owner's active household
     const householdId = await getActiveHouseholdId(ownerId);
     if (!householdId) {
-      throw new Error("No household found for owner");
+      throw new AppError("No household found for owner", 400);
     }
 
     // Check if user already exists
@@ -138,13 +139,13 @@ export class MembersService {
     if (existingUser) {
       const existingMember = await this.repository.findByUserIdAndHousehold(existingUser.id, householdId);
       if (existingMember) {
-        throw new Error("User is already a member of this household");
+        throw new AppError("User is already a member of this household", 400);
       }
     } else {
       // Check for pending invitation
       const existingPending = await this.repository.findByEmailAndHousehold(data.email, householdId);
       if (existingPending && existingPending.status === "pending") {
-        throw new Error("Member with this email has already been invited");
+        throw new AppError("Member with this email has already been invited", 400);
       }
     }
 
@@ -155,7 +156,7 @@ export class MembersService {
     // Get current user for invitedBy
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
-      throw new Error("User not authenticated");
+      throw new AppError("User not authenticated", 401);
     }
 
     // Create member
@@ -225,7 +226,7 @@ export class MembersService {
     // Get current member
     const currentMember = await this.repository.findById(memberId);
     if (!currentMember) {
-      throw new Error("Member not found");
+      throw new AppError("Member not found", 404);
     }
 
     const now = formatTimestamp(new Date());
@@ -263,7 +264,7 @@ export class MembersService {
             currentMember.householdId
           );
           if (existingMember && existingMember.id !== memberId) {
-            throw new Error("Email is already used by another member");
+            throw new AppError("Email is already used by another member", 400);
           }
         }
 
@@ -317,7 +318,7 @@ export class MembersService {
     // Get member info before deleting
     const member = await this.repository.findById(memberId);
     if (!member) {
-      throw new Error("Member not found");
+      throw new AppError("Member not found", 404);
     }
 
     // If member has userId, create personal household if needed
@@ -360,15 +361,15 @@ export class MembersService {
 
     const member = await this.repository.findById(memberId);
     if (!member) {
-      throw new Error("Member not found");
+      throw new AppError("Member not found", 404);
     }
 
     if (member.status !== "pending") {
-      throw new Error("Can only resend invitation for pending members");
+      throw new AppError("Can only resend invitation for pending members", 400);
     }
 
     if (!member.invitationToken || !member.email) {
-      throw new Error("Invalid invitation: missing token or email");
+      throw new AppError("Invalid invitation: missing token or email", 400);
     }
 
     // Get household owner
@@ -385,7 +386,7 @@ export class MembersService {
       .single();
 
     if (!owner) {
-      throw new Error("Owner not found");
+      throw new AppError("Owner not found", 404);
     }
 
     // Send invitation email
@@ -408,17 +409,17 @@ export class MembersService {
     // Find invitation
     const invitation = await this.repository.findByInvitationToken(token);
     if (!invitation) {
-      throw new Error("Invalid or expired invitation token");
+      throw new AppError("Invalid or expired invitation token", 400);
     }
 
     // Verify user email matches
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) {
-      throw new Error("User not authenticated");
+      throw new AppError("User not authenticated", 401);
     }
 
     if (invitation.email && authUser.email?.toLowerCase() !== invitation.email.toLowerCase()) {
-      throw new Error("Email does not match the invitation");
+      throw new AppError("Email does not match the invitation", 400);
     }
 
     const now = formatTimestamp(new Date());
@@ -532,6 +533,72 @@ export class MembersService {
         isOwner: false,
         isMember: false,
       };
+    }
+  }
+
+  /**
+   * Get user role (admin, member, or super_admin)
+   * Optimized version that checks User role and household memberships
+   */
+  async getUserRole(userId: string): Promise<"admin" | "member" | "super_admin" | null> {
+    try {
+      const supabase = await createServerClient();
+      
+      // Fetch User role and HouseholdMemberNew in parallel
+      const [userResult, householdResult] = await Promise.all([
+        supabase
+          .from("User")
+          .select("role")
+          .eq("id", userId)
+          .single(),
+        // Get user's household memberships
+        supabase
+          .from("HouseholdMemberNew")
+          .select("role, userId, status, Household(type, createdBy)")
+          .eq("userId", userId)
+          .eq("status", "active")
+      ]);
+
+      const userData = userResult.data;
+      
+      // Check super_admin first (highest priority)
+      if (userData?.role === "super_admin") {
+        return "super_admin";
+      }
+
+      // Check household membership
+      const memberships = householdResult.data || [];
+      
+      // Check if user is owner of a household
+      const ownedHousehold = memberships.find(
+        (m: any) => {
+          const household = m.Household as any;
+          return household?.createdBy === userId && household?.type !== 'personal';
+        }
+      );
+      
+      if (ownedHousehold) {
+        // Owner role maps to 'admin' in old system
+        return "admin";
+      }
+
+      // Check if user is an active member (not owner)
+      const activeMember = memberships.find(
+        (m: any) => {
+          const household = m.Household as any;
+          return household?.createdBy !== userId;
+        }
+      );
+      
+      if (activeMember) {
+        return "member";
+      }
+
+      // Default: user is owner of their personal household (admin)
+      return "admin";
+    } catch (error) {
+      logger.error("[MembersService] Error getting user role:", error);
+      return null;
     }
   }
 }

@@ -13,6 +13,7 @@ import { formatTimestamp, formatDateOnly } from "@/src/infrastructure/utils/time
 import { mapClassToSector, normalizeAssetType } from "@/lib/utils/portfolio-utils";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { HOLDINGS_CACHE_TTL } from "../../domain/investments/investments.constants";
+import { AppError } from "../shared/app-error";
 
 // In-memory cache for holdings
 const holdingsCache = new Map<string, { data: BaseHolding[]; timestamp: number }>();
@@ -184,7 +185,7 @@ export class InvestmentsService {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     const id = crypto.randomUUID();
@@ -226,7 +227,7 @@ export class InvestmentsService {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     const updateData: any = {};
@@ -261,7 +262,7 @@ export class InvestmentsService {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     await this.repository.deleteTransaction(id);
@@ -370,7 +371,7 @@ export class InvestmentsService {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     const id = crypto.randomUUID();
@@ -392,7 +393,7 @@ export class InvestmentsService {
 
     if (error) {
       logger.error("[InvestmentsService] Error creating investment account:", error);
-      throw new Error(`Failed to create investment account: ${error.message}`);
+      throw new AppError(`Failed to create investment account: ${error.message}`, 500);
     }
 
     return {

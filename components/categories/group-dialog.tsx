@@ -104,12 +104,12 @@ export function GroupDialog({
       if (pendingCategories.length > 0) {
         for (const pendingCategory of pendingCategories) {
           // Create category
-          const categoryRes = await fetch("/api/categories", {
+          const categoryRes = await fetch("/api/v2/categories", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: pendingCategory.name,
-              macroId: macro.id,
+              groupId: macro.id,
             }),
           });
 
@@ -123,10 +123,13 @@ export function GroupDialog({
           // Create subcategories for this category
           if (pendingCategory.subcategories.length > 0) {
             for (const pendingSubcategory of pendingCategory.subcategories) {
-              const subcategoryRes = await fetch(`/api/categories/${category.id}/subcategories`, {
+              const subcategoryRes = await fetch("/api/v2/categories/subcategories", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: pendingSubcategory.name }),
+                body: JSON.stringify({ 
+                  name: pendingSubcategory.name,
+                  categoryId: category.id 
+                }),
               });
 
               if (!subcategoryRes.ok) {

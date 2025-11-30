@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateAllSecurityPrices } from "@/lib/api/market-prices";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,6 +32,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error updating security prices:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : "Failed to update security prices",

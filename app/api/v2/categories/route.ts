@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import { CategoryFormData } from "@/src/domain/categories/categories.validations";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,6 +61,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching categories:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch categories" },
       { status: 500 }
@@ -101,6 +110,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     console.error("Error creating category:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create category" },
       { status: 500 }

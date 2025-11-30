@@ -9,6 +9,7 @@ import { makeTransactionsService } from "@/src/application/transactions/transact
 import { makeAccountsService } from "@/src/application/accounts/accounts.factory";
 import { makeDebtsService } from "@/src/application/debts/debts.factory";
 import { getUserLiabilities } from "@/lib/api/plaid/liabilities";
+import { AppError } from "../shared/app-error";
 
 export interface FinancialHealthData {
   score: number;
@@ -682,7 +683,7 @@ export async function calculateFinancialHealth(
     // Validate result before returning
     if (result.score === undefined || isNaN(result.score) || !isFinite(result.score)) {
       log.error("Invalid score calculated:", result.score);
-      throw new Error("Invalid score calculated");
+      throw new AppError("Invalid score calculated", 500);
     }
     
     // Only warn if spendingDiscipline is Unknown AND we have data (indicates a calculation issue)

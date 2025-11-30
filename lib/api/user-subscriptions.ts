@@ -64,7 +64,10 @@ export async function getUserSubscriptionsInternal(
     return [];
   }
 
-  logger.info(`[getUserSubscriptions] Fetching subscriptions for user: ${user.id}`);
+  logger.debug(
+    `[getUserSubscriptions] Fetching user service subscriptions (Netflix, Spotify, etc.) ` +
+    `for user: ${user.id}. Note: This is for service subscriptions, NOT Stripe subscription plans.`
+  );
 
   // Note: We don't filter by userId here because RLS policies handle access control
   // RLS policy allows access if:
@@ -76,7 +79,7 @@ export async function getUserSubscriptionsInternal(
     .order("createdAt", { ascending: false });
 
   if (error) {
-    logger.error("[getUserSubscriptions] Supabase error fetching subscriptions:", {
+    logger.error("[getUserSubscriptions] Supabase error fetching user service subscriptions:", {
       error: error.message,
       code: error.code,
       details: error.details,
@@ -89,15 +92,22 @@ export async function getUserSubscriptionsInternal(
   // OPTIMIZED: Reduce logging verbosity - only log errors or when data is found
   if (!data || data.length === 0) {
     // Only log in debug mode to reduce noise
-    logger.debug(`[getUserSubscriptions] No subscriptions found for user: ${user.id}`);
+    logger.debug(
+      `[getUserSubscriptions] No user service subscriptions found for user: ${user.id}. ` +
+      `This is expected if the user hasn't added any service subscriptions yet.`
+    );
     return [];
   }
 
   // Only log when subscriptions are found (useful for debugging)
-  logger.debug(`[getUserSubscriptions] Found ${data.length} subscription(s) for user: ${user.id}`, {
-    subscriptionIds: data.map(s => s.id),
-    serviceNames: data.map(s => s.serviceName),
-  });
+  logger.debug(
+    `[getUserSubscriptions] Found ${data.length} user service subscription(s) for user: ${user.id}`,
+    {
+      subscriptionIds: data.map(s => s.id),
+      serviceNames: data.map(s => s.serviceName),
+      activeCount: data.filter(s => s.isActive).length,
+    }
+  );
 
   // OPTIMIZED: Batch fetch all related data to avoid N+1 queries
   // Collect all unique IDs first

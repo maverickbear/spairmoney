@@ -14,6 +14,7 @@ import { guardFeatureAccessReadOnly } from "../shared/feature-guard";
 import { getUserLiabilities } from "@/lib/api/plaid/liabilities";
 import { startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, format } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import type {
   ReportsData,
   ReportPeriod,
@@ -32,6 +33,34 @@ import type { PortfolioSummary, HistoricalDataPoint, Holding } from "@/src/domai
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
 
 export class ReportsService {
+  /**
+   * Get session tokens (access and refresh) for the current user
+   * Returns undefined if tokens cannot be retrieved
+   */
+  async getSessionTokens(): Promise<{ accessToken?: string; refreshToken?: string }> {
+    try {
+      const supabase = await createServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        return {};
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return {};
+      }
+
+      return {
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+      };
+    } catch (error) {
+      logger.warn("[ReportsService] Error retrieving session tokens:", error);
+      return {};
+    }
+  }
+
   /**
    * Get date range for a report period
    */

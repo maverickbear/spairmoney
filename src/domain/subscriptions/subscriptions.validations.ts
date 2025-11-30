@@ -79,3 +79,27 @@ export const subscriptionSchema = z.object({
  */
 export type Subscription = z.infer<typeof subscriptionSchema>;
 
+/**
+ * User Service Subscription Form Schema
+ * Defines the structure for creating/updating user service subscriptions
+ */
+export const userServiceSubscriptionFormSchema = z.object({
+  serviceName: z.string().min(1, "Service name is required"),
+  subcategoryId: z.string().optional().nullable(),
+  amount: z.number().positive("Amount must be positive"),
+  description: z.string().optional().nullable(),
+  billingFrequency: z.enum(["monthly", "weekly", "biweekly", "semimonthly", "daily"]),
+  billingDay: z.number().int().min(1).max(31).optional().nullable(),
+  accountId: z.string().min(1, "Account ID is required"),
+  firstBillingDate: z.union([z.date(), z.string()]),
+  categoryId: z.string().optional().nullable(),
+  newSubcategoryName: z.string().optional().nullable(),
+  planId: z.string().optional().nullable(),
+});
+
+/**
+ * User Service Subscription Form Type
+ * Inferred from userServiceSubscriptionFormSchema
+ */
+export type UserServiceSubscriptionFormData = z.infer<typeof userServiceSubscriptionFormSchema>;
+

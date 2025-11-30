@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId, guardFeatureAccess } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import { extractTransactionsFromPDF } from "@/lib/pdf/investment-extract";
 import { InvestmentTransactionInput } from "@/lib/csv/investment-import";
 
@@ -106,6 +107,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error extracting transactions from PDF:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       {
         error:

@@ -18,7 +18,7 @@ export default function PlansPage() {
   async function loadAdminPlans() {
     try {
       setLoadingPlans(true);
-      const response = await fetch("/api/admin/plans");
+      const response = await fetch("/api/v2/admin/plans");
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to load plans";

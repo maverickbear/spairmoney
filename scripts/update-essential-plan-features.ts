@@ -14,7 +14,7 @@ async function updateEssentialPlanFeatures() {
   const { data: plan, error: fetchError } = await supabase
     .from("Plan")
     .select("*")
-    .eq("id", "essencial")
+    .eq("id", "essential")
     .single();
   
   if (fetchError || !plan) {
@@ -51,7 +51,7 @@ async function updateEssentialPlanFeatures() {
       features: updatedFeatures,
       updatedAt: new Date().toISOString(),
     })
-    .eq("id", "essencial")
+    .eq("id", "essential")
     .select()
     .single();
   
@@ -67,7 +67,7 @@ async function updateEssentialPlanFeatures() {
   const { data: verifiedPlan } = await supabase
     .from("Plan")
     .select("*")
-    .eq("id", "essencial")
+    .eq("id", "essential")
     .single();
   
   if (verifiedPlan) {

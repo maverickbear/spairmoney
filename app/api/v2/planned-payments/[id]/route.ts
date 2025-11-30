@@ -3,6 +3,7 @@ import { makePlannedPaymentsService } from "@/src/application/planned-payments/p
 import { PlannedPaymentFormData, plannedPaymentSchema } from "@/src/domain/planned-payments/planned-payments.validations";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
 import { ZodError } from "zod";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function PATCH(
   request: NextRequest,
@@ -27,6 +28,13 @@ export async function PATCH(
     return NextResponse.json(plannedPayment, { status: 200 });
   } catch (error) {
     console.error("Error updating planned payment:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     if (error instanceof ZodError) {
       return NextResponse.json(
@@ -66,6 +74,14 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting planned payment:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete planned payment" },
       { status: 400 }

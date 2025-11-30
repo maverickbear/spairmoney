@@ -18,6 +18,7 @@ import {
   calculatePaymentsFromDate,
   type DebtForCalculation,
 } from "@/lib/utils/debts";
+import { AppError } from "../shared/app-error";
 
 export class DebtsService {
   constructor(private repository: DebtsRepository) {}
@@ -161,7 +162,7 @@ export class DebtsService {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     const downPayment = data.downPayment ?? 0;
@@ -173,7 +174,7 @@ export class DebtsService {
     // Get active household ID
     const householdId = await getActiveHouseholdId(user.id);
     if (!householdId) {
-      throw new Error("No active household found. Please contact support.");
+      throw new AppError("No active household found. Please contact support.", 400);
     }
 
     const id = crypto.randomUUID();
@@ -240,7 +241,7 @@ export class DebtsService {
     // Get current debt
     const currentDebt = await this.repository.findById(id);
     if (!currentDebt) {
-      throw new Error("Debt not found");
+      throw new AppError("Debt not found", 404);
     }
 
     // Use provided values or keep existing ones
@@ -324,11 +325,11 @@ export class DebtsService {
 
     const debt = await this.repository.findById(id);
     if (!debt) {
-      throw new Error("Debt not found");
+      throw new AppError("Debt not found", 404);
     }
 
     if (debt.isPaidOff) {
-      throw new Error("Debt is already paid off");
+      throw new AppError("Debt is already paid off", 400);
     }
 
     // Calculate new balance

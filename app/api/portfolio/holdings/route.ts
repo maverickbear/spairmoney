@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getHoldings } from "@/lib/api/investments";
+import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 import { guardFeatureAccessReadOnly, getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,12 +27,26 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const accountId = searchParams.get("accountId") || undefined;
 
-    const holdings = await getHoldings(accountId);
-    return NextResponse.json(holdings);
+    const service = makeInvestmentsService();
+    const holdings = await service.getHoldings(accountId);
+    
+    return NextResponse.json(holdings, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60',
+      },
+    });
   } catch (error) {
     console.error("Error fetching portfolio holdings:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch portfolio holdings" },
+      { error: error instanceof Error ? error.message : "Failed to fetch portfolio holdings" },
       { status: 500 }
     );
   }

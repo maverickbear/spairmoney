@@ -15,7 +15,7 @@ export default function ContactFormsPage() {
   async function loadContactForms() {
     try {
       setLoadingContactForms(true);
-      const response = await fetch("/api/admin/contact-forms");
+      const response = await fetch("/api/v2/admin/contact-forms");
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to load contact forms";

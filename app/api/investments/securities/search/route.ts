@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchSecurityBySymbol, searchSecuritiesByName } from "@/lib/api/market-prices";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: Request) {
   try {
@@ -52,8 +53,16 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error("Error searching security:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to search security" },
+      { error: error instanceof Error ? error.message : "Failed to search security" },
       { status: 500 }
     );
   }

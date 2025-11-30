@@ -74,7 +74,7 @@ export function ContactFormsTable({ contactForms, loading, onUpdate }: ContactFo
 
     setIsUpdating(true);
     try {
-      const response = await fetch("/api/admin/contact-forms", {
+      const response = await fetch("/api/v2/admin/contact-forms", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

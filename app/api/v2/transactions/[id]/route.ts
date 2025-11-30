@@ -3,12 +3,18 @@ import { makeTransactionsService } from "@/src/application/transactions/transact
 import { TransactionFormData } from "@/src/domain/transactions/transactions.validations";
 import { ZodError } from "zod";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     
     const service = makeTransactionsService();
@@ -24,6 +30,14 @@ export async function GET(
     return NextResponse.json(transaction, { status: 200 });
   } catch (error) {
     console.error("Error fetching transaction:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch transaction" },
       { status: 500 }
@@ -60,6 +74,13 @@ export async function PATCH(
     return NextResponse.json(transaction, { status: 200 });
   } catch (error) {
     console.error("Error updating transaction:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     // Handle validation errors
     if (error instanceof ZodError) {
@@ -102,6 +123,14 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting transaction:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete transaction" },
       { status: 400 }

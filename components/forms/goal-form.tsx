@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/components/common/money";
-import { type Goal as GoalType } from "@/lib/api/goals";
+import { type Goal as GoalType } from "@/src/domain/goals/goals.types";
 import { calculateProgress, calculateIncomePercentageFromTargetMonths } from "@/lib/utils/goals";
 import { useToast } from "@/components/toast-provider";
 import { Loader2 } from "lucide-react";
@@ -139,7 +139,7 @@ export function GoalForm({
             incomeBasis = cachedIncomeBasis;
         } else {
           // Fetch income basis from API
-          const res = await fetch("/api/goals/income-basis");
+          const res = await fetch("/api/v2/goals/income-basis");
           if (res.ok) {
             const data = await res.json();
             incomeBasis = data.incomeBasis || 0;
@@ -173,7 +173,7 @@ export function GoalForm({
         // OPTIMIZED: Use cached goals if available
         let goals = cachedGoals;
         if (!goals) {
-        const res = await fetch("/api/goals");
+        const res = await fetch("/api/v2/goals");
         if (!res.ok) {
           throw new Error("Failed to fetch goals");
         }
@@ -323,7 +323,7 @@ export function GoalForm({
 
   async function loadAccounts() {
     try {
-      const accountsRes = await fetch("/api/accounts");
+      const accountsRes = await fetch("/api/v2/accounts");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
         // Filter to only investment and savings accounts
@@ -358,7 +358,7 @@ export function GoalForm({
 
   async function checkAccountsAndShowForm() {
     try {
-      const accountsRes = await fetch("/api/accounts");
+      const accountsRes = await fetch("/api/v2/accounts");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
         if (accountsData.length === 0) {
@@ -431,7 +431,7 @@ export function GoalForm({
         }
       } else {
         // Create new goal
-        const res = await fetch("/api/goals", {
+        const res = await fetch("/api/v2/goals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

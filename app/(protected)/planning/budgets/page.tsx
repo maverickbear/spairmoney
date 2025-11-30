@@ -1,13 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Wallet } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Wallet, Edit, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { BudgetForm } from "@/components/forms/budget-form";
-import { BudgetCard } from "@/components/budgets/budget-card";
+import { BudgetMobileCard } from "@/components/budgets/budget-mobile-card";
 import { useToast } from "@/components/toast-provider";
 import { formatMoney } from "@/components/common/money";
 import { EmptyState } from "@/components/common/empty-state";
@@ -15,6 +23,9 @@ import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import { FeatureGuard } from "@/components/common/feature-guard";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 
 interface Budget {
   id: string;
@@ -76,6 +87,8 @@ export default function BudgetsPage() {
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedBudgetIds, setSelectedBudgetIds] = useState<Set<string>>(new Set());
+  const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
   const now = new Date();
 
   useEffect(() => {
@@ -165,6 +178,53 @@ export default function BudgetsPage() {
     );
   }
 
+  function handleSelectBudget(id: string, checked: boolean) {
+    setSelectedBudgetIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedBudgetIds(new Set(budgets.map((b) => b.id)));
+    } else {
+      setSelectedBudgetIds(new Set());
+    }
+  }
+
+  const allSelected = budgets.length > 0 && selectedBudgetIds.size === budgets.length;
+  const someSelected = selectedBudgetIds.size > 0 && selectedBudgetIds.size < budgets.length;
+
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  function getStatusColor(status?: "ok" | "warning" | "over") {
+    if (status === "over") return "bg-destructive";
+    if (status === "warning") return "bg-yellow-500 dark:bg-yellow-600";
+    return "bg-green-500 dark:bg-green-600";
+  }
+
+  function getStatusTextColor(status?: "ok" | "warning" | "over") {
+    if (status === "over") return "text-destructive";
+    if (status === "warning") return "text-yellow-600 dark:text-yellow-400";
+    return "text-green-600 dark:text-green-400";
+  }
+
+  function getStatusLabel(status?: "ok" | "warning" | "over") {
+    if (status === "over") return "Over Budget";
+    if (status === "warning") return "Warning";
+    return "On Track";
+  }
+
   // Calculate summary statistics
   const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0);
   const totalSpent = budgets.reduce((sum, b) => sum + (b.actualSpend || 0), 0);
@@ -200,50 +260,205 @@ export default function BudgetsPage() {
       </PageHeader>
 
       <div className="w-full p-4 lg:p-8">
-        {/* Budgets Grid */}
-        {loading && !hasLoaded ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <div className="text-muted-foreground">Loading budgets...</div>
-          </CardContent>
-        </Card>
-      ) : budgets.length === 0 ? (
-        <div className="w-full h-full min-h-[400px]">
-        <EmptyState
-          icon={Wallet}
-          title="No budgets yet"
-          description="Create your first budget to start tracking your spending and stay on top of your finances."
-          actionLabel={canWrite ? "Create Your First Budget" : undefined}
-          onAction={canWrite ? () => {
-            if (!checkWriteAccess()) return;
-            setSelectedBudget(null);
-            setIsFormOpen(true);
-          } : undefined}
-          actionIcon={canWrite ? Plus : undefined}
-        />
+        {/* Mobile Card View */}
+        <div className="lg:hidden space-y-3">
+          {loading && !hasLoaded ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <div className="text-muted-foreground">Loading budgets...</div>
+              </CardContent>
+            </Card>
+          ) : budgets.length === 0 ? (
+            <div className="w-full h-full min-h-[400px]">
+              <EmptyState
+                icon={Wallet}
+                title="No budgets yet"
+                description="Create your first budget to start tracking your spending and stay on top of your finances."
+                actionLabel={canWrite ? "Create Your First Budget" : undefined}
+                onAction={canWrite ? () => {
+                  if (!checkWriteAccess()) return;
+                  setSelectedBudget(null);
+                  setIsFormOpen(true);
+                } : undefined}
+                actionIcon={canWrite ? Plus : undefined}
+              />
+            </div>
+          ) : (
+            budgets.map((budget) => (
+              <BudgetMobileCard
+                key={budget.id}
+                budget={budget}
+                isSelected={selectedBudgetIds.has(budget.id)}
+                onSelect={(checked) => handleSelectBudget(budget.id, checked)}
+                onEdit={() => {
+                  if (!checkWriteAccess()) return;
+                  setSelectedBudget(budget);
+                  setIsFormOpen(true);
+                }}
+                onDelete={() => {
+                  if (!checkWriteAccess()) return;
+                  if (deletingId !== budget.id) {
+                    handleDelete(budget.id);
+                  }
+                }}
+                deleting={deletingId === budget.id}
+              />
+            ))
+          )}
         </div>
-      ) : (
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-          {budgets.map((budget) => (
-            <BudgetCard
-              key={budget.id}
-              budget={budget}
-              onEdit={(b) => {
-                if (!checkWriteAccess()) return;
-                setSelectedBudget(b);
-                setIsFormOpen(true);
-              }}
-              onDelete={(id) => {
-                if (!checkWriteAccess()) return;
-                if (deletingId !== id) {
-                  handleDelete(id);
-                }
-              }}
-              deletingId={deletingId}
-            />
-          ))}
+
+        {/* Desktop Table View */}
+        <div className="hidden lg:block rounded-[12px] border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    ref={selectAllCheckboxRef}
+                    checked={allSelected}
+                    onCheckedChange={handleSelectAll}
+                    className="h-4 w-4"
+                  />
+                </TableHead>
+                <TableHead className="text-xs md:text-sm">Category</TableHead>
+                <TableHead className="text-xs md:text-sm">Budget</TableHead>
+                <TableHead className="text-xs md:text-sm">Spent</TableHead>
+                <TableHead className="text-xs md:text-sm">Remaining</TableHead>
+                <TableHead className="text-xs md:text-sm">Progress</TableHead>
+                <TableHead className="text-xs md:text-sm">Status</TableHead>
+                <TableHead className="text-xs md:text-sm">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && !hasLoaded ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    Loading budgets...
+                  </TableCell>
+                </TableRow>
+              ) : budgets.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    No budgets found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                budgets.map((budget) => {
+                  const percentage = budget.percentage || 0;
+                  const clampedPercentage = Math.min(percentage, 100);
+                  const actualSpend = budget.actualSpend || 0;
+                  const remaining = Math.max(0, budget.amount - actualSpend);
+
+                  return (
+                    <TableRow key={budget.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedBudgetIds.has(budget.id)}
+                          onCheckedChange={(checked) => handleSelectBudget(budget.id, checked as boolean)}
+                          className="h-4 w-4"
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium text-xs md:text-sm">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{budget.displayName || budget.category?.name || "Unknown"}</span>
+                          {budget.subcategory && (
+                            <span className="text-xs text-muted-foreground">
+                              {budget.subcategory.name}
+                            </span>
+                          )}
+                          {budget.macro && (
+                            <span className="text-xs text-muted-foreground">
+                              {budget.macro.name}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {formatMoney(budget.amount)}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {formatMoney(actualSpend)}
+                      </TableCell>
+                      <TableCell className={cn("text-xs md:text-sm font-medium", getStatusTextColor(budget.status))}>
+                        {formatMoney(remaining)}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        <div className="flex items-center gap-2 min-w-[120px]">
+                          <div className="relative flex-1 h-2 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={cn(
+                                "h-full transition-all",
+                                getStatusColor(budget.status)
+                              )}
+                              style={{ width: `${clampedPercentage}%` }}
+                            />
+                            {percentage > 100 && (
+                              <div
+                                className={cn(
+                                  "absolute top-0 h-full transition-all opacity-30",
+                                  getStatusColor(budget.status)
+                                )}
+                                style={{
+                                  width: `${((percentage - 100) / percentage) * 100}%`,
+                                  left: "100%",
+                                }}
+                              />
+                            )}
+                            <div className="absolute top-0 left-0 h-full w-[1px] bg-border" style={{ left: "100%" }} />
+                          </div>
+                          <span className={cn("text-xs whitespace-nowrap", getStatusTextColor(budget.status))}>
+                            {percentage.toFixed(1)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={cn(getStatusColor(budget.status), "text-white text-xs")} variant="default">
+                          {getStatusLabel(budget.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {canWrite && (
+                          <div className="flex space-x-1 md:space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 md:h-10 md:w-10"
+                              onClick={() => {
+                                if (!checkWriteAccess()) return;
+                                setSelectedBudget(budget);
+                                setIsFormOpen(true);
+                              }}
+                            >
+                              <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 md:h-10 md:w-10"
+                              onClick={() => {
+                                if (!checkWriteAccess()) return;
+                                if (deletingId !== budget.id) {
+                                  handleDelete(budget.id);
+                                }
+                              }}
+                              disabled={deletingId === budget.id}
+                            >
+                              {deletingId === budget.id ? (
+                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
-      )}
 
       <BudgetForm 
         macros={macros}

@@ -5,7 +5,7 @@ import {
 } from "@/lib/api/simple-investments";
 import { z } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { isPlanError } from "@/lib/utils/plan-errors";
+import { AppError } from "@/src/application/shared/app-error";
 
 const updateValueSchema = z.object({
   totalValue: z.number().positive(),
@@ -39,8 +39,16 @@ export async function GET(
     return NextResponse.json(value);
   } catch (error) {
     console.error("Error fetching account investment value:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch value" },
+      { error: error instanceof Error ? error.message : "Failed to fetch value" },
       { status: 500 }
     );
   }
@@ -80,20 +88,24 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating account investment value:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
-    const message =
-      error instanceof Error ? error.message : "Failed to update value";
-    return NextResponse.json({ error: message }, { status: 400 });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
+        { status: 400 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update value" },
+      { status: 500 }
+    );
   }
 }
 

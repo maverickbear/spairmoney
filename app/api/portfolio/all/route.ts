@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { guardFeatureAccessReadOnly } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { 
   getPortfolioSummaryInternal, 
@@ -137,8 +138,16 @@ export async function GET(request: Request) {
     return NextResponse.json(data);
   } catch (error) {
     logger.error("Error fetching portfolio data:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch portfolio data" },
+      { error: error instanceof Error ? error.message : "Failed to fetch portfolio data" },
       { status: 500 }
     );
   }

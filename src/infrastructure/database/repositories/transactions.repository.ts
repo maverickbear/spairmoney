@@ -383,6 +383,7 @@ export class TransactionsRepository {
    * Call SQL function for transaction creation with limit check
    */
   async createTransactionWithLimit(params: {
+    id: string;
     userId: string;
     accountId: string;
     amount: number;
@@ -395,10 +396,13 @@ export class TransactionsRepository {
     recurring: boolean;
     expenseType: string | null;
     maxTransactions: number;
+    createdAt: string;
+    updatedAt: string;
   }): Promise<{ id: string } | null> {
     const supabase = await createServerClient();
 
     const { data, error } = await supabase.rpc('create_transaction_with_limit', {
+      p_id: params.id,
       p_user_id: params.userId,
       p_account_id: params.accountId,
       p_amount: params.amount,
@@ -411,6 +415,8 @@ export class TransactionsRepository {
       p_recurring: params.recurring,
       p_expense_type: params.expenseType,
       p_max_transactions: params.maxTransactions,
+      p_created_at: params.createdAt,
+      p_updated_at: params.updatedAt,
     });
 
     if (error) {

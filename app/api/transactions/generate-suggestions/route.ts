@@ -2,22 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { suggestCategory } from "@/src/application/shared/category-learning";
 import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
+/**
+ * POST /api/transactions/generate-suggestions
+ * Generate category suggestions for uncategorized transactions
+ * Note: This is an auxiliary route for background processing.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createServerClient();
 
     // Get all transactions without category for this user
     const { data: transactions, error: fetchError } = await supabase
       .from("Transaction")
       .select("id, description, amount, type, userId")
-      .eq("userId", user.id)
+      .eq("userId", userId)
       .is("categoryId", null)
       .is("suggestedCategoryId", null) // Only process transactions without suggestions
       .not("description", "is", null)
@@ -26,10 +32,7 @@ export async function POST(request: NextRequest) {
 
     if (fetchError) {
       console.error("Error fetching transactions:", fetchError);
-      return NextResponse.json(
-        { error: "Failed to fetch transactions" },
-        { status: 500 }
-      );
+      throw new AppError("Failed to fetch transactions", 500);
     }
 
     if (!transactions || transactions.length === 0) {
@@ -92,6 +95,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error generating suggestions:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

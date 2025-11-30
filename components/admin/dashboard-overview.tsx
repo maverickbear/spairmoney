@@ -49,7 +49,7 @@ export function DashboardOverview({
       async function loadMaintenanceMode() {
         try {
           setLoadingMaintenance(true);
-          const response = await fetch("/api/admin/system-settings");
+          const response = await fetch("/api/v2/admin/system-settings");
           if (response.ok) {
             const data = await response.json();
             setMaintenanceMode(data.maintenanceMode || false);
@@ -67,7 +67,7 @@ export function DashboardOverview({
   async function handleMaintenanceToggle(checked: boolean) {
     try {
       setUpdatingMaintenance(true);
-      const response = await fetch("/api/admin/system-settings", {
+      const response = await fetch("/api/v2/admin/system-settings", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

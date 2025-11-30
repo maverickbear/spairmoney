@@ -304,13 +304,19 @@ async function loadDashboardDataInternal(
       try {
         const { getUserSubscriptionsInternal } = await import('@/lib/api/user-subscriptions');
         const subs = await getUserSubscriptionsInternal(accessToken, refreshToken);
-        logger.info(`[Dashboard] Loaded ${subs.length} subscription(s) for dashboard`);
+        logger.debug(
+          `[Dashboard] Loaded ${subs.length} user service subscription(s) (Netflix, Spotify, etc.) ` +
+          `for dashboard. Note: This is separate from Stripe subscription plans.`
+        );
         if (subs.length > 0) {
-          logger.info(`[Dashboard] Subscription details:`, subs.map(s => ({ id: s.id, name: s.serviceName, active: s.isActive })));
+          logger.debug(
+            `[Dashboard] User service subscription details:`,
+            subs.map(s => ({ id: s.id, name: s.serviceName, active: s.isActive }))
+          );
         }
         return subs;
       } catch (error) {
-        logger.error("[Dashboard] Error fetching subscriptions:", error);
+        logger.error("[Dashboard] Error fetching user service subscriptions:", error);
         return [];
       }
     })(),

@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function ForgotPasswordForm() {
   const router = useRouter();
@@ -58,17 +59,13 @@ export function ForgotPasswordForm() {
   if (success) {
     return (
       <div className="space-y-6">
-        <div className="rounded-[12px] bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 p-4 flex items-start gap-3">
-          <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-green-900 dark:text-green-100">
-              If an account exists with this email, you will receive a password reset link shortly.
-            </p>
-            <p className="text-sm text-green-700 dark:text-green-300 mt-2">
-              Please check your inbox and follow the instructions to reset your password.
-            </p>
-          </div>
-        </div>
+        <Alert>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>Check your email</AlertTitle>
+          <AlertDescription>
+            If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and follow the instructions to reset your password.
+          </AlertDescription>
+        </Alert>
 
         <div className="text-center">
           <Link
@@ -86,12 +83,11 @@ export function ForgotPasswordForm() {
     <div className="space-y-6">
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         {error && (
-          <div className="rounded-[12px] bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            </div>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         <div className="space-y-1">

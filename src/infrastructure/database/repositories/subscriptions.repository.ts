@@ -214,5 +214,28 @@ export class SubscriptionsRepository {
 
     return household?.createdBy || null;
   }
+
+  /**
+   * Find subscription by ID
+   */
+  async findById(id: string): Promise<SubscriptionRow | null> {
+    const supabase = await createServerClient();
+
+    const { data: subscription, error } = await supabase
+      .from("Subscription")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Not found
+      }
+      logger.error("[SubscriptionsRepository] Error fetching subscription by ID:", error);
+      return null;
+    }
+
+    return subscription as SubscriptionRow | null;
+  }
 }
 

@@ -157,7 +157,7 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
           recurring: false, // Mark as non-recurring since this is a one-time payment
         };
 
-        const res = await fetch("/api/transactions", {
+        const res = await fetch("/api/v2/transactions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

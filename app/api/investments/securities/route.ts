@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSecurities, createSecurity } from "@/lib/api/investments";
+import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { isPlanError } from "@/lib/utils/plan-errors";
+import { AppError } from "@/src/application/shared/app-error";
 import { z } from "zod";
 
 const createSecuritySchema = z.object({
@@ -30,12 +30,26 @@ export async function GET(request: Request) {
       );
     }
 
-    const securities = await getSecurities();
-    return NextResponse.json(securities);
+    const service = makeInvestmentsService();
+    const securities = await service.getSecurities();
+    
+    return NextResponse.json(securities, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=300, stale-while-revalidate=600',
+      },
+    });
   } catch (error) {
     console.error("Error fetching securities:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch securities" },
+      { error: error instanceof Error ? error.message : "Failed to fetch securities" },
       { status: 500 }
     );
   }
@@ -64,7 +78,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validated = createSecuritySchema.parse(body);
     
-    const security = await createSecurity({
+    const service = makeInvestmentsService();
+    const security = await service.createSecurity({
       symbol: validated.symbol,
       name: validated.name,
       class: validated.class,
@@ -74,14 +89,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating security:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
@@ -92,8 +103,10 @@ export async function POST(request: Request) {
       );
     }
     
-    const message = error instanceof Error ? error.message : "Failed to create security";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create security" },
+      { status: 500 }
+    );
   }
 }
 

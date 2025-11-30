@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/components/common/money";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { getInitials, isValidAvatarUrl } from "@/lib/utils/avatar";
 
 interface Account {
   id: string;
@@ -53,25 +54,6 @@ interface Account {
   institutionLogo?: string | null;
 }
 
-// Helper function to get initials from name
-function getInitials(name: string | null | undefined): string {
-  try {
-    if (!name) return "?";
-    const trimmed = name.trim();
-    if (!trimmed) return "?";
-    const parts = trimmed.split(/\s+/).filter(p => p.length > 0);
-    if (parts.length === 0) return "?";
-    if (parts.length === 1) {
-      return parts[0].substring(0, 2).toUpperCase();
-    }
-    const first = parts[0][0] || "";
-    const last = parts[parts.length - 1][0] || "";
-    return (first + last).toUpperCase() || "?";
-  } catch (error) {
-    console.error("Error getting initials:", error);
-    return "?";
-  }
-}
 
 export default function AccountsPage() {
   const perf = usePagePerformance("Accounts");
@@ -660,21 +642,24 @@ export default function AccountsPage() {
                           {account.householdName ? (
                             <div className="flex items-center gap-2">
                               <div className="relative flex-shrink-0">
-                                {account.ownerAvatarUrl ? (
+                                {isValidAvatarUrl(account.ownerAvatarUrl) ? (
                                   <>
                                     <img
-                                      src={account.ownerAvatarUrl}
+                                      src={account.ownerAvatarUrl!}
                                       alt={account.ownerName || account.householdName || "Owner"}
                                       className="h-8 w-8 rounded-full object-cover border"
+                                      loading="eager"
+                                      decoding="async"
                                       onError={(e) => {
-                                        e.currentTarget.style.display = "none";
-                                        const initialsContainer = e.currentTarget.nextElementSibling;
+                                        const img = e.currentTarget;
+                                        img.style.display = "none";
+                                        const initialsContainer = img.nextElementSibling as HTMLElement;
                                         if (initialsContainer) {
-                                          (initialsContainer as HTMLElement).style.display = "flex";
+                                          initialsContainer.style.display = "flex";
                                         }
                                       }}
                                     />
-                                    <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border">
+                                    <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border absolute top-0 left-0">
                                       {getInitials(account.ownerName || account.householdName)}
                                     </div>
                                   </>

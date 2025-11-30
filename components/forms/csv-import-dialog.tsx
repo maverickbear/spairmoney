@@ -321,7 +321,7 @@ export function CsvImportDialog({
       }
       
       // Import all transactions via batch API
-      const response = await fetch("/api/transactions/import", {
+      const response = await fetch("/api/v2/transactions/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

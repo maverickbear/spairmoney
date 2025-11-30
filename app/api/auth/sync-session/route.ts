@@ -14,11 +14,22 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient();
     
-    // First, try to get the session
+    // SECURITY: Use getUser() first to verify authentication
+    // getSession() reads from storage and may not be authentic
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "No active session found", success: false },
+        { status: 401 }
+      );
+    }
+    
+    // Now get session tokens (after verifying user is authenticated)
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     // If we have a session, use it
-    if (session && session.user) {
+    if (session && session.user && session.user.id === user.id) {
       const response = NextResponse.json({
         success: true,
         user: {
@@ -51,17 +62,6 @@ export async function POST(request: NextRequest) {
       return response;
     }
     
-    // If no session, try to get user directly (session might be in cookies)
-    const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !currentUser) {
-      console.warn("[SYNC-SESSION] No user found:", userError?.message);
-      return NextResponse.json(
-        { error: "No active session found", success: false },
-        { status: 401 }
-      );
-    }
-    
     // If we have a user but no session, try to refresh
     const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
     
@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         user: {
-          id: currentUser.id,
-          email: currentUser.email,
+          id: user.id,
+          email: user.email,
         },
         warning: "Session refresh failed, but user is authenticated",
       });
@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       user: {
-        id: currentUser.id,
-        email: currentUser.email,
+        id: user.id,
+        email: user.email,
       },
     });
     

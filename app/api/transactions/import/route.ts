@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createTransaction } from "@/lib/api/transactions";
-import { TransactionFormData, transactionSchema } from "@/src/domain/transactions/transactions.validations";
-import { ZodError } from "zod";
+import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
 import { getCurrentUserId, guardFeatureAccess } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
 
 interface ImportRequest {
   transactions: Array<{
@@ -112,73 +110,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Small imports: process immediately
-    let successCount = 0;
-    let errorCount = 0;
-    const errors: Array<{ rowIndex: number; fileName?: string; error: string }> = [];
-
-    // Process transactions in batches to avoid rate limiting
-    const batchSize = 20;
-    for (let i = 0; i < transactions.length; i += batchSize) {
-      const batch = transactions.slice(i, i + batchSize);
-      
-      // Process batch with a small delay between batches to avoid rate limiting
-      await Promise.allSettled(
-        batch.map(async (tx) => {
-          try {
-            // Convert date string to Date object if needed
-            const data: TransactionFormData = {
-              date: tx.date instanceof Date ? tx.date : new Date(tx.date),
-              type: tx.type,
-              amount: tx.amount,
-              accountId: tx.accountId,
-              toAccountId: tx.toAccountId,
-              categoryId: tx.categoryId || undefined,
-              subcategoryId: tx.subcategoryId || undefined,
-              description: tx.description || undefined,
-              recurring: tx.recurring || false,
-              expenseType: tx.expenseType || undefined,
-            };
-            
-            // Validate with schema
-            const validatedData = transactionSchema.parse(data);
-            
-            await createTransaction(validatedData);
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            let errorMessage = "Unknown error";
-            
-            if (error instanceof ZodError) {
-              errorMessage = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-            } else if (error instanceof Error) {
-              errorMessage = error.message;
-            }
-            
-            errors.push({
-              rowIndex: tx.rowIndex || 0,
-              fileName: tx.fileName,
-              error: errorMessage,
-            });
-            console.error("Error importing transaction:", error);
-          }
-        })
-      );
-
-      // Add a small delay between batches to avoid rate limiting
-      if (i + batchSize < transactions.length) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay between batches
-      }
-    }
+    // Small imports: process immediately using service
+    const service = makeTransactionsService();
+    const result = await service.importTransactions(userId, transactions);
 
     return NextResponse.json({
       success: true,
-      imported: successCount,
-      errors: errorCount,
-      errorDetails: errors,
+      ...result,
     });
   } catch (error) {
     console.error("Error in transaction import:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : "Failed to import transactions",

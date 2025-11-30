@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeBudgetsService } from "@/src/application/budgets/budgets.factory";
 import { BudgetFormData } from "@/src/domain/budgets/budgets.validations";
+import { AppError } from "@/src/application/shared/app-error";
 import { ZodError } from "zod";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 
@@ -40,6 +41,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching budgets:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch budgets" },
       { status: 500 }
@@ -69,6 +78,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error creating budget:", error);
     
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
@@ -76,12 +92,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const errorMessage = error instanceof Error ? error.message : "Failed to create budget";
-    const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;
-    
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : "Failed to create budget" },
+      { status: 500 }
     );
   }
 }

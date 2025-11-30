@@ -97,6 +97,29 @@ export class AccountsRepository {
   }
 
   /**
+   * Find multiple accounts by IDs
+   */
+  async findByIds(ids: string[], accessToken?: string, refreshToken?: string): Promise<AccountRow[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: accounts, error } = await supabase
+      .from("Account")
+      .select("id, name, type")
+      .in("id", ids);
+
+    if (error) {
+      logger.error("[AccountsRepository] Error fetching accounts by IDs:", error);
+      throw new Error(`Failed to fetch accounts: ${error.message}`);
+    }
+
+    return (accounts || []) as AccountRow[];
+  }
+
+  /**
    * Create a new account
    */
   async create(data: {

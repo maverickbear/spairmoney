@@ -100,6 +100,45 @@ export class CategoriesRepository {
   }
 
   /**
+   * Find multiple categories by IDs
+   */
+  async findCategoriesByIds(
+    ids: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<CategoryRow[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id || null;
+
+    let query = supabase
+      .from("Category")
+      .select("id, name, groupId")
+      .in("id", ids);
+
+    // If authenticated, get system defaults (userId IS NULL) OR user's own categories
+    if (userId) {
+      query = query.or(`userId.is.null,userId.eq.${userId}`);
+    } else {
+      query = query.is("userId", null);
+    }
+
+    const { data: categories, error } = await query;
+
+    if (error) {
+      logger.error("[CategoriesRepository] Error fetching categories by IDs:", error);
+      throw new Error(`Failed to fetch categories: ${error.message}`);
+    }
+
+    return (categories || []) as CategoryRow[];
+  }
+
+  /**
    * Create a new category
    */
   async createCategory(data: {
@@ -239,6 +278,45 @@ export class CategoriesRepository {
     }
 
     return subcategory as SubcategoryRow;
+  }
+
+  /**
+   * Find multiple subcategories by IDs
+   */
+  async findSubcategoriesByIds(
+    ids: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<SubcategoryRow[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id || null;
+
+    let query = supabase
+      .from("Subcategory")
+      .select("id, name, logo")
+      .in("id", ids);
+
+    // If authenticated, get system defaults (userId IS NULL) OR user's own subcategories
+    if (userId) {
+      query = query.or(`userId.is.null,userId.eq.${userId}`);
+    } else {
+      query = query.is("userId", null);
+    }
+
+    const { data: subcategories, error } = await query;
+
+    if (error) {
+      logger.error("[CategoriesRepository] Error fetching subcategories by IDs:", error);
+      throw new Error(`Failed to fetch subcategories: ${error.message}`);
+    }
+
+    return (subcategories || []) as SubcategoryRow[];
   }
 
   /**

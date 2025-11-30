@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMacros, getCategoriesByMacro, getSubcategoriesByCategory, getAllCategories, createCategory } from "@/lib/api/categories";
+import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
+/**
+ * @deprecated This route is deprecated. Use /api/v2/categories instead.
+ * This route will be removed in a future version.
+ */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -10,38 +15,48 @@ export async function GET(request: NextRequest) {
     const all = searchParams.get("all");
     const consolidated = searchParams.get("consolidated");
 
-    // If "consolidated" parameter is present, return both groups and categories in one call
+    const service = makeCategoriesService();
+
+    // If "consolidated" parameter is present, return both groups and categories
     if (consolidated === "true" || consolidated === "") {
       const [groups, categories] = await Promise.all([
-        getMacros(),
-        getAllCategories(),
+        service.getGroups(),
+        service.getAllCategories(),
       ]);
       return NextResponse.json({ groups, categories }, { status: 200 });
     }
 
     // If "all" parameter is present, return all categories
     if (all === "true" || all === "") {
-      const categories = await getAllCategories();
+      const categories = await service.getAllCategories();
       return NextResponse.json(categories, { status: 200 });
     }
 
     // If categoryId is provided, return subcategories
     if (categoryId) {
-      const subcategories = await getSubcategoriesByCategory(categoryId);
+      const subcategories = await service.getSubcategoriesByCategory(categoryId);
       return NextResponse.json(subcategories, { status: 200 });
     }
 
-    // If macroId is provided, return categories for that macro
+    // If macroId is provided, return categories for that group
     if (macroId) {
-      const categories = await getCategoriesByMacro(macroId);
+      const categories = await service.getCategoriesByGroup(macroId);
       return NextResponse.json(categories, { status: 200 });
     }
 
-    // Default: return macros
-    const macros = await getMacros();
-    return NextResponse.json(macros, { status: 200 });
+    // Default: return groups
+    const groups = await service.getGroups();
+    return NextResponse.json(groups, { status: 200 });
   } catch (error) {
     console.error("Error fetching categories:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch categories" },
       { status: 500 }
@@ -49,6 +64,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * @deprecated This route is deprecated. Use /api/v2/categories instead.
+ * This route will be removed in a future version.
+ */
 export async function POST(request: NextRequest) {
   try {
     const userId = await getCurrentUserId();
@@ -73,10 +92,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const category = await createCategory({ name, groupId: finalGroupId, macroId });
+    const service = makeCategoriesService();
+    const category = await service.createCategory({ 
+      name, 
+      groupId: finalGroupId, 
+      macroId: macroId || undefined 
+    });
+    
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     console.error("Error creating category:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create category" },
       { status: 500 }

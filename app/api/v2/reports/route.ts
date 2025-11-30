@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeReportsService } from "@/src/application/reports/reports.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import type { ReportPeriod } from "@/src/domain/reports/reports.types";
 
 /**
@@ -20,26 +21,11 @@ export async function GET(request: NextRequest) {
       ["current-month", "last-3-months", "last-6-months", "last-12-months", "year-to-date", "custom"].includes(periodParam)
     ) ? periodParam as ReportPeriod : "last-12-months";
 
-    // Get session tokens
-    let accessToken: string | undefined;
-    let refreshToken: string | undefined;
-    try {
-      const { createServerClient } = await import("@/lib/supabase-server");
-      const supabase = await createServerClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          accessToken = session.access_token;
-          refreshToken = session.refresh_token;
-        }
-      }
-    } catch (error: any) {
-      // Continue without tokens - service will try to get them itself
-    }
-
     const service = makeReportsService();
+    
+    // Get session tokens from service
+    const { accessToken, refreshToken } = await service.getSessionTokens();
+    
     const data = await service.getReportsData(userId, period, accessToken, refreshToken);
 
     return NextResponse.json(data, {
@@ -48,6 +34,15 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    console.error("Error fetching reports:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal server error" },
       { status: 500 }

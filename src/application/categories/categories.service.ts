@@ -19,6 +19,7 @@ async function canUserWrite(userId: string): Promise<boolean> {
   return service.canUserWrite(userId);
 }
 import { invalidateCache } from "@/src/infrastructure/cache/cache.manager";
+import { AppError } from "../shared/app-error";
 
 // In-memory cache for categories
 const categoriesCache = new Map<string, { data: any[]; timestamp: number; userId: string | null }>();
@@ -184,25 +185,25 @@ export class CategoriesService {
   async createCategory(data: CategoryFormData): Promise<CategoryWithRelations> {
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Check if user has paid plan
     const isPaidPlan = await canUserWrite(userId);
     if (!isPaidPlan) {
-      throw new Error("Creating custom categories requires a paid plan");
+      throw new AppError("Creating custom categories requires a paid plan", 403);
     }
 
     // Support both groupId and deprecated macroId
     const groupId = data.groupId || data.macroId;
     if (!groupId) {
-      throw new Error("groupId is required");
+      throw new AppError("groupId is required", 400);
     }
 
     // Verify group exists
     const group = await this.repository.findGroupById(groupId);
     if (!group) {
-      throw new Error("Group not found");
+      throw new AppError("Group not found", 404);
     }
 
     const id = crypto.randomUUID();
@@ -229,17 +230,17 @@ export class CategoriesService {
   async updateCategory(id: string, data: Partial<CategoryFormData>): Promise<CategoryWithRelations> {
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Verify category belongs to user
     const existingCategory = await this.repository.findCategoryById(id);
     if (!existingCategory) {
-      throw new Error("Category not found");
+      throw new AppError("Category not found", 404);
     }
 
     if (existingCategory.userId !== userId) {
-      throw new Error("Cannot update system default categories");
+      throw new AppError("Cannot update system default categories", 403);
     }
 
     const updateData: any = {
@@ -255,7 +256,7 @@ export class CategoriesService {
     if (groupId !== undefined) {
       const group = await this.repository.findGroupById(groupId);
       if (!group) {
-        throw new Error("Group not found");
+        throw new AppError("Group not found", 404);
       }
       updateData.groupId = groupId;
     }
@@ -277,17 +278,17 @@ export class CategoriesService {
   async deleteCategory(id: string): Promise<void> {
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Verify category belongs to user
     const category = await this.repository.findCategoryById(id);
     if (!category) {
-      throw new Error("Category not found");
+      throw new AppError("Category not found", 404);
     }
 
     if (category.userId !== userId) {
-      throw new Error("Cannot delete system default categories");
+      throw new AppError("Cannot delete system default categories", 403);
     }
 
     await this.repository.deleteCategory(id);
@@ -302,23 +303,23 @@ export class CategoriesService {
   async createSubcategory(data: SubcategoryFormData): Promise<SubcategoryWithRelations> {
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Verify category exists
     const category = await this.repository.findCategoryById(data.categoryId);
     if (!category) {
-      throw new Error("Category not found");
+      throw new AppError("Category not found", 404);
     }
 
     // If category is system default, user needs paid plan
     if (category.userId === null) {
       const isPaidPlan = await canUserWrite(userId);
       if (!isPaidPlan) {
-        throw new Error("Creating subcategories for system default categories requires a paid plan");
+        throw new AppError("Creating subcategories for system default categories requires a paid plan", 403);
       }
     } else if (category.userId !== userId) {
-      throw new Error("Category not found or access denied");
+      throw new AppError("Category not found or access denied", 404);
     }
 
     const id = crypto.randomUUID();
@@ -347,23 +348,23 @@ export class CategoriesService {
   async updateSubcategory(id: string, data: Partial<SubcategoryFormData>): Promise<SubcategoryWithRelations> {
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Verify subcategory exists and user has access
     const subcategory = await this.repository.findSubcategoryById(id);
     if (!subcategory) {
-      throw new Error("Subcategory not found");
+      throw new AppError("Subcategory not found", 404);
     }
 
     // Check if user can update (must own subcategory or category)
     const category = await this.repository.findCategoryById(subcategory.categoryId);
     if (!category) {
-      throw new Error("Category not found");
+      throw new AppError("Category not found", 404);
     }
 
     if (subcategory.userId !== userId && category.userId !== userId) {
-      throw new Error("Cannot update this subcategory");
+      throw new AppError("Cannot update this subcategory", 403);
     }
 
     const updateData: any = {
@@ -391,23 +392,23 @@ export class CategoriesService {
   async deleteSubcategory(id: string): Promise<void> {
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Verify subcategory exists and user has access
     const subcategory = await this.repository.findSubcategoryById(id);
     if (!subcategory) {
-      throw new Error("Subcategory not found");
+      throw new AppError("Subcategory not found", 404);
     }
 
     // Check if user can delete (must own subcategory or category)
     const category = await this.repository.findCategoryById(subcategory.categoryId);
     if (!category) {
-      throw new Error("Category not found");
+      throw new AppError("Category not found", 404);
     }
 
     if (subcategory.userId !== userId && category.userId !== userId) {
-      throw new Error("Cannot delete this subcategory");
+      throw new AppError("Cannot delete this subcategory", 403);
     }
 
     await this.repository.deleteSubcategory(id);
@@ -422,17 +423,17 @@ export class CategoriesService {
   async deleteGroup(id: string): Promise<void> {
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Verify group exists and belongs to user (can't delete system defaults)
     const group = await this.repository.findGroupById(id);
     if (!group) {
-      throw new Error("Group not found");
+      throw new AppError("Group not found", 404);
     }
 
     if (group.userId !== userId) {
-      throw new Error("Cannot delete system default groups");
+      throw new AppError("Cannot delete system default groups", 403);
     }
 
     await this.repository.deleteGroup(id);

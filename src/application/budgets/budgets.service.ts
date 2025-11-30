@@ -14,6 +14,7 @@ import { requireBudgetOwnership } from "@/lib/utils/security";
 import { logger } from "@/lib/utils/logger";
 import { invalidateBudgetCaches } from "@/src/infrastructure/cache/cache.manager";
 import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
+import { AppError } from "../shared/app-error";
 
 export class BudgetsService {
   constructor(private repository: BudgetsRepository) {}
@@ -195,7 +196,7 @@ export class BudgetsService {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Format period
@@ -216,7 +217,7 @@ export class BudgetsService {
     );
 
     if (exists) {
-      throw new Error("Budget already exists for this period and category");
+      throw new AppError("Budget already exists for this period and category", 409);
     }
 
     const id = crypto.randomUUID();

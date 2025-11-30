@@ -4,6 +4,7 @@
  */
 
 import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
+import { PlaidRepository } from "@/src/infrastructure/database/repositories/plaid.repository";
 import { AccountsMapper } from "./accounts.mapper";
 import { AccountFormData } from "../../domain/accounts/accounts.validations";
 import { AccountWithBalance, BaseAccount } from "../../domain/accounts/accounts.types";
@@ -15,6 +16,7 @@ import { requireAccountOwnership } from "@/src/infrastructure/utils/security";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { invalidateAccountCaches, invalidateTransactionCaches } from "@/src/infrastructure/cache/cache.manager";
 import { revalidateTag } from "next/cache";
+import { AppError } from "../shared/app-error";
 
 // Simple in-memory cache for request deduplication
 const requestCache = new Map<string, { promise: Promise<AccountWithBalance[]>; timestamp: number }>();
@@ -283,7 +285,7 @@ export class AccountsService {
     // Get current user
     const userId = await getCurrentUserId();
     if (!userId) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Check account limit
@@ -378,7 +380,7 @@ export class AccountsService {
     // Update owners if provided
     if (ownerIds !== undefined) {
       if (ownerIds.length === 0) {
-        throw new Error("At least one account owner is required");
+        throw new AppError("At least one account owner is required", 400);
       }
       const now = formatTimestamp(new Date());
       await this.repository.setAccountOwners(id, ownerIds, now);
@@ -403,7 +405,7 @@ export class AccountsService {
     } else {
       const hasTransactions = await this.repository.hasTransactions(id);
       if (hasTransactions) {
-        throw new Error("Account has associated transactions. Please select a destination account to transfer them to.");
+        throw new AppError("Account has associated transactions. Please select a destination account to transfer them to.", 400);
       }
     }
 
@@ -413,6 +415,43 @@ export class AccountsService {
     // Invalidate cache
     invalidateAccountCaches();
     invalidateTransactionCaches();
+  }
+
+  /**
+   * Get account by ID with institution information
+   */
+  async getAccountById(id: string): Promise<BaseAccount & { institutionName?: string | null; institutionLogo?: string | null }> {
+    // Verify account ownership
+    await requireAccountOwnership(id);
+    
+    // Get account from repository
+    const accountRow = await this.repository.findById(id);
+    
+    if (!accountRow) {
+      throw new AppError("Account not found", 404);
+    }
+    
+    const account = AccountsMapper.toDomain(accountRow);
+    
+    // Get institution name and logo from PlaidConnection if account has plaidItemId
+    let institutionName: string | null = null;
+    let institutionLogo: string | null = null;
+    
+    if (accountRow.plaidItemId) {
+      const plaidRepository = new PlaidRepository();
+      const institutionInfo = await plaidRepository.getInstitutionInfoByItemId(accountRow.plaidItemId);
+      
+      if (institutionInfo) {
+        institutionName = institutionInfo.institutionName;
+        institutionLogo = institutionInfo.institutionLogo;
+      }
+    }
+    
+    return {
+      ...account,
+      institutionName,
+      institutionLogo,
+    };
   }
 
   /**

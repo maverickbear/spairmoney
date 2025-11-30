@@ -21,7 +21,7 @@ export default function FeedbackPage() {
   async function loadFeedbacks() {
     try {
       setLoadingFeedbacks(true);
-      const response = await fetch("/api/admin/feedback");
+      const response = await fetch("/api/v2/admin/feedback");
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to load feedbacks";

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getInvestmentAccounts, createInvestmentAccount } from "@/lib/api/investments";
+import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { isPlanError } from "@/lib/utils/plan-errors";
+import { AppError } from "@/src/application/shared/app-error";
 import { investmentAccountSchema } from "@/src/domain/investments/investments.validations";
+import { ZodError } from "zod";
 
 export async function GET(request: Request) {
   try {
@@ -24,12 +25,26 @@ export async function GET(request: Request) {
       );
     }
 
-    const accounts = await getInvestmentAccounts();
-    return NextResponse.json(accounts);
+    const service = makeInvestmentsService();
+    const accounts = await service.getInvestmentAccounts();
+    
+    return NextResponse.json(accounts, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=300',
+      },
+    });
   } catch (error) {
     console.error("Error fetching investment accounts:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch investment accounts" },
+      { error: error instanceof Error ? error.message : "Failed to fetch investment accounts" },
       { status: 500 }
     );
   }
@@ -58,24 +73,31 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validated = investmentAccountSchema.parse(body);
     
-    const account = await createInvestmentAccount(validated);
+    const service = makeInvestmentsService();
+    const account = await service.createInvestmentAccount(validated);
+    
     return NextResponse.json(account, { status: 201 });
   } catch (error) {
     console.error("Error creating investment account:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
+        { status: 400 }
       );
     }
     
-    const message = error instanceof Error ? error.message : "Failed to create investment account";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create investment account" },
+      { status: 500 }
+    );
   }
 }
 

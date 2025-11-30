@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import { CategoryFormData } from "@/src/domain/categories/categories.validations";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function PATCH(
   request: NextRequest,
@@ -31,6 +32,14 @@ export async function PATCH(
     return NextResponse.json(category, { status: 200 });
   } catch (error) {
     console.error("Error updating category:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update category" },
       { status: 500 }
@@ -60,6 +69,14 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting category:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete category" },
       { status: 500 }

@@ -83,7 +83,7 @@ export function SubscriptionManagement({
     
     async function loadHouseholdInfo() {
       try {
-        const response = await fetch("/api/household/info");
+        const response = await fetch("/api/v2/household/info");
         if (response.ok) {
           const data = await response.json();
           setHouseholdInfo(data);

@@ -5,34 +5,38 @@ import {
   deletePaymentMethod, 
   setDefaultPaymentMethod 
 } from "@/lib/api/stripe";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const { paymentMethods, error } = await getPaymentMethods(authUser.id);
+    const { paymentMethods, error } = await getPaymentMethods(userId);
 
     if (error) {
-      return NextResponse.json(
-        { error },
-        { status: 500 }
-      );
+      throw new AppError(error, 500);
     }
 
     return NextResponse.json({ paymentMethods });
   } catch (error) {
     console.error("Error getting payment methods:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to get payment methods" },
+      { error: error instanceof Error ? error.message : "Failed to get payment methods" },
       { status: 500 }
     );
   }
@@ -40,30 +44,33 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const { clientSecret, error } = await createSetupIntent(authUser.id);
+    const { clientSecret, error } = await createSetupIntent(userId);
 
     if (error || !clientSecret) {
-      return NextResponse.json(
-        { error: error || "Failed to create setup intent" },
-        { status: 500 }
-      );
+      throw new AppError(error || "Failed to create setup intent", 500);
     }
 
     return NextResponse.json({ clientSecret });
   } catch (error) {
     console.error("Error creating setup intent:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to create setup intent" },
+      { error: error instanceof Error ? error.message : "Failed to create setup intent" },
       { status: 500 }
     );
   }
@@ -71,10 +78,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -85,29 +90,31 @@ export async function DELETE(request: NextRequest) {
     const { paymentMethodId } = body;
 
     if (!paymentMethodId) {
-      return NextResponse.json(
-        { error: "paymentMethodId is required" },
-        { status: 400 }
-      );
+      throw new AppError("paymentMethodId is required", 400);
     }
 
     const { success, error } = await deletePaymentMethod(
-      authUser.id,
+      userId,
       paymentMethodId
     );
 
     if (!success) {
-      return NextResponse.json(
-        { error: error || "Failed to delete payment method" },
-        { status: 500 }
-      );
+      throw new AppError(error || "Failed to delete payment method", 500);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting payment method:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to delete payment method" },
+      { error: error instanceof Error ? error.message : "Failed to delete payment method" },
       { status: 500 }
     );
   }
@@ -115,10 +122,8 @@ export async function DELETE(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -129,29 +134,31 @@ export async function PUT(request: NextRequest) {
     const { paymentMethodId } = body;
 
     if (!paymentMethodId) {
-      return NextResponse.json(
-        { error: "paymentMethodId is required" },
-        { status: 400 }
-      );
+      throw new AppError("paymentMethodId is required", 400);
     }
 
     const { success, error } = await setDefaultPaymentMethod(
-      authUser.id,
+      userId,
       paymentMethodId
     );
 
     if (!success) {
-      return NextResponse.json(
-        { error: error || "Failed to set default payment method" },
-        { status: 500 }
-      );
+      throw new AppError(error || "Failed to set default payment method", 500);
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error setting default payment method:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to set default payment method" },
+      { error: error instanceof Error ? error.message : "Failed to set default payment method" },
       { status: 500 }
     );
   }

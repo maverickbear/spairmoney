@@ -21,27 +21,65 @@ function calculateTrialDaysRemaining(trialEndDate: string | null | undefined): n
   return Math.max(0, diffDays);
 }
 
-function calculateTrialProgress(trialStartDate: string | null | undefined, trialEndDate: string | null | undefined): number {
-  if (!trialStartDate || !trialEndDate) return 0;
+function calculateTrialProgress(
+  trialStartDate: string | null | undefined, 
+  trialEndDate: string | null | undefined,
+  daysRemaining?: number
+): number {
+  if (!trialEndDate) return 0;
   
-  const startDate = new Date(trialStartDate);
   const endDate = new Date(trialEndDate);
   const now = new Date();
   
-  // Validate dates
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+  // Validate end date
+  if (isNaN(endDate.getTime())) {
     return 0;
   }
-  
-  const totalDuration = endDate.getTime() - startDate.getTime();
-  
-  if (totalDuration <= 0) return 0;
   
   // Calculate remaining time
   const remainingTime = endDate.getTime() - now.getTime();
   
   // If trial has already ended, return 0
   if (remainingTime <= 0) return 0;
+  
+  let totalDuration: number;
+  
+  if (trialStartDate) {
+    // If we have start date, use it to calculate total duration
+    const startDate = new Date(trialStartDate);
+    if (isNaN(startDate.getTime())) {
+      return 0;
+    }
+    totalDuration = endDate.getTime() - startDate.getTime();
+  } else if (daysRemaining !== undefined && daysRemaining > 0) {
+    // If we don't have start date but have days remaining, estimate total duration
+    // Calculate elapsed time from now to end date, then estimate total
+    // We know: remainingTime = time from now to end
+    // We need: totalDuration = time from start to end
+    // Estimate: if we have daysRemaining, we can estimate elapsed days
+    // Common trial periods: 7, 14, 30 days. Use daysRemaining to estimate.
+    // If daysRemaining is high (e.g., 25), trial is likely 30 days
+    // If daysRemaining is medium (e.g., 10-20), trial is likely 14 days  
+    // If daysRemaining is low (e.g., <10), trial is likely 7 days
+    let estimatedTotalDays: number;
+    if (daysRemaining >= 20) {
+      estimatedTotalDays = 30; // Likely a 30-day trial
+    } else if (daysRemaining >= 5) {
+      estimatedTotalDays = 14; // Likely a 14-day trial
+    } else {
+      estimatedTotalDays = 7; // Likely a 7-day trial
+    }
+    
+    // Calculate elapsed days (estimated)
+    const elapsedDays = estimatedTotalDays - daysRemaining;
+    // Use the actual remaining time and add estimated elapsed time
+    totalDuration = remainingTime + (elapsedDays * 24 * 60 * 60 * 1000);
+  } else {
+    // Fallback: assume 14-day trial period
+    totalDuration = 14 * 24 * 60 * 60 * 1000;
+  }
+  
+  if (totalDuration <= 0) return 0;
   
   // Calculate progress as percentage of remaining time
   // This way the slider starts at 100% and decreases as days pass
@@ -61,42 +99,48 @@ export function TrialWidget({
   onUpgrade,
   planName 
 }: TrialWidgetProps) {
-  const [currentProgress, setCurrentProgress] = useState(initialProgress || 0);
   const router = useRouter();
+
+  // Calculate initial progress value
+  const getInitialProgress = (): number => {
+    if (trialEndDate) {
+      const calculated = calculateTrialProgress(trialStartDate, trialEndDate, daysRemaining);
+      // Use calculated value if it's valid (even if 0)
+      if (!isNaN(calculated)) {
+        return calculated;
+      }
+    }
+    // Fallback to initialProgress if dates are not available or calculation fails
+    return initialProgress || 0;
+  };
+
+  const [currentProgress, setCurrentProgress] = useState(getInitialProgress());
 
   // Update progress dynamically
   useEffect(() => {
-    // Recalculate progress immediately
     const updateProgress = () => {
-      if (trialStartDate && trialEndDate) {
-        const newProgress = calculateTrialProgress(trialStartDate, trialEndDate);
-        // Only update if we got a valid progress value (> 0)
-        // If calculation fails or returns 0 but initialProgress is valid, keep initialProgress
-        if (newProgress > 0) {
-          setCurrentProgress(newProgress);
-        } else if (initialProgress > 0) {
-          // Keep initialProgress if calculation fails
-          setCurrentProgress(initialProgress);
+      if (trialEndDate) {
+        const calculated = calculateTrialProgress(trialStartDate, trialEndDate, daysRemaining);
+        // Use calculated value if it's valid (even if 0)
+        if (!isNaN(calculated)) {
+          setCurrentProgress(calculated);
+          return;
         }
-      } else {
-        // Use initialProgress if dates are not available
-        setCurrentProgress(initialProgress || 0);
+      }
+      // Fallback to initialProgress if dates are not available or calculation fails
+      if (initialProgress !== undefined && initialProgress !== null) {
+        setCurrentProgress(initialProgress);
       }
     };
 
-    // Initialize with initialProgress first
-    if (initialProgress !== undefined && initialProgress !== null) {
-      setCurrentProgress(initialProgress);
-    }
-
-    // Then try to recalculate if dates are available
+    // Update immediately
     updateProgress();
 
     // Update every minute to keep it dynamic
     const interval = setInterval(updateProgress, 60000); // 60000ms = 1 minute
 
     return () => clearInterval(interval);
-  }, [trialStartDate, trialEndDate, initialProgress]);
+  }, [trialStartDate, trialEndDate, initialProgress, daysRemaining]);
 
   const handleClick = () => {
     if (onUpgrade) {
@@ -135,15 +179,17 @@ export function TrialWidget({
           <div className="relative mb-3">
             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
               <div 
-                className="h-full bg-primary rounded-full transition-all"
-                style={{ width: `${currentProgress}%` }}
+                className="h-full bg-primary rounded-full transition-all duration-300"
+                style={{ width: `${Math.max(0, Math.min(100, currentProgress))}%` }}
               />
             </div>
             {/* Vertical indicator/thumb at the end of progress */}
-            <div 
-              className="absolute top-1/2 -translate-y-1/2 h-3 w-0.5 bg-primary"
-              style={{ left: `calc(${currentProgress}% - 1px)` }}
-            />
+            {currentProgress > 0 && (
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 h-3 w-0.5 bg-primary transition-all duration-300"
+                style={{ left: `calc(${Math.max(0, Math.min(100, currentProgress))}% - 1px)` }}
+              />
+            )}
           </div>
           
           {/* Plan name */}

@@ -75,7 +75,7 @@ export function PlanDialog({
 
     setLoading(true);
     try {
-      const response = await fetch("/api/admin/plans", {
+      const response = await fetch("/api/v2/admin/plans", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeMembersService } from "@/src/application/members/members.factory";
 import { MemberInviteFormData, memberInviteSchema } from "@/src/domain/members/members.validations";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import { ZodError } from "zod";
 
 export async function GET(request: NextRequest) {
@@ -17,14 +18,19 @@ export async function GET(request: NextRequest) {
 
     const service = makeMembersService();
     const members = await service.getHouseholdMembers(userId);
-    
-    // Get user role (temporary: using old function until migrated to service)
-    const { getUserRoleOptimized } = await import("@/lib/api/members");
-    const userRole = await getUserRoleOptimized(userId);
+    const userRole = await service.getUserRole(userId);
 
     return NextResponse.json({ members, userRole }, { status: 200 });
   } catch (error) {
     console.error("Error fetching members:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch members" },
       { status: 500 }
@@ -53,6 +59,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error inviting member:", error);
 
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
@@ -60,12 +73,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const errorMessage = error instanceof Error ? error.message : "Failed to invite member";
-    const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;
-
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : "Failed to invite member" },
+      { status: 500 }
     );
   }
 }

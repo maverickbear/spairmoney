@@ -8,6 +8,7 @@
 import { planFeaturesSchema, type PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
 import { getDefaultFeatures } from "@/lib/utils/plan-features";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { AppError } from "./app-error";
 
 const log = logger.withPrefix("PLAN-FEATURES-SERVICE");
 
@@ -166,8 +167,9 @@ export function validateFeaturesForSave(
       error: validationResult.error.errors,
       features,
     });
-    throw new Error(
-      `Invalid features: ${validationResult.error.errors.map(e => e.message).join(', ')}`
+    throw new AppError(
+      `Invalid features: ${validationResult.error.errors.map(e => e.message).join(', ')}`,
+      400
     );
   }
   

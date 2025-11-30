@@ -4,7 +4,6 @@ import { Nav } from "@/components/nav";
 import { BottomNav } from "@/components/bottom-nav";
 import { MobileHeader } from "@/components/mobile-header";
 import { CancelledSubscriptionBanner } from "@/components/common/cancelled-subscription-banner";
-import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { useFixedElementsHeight } from "@/hooks/use-fixed-elements-height";
 import { useEffect, useState, memo, useMemo } from "react";
 import { useSubscriptionContext } from "@/contexts/subscription-context";
@@ -211,9 +210,6 @@ export const LayoutWrapper = memo(function LayoutWrapper({ children }: { childre
       
       {/* Bottom Navigation - Fixed Bottom (mobile only) */}
       <BottomNav hasSubscription={showNav} />
-      
-      {/* PWA Install Prompt - Mobile only */}
-      <PWAInstallPrompt />
     </div>
   );
 });

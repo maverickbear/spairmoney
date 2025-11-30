@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { getTransactionAmount, decryptDescription } from "@/src/infrastructure/utils/transaction-encryption";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/transactions/by-ids
  * Get transactions by their IDs
+ * Note: This is an auxiliary route. Consider using TransactionsService.getTransactions() with filters instead.
  */
 export async function POST(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { ids } = body;
 
@@ -20,15 +28,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createServerClient();
     
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
     // Fetch transactions by IDs
     const { data: transactions, error } = await supabase
       .from("Transaction")
@@ -41,14 +40,12 @@ export async function POST(request: NextRequest) {
         account:Account(id, name)
       `)
       .in("id", ids)
+      .eq("userId", userId) // Ensure user can only access their own transactions
       .order("date", { ascending: false });
 
     if (error) {
       console.error("Error fetching transactions:", error);
-      return NextResponse.json(
-        { error: "Failed to fetch transactions" },
-        { status: 500 }
-      );
+      throw new AppError("Failed to fetch transactions", 500);
     }
 
     // Decrypt descriptions and format amounts
@@ -71,11 +68,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(formattedTransactions);
   } catch (error) {
     console.error("Error in POST /api/transactions/by-ids:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
   }
 }
-
-

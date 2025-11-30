@@ -418,10 +418,10 @@ export function SubscriptionForm({
       }
     }
     
-    // If not found, try to fetch from API
-    try {
-      const res = await fetch(`/api/categories?categoryId=${selectedCategoryId || ""}`);
-      if (res.ok) {
+      // If not found, try to fetch from API
+      try {
+        const res = await fetch(`/api/v2/categories?categoryId=${selectedCategoryId || ""}`);
+        if (res.ok) {
         const subcats = await res.json();
         const found = subcats.find((sc: any) => sc.id === subcategoryId);
         if (found) {
@@ -610,7 +610,7 @@ export function SubscriptionForm({
           variant: "success",
         });
       } else {
-        const response = await fetch("/api/user-subscriptions", {
+        const response = await fetch("/api/v2/user-subscriptions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

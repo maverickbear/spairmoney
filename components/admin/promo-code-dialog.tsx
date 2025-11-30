@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import type { PromoCode } from "@/lib/api/admin";
+import type { PromoCode } from "@/src/domain/admin/admin.types";
 import { DatePicker } from "@/components/ui/date-picker";
 
 const promoCodeSchema = z.object({
@@ -108,7 +108,7 @@ export function PromoCodeDialog({
 
       if (promoCode) {
         // Update
-        const response = await fetch("/api/admin/promo-codes", {
+        const response = await fetch("/api/v2/admin/promo-codes", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -123,7 +123,7 @@ export function PromoCodeDialog({
         }
       } else {
         // Create
-        const response = await fetch("/api/admin/promo-codes", {
+        const response = await fetch("/api/v2/admin/promo-codes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

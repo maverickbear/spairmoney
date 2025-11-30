@@ -12,6 +12,7 @@ import { formatTimestamp, formatDateOnly } from "@/src/infrastructure/utils/time
 import { encryptDescription } from "@/src/infrastructure/utils/transaction-encryption";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { AppError } from "../shared/app-error";
 
 export class PlannedPaymentsService {
   constructor(private repository: PlannedPaymentsRepository) {}
@@ -103,12 +104,12 @@ export class PlannedPaymentsService {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     const householdId = await getActiveHouseholdId(user.id);
     if (!householdId) {
-      throw new Error("No active household found. Please contact support.");
+      throw new AppError("No active household found. Please contact support.", 400);
     }
 
     const date = data.date instanceof Date ? data.date : new Date(data.date);
@@ -150,7 +151,7 @@ export class PlannedPaymentsService {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     const updateData: any = {};
@@ -223,11 +224,11 @@ export class PlannedPaymentsService {
 
     const plannedPayment = await this.repository.findById(id);
     if (!plannedPayment) {
-      throw new Error("Planned payment not found");
+      throw new AppError("Planned payment not found", 404);
     }
 
     if (plannedPayment.status !== "scheduled") {
-      throw new Error("Only scheduled payments can be marked as paid");
+      throw new AppError("Only scheduled payments can be marked as paid", 400);
     }
 
     // Create transaction from planned payment
@@ -268,11 +269,11 @@ export class PlannedPaymentsService {
   async skipPlannedPayment(id: string): Promise<BasePlannedPayment> {
     const plannedPayment = await this.repository.findById(id);
     if (!plannedPayment) {
-      throw new Error("Planned payment not found");
+      throw new AppError("Planned payment not found", 404);
     }
 
     if (plannedPayment.status !== "scheduled") {
-      throw new Error("Only scheduled payments can be skipped");
+      throw new AppError("Only scheduled payments can be skipped", 400);
     }
 
     const supabase = await createServerClient();
@@ -291,11 +292,11 @@ export class PlannedPaymentsService {
   async cancelPlannedPayment(id: string): Promise<BasePlannedPayment> {
     const plannedPayment = await this.repository.findById(id);
     if (!plannedPayment) {
-      throw new Error("Planned payment not found");
+      throw new AppError("Planned payment not found", 404);
     }
 
     if (plannedPayment.status === "paid") {
-      throw new Error("Paid payments cannot be cancelled");
+      throw new AppError("Paid payments cannot be cancelled", 400);
     }
 
     const supabase = await createServerClient();

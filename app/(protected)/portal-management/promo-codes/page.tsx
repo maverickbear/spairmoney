@@ -20,7 +20,7 @@ export default function PromoCodesPage() {
 
   async function loadPromoCodes() {
     try {
-      const response = await fetch("/api/admin/promo-codes");
+      const response = await fetch("/api/v2/admin/promo-codes");
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to load promo codes";
@@ -64,7 +64,7 @@ export default function PromoCodesPage() {
   }
 
   async function handleDeletePromoCode(id: string) {
-    const response = await fetch(`/api/admin/promo-codes?id=${id}`, {
+    const response = await fetch(`/api/v2/admin/promo-codes?id=${id}`, {
       method: "DELETE",
     });
 
@@ -77,7 +77,7 @@ export default function PromoCodesPage() {
   }
 
   async function handleTogglePromoCodeActive(id: string, isActive: boolean) {
-    const response = await fetch("/api/admin/promo-codes", {
+    const response = await fetch("/api/v2/admin/promo-codes", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

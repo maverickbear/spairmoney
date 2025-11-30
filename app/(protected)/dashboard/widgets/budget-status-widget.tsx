@@ -35,12 +35,12 @@ export function BudgetStatusWidget({
 
   if (budgets.length === 0) {
     return (
-      <Card className="h-full">
+      <Card className="h-full flex flex-col">
         <CardHeader>
           <CardTitle>Budget Status</CardTitle>
           <CardDescription>Used vs remaining in your budgets</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-y-auto max-h-[300px]">
           <div className="flex items-center justify-center py-8">
             <p className="text-sm text-muted-foreground">No budgets set for this period</p>
           </div>
@@ -50,12 +50,12 @@ export function BudgetStatusWidget({
   }
 
   return (
-    <Card className="h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle>Budget Status</CardTitle>
         <CardDescription>Used vs remaining in your budgets</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 overflow-y-auto max-h-[300px] pr-2">
         <div className="space-y-4">
           {sortedBudgets.map((budget) => {
             const percentage = budget.percentage || 0;

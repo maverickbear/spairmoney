@@ -65,7 +65,11 @@ export async function calculateIncomeBasis(
     end: currentMonth,
   });
 
-  logger.log("[GOALS] Calculating income basis from last 3 months:", months.length, "months");
+  logger.log(
+    `[GOALS] Calculating income basis: analyzing ${months.length} months ` +
+    `(from ${months[0]?.toISOString().substring(0, 7)} to ${months[months.length - 1]?.toISOString().substring(0, 7)}) ` +
+    `and averaging monthly income`
+  );
 
   // Import decryption utilities
   const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
@@ -96,16 +100,25 @@ export async function calculateIncomeBasis(
         return sum + amount;
       }, 0);
       
-      logger.log(`[GOALS] Month ${monthStart.toISOString().substring(0, 7)}: ${transactions?.length || 0} transactions, total: ${monthIncome}`);
+      logger.debug(
+        `[GOALS] Month ${monthStart.toISOString().substring(0, 7)}: ` +
+        `${transactions?.length || 0} transaction(s), total income: ${monthIncome}`
+      );
       return monthIncome;
     })
   );
 
-  // Calculate rolling average
+  // Calculate average of all months analyzed
   const totalIncome = monthlyIncomes.reduce((sum, income) => sum + income, 0);
+  const monthsWithData = monthlyIncomes.filter(income => income > 0).length;
   const avgIncome = monthlyIncomes.length > 0 ? totalIncome / monthlyIncomes.length : 0;
 
-  logger.log("[GOALS] Total income (3 months):", totalIncome, "Average monthly:", avgIncome);
+  logger.log(
+    `[GOALS] Income basis calculation complete: ` +
+    `Total income across ${months.length} months: ${totalIncome}, ` +
+    `Months with data: ${monthsWithData}, ` +
+    `Average monthly income: ${avgIncome}`
+  );
 
   return avgIncome;
 }

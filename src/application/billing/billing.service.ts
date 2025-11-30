@@ -7,10 +7,11 @@
 import { BaseBillingData, BaseLimitCheckResult } from "../../domain/billing/billing.types";
 import { makeSubscriptionsService } from "../subscriptions/subscriptions.factory";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { AppError } from "../shared/app-error";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY is not set");
+  throw new AppError("STRIPE_SECRET_KEY is not set", 500);
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {

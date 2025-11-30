@@ -37,7 +37,7 @@ export default function UsersPage() {
   async function loadUsers() {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/users");
+      const response = await fetch("/api/v2/admin/users");
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to load users";

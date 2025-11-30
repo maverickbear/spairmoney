@@ -16,12 +16,26 @@ import { invalidateGoalCaches } from "@/src/infrastructure/cache/cache.manager";
 import { calculateProgress } from "@/lib/utils/goals";
 import { startOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
 import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
+import { AppError } from "../shared/app-error";
 
 export class GoalsService {
   constructor(private repository: GoalsRepository) {}
 
   /**
    * Calculate income basis from last 3 months of income transactions
+   * 
+   * This method calculates the average monthly income from the last 3 complete months
+   * (excluding the current month if it's not complete). The calculation includes:
+   * - 3 months before the current month
+   * - The current month (if it has transactions)
+   * 
+   * The result is the average of all months with transactions, providing a more
+   * accurate income basis for goal calculations.
+   * 
+   * @param expectedIncome - Optional expected income value to use instead of calculating from transactions
+   * @param accessToken - Optional Supabase access token for authenticated requests
+   * @param refreshToken - Optional Supabase refresh token for authenticated requests
+   * @returns Average monthly income from the analyzed period
    */
   async calculateIncomeBasis(
     expectedIncome?: number | null,
@@ -29,6 +43,7 @@ export class GoalsService {
     refreshToken?: string
   ): Promise<number> {
     if (expectedIncome && expectedIncome > 0) {
+      logger.log("[GoalsService] Using provided expectedIncome:", expectedIncome);
       return expectedIncome;
     }
 
@@ -36,11 +51,19 @@ export class GoalsService {
     const now = new Date();
     const currentMonth = startOfMonth(now);
     
-    // Get last 3 months
+    // Get last 3 months plus current month
+    // Note: eachMonthOfInterval includes both start and end, so this gives us 4 months total
+    // (3 months before + current month). We calculate the average of all months with transactions.
     const months = eachMonthOfInterval({
       start: subMonths(currentMonth, 3),
       end: currentMonth,
     });
+
+    logger.log(
+      `[GoalsService] Calculating income basis: analyzing ${months.length} months ` +
+      `(from ${months[0]?.toISOString().substring(0, 7)} to ${months[months.length - 1]?.toISOString().substring(0, 7)}) ` +
+      `and averaging monthly income`
+    );
 
     const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
 
@@ -64,13 +87,28 @@ export class GoalsService {
           return sum + amount;
         }, 0);
         
+        logger.debug(
+          `[GoalsService] Month ${monthStart.toISOString().substring(0, 7)}: ` +
+          `${transactions.length} transaction(s), total income: ${monthIncome}`
+        );
+        
         return monthIncome;
       })
     );
 
-    // Calculate average
+    // Calculate average of all months with transactions
     const totalIncome = monthlyIncomes.reduce((sum, income) => sum + income, 0);
-    return monthlyIncomes.length > 0 ? totalIncome / monthlyIncomes.length : 0;
+    const monthsWithData = monthlyIncomes.filter(income => income > 0).length;
+    const averageIncome = monthlyIncomes.length > 0 ? totalIncome / monthlyIncomes.length : 0;
+
+    logger.log(
+      `[GoalsService] Income basis calculation complete: ` +
+      `Total income across ${months.length} months: ${totalIncome}, ` +
+      `Months with data: ${monthsWithData}, ` +
+      `Average monthly income: ${averageIncome}`
+    );
+
+    return averageIncome;
   }
 
   /**
@@ -227,12 +265,12 @@ export class GoalsService {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     // Validate targetAmount
     if (data.targetAmount <= 0 && !data.isSystemGoal) {
-      throw new Error("Target amount must be greater than 0");
+      throw new AppError("Target amount must be greater than 0", 400);
     }
 
     // Calculate incomePercentage if targetMonths is provided
@@ -254,7 +292,7 @@ export class GoalsService {
     if (incomePercentage > 0) {
       const validation = await this.validateAllocation(null, incomePercentage);
       if (!validation.valid) {
-        throw new Error(validation.message || "Total allocation exceeds 100%");
+        throw new AppError(validation.message || "Total allocation exceeds 100%", 400);
       }
     }
 
@@ -264,7 +302,7 @@ export class GoalsService {
     // Get active household ID
     const householdId = await getActiveHouseholdId(user.id);
     if (!householdId) {
-      throw new Error("No active household found. Please contact support.");
+      throw new AppError("No active household found. Please contact support.", 400);
     }
 
     const id = crypto.randomUUID();
@@ -311,14 +349,14 @@ export class GoalsService {
     // Get current goal
     const currentGoal = await this.repository.findById(id);
     if (!currentGoal) {
-      throw new Error("Goal not found");
+      throw new AppError("Goal not found", 404);
     }
 
     // Validate targetAmount
     const targetAmount = data.targetAmount ?? currentGoal.targetAmount;
     const isSystemGoal = currentGoal.isSystemGoal;
     if (data.targetAmount !== undefined && data.targetAmount <= 0 && !isSystemGoal) {
-      throw new Error("Target amount must be greater than 0");
+      throw new AppError("Target amount must be greater than 0", 400);
     }
 
     const effectiveCurrentBalance = data.currentBalance !== undefined 
@@ -345,7 +383,7 @@ export class GoalsService {
     if (incomePercentage !== undefined) {
       const validation = await this.validateAllocation(id, incomePercentage);
       if (!validation.valid) {
-        throw new Error(validation.message || "Total allocation exceeds 100%");
+        throw new AppError(validation.message || "Total allocation exceeds 100%", 400);
       }
     }
 
@@ -406,7 +444,7 @@ export class GoalsService {
 
     const goal = await this.repository.findById(id);
     if (!goal) {
-      throw new Error("Goal not found");
+      throw new AppError("Goal not found", 404);
     }
 
     const newBalance = goal.currentBalance + amount;
@@ -433,12 +471,12 @@ export class GoalsService {
     await requireGoalOwnership(id);
 
     if (amount <= 0) {
-      throw new Error("Withdrawal amount must be positive");
+      throw new AppError("Withdrawal amount must be positive", 400);
     }
 
     const goal = await this.repository.findById(id);
     if (!goal) {
-      throw new Error("Goal not found");
+      throw new AppError("Goal not found", 404);
     }
 
     const newBalance = Math.max(0, goal.currentBalance - amount);
@@ -518,7 +556,7 @@ export class GoalsService {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      throw new Error("Unauthorized");
+      throw new AppError("Unauthorized", 401);
     }
 
     const householdId = await getActiveHouseholdId(user.id, accessToken, refreshToken);

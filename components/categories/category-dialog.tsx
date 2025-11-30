@@ -111,7 +111,7 @@ export function CategoryDialog({
   useEffect(() => {
     async function loadCurrentUser() {
       try {
-        const response = await fetch("/api/user");
+        const response = await fetch("/api/v2/user");
         if (response.ok) {
           const data = await response.json();
           setCurrentUserId(data.user?.id || null);

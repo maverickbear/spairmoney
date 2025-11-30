@@ -12,7 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, AlertTriangle, Ban, Calendar } from "lucide-react";
+import { Loader2, AlertTriangle, Ban, Calendar, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
@@ -451,9 +452,10 @@ export function ManageSubscriptionDialog({
             </SimpleTabsContent>
 
             {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-2 rounded mx-6">
-                {error}
-              </div>
+              <Alert variant="destructive" className="mx-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
         </SimpleTabs>
 

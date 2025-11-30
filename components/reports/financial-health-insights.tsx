@@ -67,20 +67,16 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
                   key={alert.id}
                   className={cn(getSeverityColor(alert.severity))}
                 >
-                  <div className="flex items-start gap-3">
                     {getSeverityIcon(alert.severity)}
-                    <div className="flex-1">
                       <AlertTitle className="text-sm font-semibold">
                         {alert.title}
                       </AlertTitle>
-                      <AlertDescription className="text-sm mt-1">
+                  <AlertDescription className="text-sm">
                         {alert.description}
-                      </AlertDescription>
                       {alert.action && (
                         <p className="text-xs mt-2 font-medium">{alert.action}</p>
                       )}
-                    </div>
-                  </div>
+                  </AlertDescription>
                 </Alert>
               ))}
             </div>

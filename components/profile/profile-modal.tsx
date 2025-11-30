@@ -57,7 +57,7 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
   async function loadProfile() {
     try {
       setLoading(true);
-      const res = await fetch("/api/profile");
+      const res = await fetch("/api/v2/profile");
       
       if (!res.ok) {
         console.error("Error fetching profile:", res.status, res.statusText);
@@ -166,7 +166,7 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
       formData.append("file", file);
 
       // Upload to Supabase Storage
-      const res = await fetch("/api/profile/avatar", {
+      const res = await fetch("/api/v2/profile/avatar", {
         method: "POST",
         body: formData,
       });
@@ -217,7 +217,7 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
     try {
       setSaving(true);
 
-      const res = await fetch("/api/profile", {
+      const res = await fetch("/api/v2/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

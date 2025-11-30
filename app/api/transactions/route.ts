@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createTransaction, getTransactions } from "@/lib/api/transactions";
+import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
 import { TransactionFormData, transactionSchema } from "@/src/domain/transactions/transactions.validations";
 import { ZodError } from "zod";
+import { AppError } from "@/src/application/shared/app-error";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 
+/**
+ * @deprecated This route is deprecated. Use /api/v2/transactions instead.
+ * This route will be removed in a future version.
+ */
 export async function GET(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     
     // Parse filters from query parameters
@@ -13,7 +24,7 @@ export async function GET(request: NextRequest) {
       endDate?: Date;
       categoryId?: string;
       accountId?: string;
-      type?: string;
+      type?: 'income' | 'expense' | 'transfer';
       search?: string;
       recurring?: boolean;
       page?: number;
@@ -26,8 +37,6 @@ export async function GET(request: NextRequest) {
     if (searchParams.get("endDate")) {
       filters.endDate = new Date(searchParams.get("endDate")!);
     }
-    // Se endDate não for fornecido, não aplicamos filtro de data final
-    // Isso permite mostrar todas as transações, incluindo as futuras
     if (searchParams.get("categoryId")) {
       filters.categoryId = searchParams.get("categoryId")!;
     }
@@ -35,7 +44,7 @@ export async function GET(request: NextRequest) {
       filters.accountId = searchParams.get("accountId")!;
     }
     if (searchParams.get("type")) {
-      filters.type = searchParams.get("type")!;
+      filters.type = searchParams.get("type")! as 'income' | 'expense' | 'transfer';
     }
     if (searchParams.get("search")) {
       filters.search = searchParams.get("search")!;
@@ -54,33 +63,17 @@ export async function GET(request: NextRequest) {
       filters.limit = parseInt(limit, 10);
     }
     
-    // OPTIMIZED: Check for force refresh parameter to bypass unstable_cache
-    // This is used after creating/updating/deleting transactions to ensure fresh data
-    const forceRefresh = searchParams.get("_forceRefresh") === "true";
+    const service = makeTransactionsService();
+    const result = await service.getTransactions(filters);
     
-    // If force refresh is requested, bypass cache by adding a temporary search parameter
-    // This makes getTransactions() skip unstable_cache (searches bypass cache)
-    // The search parameter will be filtered out in getTransactionsInternal if it starts with "_refresh_"
-    let result;
-    if (forceRefresh && !filters.search) {
-      // Add temporary search parameter to bypass cache
-      // getTransactionsInternal will ignore searches starting with "_refresh_"
-      result = await getTransactions({ ...filters, search: `_refresh_${Date.now()}` });
-    } else {
-      result = await getTransactions(filters);
-    }
-    
-    // Use appropriate cache headers based on whether search is active
-    // Search results should not be cached, but regular queries can be cached briefly
-    // Note: Cache is invalidated server-side via revalidateTag, but we also set shorter browser cache
-    // to ensure UI updates quickly after deletions
+    // Use appropriate cache headers
     const hasSearch = !!filters.search;
     const cacheHeaders = hasSearch
       ? {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
         }
       : {
-          'Cache-Control': 'private, max-age=0, must-revalidate', // Changed from max-age=10 to 0 to force revalidation
+          'Cache-Control': 'private, max-age=0, must-revalidate',
         };
     
     return NextResponse.json(result, { 
@@ -89,34 +82,52 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching transactions:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch transactions" },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
 
+/**
+ * @deprecated This route is deprecated. Use /api/v2/transactions instead.
+ * This route will be removed in a future version.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
     // Date is now sent as YYYY-MM-DD string from frontend to avoid timezone issues
-    // Convert to Date object for validation (formatDateOnly will convert back to YYYY-MM-DD)
+    // Convert to Date object for validation
     const data: TransactionFormData = {
       ...body,
-      // If it's already a Date, use it; otherwise parse the YYYY-MM-DD string
-      // Note: body.date should be YYYY-MM-DD string, not ISO timestamp
       date: body.date instanceof Date ? body.date : new Date(body.date + 'T00:00:00'),
     };
     
     // Validate with schema
     const validatedData = transactionSchema.parse(data);
     
-    const transaction = await createTransaction(validatedData);
+    const service = makeTransactionsService();
+    const transaction = await service.createTransaction(validatedData);
     
     return NextResponse.json(transaction, { status: 201 });
   } catch (error) {
     console.error("Error creating transaction:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     // Handle validation errors
     if (error instanceof ZodError) {

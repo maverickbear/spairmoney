@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AlertTriangle, Loader2, Eye, EyeOff } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/toast-provider";
 
 interface DeleteAccountDialogProps {
@@ -46,7 +47,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
     setLoading(true);
 
     try {
-      const response = await fetch("/api/profile/delete-account", {
+      const response = await fetch("/api/v2/profile/delete-account", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -120,17 +121,18 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         </DialogHeader>
 
         <div className="space-y-4 py-4 px-6">
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 space-y-2">
-            <p className="text-sm font-medium text-destructive">
-              Warning: This will permanently delete your account
-            </p>
-            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Warning: This will permanently delete your account</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc list-inside space-y-1 mt-2">
               <li>All your data (transactions, accounts, budgets, goals) will be permanently deleted</li>
               <li>Your active subscription will be cancelled immediately</li>
               <li>This action cannot be undone - there is no recovery period</li>
               <li>You will not be able to access your account after deletion</li>
             </ul>
-          </div>
+            </AlertDescription>
+          </Alert>
 
           <div className="space-y-2">
             <Label htmlFor="delete-password">Enter your password to confirm</Label>
@@ -184,9 +186,10 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
           </div>
 
           {error && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
         </div>
 

@@ -202,7 +202,7 @@ export function InvestmentTransactionForm({
 
   async function checkAccountsAndShowForm() {
     try {
-      const accountsRes = await fetch("/api/accounts");
+      const accountsRes = await fetch("/api/v2/accounts");
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
         if (accountsData.length === 0) {

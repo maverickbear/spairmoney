@@ -80,7 +80,7 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
         }
       } else {
         // Invite new member
-        const res = await fetch("/api/members", {
+        const res = await fetch("/api/v2/members", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),

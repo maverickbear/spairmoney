@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Loader2, AlertCircle, Mail, HelpCircle } from "lucide-react";
+import { Loader2, AlertCircle, Mail, HelpCircle, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { setTrustedBrowser } from "@/lib/utils/trusted-browser";
 
@@ -94,6 +95,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [trustBrowser, setTrustBrowser] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const isVerifyingRef = useRef(false);
 
   // Focus first input on mount
   useEffect(() => {
@@ -141,6 +143,25 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       inputRefs.current[index + 1]?.focus();
     }
   };
+
+  // Auto-verify when all 6 digits are entered
+  useEffect(() => {
+    const otpCode = otp.join("");
+    if (otpCode.length === 6 && !loading && !isVerifyingRef.current && email) {
+      isVerifyingRef.current = true;
+      // Use a small delay to ensure state is updated
+      const timer = setTimeout(() => {
+        handleVerify().finally(() => {
+          isVerifyingRef.current = false;
+        });
+      }, 100);
+      return () => {
+        clearTimeout(timer);
+        isVerifyingRef.current = false;
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp, loading, email]);
 
   // Handle backspace
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -453,21 +474,19 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded-[12px] bg-destructive/10 border border-destructive/20 p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-destructive">{error}</p>
-          </div>
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {successMessage && (
-        <div className="rounded-[12px] bg-green-500/10 border border-green-500/20 p-4 flex items-start gap-3">
-          <Mail className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-green-600">{successMessage}</p>
-          </div>
-        </div>
+        <Alert>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>Success</AlertTitle>
+          <AlertDescription>{successMessage}</AlertDescription>
+        </Alert>
       )}
 
       <div className="space-y-4">
@@ -508,6 +527,12 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
             />
           ))}
         </div>
+        {loading && (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Verifying...</span>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -544,45 +569,27 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
           </div>
         </div>
 
-        <Button 
-          onClick={handleVerify}
-          className="w-full h-11 text-base font-medium" 
-          disabled={loading || otp.join("").length !== 6}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Verifying...
-            </>
-          ) : (
-            "Verify and Sign In"
-          )}
-        </Button>
       </div>
 
-      <div className="text-center space-y-2">
-        <p className="text-sm text-muted-foreground">
-          Didn't receive the code?
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground inline">
+          Didn't receive the code?{" "}
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resending || loading}
+            className="text-sm text-primary hover:underline font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {resending ? (
+              <>
+                <Loader2 className="w-4 h-4 inline mr-1 animate-spin" />
+                Resending...
+              </>
+            ) : (
+              "Resend Code"
+            )}
+          </button>
         </p>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleResend}
-          disabled={resending || loading}
-          className="text-sm"
-        >
-          {resending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Resending...
-            </>
-          ) : (
-            <>
-              <Mail className="w-4 h-4 mr-2" />
-              Resend Code
-            </>
-          )}
-        </Button>
       </div>
 
       {onBack && (

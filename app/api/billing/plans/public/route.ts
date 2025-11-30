@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPlans } from "@/lib/api/subscription";
+import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * Public endpoint to fetch plans without authentication
@@ -7,15 +8,29 @@ import { getPlans } from "@/lib/api/subscription";
  */
 export async function GET() {
   try {
-    const plans = await getPlans();
+    const service = makeSubscriptionsService();
+    const plans = await service.getPlans();
     
-    return NextResponse.json({
-      plans,
-    });
+    return NextResponse.json(
+      { plans },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
+        },
+      }
+    );
   } catch (error) {
     console.error("[API/BILLING/PLANS/PUBLIC] Error fetching plans:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to fetch plans" },
+      { error: error instanceof Error ? error.message : "Failed to fetch plans" },
       { status: 500 }
     );
   }

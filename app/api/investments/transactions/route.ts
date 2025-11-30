@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { 
-  createInvestmentTransaction, 
-  updateInvestmentTransaction,
-  deleteInvestmentTransaction,
-  getInvestmentTransactions,
-  createSecurity, 
-  createSecurityPrice 
-} from "@/lib/api/investments";
+import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 import { InvestmentTransactionFormData } from "@/src/domain/investments/investments.validations";
 import { ZodError } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { isPlanError } from "@/lib/utils/plan-errors";
-import { invalidatePortfolioCache } from "@/lib/api/portfolio";
+import { AppError } from "@/src/application/shared/app-error";
+import { makePortfolioService } from "@/src/application/portfolio/portfolio.factory";
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,31 +32,31 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate") ? new Date(searchParams.get("startDate")!) : undefined;
     const endDate = searchParams.get("endDate") ? new Date(searchParams.get("endDate")!) : undefined;
 
-    const transactions = await getInvestmentTransactions({
+    const service = makeInvestmentsService();
+    const transactions = await service.getInvestmentTransactions({
       accountId,
       securityId,
       startDate,
       endDate,
     });
 
-    return NextResponse.json(transactions);
+    return NextResponse.json(transactions, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=300',
+      },
+    });
   } catch (error) {
     console.error("Error fetching investment transactions:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
-    const errorMessage = error instanceof Error ? error.message : "Failed to fetch investment transactions";
     return NextResponse.json(
-      { error: errorMessage },
+      { error: error instanceof Error ? error.message : "Failed to fetch investment transactions" },
       { status: 500 }
     );
   }
@@ -91,11 +84,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     
+    const service = makeInvestmentsService();
+    
     // Handle security creation if needed
     let securityId = body.securityId;
     if (!securityId && body.security) {
       // Create security if it doesn't exist
-      const security = await createSecurity({
+      const security = await service.createSecurity({
         symbol: body.security.symbol,
         name: body.security.name,
         class: body.security.class,
@@ -115,12 +110,12 @@ export async function POST(request: NextRequest) {
       notes: body.notes,
     };
 
-    const transaction = await createInvestmentTransaction(transactionData);
+    const transaction = await service.createInvestmentTransaction(transactionData);
 
     // Handle price update if provided
     if (securityId && body.currentPrice) {
       try {
-        await createSecurityPrice({
+        await service.createSecurityPrice({
           securityId,
           date: transactionData.date,
           price: body.currentPrice,
@@ -131,26 +126,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Invalidate portfolio cache to ensure fresh data
-    try {
-      await invalidatePortfolioCache();
-    } catch (error) {
-      console.error("Error invalidating portfolio cache:", error);
-      // Don't fail the transaction if cache invalidation fails
-    }
-
     return NextResponse.json(transaction, { status: 201 });
   } catch (error) {
     console.error("Error creating investment transaction:", error);
     
-    if (isPlanError(error)) {
+    if (error instanceof AppError) {
       return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          planError: error,
-        },
-        { status: 403 }
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
@@ -161,12 +144,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const errorMessage = error instanceof Error ? error.message : "Failed to create investment transaction";
-    const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;
-    
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : "Failed to create investment transaction" },
+      { status: 500 }
     );
   }
 }

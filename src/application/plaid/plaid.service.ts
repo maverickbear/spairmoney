@@ -8,6 +8,7 @@ import { PlaidRepository } from "@/src/infrastructure/database/repositories/plai
 import { getPlaidClient } from "@/src/infrastructure/external/plaid/plaid-client";
 import { PlaidConnection, PlaidInstitution, PlaidSyncResult } from "../../domain/plaid/plaid.types";
 import { CountryCode, Products } from "plaid";
+import { AppError } from "../shared/app-error";
 
 export class PlaidService {
   constructor(private repository: PlaidRepository) {}
@@ -67,7 +68,7 @@ export class PlaidService {
     const response = await plaidClient.linkTokenCreate(linkTokenConfig);
 
     if (!response.data.link_token) {
-      throw new Error('Failed to create link token');
+      throw new AppError('Failed to create link token', 500);
     }
 
     return response.data.link_token;
