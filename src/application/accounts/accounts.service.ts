@@ -5,17 +5,15 @@
 
 import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
 import { PlaidRepository } from "@/src/infrastructure/database/repositories/plaid.repository";
+import { InvestmentsRepository } from "@/src/infrastructure/database/repositories/investments.repository";
 import { AccountsMapper } from "./accounts.mapper";
 import { AccountFormData } from "../../domain/accounts/accounts.validations";
 import { AccountWithBalance, BaseAccount } from "../../domain/accounts/accounts.types";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
-import { getActiveHouseholdId } from "@/lib/utils/household";
+import { makeMembersService } from "../members/members.factory";
 import { guardAccountLimit, throwIfNotAllowed, getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { requireAccountOwnership } from "@/src/infrastructure/utils/security";
 import { logger } from "@/src/infrastructure/utils/logger";
-import { invalidateAccountCaches, invalidateTransactionCaches } from "@/src/infrastructure/cache/cache.manager";
-import { revalidateTag } from "next/cache";
 import { AppError } from "../shared/app-error";
 
 // Simple in-memory cache for request deduplication
@@ -32,7 +30,10 @@ function cleanAccountsCache() {
 }
 
 export class AccountsService {
-  constructor(private repository: AccountsRepository) {}
+  constructor(
+    private repository: AccountsRepository,
+    private investmentsRepository: InvestmentsRepository
+  ) {}
 
   /**
    * Get all accounts for the current user with balances
@@ -42,18 +43,19 @@ export class AccountsService {
     refreshToken?: string,
     options?: { includeHoldings?: boolean }
   ): Promise<AccountWithBalance[]> {
-    const supabase = await createServerClient(accessToken, refreshToken);
     const includeHoldings = options?.includeHoldings ?? true;
 
-    // Verify user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      logger.error("[AccountsService] User not authenticated:", authError?.message);
+    // Get current user ID
+    const { getCurrentUserId } = await import("@/src/application/shared/feature-guard");
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      // In server components, this can happen during SSR - return empty array gracefully
+      // Don't log as error since this is expected in some contexts
       return [];
     }
 
     // Request deduplication
-    const cacheKey = `accounts:${user.id}:${includeHoldings ? 'with-holdings' : 'no-holdings'}`;
+    const cacheKey = `accounts:${userId}:${includeHoldings ? 'with-holdings' : 'no-holdings'}`;
     const cached = requestCache.get(cacheKey);
     const now = Date.now();
 
@@ -67,7 +69,7 @@ export class AccountsService {
     }
 
     // Create new request promise
-    const requestPromise = this.fetchAccountsInternal(supabase, user.id, includeHoldings, accessToken, refreshToken);
+    const requestPromise = this.fetchAccountsInternal(userId, includeHoldings, accessToken, refreshToken);
 
     // Store in cache
     requestCache.set(cacheKey, { promise: requestPromise, timestamp: now });
@@ -81,7 +83,6 @@ export class AccountsService {
   }
 
   private async fetchAccountsInternal(
-    supabase: any,
     userId: string,
     includeHoldings: boolean,
     accessToken?: string,
@@ -92,7 +93,15 @@ export class AccountsService {
     // Fetch accounts from repository
     const accountRows = await this.repository.findAll(accessToken, refreshToken);
 
+    logger.debug("[AccountsService] Repository returned accounts:", {
+      count: accountRows.length,
+      userId,
+      accountIds: accountRows.map(row => row.id),
+      accountNames: accountRows.map(row => row.name),
+    });
+
     if (accountRows.length === 0) {
+      logger.warn("[AccountsService] No accounts found for user:", userId);
       return [];
     }
 
@@ -132,7 +141,6 @@ export class AccountsService {
     const investmentAccounts = accountRows.filter(row => row.type === "investment");
     if (investmentAccounts.length > 0) {
       await this.calculateInvestmentBalances(
-        supabase,
         investmentAccounts,
         balances,
         includeHoldings,
@@ -157,13 +165,11 @@ export class AccountsService {
       if (row.userId) allOwnerIds.add(row.userId);
     });
 
-    const { data: owners } = await supabase
-      .from("User")
-      .select("id, name")
-      .in("id", Array.from(allOwnerIds));
+    // Get owner names from repository
+    const owners = await this.repository.getUserNamesByIds(Array.from(allOwnerIds), accessToken, refreshToken);
 
     const householdNamesMap = new Map<string, string>();
-    owners?.forEach((owner: any) => {
+    owners.forEach((owner) => {
       if (owner.id && owner.name) {
         const firstName = owner.name.split(' ')[0];
         householdNamesMap.set(owner.id, firstName);
@@ -171,16 +177,27 @@ export class AccountsService {
     });
 
     // Map to domain entities with balances
-    return AccountsMapper.toDomainWithBalance(
+    const accountsWithBalance = AccountsMapper.toDomainWithBalance(
       accountRows,
       balances,
       accountOwnersMap,
       householdNamesMap
     );
+    
+    logger.debug("[AccountsService] Final accounts with balances:", {
+      count: accountsWithBalance.length,
+      accounts: accountsWithBalance.map(acc => ({
+        id: acc.id,
+        name: acc.name,
+        type: acc.type,
+        balance: acc.balance,
+      })),
+    });
+    
+    return accountsWithBalance;
   }
 
   private async calculateInvestmentBalances(
-    supabase: any,
     investmentAccounts: any[],
     balances: Map<string, number>,
     includeHoldings: boolean,
@@ -188,64 +205,84 @@ export class AccountsService {
     refreshToken?: string
   ): Promise<void> {
     const investmentAccountIds = investmentAccounts.map(acc => acc.id);
+    
+    logger.debug("[AccountsService] Calculating investment balances:", {
+      accountIds: investmentAccountIds,
+      includeHoldings,
+    });
 
     // 1. Try to get values from InvestmentAccount
-    const { data: investmentAccountData } = await supabase
-      .from("InvestmentAccount")
-      .select("accountId, totalEquity, marketValue, cash")
-      .in("accountId", investmentAccountIds)
-      .not("accountId", "is", null);
+    const investmentAccountData = await this.investmentsRepository.getInvestmentAccountData(
+      investmentAccountIds,
+      accessToken,
+      refreshToken
+    );
 
-    if (investmentAccountData) {
-      investmentAccountData.forEach((ia: any) => {
-        if (ia.accountId) {
-          const totalEquity = ia.totalEquity != null ? Number(ia.totalEquity) : null;
-          const marketValue = ia.marketValue != null ? Number(ia.marketValue) : 0;
-          const cash = ia.cash != null ? Number(ia.cash) : 0;
-          const accountValue = totalEquity ?? (marketValue + cash);
-          balances.set(ia.accountId, accountValue);
-        }
-      });
-    }
+    logger.debug("[AccountsService] InvestmentAccount data:", {
+      count: investmentAccountData.length,
+      data: investmentAccountData,
+    });
+
+    investmentAccountData.forEach((ia: any) => {
+      if (ia.accountId) {
+        const totalEquity = ia.totalEquity != null ? Number(ia.totalEquity) : null;
+        const marketValue = ia.marketValue != null ? Number(ia.marketValue) : 0;
+        const cash = ia.cash != null ? Number(ia.cash) : 0;
+        const accountValue = totalEquity ?? (marketValue + cash);
+        logger.debug(`[AccountsService] Setting balance for investment account ${ia.accountId}:`, {
+          totalEquity,
+          marketValue,
+          cash,
+          accountValue,
+        });
+        balances.set(ia.accountId, accountValue);
+      }
+    });
 
     // 2. For accounts without InvestmentAccount data, try AccountInvestmentValue
     const accountsWithoutInvestmentAccount = investmentAccountIds.filter(
       (accountId: string) => !balances.has(accountId)
     );
 
-    if (accountsWithoutInvestmentAccount.length > 0) {
-      const { data: investmentValues } = await supabase
-        .from("AccountInvestmentValue")
-        .select("accountId, totalValue")
-        .in("accountId", accountsWithoutInvestmentAccount);
+    logger.debug("[AccountsService] Accounts without InvestmentAccount data:", {
+      count: accountsWithoutInvestmentAccount.length,
+      accountIds: accountsWithoutInvestmentAccount,
+    });
 
-      if (investmentValues) {
-        investmentValues.forEach((iv: any) => {
-          const totalValue = iv.totalValue != null ? Number(iv.totalValue) : 0;
-          balances.set(iv.accountId, totalValue);
+    if (accountsWithoutInvestmentAccount.length > 0) {
+      const investmentValues = await this.investmentsRepository.getAccountInvestmentValues(
+        accountsWithoutInvestmentAccount,
+        accessToken,
+        refreshToken
+      );
+
+      logger.debug("[AccountsService] AccountInvestmentValue data:", {
+        count: investmentValues.length,
+        data: investmentValues,
+      });
+
+      investmentValues.forEach((iv: any) => {
+        const totalValue = iv.totalValue != null ? Number(iv.totalValue) : 0;
+        logger.debug(`[AccountsService] Setting balance from AccountInvestmentValue for ${iv.accountId}:`, {
+          totalValue,
         });
-      }
+        balances.set(iv.accountId, totalValue);
+      });
     }
 
     // 3. Calculate from holdings if requested
     if (includeHoldings) {
       try {
-        const { getHoldings } = await import("@/lib/api/investments");
-        const holdings = await getHoldings(undefined, accessToken, refreshToken);
+        const { makeInvestmentsService } = await import("@/src/application/investments/investments.factory");
+        const investmentsService = makeInvestmentsService();
+        const holdings = await investmentsService.getHoldings(undefined, accessToken, refreshToken);
 
         // Create map from InvestmentAccount.id to Account.id
-        const investmentAccountMap = new Map<string, string>();
-        const { data: investmentAccountsData } = await supabase
-          .from("InvestmentAccount")
-          .select("id, accountId")
-          .in("accountId", investmentAccountIds)
-          .not("accountId", "is", null);
-
-        investmentAccountsData?.forEach((ia: any) => {
-          if (ia.accountId) {
-            investmentAccountMap.set(ia.id, ia.accountId);
-          }
-        });
+        const investmentAccountMap = await this.investmentsRepository.getInvestmentAccountMapping(
+          investmentAccountIds,
+          accessToken,
+          refreshToken
+        );
 
         // Calculate value for each account based on holdings
         investmentAccountIds.forEach(accountId => {
@@ -271,8 +308,15 @@ export class AccountsService {
     // 4. Set to 0 for accounts without any value
     investmentAccounts.forEach((account: any) => {
       if (!balances.has(account.id)) {
+        logger.warn(`[AccountsService] Investment account ${account.id} (${account.name}) has no balance data - setting to 0`);
         balances.set(account.id, 0);
       }
+    });
+    
+    logger.debug("[AccountsService] Final investment balances:", {
+      balances: Array.from(balances.entries()).filter(([accountId]) => 
+        investmentAccountIds.includes(accountId)
+      ),
     });
   }
 
@@ -280,8 +324,6 @@ export class AccountsService {
    * Create a new account
    */
   async createAccount(data: AccountFormData): Promise<BaseAccount> {
-    const supabase = await createServerClient();
-
     // Get current user
     const userId = await getCurrentUserId();
     if (!userId) {
@@ -300,7 +342,8 @@ export class AccountsService {
     const ownerIds = data.ownerIds && data.ownerIds.length > 0 ? data.ownerIds : [userId];
 
     // Get active household ID
-    const householdId = await getActiveHouseholdId(userId);
+    const membersService = makeMembersService();
+    const householdId = await membersService.getActiveHouseholdId(userId);
 
     // Create account via repository
     const accountRow = await this.repository.create({
@@ -308,7 +351,7 @@ export class AccountsService {
       name: data.name,
       type: data.type,
       creditLimit: data.type === "credit" ? data.creditLimit : null,
-      initialBalance: (data.type === "checking" || data.type === "savings") ? (data.initialBalance ?? 0) : null,
+      initialBalance: (data.type === "checking" || data.type === "savings" || data.type === "cash") ? (data.initialBalance ?? 0) : null,
       dueDayOfMonth: data.type === "credit" ? (data.dueDayOfMonth ?? null) : null,
       currencyCode: data.currencyCode || 'USD',
       userId,
@@ -322,9 +365,6 @@ export class AccountsService {
       await this.repository.setAccountOwners(id, ownerIds, now);
     }
 
-    // Invalidate cache
-    revalidateTag('accounts', 'max');
-    revalidateTag('dashboard', 'max');
 
     return AccountsMapper.toDomain(accountRow);
   }
@@ -358,7 +398,7 @@ export class AccountsService {
 
     // Handle initialBalance based on type
     if (data.type !== undefined) {
-      if (data.type === "checking" || data.type === "savings") {
+      if (data.type === "checking" || data.type === "savings" || data.type === "cash") {
         updateData.initialBalance = data.initialBalance ?? 0;
       } else {
         updateData.initialBalance = null;
@@ -386,8 +426,6 @@ export class AccountsService {
       await this.repository.setAccountOwners(id, ownerIds, now);
     }
 
-    // Invalidate cache
-    invalidateAccountCaches();
 
     return AccountsMapper.toDomain(accountRow);
   }
@@ -411,10 +449,6 @@ export class AccountsService {
 
     // Delete account
     await this.repository.delete(id);
-
-    // Invalidate cache
-    invalidateAccountCaches();
-    invalidateTransactionCaches();
   }
 
   /**
@@ -478,9 +512,6 @@ export class AccountsService {
     // Transfer via repository
     const count = await this.repository.transferTransactions(fromAccountId, toAccountId);
 
-    // Invalidate cache
-    invalidateTransactionCaches();
-    invalidateAccountCaches();
 
     return { transferred: count };
   }

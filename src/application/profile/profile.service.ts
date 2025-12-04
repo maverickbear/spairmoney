@@ -12,15 +12,11 @@ import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { makeSubscriptionsService } from "../subscriptions/subscriptions.factory";
 import { makeMembersService } from "../members/members.factory";
+import { makeAuthService } from "../auth/auth.factory";
 import { AppError } from "../shared/app-error";
+import { getCurrentUserId } from "../shared/feature-guard";
 import { validateImageFile, sanitizeFilename, getFileExtension } from "@/lib/utils/file-validation";
 import { SecurityLogger } from "@/src/infrastructure/utils/security-logging";
-import {
-  checkHouseholdOwnership,
-  cancelUserSubscription,
-  verifyPasswordForDeletion,
-  deleteAccountImmediately,
-} from "@/lib/api/account-deletion";
 
 export class ProfileService {
   constructor(private repository: ProfileRepository) {}
@@ -33,15 +29,12 @@ export class ProfileService {
     refreshToken?: string
   ): Promise<BaseProfile | null> {
     try {
-      const supabase = await createServerClient(accessToken, refreshToken);
-      
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
+      const userId = await getCurrentUserId();
+      if (!userId) {
         return null;
       }
 
-      const userRow = await this.repository.findById(user.id, accessToken, refreshToken);
+      const userRow = await this.repository.findById(userId, accessToken, refreshToken);
       
       if (!userRow) {
         return null;
@@ -57,24 +50,35 @@ export class ProfileService {
   /**
    * Update user profile
    */
-  async updateProfile(data: ProfileFormData): Promise<BaseProfile> {
-    const supabase = await createServerClient();
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+  async updateProfile(data: Partial<ProfileFormData> & { temporaryExpectedIncome?: import("../../domain/onboarding/onboarding.types").ExpectedIncomeRange | null; temporaryExpectedIncomeAmount?: number | null }): Promise<BaseProfile> {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
     const now = formatTimestamp(new Date());
 
     // Update user profile
-    const userRow = await this.repository.update(user.id, {
-      name: data.name || null,
-      avatarUrl: data.avatarUrl || null,
-      phoneNumber: data.phoneNumber || null,
+    const updateData: Parameters<typeof this.repository.update>[1] = {
+      name: data.name !== undefined ? (data.name || null) : undefined,
+      avatarUrl: data.avatarUrl !== undefined ? (data.avatarUrl || null) : undefined,
+      phoneNumber: data.phoneNumber !== undefined ? (data.phoneNumber || null) : undefined,
+      dateOfBirth: data.dateOfBirth !== undefined ? (data.dateOfBirth || null) : undefined,
       updatedAt: now,
+    };
+
+    if (data.temporaryExpectedIncome !== undefined) {
+      updateData.temporaryExpectedIncome = data.temporaryExpectedIncome as string | null;
+    }
+
+    // Remove undefined values
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key as keyof typeof updateData] === undefined) {
+        delete updateData[key as keyof typeof updateData];
+      }
     });
+
+    const userRow = await this.repository.update(userId, updateData);
 
     return ProfileMapper.toDomain(userRow);
   }
@@ -83,21 +87,18 @@ export class ProfileService {
    * Update user email (requires re-authentication in Supabase Auth)
    */
   async updateEmail(newEmail: string): Promise<void> {
-    const supabase = await createServerClient();
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
     // Update email in Auth (this will send confirmation email)
-    await this.repository.updateAuthEmail(user.id, newEmail);
+    await this.repository.updateAuthEmail(userId, newEmail);
 
     // Note: Email updates should be handled through auth system, not profile service
     // This method is kept for backward compatibility but email is not updated here
     const now = formatTimestamp(new Date());
-    await this.repository.update(user.id, {
+    await this.repository.update(userId, {
       updatedAt: now,
     });
   }
@@ -277,13 +278,15 @@ export class ProfileService {
   async deleteAccount(userId: string, password: string): Promise<{ success: boolean; message: string }> {
     try {
       // 1. Verify password
-      const passwordVerification = await verifyPasswordForDeletion(password);
+      const authService = makeAuthService();
+      const passwordVerification = await authService.verifyPasswordForDeletion(password);
       if (!passwordVerification.valid) {
         throw new AppError(passwordVerification.error || "Invalid password", 400);
       }
 
       // 2. Check household ownership
-      const householdCheck = await checkHouseholdOwnership(userId);
+      const membersService = makeMembersService();
+      const householdCheck = await membersService.checkHouseholdOwnership(userId);
       if (householdCheck.isOwner && householdCheck.memberCount > 1) {
         throw new AppError(
           `You are the owner of a household "${householdCheck.householdName || "Household"}" with ${householdCheck.memberCount - 1} other member(s). Please transfer ownership to another member or remove all members before deleting your account.`,
@@ -292,13 +295,14 @@ export class ProfileService {
       }
 
       // 3. Cancel active subscription (don't fail if this fails, but log it)
-      const subscriptionResult = await cancelUserSubscription(userId);
+      const subscriptionsService = makeSubscriptionsService();
+      const subscriptionResult = await subscriptionsService.cancelUserSubscription(userId);
       if (!subscriptionResult.cancelled && subscriptionResult.error) {
         logger.error("[ProfileService] Warning: Failed to cancel subscription:", subscriptionResult.error);
       }
 
       // 4. Delete account immediately
-      const deletionResult = await deleteAccountImmediately(userId);
+      const deletionResult = await this.deleteAccountImmediately(userId);
       if (!deletionResult.success) {
         throw new AppError(deletionResult.error || "Failed to delete account", 500);
       }
@@ -322,6 +326,184 @@ export class ProfileService {
         throw error;
       }
       throw new AppError("Failed to delete account", 500);
+    }
+  }
+
+  /**
+   * Delete account immediately
+   * Uses service role to bypass RLS and delete all user data
+   */
+  private async deleteAccountImmediately(userId: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
+      const { createClient } = await import("@supabase/supabase-js");
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+      if (!supabaseServiceKey) {
+        throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
+      }
+
+      if (!supabaseUrl) {
+        throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
+      }
+
+      logger.debug("[ProfileService] Attempting to delete user:", userId);
+
+      // Use service role to clean up data before deletion
+      const serviceSupabase = createServiceRoleClient();
+      
+      // Call SQL function to delete user data (goals, subscriptions, etc.)
+      // This handles RESTRICT constraints properly
+      try {
+        const { error: functionError } = await serviceSupabase.rpc("delete_user_data", {
+          p_user_id: userId,
+        });
+        
+        if (functionError) {
+          logger.warn("[ProfileService] Warning: Could not delete user data via function:", functionError);
+          // Try manual deletion as fallback
+          const { error: deleteSubsError } = await serviceSupabase
+            .from("Subscription")
+            .delete()
+            .eq("userId", userId);
+          
+          if (deleteSubsError) {
+            logger.warn("[ProfileService] Warning: Could not delete subscriptions manually:", deleteSubsError);
+          } else {
+            logger.debug("[ProfileService] Deleted user subscriptions manually");
+          }
+        } else {
+          logger.debug("[ProfileService] User data cleaned up via SQL function");
+        }
+      } catch (funcErr) {
+        logger.warn("[ProfileService] Warning: Exception calling delete_user_data function:", funcErr);
+        // Continue with manual deletion
+        const { error: deleteSubsError } = await serviceSupabase
+          .from("Subscription")
+          .delete()
+          .eq("userId", userId);
+        
+        if (!deleteSubsError) {
+          logger.debug("[ProfileService] Deleted user subscriptions manually (fallback)");
+        }
+      }
+
+      // Use Admin API to delete user from auth.users
+      // This will cascade delete from User table due to FK constraint
+      const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
+
+      // Try to delete user from auth.users with retry logic
+      let deleteError = null;
+      let data = null;
+      const maxRetries = 2;
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          // Wait a bit before retrying (exponential backoff)
+          const delay = attempt * 1000; // 1s, 2s
+          logger.debug(`[ProfileService] Retry attempt ${attempt} after ${delay}ms delay...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+        const result = await adminClient.auth.admin.deleteUser(userId);
+        deleteError = result.error;
+        data = result.data;
+        
+        if (!deleteError) {
+          break; // Success!
+        }
+        
+        // If it's not a database error, don't retry
+        const errorCode = (deleteError as any).code;
+        if (errorCode !== "unexpected_failure" && deleteError.status !== 500) {
+          break;
+        }
+      }
+
+      if (deleteError) {
+        logger.error("[ProfileService] Error deleting user after retries:", {
+          error: deleteError,
+          message: deleteError.message,
+          status: deleteError.status,
+          code: (deleteError as any).code,
+          userId,
+        });
+
+        const errorCode = (deleteError as any).code;
+        const errorStatus = deleteError.status;
+        
+        // If it's a database error, this is likely a Supabase Auth internal issue
+        // As a workaround, we'll block the user and clean up all accessible data
+        if (errorCode === "unexpected_failure" || errorStatus === 500) {
+          logger.debug("[ProfileService] Supabase Auth deletion failed with unexpected_failure.");
+          logger.debug("[ProfileService] Attempting workaround: blocking user and cleaning up data...");
+          
+          try {
+            // Step 1: Block the user to prevent access
+            const { error: blockError } = await serviceSupabase
+              .from("User")
+              .update({ isBlocked: true })
+              .eq("id", userId);
+            
+            if (blockError) {
+              logger.error("[ProfileService] Could not block user:", blockError);
+              return { 
+                success: false, 
+                error: "Unable to complete account deletion. Please contact support for assistance." 
+              };
+            }
+            
+            logger.debug("[ProfileService] User marked as blocked - access is now disabled");
+            
+            // Return success since account is effectively deleted (blocked + data cleaned)
+            return { 
+              success: true,
+            };
+          } catch (workaroundError) {
+            logger.error("[ProfileService] Error in workaround:", workaroundError);
+            return { 
+              success: false, 
+              error: "Unable to complete account deletion due to a database constraint. Your subscriptions have been cancelled. Please contact support to complete the account deletion process." 
+            };
+          }
+        }
+        
+        // Provide user-friendly error message for other errors
+        let errorMessage = "Failed to delete account";
+        
+        if (deleteError.message) {
+          errorMessage = deleteError.message;
+        } else if (errorCode) {
+          errorMessage = `Error: ${errorCode}`;
+        }
+
+        return { success: false, error: errorMessage };
+      }
+
+      logger.debug("[ProfileService] Successfully deleted user:", userId, "Data:", data);
+      return { success: true };
+    } catch (error) {
+      logger.error("[ProfileService] Exception in deleteAccountImmediately:", {
+        error,
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+      });
+      
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : "Failed to delete account" 
+      };
     }
   }
 }

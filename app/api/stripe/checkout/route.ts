@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createCheckoutSession, createTrialCheckoutSession } from "@/lib/api/stripe";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,25 +21,28 @@ export async function POST(request: NextRequest) {
       ? `${baseUrl}${returnUrl.startsWith('/') ? returnUrl : `/${returnUrl}`}`
       : `${baseUrl}/subscription/success`;
 
+    const stripeService = makeStripeService();
+
     // For trial checkout, allow unauthenticated users
+    // NOTE: This path requires payment method. For trial without card,
+    // users should use /api/billing/start-trial after authentication.
+    // This is kept for backward compatibility.
     if (isTrial) {
-      const { url, error } = await createTrialCheckoutSession(planId, interval, finalReturnUrl, promoCode);
+      const result = await stripeService.createTrialCheckoutSession(planId, interval, finalReturnUrl, promoCode);
       
-      if (error || !url) {
+      if (result.error || !result.url) {
         return NextResponse.json(
-          { error: error || "Failed to create checkout session" },
+          { error: result.error || "Failed to create checkout session" },
           { status: 500 }
         );
       }
 
-      return NextResponse.json({ url });
+      return NextResponse.json({ url: result.url });
     }
 
     // For regular checkout, require authentication
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -46,18 +50,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Create checkout session
-    const { url, error } = await createCheckoutSession(authUser.id, planId, interval, finalReturnUrl, promoCode);
+    const result = await stripeService.createCheckoutSession(userId, planId, interval, finalReturnUrl, promoCode);
 
-    if (error || !url) {
+    if (result.error || !result.url) {
       return NextResponse.json(
-        { error: error || "Failed to create checkout session" },
+        { error: result.error || "Failed to create checkout session" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url: result.url });
   } catch (error) {
     console.error("Error creating checkout session:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to create checkout session" },
       { status: 500 }

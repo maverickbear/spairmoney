@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/v2/auth/google-signin
@@ -10,37 +11,34 @@ import { createServerClient } from "@/src/infrastructure/database/supabase-serve
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
-    const redirectTo = `${appUrl}/auth/callback`;
+    const body = await request.json().catch(() => ({}));
+    const { redirectTo } = body;
 
-    // Get the OAuth URL from Supabase
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    });
+    const service = makeAuthService();
+    const result = await service.signInWithGoogle(redirectTo);
 
-    if (error) {
-      console.error("Error initiating Google OAuth:", error);
+    if (result.error) {
       return NextResponse.json(
-        { error: error.message || "Failed to sign in with Google" },
+        { error: result.error },
         { status: 400 }
       );
     }
 
     // Return the URL for the client to redirect to
     return NextResponse.json(
-      { url: data.url },
+      { url: result.url },
       { status: 200 }
     );
   } catch (error) {
     console.error("Error in Google sign-in:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to sign in with Google" },
       { status: 500 }

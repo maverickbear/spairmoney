@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deduplicateTransactions } from '@/lib/api/plaid/deduplicate-transactions';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { getCurrentUserId } from '@/src/application/shared/feature-guard';
+import { AppError } from '@/src/application/shared/app-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,8 +18,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const accountId = body.accountId || undefined;
 
-    // Run deduplication
-    const result = await deduplicateTransactions(accountId);
+    // Run deduplication using PlaidService
+    const plaidService = makePlaidService();
+    const result = await plaidService.deduplicateTransactions(accountId);
 
     return NextResponse.json({
       success: true,
@@ -26,6 +28,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error deduplicating transactions:', error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Failed to deduplicate transactions' },
       { status: 500 }

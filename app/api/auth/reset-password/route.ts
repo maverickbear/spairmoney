@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resetPassword } from "@/lib/api/auth";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { resetPasswordSchema } from "@/src/domain/auth/auth.validations";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/reset-password
@@ -31,7 +32,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Reset password (includes HIBP validation)
-    const result = await resetPassword({ password, confirmPassword });
+    const service = makeAuthService();
+    const result = await service.resetPassword({ password, confirmPassword });
 
     if (result.error) {
       console.error("[RESET-PASSWORD] Error resetting password:", result.error);
@@ -48,6 +50,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[RESET-PASSWORD] Unexpected error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

@@ -143,7 +143,7 @@ function ResetPasswordFormContent() {
         <div className="text-center space-y-2">
           <Link
             href="/auth/forgot-password"
-            className="text-sm text-primary hover:underline font-medium transition-colors block"
+            className="text-sm text-foreground hover:underline font-medium transition-colors block"
           >
             Request new reset link
           </Link>

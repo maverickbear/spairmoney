@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Edit, Trash2, Folder } from "lucide-react";
-import type { SystemCategory } from "@/lib/api/admin";
+import type { SystemCategory } from "@/src/domain/admin/admin.types";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface CategoriesTableProps {

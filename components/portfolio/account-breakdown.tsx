@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
-import { Account } from "@/lib/api/portfolio";
+import { BasePortfolioAccount as Account } from "@/src/domain/portfolio/portfolio.types";
 import { Wallet } from "lucide-react";
 
 interface AccountBreakdownProps {

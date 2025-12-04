@@ -11,13 +11,13 @@
           "description": "Primary brand color scale",
           "type": "object",
           "properties": {
-            "900": { "value": "{default-values.primary.blue-900}", "description": "Primary darkest" },
-            "800": { "value": "{default-values.primary.blue-800}", "description": "Primary dark" },
-            "700": { "value": "{default-values.primary.blue-700}", "description": "Primary dark" },
-            "600": { "value": "{default-values.primary.blue-600}", "description": "Primary medium" },
-            "500": { "value": "{default-values.primary.blue-500}", "description": "Primary base" },
-            "400": { "value": "{default-values.primary.blue-400}", "description": "Primary light" },
-            "300": { "value": "{default-values.primary.blue-300}", "description": "Primary lighter" }
+            "900": { "value": "{default-values.primary.green-900}", "description": "Primary darkest" },
+            "800": { "value": "{default-values.primary.green-800}", "description": "Primary dark" },
+            "700": { "value": "{default-values.primary.green-700}", "description": "Primary dark" },
+            "600": { "value": "{default-values.primary.green-600}", "description": "Primary medium" },
+            "500": { "value": "{default-values.primary.green-500}", "description": "Primary base" },
+            "400": { "value": "{default-values.primary.green-400}", "description": "Primary light" },
+            "300": { "value": "{default-values.primary.green-300}", "description": "Primary lighter" }
           }
         },
         "gray": {

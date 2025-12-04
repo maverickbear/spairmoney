@@ -233,7 +233,7 @@ export default async function PrivacyPolicyPage() {
                   </ul>
                   <p className="text-sm text-muted-foreground mt-2">
                     For more information about how Stripe handles your payment data, please review 
-                    <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+                    <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline ml-1">
                       Stripe's Privacy Policy
                     </a>.
                   </p>
@@ -257,7 +257,7 @@ export default async function PrivacyPolicyPage() {
                   </ul>
                   <p className="text-sm text-muted-foreground mt-2">
                     For more information about how Plaid handles your financial data, please review 
-                    <a href="https://plaid.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+                    <a href="https://plaid.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline ml-1">
                       Plaid's Privacy Policy
                     </a>.
                   </p>
@@ -278,7 +278,7 @@ export default async function PrivacyPolicyPage() {
                   </ul>
                   <p className="text-sm text-muted-foreground mt-2">
                     For more information about how OpenAI handles data, please review 
-                    <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+                    <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline ml-1">
                       OpenAI's Privacy Policy
                     </a>.
                   </p>
@@ -297,7 +297,7 @@ export default async function PrivacyPolicyPage() {
                   </ul>
                   <p className="text-sm text-muted-foreground mt-2">
                     For more information about Sentry's data practices, please review 
-                    <a href="https://sentry.io/privacy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+                    <a href="https://sentry.io/privacy/" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline ml-1">
                       Sentry's Privacy Policy
                     </a>.
                   </p>
@@ -315,7 +315,7 @@ export default async function PrivacyPolicyPage() {
                   </ul>
                   <p className="text-sm text-muted-foreground mt-2">
                     For more information about Resend's data practices, please review 
-                    <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+                    <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline ml-1">
                       Resend's Privacy Policy
                     </a>.
                   </p>

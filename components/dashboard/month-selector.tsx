@@ -58,7 +58,7 @@ export function MonthSelector() {
       value={selectedRange}
       onValueChange={handleRangeChange}
     >
-      <SelectTrigger size="small" className="w-[180px]">
+      <SelectTrigger size="small" className="h-8 w-[140px] text-xs">
         <SelectValue>
           {getDisplayText(selectedRange)}
         </SelectValue>

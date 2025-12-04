@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAdminService } from "@/src/application/admin/admin.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { unblockUserSchema } from "@/src/domain/admin/admin.validations";
 import { z } from "zod";
 import { AppError } from "@/src/application/shared/app-error";
-
-const unblockUserSchema = z.object({
-  userId: z.string(),
-  reason: z.string(),
-  pauseSubscription: z.boolean().optional(),
-});
 
 /**
  * PUT /api/v2/admin/users/unblock

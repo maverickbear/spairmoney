@@ -256,7 +256,7 @@ export function UpcomingTransactions({ transactions }: UpcomingTransactionsProps
   };
 
   const getCardBackgroundColor = () => {
-    return "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700";
+    return "bg-white dark:bg-gray-900 border border-border";
   };
 
   const getCardTextColor = () => {

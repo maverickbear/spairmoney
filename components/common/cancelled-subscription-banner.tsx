@@ -34,7 +34,7 @@ export function CancelledSubscriptionBanner({ isSidebarCollapsed = false }: Canc
     async function fetchSubscription() {
       setChecking(true);
       try {
-        const response = await fetch("/api/billing/subscription");
+        const response = await fetch("/api/v2/billing/subscription");
         if (response.ok) {
           const data = await response.json();
           setSubscription(data.subscription);

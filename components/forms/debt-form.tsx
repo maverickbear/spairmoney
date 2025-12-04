@@ -839,7 +839,7 @@ export function DebtForm({
 
       if (debt) {
         // Update existing debt
-        const res = await fetch(`/api/debts/${debt.id}`, {
+        const res = await fetch(`/api/v2/debts/${debt.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

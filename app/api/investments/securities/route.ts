@@ -2,13 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
+import { createSecuritySchema } from "@/src/domain/investments/investments.validations";
 import { z } from "zod";
-
-const createSecuritySchema = z.object({
-  symbol: z.string().min(1, "Symbol is required"),
-  name: z.string().min(1, "Name is required"),
-  class: z.enum(["stock", "etf", "crypto", "bond", "reit"]),
-});
 
 export async function GET(request: Request) {
   try {

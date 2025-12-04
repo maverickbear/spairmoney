@@ -29,6 +29,7 @@ export interface TransactionRow {
   userId: string | null;
   householdId: string | null;
   tags: string | null;
+  receiptUrl: string | null;
 }
 
 export interface TransactionFilters {
@@ -55,7 +56,7 @@ export class TransactionsRepository {
 
     let query = supabase
       .from("Transaction")
-      .select("id, date, amount, type, description, categoryId, subcategoryId, accountId, recurring, createdAt, updatedAt, transferToId, transferFromId, tags, suggestedCategoryId, suggestedSubcategoryId, plaidMetadata, expenseType, userId, householdId")
+      .select("id, date, amount, type, description, categoryId, subcategoryId, accountId, recurring, createdAt, updatedAt, transferToId, transferFromId, tags, suggestedCategoryId, suggestedSubcategoryId, plaidMetadata, expenseType, userId, householdId, receiptUrl")
       .order("date", { ascending: false });
 
     // Apply filters
@@ -183,6 +184,39 @@ export class TransactionsRepository {
   }
 
   /**
+   * Find transactions by IDs with account information
+   */
+  async findByIds(
+    ids: string[],
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<TransactionRow & { account?: { id: string; name: string } | null }>> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: transactions, error } = await supabase
+      .from("Transaction")
+      .select(`
+        id,
+        date,
+        amount,
+        description,
+        accountId,
+        account:Account(id, name)
+      `)
+      .in("id", ids)
+      .eq("userId", userId)
+      .order("date", { ascending: false });
+
+    if (error) {
+      logger.error("[TransactionsRepository] Error finding transactions by IDs:", error);
+      throw new Error(`Failed to find transactions: ${error.message}`);
+    }
+
+    return (transactions || []) as unknown as Array<TransactionRow & { account?: { id: string; name: string } | null }>;
+  }
+
+  /**
    * Create a new transaction
    */
   async create(data: {
@@ -203,6 +237,7 @@ export class TransactionsRepository {
     suggestedCategoryId?: string | null;
     suggestedSubcategoryId?: string | null;
     plaidMetadata?: Record<string, unknown> | null;
+    receiptUrl?: string | null;
     createdAt: string;
     updatedAt: string;
   }): Promise<TransactionRow> {
@@ -228,6 +263,7 @@ export class TransactionsRepository {
         suggestedCategoryId: data.suggestedCategoryId ?? null,
         suggestedSubcategoryId: data.suggestedSubcategoryId ?? null,
         plaidMetadata: data.plaidMetadata ?? null,
+        receiptUrl: data.receiptUrl ?? null,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
       })
@@ -260,6 +296,8 @@ export class TransactionsRepository {
       transferToId: string | null;
       transferFromId: string | null;
       updatedAt: string;
+      plaidMetadata: Record<string, unknown> | null;
+      receiptUrl: string | null;
     }>
   ): Promise<TransactionRow> {
     const supabase = await createServerClient();
@@ -376,7 +414,65 @@ export class TransactionsRepository {
       throw new Error(`Failed to create transfer: ${error.message}`);
     }
 
-    return data as { id: string } | null;
+    // The SQL function returns { outgoing_id, incoming_id, new_count } as JSONB
+    // Supabase RPC should automatically parse JSONB, but handle various formats
+    
+    // Handle null or undefined
+    if (!data) {
+      logger.error("[TransactionsRepository] Null response from create_transfer_with_limit:", {
+        params: {
+          userId: params.userId,
+          fromAccountId: params.fromAccountId,
+          toAccountId: params.toAccountId,
+        },
+      });
+      return null;
+    }
+
+    // Handle string (shouldn't happen with JSONB, but be safe)
+    let parsedData: any = data;
+    if (typeof data === 'string') {
+      try {
+        parsedData = JSON.parse(data);
+      } catch (parseError) {
+        logger.error("[TransactionsRepository] Failed to parse string response:", { data, parseError });
+        return null;
+      }
+    }
+
+    // Handle array (Supabase might wrap single results)
+    if (Array.isArray(parsedData)) {
+      if (parsedData.length === 0) {
+        logger.error("[TransactionsRepository] Empty array response from create_transfer_with_limit");
+        return null;
+      }
+      parsedData = parsedData[0];
+    }
+
+    // Extract outgoing_id
+    if (parsedData && typeof parsedData === 'object') {
+      // Try different possible property names
+      const outgoingId = parsedData.outgoing_id || parsedData.outgoingId || parsedData.id;
+      
+      if (outgoingId && typeof outgoingId === 'string') {
+        return { id: outgoingId };
+      }
+    }
+
+    // Log unexpected format
+    logger.error("[TransactionsRepository] Unexpected response format from create_transfer_with_limit:", {
+      originalData: data,
+      parsedData,
+      dataType: typeof data,
+      isArray: Array.isArray(data),
+      keys: parsedData && typeof parsedData === 'object' ? Object.keys(parsedData) : null,
+      params: {
+        userId: params.userId,
+        fromAccountId: params.fromAccountId,
+        toAccountId: params.toAccountId,
+      },
+    });
+    return null;
   }
 
   /**
@@ -424,7 +520,166 @@ export class TransactionsRepository {
       throw new Error(`Failed to create transaction: ${error.message}`);
     }
 
-    return data as { id: string } | null;
+    // The SQL function returns { transaction_id, new_count } as JSONB
+    // Supabase RPC should automatically parse JSONB, but handle various formats
+    
+    // Handle null or undefined
+    if (!data) {
+      logger.error("[TransactionsRepository] Null response from create_transaction_with_limit:", {
+        params: {
+          id: params.id,
+          userId: params.userId,
+          accountId: params.accountId,
+          type: params.type,
+        },
+      });
+      return null;
+    }
+
+    // Handle string (shouldn't happen with JSONB, but be safe)
+    let parsedData: any = data;
+    if (typeof data === 'string') {
+      try {
+        parsedData = JSON.parse(data);
+      } catch (parseError) {
+        logger.error("[TransactionsRepository] Failed to parse string response:", { data, parseError });
+        return null;
+      }
+    }
+
+    // Handle array (Supabase might wrap single results)
+    if (Array.isArray(parsedData)) {
+      if (parsedData.length === 0) {
+        logger.error("[TransactionsRepository] Empty array response from create_transaction_with_limit");
+        return null;
+      }
+      parsedData = parsedData[0];
+    }
+
+    // Extract transaction_id
+    if (parsedData && typeof parsedData === 'object') {
+      // Try different possible property names
+      const transactionId = parsedData.transaction_id || parsedData.transactionId || parsedData.id;
+      
+      if (transactionId && typeof transactionId === 'string') {
+        return { id: transactionId };
+      }
+    }
+
+    // Log unexpected format
+    logger.error("[TransactionsRepository] Unexpected response format from create_transaction_with_limit:", {
+      originalData: data,
+      parsedData,
+      dataType: typeof data,
+      isArray: Array.isArray(data),
+      keys: parsedData && typeof parsedData === 'object' ? Object.keys(parsedData) : null,
+      params: {
+        id: params.id,
+        userId: params.userId,
+        accountId: params.accountId,
+        type: params.type,
+      },
+    });
+    return null;
+  }
+
+  /**
+   * Find transaction by ID with suggestion fields
+   */
+  async findByIdWithSuggestions(id: string): Promise<TransactionRow | null> {
+    const supabase = await createServerClient();
+
+    const { data: transaction, error } = await supabase
+      .from("Transaction")
+      .select("id, suggestedCategoryId, suggestedSubcategoryId, userId")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      logger.error("[TransactionsRepository] Error fetching transaction:", error);
+      throw new Error(`Failed to fetch transaction: ${error.message}`);
+    }
+
+    return transaction as TransactionRow;
+  }
+
+  /**
+   * Find uncategorized transactions for suggestions
+   */
+  async findUncategorizedForSuggestions(
+    userId: string,
+    limit: number = 100
+  ): Promise<Array<{
+    id: string;
+    description: string | null;
+    amount: number;
+    type: 'income' | 'expense' | 'transfer';
+    userId: string | null;
+  }>> {
+    const supabase = await createServerClient();
+
+    const { data: transactions, error } = await supabase
+      .from("Transaction")
+      .select("id, description, amount, type, userId")
+      .eq("userId", userId)
+      .is("categoryId", null)
+      .is("suggestedCategoryId", null)
+      .not("description", "is", null)
+      .order("date", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      logger.error("[TransactionsRepository] Error fetching uncategorized transactions:", error);
+      throw new Error(`Failed to fetch transactions: ${error.message}`);
+    }
+
+    return (transactions || []) as Array<{
+      id: string;
+      description: string | null;
+      amount: number;
+      type: 'income' | 'expense' | 'transfer';
+      userId: string | null;
+    }>;
+  }
+
+  /**
+   * Update suggestion fields
+   */
+  async updateSuggestions(
+    id: string,
+    data: {
+      suggestedCategoryId?: string | null;
+      suggestedSubcategoryId?: string | null;
+    }
+  ): Promise<TransactionRow> {
+    const supabase = await createServerClient();
+
+    const { data: transaction, error } = await supabase
+      .from("Transaction")
+      .update(data)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("[TransactionsRepository] Error updating suggestions:", error);
+      throw new Error(`Failed to update suggestions: ${error.message}`);
+    }
+
+    return transaction as TransactionRow;
+  }
+
+  /**
+   * Clear suggestion fields
+   */
+  async clearSuggestions(id: string): Promise<TransactionRow> {
+    return this.updateSuggestions(id, {
+      suggestedCategoryId: null,
+      suggestedSubcategoryId: null,
+    });
   }
 }
 

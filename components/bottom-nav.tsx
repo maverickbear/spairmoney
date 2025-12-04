@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Receipt,
-  FileText,
+  Target,
   MoreHorizontal,
   Plus,
 } from "lucide-react";
@@ -74,9 +74,9 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
       onClick: () => setIsAddSheetOpen(true),
     },
     {
-      href: "/reports",
-      label: "Reports",
-      icon: FileText,
+      href: "/planning/budgets",
+      label: "Budgets",
+      icon: Target,
       type: "link",
     },
     {

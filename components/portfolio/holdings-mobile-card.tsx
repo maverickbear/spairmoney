@@ -4,7 +4,7 @@ import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { cn } from "@/lib/utils";
-import { Holding } from "@/lib/api/portfolio";
+import { Holding } from "@/src/domain/portfolio/portfolio.types";
 
 interface HoldingsMobileCardProps {
   holding: Holding;

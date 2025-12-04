@@ -23,7 +23,7 @@ interface LogoProps {
  * 
  * Variants:
  * - icon: Just the "S" icon (for collapsed nav, small spaces)
- * - wordmark: "SPARE FINANCE" text logo
+ * - wordmark: Full logo with icon and text (same as "full", maintained for compatibility)
  * - full: Full logo with icon and text (default)
  * 
  * Colors:
@@ -66,23 +66,32 @@ export function Logo({
     }
 
     if (variant === "icon") {
-      // Icon variant - S icon
+      // Icon variant - use new SVG icons (1024px versions)
       return effectiveColor === "white"
-        ? "/assets/logos/icon-white.svg" // White S on purple background
-        : "/assets/logos/icon-purple.svg"; // Purple S on white background
+        ? "/assets/logos/1024-icon-white.svg" // White S icon on dark background
+        : "/assets/logos/1024-icon-black.svg"; // Black S icon on light background (green background)
     }
 
     if (variant === "wordmark") {
-      // Wordmark variant - SPARE FINANCE text
+      // Wordmark variant - now uses full logo (icon + text) instead of text only
       return effectiveColor === "white"
-        ? "/assets/logos/wordmark-white.svg" // White text on dark background
-        : "/assets/logos/wordmark-purple.svg"; // Purple/blue text on light background
+        ? "/assets/logos/sparefiance-logo-dark-mode.svg" // Dark mode logo (green icon with white text)
+        : "/assets/logos/sparefiance-logo-black.svg"; // Full black logo on light background
     }
 
-    // Full variant - icon + wordmark (or just wordmark if full not available)
+    // Full variant - use new full logo SVGs (prefer SVG over PNG)
+    if (variant === "full") {
+      // For light backgrounds (purple/auto in light mode), use black logo
+      // For dark backgrounds (white/auto in dark mode), use dark-mode logo
+      return effectiveColor === "white"
+        ? "/assets/logos/sparefiance-logo-dark-mode.svg" // Dark mode logo (green icon with white text)
+        : "/assets/logos/sparefiance-logo-black.svg"; // Full black logo on light background
+    }
+
+    // Fallback (should not reach here, but just in case)
     return effectiveColor === "white"
-      ? "/assets/logos/wordmark-white.svg" // Fallback to wordmark if full not available
-      : "/assets/logos/wordmark-purple.svg";
+      ? "/assets/logos/sparefiance-logo-dark-mode.svg"
+      : "/assets/logos/sparefiance-logo-black.svg";
   };
 
   // Default dimensions based on variant

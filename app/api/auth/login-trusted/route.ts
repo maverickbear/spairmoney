@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceRoleClient, createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/login-trusted
@@ -33,61 +34,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use service role client to validate credentials
-    const serviceRoleClient = createServiceRoleClient();
+    const service = makeAuthService();
+    const result = await service.loginTrusted({ email, password });
 
-    // Validate credentials by attempting to sign in
-    const { data: authData, error: authError } = await serviceRoleClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError || !authData.user) {
-      console.error("[LOGIN-TRUSTED] Invalid credentials:", authError?.message);
-      // Don't reveal if email exists or not for security
+    if (!result.success) {
+      const statusCode = result.error?.includes("blocked") ? 403 : 
+                        result.error?.includes("confirm") ? 401 : 401;
       return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
-
-    // Check if email is confirmed
-    if (!authData.user.email_confirmed_at) {
-      return NextResponse.json(
-        { error: "Please confirm your email before signing in. Check your inbox for the confirmation link." },
-        { status: 401 }
-      );
-    }
-
-    // Check if user is blocked
-    const { data: userData, error: userError } = await serviceRoleClient
-      .from("User")
-      .select("isBlocked, role")
-      .eq("id", authData.user.id)
-      .single();
-
-    if (!userError && userData?.isBlocked && userData?.role !== "super_admin") {
-      console.log("[LOGIN-TRUSTED] User is blocked:", authData.user.id);
-      return NextResponse.json(
-        { error: "Your account has been blocked. Please contact support@sparefinance.com for assistance." },
-        { status: 403 }
-      );
-    }
-
-    // Create a session using the server client
-    // Sign in with password using server client to create a proper session with cookies
-    const serverClient = await createServerClient();
-    
-    const { data: sessionData, error: sessionError } = await serverClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (sessionError || !sessionData.session) {
-      console.error("[LOGIN-TRUSTED] Error creating session:", sessionError?.message);
-      return NextResponse.json(
-        { error: "Failed to create session. Please try again." },
-        { status: 500 }
+        { error: result.error || "Failed to sign in" },
+        { status: statusCode }
       );
     }
 
@@ -96,36 +51,43 @@ export async function POST(request: NextRequest) {
     // Create response with success
     const response = NextResponse.json({ 
       success: true,
-      user: {
-        id: sessionData.user.id,
-        email: sessionData.user.email,
-      },
+      user: result.user,
     });
 
-    // Set session cookies explicitly to ensure they're set correctly
-    const expiresIn = sessionData.session.expires_in || 3600;
-    const maxAge = expiresIn;
-    const refreshMaxAge = 7 * 24 * 60 * 60; // 7 days for refresh token
+    // Set session cookies explicitly if we have a session
+    if (result.session) {
+      const expiresIn = result.session.expires_in || 3600;
+      const maxAge = expiresIn;
+      const refreshMaxAge = 7 * 24 * 60 * 60; // 7 days for refresh token
 
-    response.cookies.set("sb-access-token", sessionData.session.access_token, {
-      path: "/",
-      maxAge: maxAge,
-      httpOnly: false, // Allow client-side access for Supabase client
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    });
+      response.cookies.set("sb-access-token", result.session.access_token, {
+        path: "/",
+        maxAge: maxAge,
+        httpOnly: false, // Allow client-side access for Supabase client
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
 
-    response.cookies.set("sb-refresh-token", sessionData.session.refresh_token, {
-      path: "/",
-      maxAge: refreshMaxAge,
-      httpOnly: false, // Allow client-side access for Supabase client
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    });
+      response.cookies.set("sb-refresh-token", result.session.refresh_token, {
+        path: "/",
+        maxAge: refreshMaxAge,
+        httpOnly: false, // Allow client-side access for Supabase client
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    }
 
     return response;
   } catch (error) {
     console.error("[LOGIN-TRUSTED] Unexpected error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

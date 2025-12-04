@@ -52,7 +52,7 @@ async function preloadUserData() {
         }
         return profile;
       }).catch(() => null),
-      fetch("/api/billing/subscription", { cache: "no-store" }).then(async (r) => {
+      fetch("/api/v2/billing/subscription", { cache: "no-store" }).then(async (r) => {
         if (!r.ok) return null;
         const subData = await r.json();
         if (!subData) return null;
@@ -421,25 +421,8 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
               }),
             });
 
-            if (createResponse.ok) {
-              // Create household and member if needed
-              try {
-                await fetch("/api/auth/create-household-member", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    ownerId: oauthData.userId,
-                    memberId: oauthData.userId,
-                    email: currentUser.email,
-                    name: oauthData.name,
-                  }),
-                });
-              } catch (householdError) {
-                console.error("Error creating household:", householdError);
-              }
-            }
+            // Note: createUserProfile now automatically creates household
+            // No need to call create-household-member separately
           } catch (profileError) {
             console.error("Error creating user profile:", profileError);
           }
@@ -564,7 +547,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Complete invitation acceptance
-          const completeResponse = await fetch("/api/members/invite/complete-after-otp", {
+          const completeResponse = await fetch("/api/v2/members/invite/complete-after-otp", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -597,7 +580,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
             
             while (!subscriptionFound && retries < maxRetries) {
               try {
-                const subscriptionCheck = await fetch("/api/billing/subscription");
+                const subscriptionCheck = await fetch("/api/v2/billing/subscription");
                 if (subscriptionCheck.ok) {
                   const subscriptionData = await subscriptionCheck.json();
                   if (subscriptionData.subscription && (subscriptionData.subscription.status === "active" || subscriptionData.subscription.status === "trialing")) {
@@ -670,54 +653,19 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         }
       }
 
-      // If planId is provided, redirect to Stripe Checkout
-      if (planId) {
-        try {
-          // Wait for session to be fully established
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Create Stripe Checkout session and redirect to Stripe
-          const response = await fetch("/api/stripe/checkout", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ 
-              planId,
-              interval: interval || "month",
-              returnUrl: "/subscription/success"
-            }),
-          });
-
-          const checkoutData = await response.json();
-
-          if (response.ok && checkoutData.url) {
-            // Redirect to Stripe Checkout
-            window.location.href = checkoutData.url;
-            return;
-          }
-        } catch (error) {
-          console.error("[OTP] Error creating checkout:", error);
-        }
+      // If planId is provided, user selected a plan before signup
+      // Save it to sessionStorage so onboarding dialog can use it
+      // They will start trial through the onboarding dialog in dashboard
+      // No need to create checkout - trial will be created without payment method
+      if (planId && interval) {
+        console.log("[OTP] Plan selected before signup, saving to sessionStorage for onboarding:", { planId, interval });
+        const onboardingData = {
+          step3: { planId, interval },
+        };
+        sessionStorage.setItem("onboarding-temp-data", JSON.stringify(onboardingData));
       }
 
-      // Check if income onboarding is complete before redirecting to dashboard
-      try {
-        const incomeCheckResponse = await fetch("/api/v2/onboarding/income");
-        if (incomeCheckResponse.ok) {
-          const incomeData = await incomeCheckResponse.json();
-          if (!incomeData.hasExpectedIncome) {
-            // Redirect to income onboarding if not complete
-            router.push("/onboarding/income");
-            return;
-          }
-        }
-      } catch (error) {
-        console.warn("[OTP] Error checking income onboarding status:", error);
-        // Continue to dashboard even if check fails
-      }
-
-      // Default: redirect to dashboard
+      // Redirect to dashboard - onboarding dialog will handle plan selection and trial start
       router.push("/dashboard");
     } catch (error) {
       console.error("Error verifying OTP:", error);
@@ -885,7 +833,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           type="button"
           onClick={handleResend}
           disabled={resending || loading}
-          className="text-sm text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          className="text-sm text-foreground hover:underline disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
         >
           {resending ? (
             <>

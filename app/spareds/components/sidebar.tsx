@@ -116,11 +116,11 @@ export function Sidebar() {
       {/* Logo/Header */}
       <div className="p-6 border-b border-border">
         <Link href="/spareds" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4A4AF2] to-[#6D6DFF] flex items-center justify-center text-white font-bold">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-scale-500 to-primary-scale-400 flex items-center justify-center text-white font-bold">
             S
           </div>
             <div>
-              <div className="font-bold text-lg bg-gradient-to-r from-[#4A4AF2] to-[#6D6DFF] bg-clip-text text-transparent">
+              <div className="font-bold text-lg bg-gradient-to-r from-primary-scale-500 to-primary-scale-400 bg-clip-text text-transparent">
                 SpareDS
               </div>
               <div className="text-xs text-muted-foreground">

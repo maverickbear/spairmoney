@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProfile, updateProfile } from "@/lib/api/profile";
-import { ProfileFormData } from "@/src/domain/profile/profile.validations";
+import { makeProfileService } from "@/src/application/profile/profile.factory";
+import { ProfileFormData, profileSchema } from "@/src/domain/profile/profile.validations";
 import { ZodError } from "zod";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
-    const profile = await getProfile();
+    const service = makeProfileService();
+    const profile = await service.getProfile();
     
     // Return profile even if it's null (user exists but profile might be incomplete)
     // This allows the modal to show empty fields for the user to fill in
@@ -22,6 +24,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(profile, { status: 200 });
   } catch (error) {
     console.error("Error fetching profile:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch profile" },
       { status: 500 }
@@ -31,13 +41,22 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const data: ProfileFormData = await request.json();
+    const body = await request.json();
+    const data = profileSchema.parse(body);
     
-    const profile = await updateProfile(data);
+    const service = makeProfileService();
+    const profile = await service.updateProfile(data);
     
     return NextResponse.json(profile, { status: 200 });
   } catch (error) {
     console.error("Error updating profile:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     // Handle validation errors
     if (error instanceof ZodError) {

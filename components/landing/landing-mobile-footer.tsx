@@ -76,7 +76,7 @@ export function LandingMobileFooter({ isAuthenticated: initialAuth }: LandingMob
               </Button>
               <Button 
                 asChild 
-                className="flex-1 font-semibold bg-[#4A4AF2] text-white hover:bg-[#3A3AD2]"
+                className="flex-1 font-semibold bg-primary-scale-500 text-foreground hover:bg-primary-scale-600"
               >
                 <Link href="/auth/signup">
                   Get Started

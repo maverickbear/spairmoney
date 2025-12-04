@@ -20,8 +20,8 @@ export function LandingHeroSection() {
       </div>
       
       {/* Decorative circles */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[#4A4AF2]/20 dark:bg-[#2A2AB8]/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-1000 ease-in-out"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#4A4AF2]/20 dark:bg-[#2A2AB8]/15 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 transition-colors duration-1000 ease-in-out"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary-scale-500/20 dark:bg-primary-scale-600/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-1000 ease-in-out"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary-scale-500/20 dark:bg-primary-scale-600/15 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 transition-colors duration-1000 ease-in-out"></div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-12">
         <div className="max-w-7xl mx-auto">
@@ -29,12 +29,12 @@ export function LandingHeroSection() {
             {/* Text Content */}
             <div className="text-center space-y-6 md:space-y-8 w-full">
               {/* Headline */}
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight tracking-tight">
                 Take Control of Your Money — One Step at a Time.
               </h1>
 
               {/* Sub-headline */}
-              <p className="text-base sm:text-lg md:text-xl text-white/90 max-w-3xl mx-auto font-light leading-relaxed">
+              <p className="text-base sm:text-lg md:text-xl text-foreground/90 max-w-3xl mx-auto font-light leading-relaxed">
                 Spare Finance helps you understand your spending, build better habits, and plan a stronger financial future — whether you manage money alone or with your household.
               </p>
 
@@ -42,11 +42,11 @@ export function LandingHeroSection() {
               <div className="pt-6 space-y-1">
                 <Button
                   asChild
-                  className="bg-white text-[#1A1A8F] hover:bg-white/90 text-lg font-semibold px-10 h-14 rounded-full transition-all shadow-lg hover:shadow-xl"
+                  className="bg-white dark:bg-black text-foreground dark:text-white hover:bg-white/90 dark:hover:bg-black/90 text-lg font-semibold px-10 h-14 rounded-full transition-all shadow-lg hover:shadow-xl"
                 >
                   <Link href="/auth/signup">Start your 30-day free trial</Link>
                 </Button>
-                <p className="text-sm text-white/80">
+                <p className="text-sm text-foreground/80">
                   No credit card needed.
                 </p>
               </div>
@@ -57,12 +57,12 @@ export function LandingHeroSection() {
           <div className="mt-24 md:mt-32 max-w-7xl mx-auto">
             {/* Glow effect wrapper */}
             <div className="relative">
-              {/* Strong glow effect - Purple tones */}
-              <div className="absolute inset-0 -z-10 rounded-t-3xl bg-[#4A4AF2]/40 dark:bg-[#2A2AB8]/25 blur-3xl scale-110 transition-colors duration-1000 ease-in-out"></div>
-              <div className="absolute inset-0 -z-10 rounded-t-3xl bg-[#6D6DFF]/30 dark:bg-[#1A1A7A]/20 blur-2xl scale-105 transition-colors duration-1000 ease-in-out"></div>
-              <div className="absolute inset-0 -z-10 rounded-t-3xl bg-[#8B8BFF]/20 dark:bg-[#0D0D5A]/15 blur-xl scale-[1.02] transition-colors duration-1000 ease-in-out"></div>
+              {/* Strong glow effect - Green tones */}
+              <div className="absolute inset-0 -z-10 rounded-t-3xl bg-primary-scale-500/40 dark:bg-primary-scale-600/25 blur-3xl scale-110 transition-colors duration-1000 ease-in-out"></div>
+              <div className="absolute inset-0 -z-10 rounded-t-3xl bg-primary-scale-400/30 dark:bg-primary-scale-900/20 blur-2xl scale-105 transition-colors duration-1000 ease-in-out"></div>
+              <div className="absolute inset-0 -z-10 rounded-t-3xl bg-primary-scale-300/20 dark:bg-primary-scale-900/15 blur-xl scale-[1.02] transition-colors duration-1000 ease-in-out"></div>
               
-              <div className="relative rounded-t-3xl overflow-hidden border-t border-l border-r border-white/10 backdrop-blur-sm bg-white/5 dark:bg-black/10 shadow-[0_0_80px_rgba(74,74,242,0.4),0_0_120px_rgba(109,109,255,0.3),0_0_200px_rgba(139,139,255,0.2)] dark:shadow-[0_0_80px_rgba(42,42,184,0.2),0_0_120px_rgba(26,26,122,0.15),0_0_200px_rgba(13,13,90,0.1)] transition-all duration-1000 ease-in-out">
+              <div className="relative rounded-t-3xl overflow-hidden border-t border-l border-r border-white/10 backdrop-blur-sm bg-white/5 dark:bg-black/10 shadow-[0_0_80px_hsl(var(--primary-500)/0.4),0_0_120px_hsl(var(--primary-400)/0.3),0_0_200px_hsl(var(--primary-300)/0.2)] dark:shadow-[0_0_80px_hsl(var(--primary-600)/0.2),0_0_120px_hsl(var(--primary-900)/0.15),0_0_200px_hsl(var(--primary-900)/0.1)] transition-all duration-1000 ease-in-out">
                 <DashboardDemo />
               </div>
             </div>

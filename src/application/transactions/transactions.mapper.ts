@@ -29,6 +29,7 @@ export class TransactionsMapper {
       suggestedCategoryId: row.suggestedCategoryId,
       suggestedSubcategoryId: row.suggestedSubcategoryId,
       plaidMetadata: row.plaidMetadata,
+      receiptUrl: row.receiptUrl,
     };
   }
 
@@ -54,6 +55,7 @@ export class TransactionsMapper {
       suggestedCategoryId: domain.suggestedCategoryId ?? null,
       suggestedSubcategoryId: domain.suggestedSubcategoryId ?? null,
       plaidMetadata: domain.plaidMetadata ?? null,
+      receiptUrl: domain.receiptUrl ?? null,
     };
   }
 

@@ -25,8 +25,8 @@ function ForgotPasswordFormWrapper() {
 
           <div className="space-y-6 pt-8">
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Mail className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Mail className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Check Your Email</h3>
@@ -37,8 +37,8 @@ function ForgotPasswordFormWrapper() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Lock className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Lock className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Secure Process</h3>
@@ -49,8 +49,8 @@ function ForgotPasswordFormWrapper() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Shield className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Shield className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Safe & Secure</h3>

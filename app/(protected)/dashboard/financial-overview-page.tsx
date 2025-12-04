@@ -1,12 +1,19 @@
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw, Loader2, ChevronDown } from "lucide-react";
 import { ChartSkeleton } from "@/components/ui/chart-skeleton";
 import { CardSkeleton } from "@/components/ui/card-skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SummaryCards } from "./summary-cards";
 import { FinancialHealthScoreWidget } from "./widgets/financial-health-score-widget";
 import { calculateTotalIncome, calculateTotalExpenses } from "./utils/transaction-helpers";
@@ -110,31 +117,127 @@ interface FinancialOverviewPageProps {
 }
 
 export function FinancialOverviewPage({
-  selectedMonthTransactions,
-  lastMonthTransactions,
-  savings,
-  totalBalance,
-  lastMonthTotalBalance,
-  accounts,
-  budgets,
-  upcomingTransactions,
-  financialHealth,
-  goals,
-  chartTransactions,
-  liabilities,
-  debts,
-  recurringPayments,
-  subscriptions,
+  selectedMonthTransactions: initialSelectedMonthTransactions,
+  lastMonthTransactions: initialLastMonthTransactions,
+  savings: initialSavings,
+  totalBalance: initialTotalBalance,
+  lastMonthTotalBalance: initialLastMonthTotalBalance,
+  accounts: initialAccounts,
+  budgets: initialBudgets,
+  upcomingTransactions: initialUpcomingTransactions,
+  financialHealth: initialFinancialHealth,
+  goals: initialGoals,
+  chartTransactions: initialChartTransactions,
+  liabilities: initialLiabilities,
+  debts: initialDebts,
+  recurringPayments: initialRecurringPayments,
+  subscriptions: initialSubscriptions,
   selectedMonthDate,
-  expectedIncomeRange,
+  expectedIncomeRange: initialExpectedIncomeRange,
 }: FinancialOverviewPageProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
+
+  // Local state for dashboard data - initialized from props and updated on refresh
+  const [selectedMonthTransactions, setSelectedMonthTransactions] = useState(initialSelectedMonthTransactions);
+  const [lastMonthTransactions, setLastMonthTransactions] = useState(initialLastMonthTransactions);
+  const [savings, setSavings] = useState(initialSavings);
+  const [totalBalance, setTotalBalance] = useState(initialTotalBalance);
+  const [lastMonthTotalBalance, setLastMonthTotalBalance] = useState(initialLastMonthTotalBalance);
+  const [accounts, setAccounts] = useState(initialAccounts);
+  const [budgets, setBudgets] = useState(initialBudgets);
+  const [upcomingTransactions, setUpcomingTransactions] = useState(initialUpcomingTransactions);
+  const [financialHealth, setFinancialHealth] = useState(initialFinancialHealth);
+  const [goals, setGoals] = useState(initialGoals);
+  const [chartTransactions, setChartTransactions] = useState(initialChartTransactions);
+  const [liabilities, setLiabilities] = useState(initialLiabilities);
+  const [debts, setDebts] = useState(initialDebts);
+  const [recurringPayments, setRecurringPayments] = useState(initialRecurringPayments);
+  const [subscriptions, setSubscriptions] = useState(initialSubscriptions);
+  const [expectedIncomeRange, setExpectedIncomeRange] = useState(initialExpectedIncomeRange);
+
+  // Update local state when props change (e.g., when range changes)
+  useEffect(() => {
+    setSelectedMonthTransactions(initialSelectedMonthTransactions);
+    setLastMonthTransactions(initialLastMonthTransactions);
+    setSavings(initialSavings);
+    setTotalBalance(initialTotalBalance);
+    setLastMonthTotalBalance(initialLastMonthTotalBalance);
+    setAccounts(initialAccounts);
+    setBudgets(initialBudgets);
+    setUpcomingTransactions(initialUpcomingTransactions);
+    setFinancialHealth(initialFinancialHealth);
+    setGoals(initialGoals);
+    setChartTransactions(initialChartTransactions);
+    setLiabilities(initialLiabilities);
+    setDebts(initialDebts);
+    setRecurringPayments(initialRecurringPayments);
+    setSubscriptions(initialSubscriptions);
+    setExpectedIncomeRange(initialExpectedIncomeRange);
+  }, [
+    initialSelectedMonthTransactions,
+    initialLastMonthTransactions,
+    initialSavings,
+    initialTotalBalance,
+    initialLastMonthTotalBalance,
+    initialAccounts,
+    initialBudgets,
+    initialUpcomingTransactions,
+    initialFinancialHealth,
+    initialGoals,
+    initialChartTransactions,
+    initialLiabilities,
+    initialDebts,
+    initialRecurringPayments,
+    initialSubscriptions,
+    initialExpectedIncomeRange,
+  ]);
+
+  // Get selected range from URL or default to "this-month"
+  type DateRange = "this-month" | "last-month" | "last-60-days" | "last-90-days";
+  const rangeParam = searchParams.get("range") as DateRange | null;
+  const selectedRange: DateRange = rangeParam && ["this-month", "last-month", "last-60-days", "last-90-days"].includes(rangeParam)
+    ? rangeParam
+    : "this-month";
+
+  const handleRangeChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (value === "this-month") {
+      // Remove range param to default to this month
+      params.delete("range");
+      params.delete("month"); // Also remove old month param if present
+    } else {
+      params.set("range", value);
+      params.delete("month"); // Remove old month param
+    }
+    
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+    router.refresh();
+  };
+
+  const getOverviewTitle = (range: DateRange): { variable: string; overview: string } => {
+    switch (range) {
+      case "this-month":
+        return { variable: "This month", overview: "overview" };
+      case "last-month":
+        return { variable: "Last month", overview: "overview" };
+      case "last-60-days":
+        return { variable: "Last 60 days", overview: "overview" };
+      case "last-90-days":
+        return { variable: "Last 90 days", overview: "overview" };
+      default:
+        return { variable: "This month", overview: "overview" };
+    }
+  };
 
   // Load household members
   useEffect(() => {
@@ -252,11 +355,47 @@ export function FinancialOverviewPage({
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Refresh the router to reload all data
-      await router.refresh();
+      // Build API URL with current range
+      const params = new URLSearchParams();
+      if (selectedRange !== "this-month") {
+        params.set("range", selectedRange);
+      }
+      const url = `/api/v2/dashboard${params.toString() ? `?${params.toString()}` : ""}`;
+      
+      // Fetch updated dashboard data
+      const response = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to refresh dashboard data");
+      }
+
+      const data = await response.json();
+
+      // Update local state with new data (cards remain visible, only numbers update)
+      setSelectedMonthTransactions(data.selectedMonthTransactions || []);
+      setLastMonthTransactions(data.lastMonthTransactions || []);
+      setSavings(data.savings || 0);
+      setTotalBalance(data.totalBalance || 0);
+      setLastMonthTotalBalance(data.lastMonthTotalBalance || 0);
+      setAccounts(data.accounts || []);
+      setBudgets(data.budgets || []);
+      setUpcomingTransactions(data.upcomingTransactions || []);
+      setFinancialHealth(data.financialHealth || initialFinancialHealth);
+      setGoals(data.goals || []);
+      setChartTransactions(data.chartTransactions || []);
+      setLiabilities(data.liabilities || []);
+      setDebts(data.debts || []);
+      setRecurringPayments(data.recurringPayments || []);
+      setSubscriptions(data.subscriptions || []);
+      setExpectedIncomeRange(data.expectedIncomeRange || null);
+      
       setLastUpdated(new Date());
     } catch (error) {
       console.error("Error refreshing dashboard:", error);
+      // Optionally show a toast notification here
     } finally {
       setIsRefreshing(false);
     }
@@ -476,14 +615,33 @@ export function FinancialOverviewPage({
     <div className="space-y-4 md:space-y-6">
       {/* Financial Overview Header with Last Updated and Refresh Button */}
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-semibold">
-          <span className="md:hidden">Overview</span>
-          <span className="hidden md:inline">Financial Overview</span>
-        </h2>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            Updated {relativeTimeText}
-          </span>
+        <Select
+          value={selectedRange}
+          onValueChange={handleRangeChange}
+        >
+          <SelectTrigger className="h-auto border-none shadow-none p-0 hover:bg-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none data-[state=open]:ring-0 data-[state=open]:border-none data-[state=open]:shadow-none data-[state=open]:outline-none w-auto min-w-0 [&>span]:flex [&>span]:items-center [&>span]:gap-2 [&>svg]:hidden">
+            <SelectValue>
+              <h2 className="text-lg md:text-xl font-normal flex items-center gap-2 cursor-pointer transition-colors group">
+                <span className="md:hidden">
+                  <span className="font-bold group-hover:text-primary transition-colors">{getOverviewTitle(selectedRange).variable}</span>
+                  <span className="group-hover:text-primary transition-colors"> {getOverviewTitle(selectedRange).overview}</span>
+                </span>
+                <span className="hidden md:inline">
+                  <span className="font-bold group-hover:text-primary transition-colors">{getOverviewTitle(selectedRange).variable}</span>
+                  <span className="group-hover:text-primary transition-colors"> {getOverviewTitle(selectedRange).overview}</span>
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 group-hover:opacity-70 transition-opacity" />
+              </h2>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="this-month">This month overview</SelectItem>
+            <SelectItem value="last-month">Last month overview</SelectItem>
+            <SelectItem value="last-60-days">Last 60 days overview</SelectItem>
+            <SelectItem value="last-90-days">Last 90 days overview</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="icon"
@@ -498,6 +656,9 @@ export function FinancialOverviewPage({
               <RefreshCw className="h-4 w-4" />
             )}
           </Button>
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            Updated {relativeTimeText}
+          </span>
         </div>
       </div>
       
@@ -515,6 +676,10 @@ export function FinancialOverviewPage({
         isLoadingMembers={isLoadingMembers}
         financialHealth={financialHealth}
         expectedIncomeRange={expectedIncomeRange}
+        recurringPayments={filteredRecurringPayments}
+        subscriptions={filteredSubscriptions}
+        goals={filteredGoals}
+        debts={filteredDebts}
       />
 
       {/* Top Widgets - Spare Score and Expenses by Category side by side */}

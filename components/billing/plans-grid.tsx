@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plan, Subscription } from "@/src/domain/subscriptions/subscriptions.validations";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { ChangePlanConfirmationModal } from "@/components/billing/change-plan-confirmation";
 import { useToast } from "@/components/toast-provider";
 
@@ -43,8 +43,8 @@ export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlan
   }
 
   function handleUpgrade(planId: string) {
-    // Redirect to pricing page instead of opening modal
-    window.location.href = "/pricing";
+    // Redirect to dashboard with pricing modal
+    window.location.href = "/dashboard?openPricingModal=true";
   }
 
   async function handleDirectPlanChange(plan: Plan) {
@@ -71,7 +71,7 @@ export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlan
   async function processPlanChange(plan: Plan, isUpgrade: boolean, isDowngrade: boolean) {
     if (!subscription?.stripeSubscriptionId) {
       // No active subscription, need to create one via checkout
-      window.location.href = "/pricing";
+      window.location.href = "/dashboard?openPricingModal=true";
       return;
     }
 
@@ -159,58 +159,35 @@ export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlan
     return "Upgrade";
   }
 
-  function getFeatures(plan: Plan): string[] {
-    const features: string[] = [];
-    
-    if (plan.features.maxTransactions === -1) {
-      features.push("Unlimited transactions");
-    } else if (plan.features.maxTransactions > 0) {
-      features.push(`${plan.features.maxTransactions} transactions/month`);
+  function getFeatures(plan: Plan): Array<{ label: string; enabled: boolean }> {
+    const f = plan.features;
+    const features: Array<{ label: string; enabled: boolean }> = [];
+
+    // Limits (always shown first)
+    if (f.maxTransactions === -1) {
+      features.push({ label: "Unlimited transactions", enabled: true });
+    } else if (f.maxTransactions > 0) {
+      features.push({ label: `${f.maxTransactions} transactions/month`, enabled: true });
     }
-    
-    if (plan.features.maxAccounts === -1) {
-      features.push("Unlimited accounts");
-    } else if (plan.features.maxAccounts > 0) {
-      features.push(`${plan.features.maxAccounts} accounts`);
+
+    if (f.maxAccounts === -1) {
+      features.push({ label: "Unlimited accounts", enabled: true });
+    } else if (f.maxAccounts > 0) {
+      features.push({ label: `${f.maxAccounts} accounts`, enabled: true });
     }
-    
-    if (plan.features.hasInvestments) {
-      features.push("Investment tracking");
-    }
-    
-    if (plan.features.hasAdvancedReports) {
-      features.push("Advanced reports");
-    }
-    
-    if (plan.features.hasCsvExport) {
-      features.push("CSV export");
-    }
-    
-    if (plan.features.hasCsvImport) {
-      features.push("CSV import");
-    }
-    
-    if (plan.features.hasDebts) {
-      features.push("Debt tracking");
-    }
-    
-    if (plan.features.hasGoals) {
-      features.push("Goals tracking");
-    }
-    
-    if (plan.features.hasBudgets) {
-      features.push("Budgets");
-    }
-    
-    // Household Members (Pro-only)
-    if (plan.features.hasHousehold) {
-      features.push("Household members");
-    }
-    
-    if (plan.features.hasBankIntegration) {
-      features.push("Bank account integration");
-    }
-    
+
+    // Features in order of importance (always shown, enabled based on plan)
+    features.push({ label: "Bank integration", enabled: f.hasBankIntegration });
+    features.push({ label: "Budgets", enabled: f.hasBudgets });
+    features.push({ label: "Goals tracking", enabled: f.hasGoals });
+    features.push({ label: "Receipt scanner", enabled: f.hasReceiptScanner });
+    features.push({ label: "Investment tracking", enabled: f.hasInvestments });
+    features.push({ label: "Advanced reports", enabled: f.hasAdvancedReports });
+    features.push({ label: "CSV import", enabled: f.hasCsvImport });
+    features.push({ label: "CSV export", enabled: f.hasCsvExport });
+    features.push({ label: "Debt tracking", enabled: f.hasDebts });
+    features.push({ label: "Household members", enabled: f.hasHousehold });
+
     return features;
   }
 
@@ -254,7 +231,7 @@ export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlan
               className={`relative flex flex-col transition-all border ${
                 isCurrent
                   ? "border-primary ring-2 ring-primary/30 shadow-lg"
-                  : "border-gray-300 dark:border-gray-700"
+                  : "border-border"
               }`}
             >
 
@@ -271,6 +248,28 @@ export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlan
                   </div>
                 </div>
               </CardHeader>
+
+              <CardContent className="pt-0 pb-4">
+                <ul className="space-y-1">
+                  {features.map((feature, index) => (
+                    <li key={index} className="flex items-start gap-1.5">
+                      {feature.enabled && (
+                        <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                      )}
+                      {!feature.enabled && (
+                        <span className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                      )}
+                      <span className={`text-xs ${
+                        feature.enabled 
+                          ? "text-foreground" 
+                          : "text-muted-foreground"
+                      }`}>
+                        {feature.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
 
               <CardFooter className="pt-2 pb-4">
                 <Button

@@ -64,31 +64,34 @@ export function DynamicPricingTable({
     return interval === "month" ? plan.priceMonthly : plan.priceYearly;
   }
 
-  function getFeatures(plan: Plan): string[] {
-    const features: string[] = [];
+  function getFeatures(plan: Plan): Array<{ label: string; enabled: boolean }> {
     const f = plan.features;
+    const features: Array<{ label: string; enabled: boolean }> = [];
 
+    // Limits (always shown first)
     if (f.maxTransactions === -1) {
-      features.push("Unlimited transactions");
+      features.push({ label: "Unlimited transactions", enabled: true });
     } else if (f.maxTransactions > 0) {
-      features.push(`${f.maxTransactions} transactions/month`);
+      features.push({ label: `${f.maxTransactions} transactions/month`, enabled: true });
     }
 
     if (f.maxAccounts === -1) {
-      features.push("Unlimited accounts");
+      features.push({ label: "Unlimited accounts", enabled: true });
     } else if (f.maxAccounts > 0) {
-      features.push(`${f.maxAccounts} accounts`);
+      features.push({ label: `${f.maxAccounts} accounts`, enabled: true });
     }
 
-    if (f.hasInvestments) features.push("Investment tracking");
-    if (f.hasAdvancedReports) features.push("Advanced reports");
-    if (f.hasCsvExport) features.push("CSV export");
-    if (f.hasCsvImport) features.push("CSV import");
-    if (f.hasDebts) features.push("Debt tracking");
-    if (f.hasGoals) features.push("Goals tracking");
-    if (f.hasBudgets) features.push("Budgets");
-    if (f.hasHousehold) features.push("Household members");
-    if (f.hasBankIntegration) features.push("Bank integration");
+    // Features in order of importance (always shown, enabled based on plan)
+    features.push({ label: "Bank integration", enabled: f.hasBankIntegration });
+    features.push({ label: "Budgets", enabled: f.hasBudgets });
+    features.push({ label: "Goals tracking", enabled: f.hasGoals });
+    features.push({ label: "Receipt scanner", enabled: f.hasReceiptScanner });
+    features.push({ label: "Investment tracking", enabled: f.hasInvestments });
+    features.push({ label: "Advanced reports", enabled: f.hasAdvancedReports });
+    features.push({ label: "CSV import", enabled: f.hasCsvImport });
+    features.push({ label: "CSV export", enabled: f.hasCsvExport });
+    features.push({ label: "Debt tracking", enabled: f.hasDebts });
+    features.push({ label: "Household members", enabled: f.hasHousehold });
 
     return features;
   }
@@ -105,7 +108,7 @@ export function DynamicPricingTable({
     <div className={`p-6 ${className || ""}`}>
       {/* Interval Toggle */}
       <div className="flex justify-center mb-8">
-        <div className="inline-flex rounded-lg border p-1 bg-muted">
+        <div className="inline-flex rounded-lg border p-1">
           <Button
             type="button"
             variant={interval === "month" ? "default" : "ghost"}
@@ -123,7 +126,7 @@ export function DynamicPricingTable({
             className={interval === "year" ? "shadow-sm" : ""}
           >
             Yearly
-            <span className="ml-1 text-xs text-primary">Save 17%</span>
+            <span className={`ml-1 text-xs ${interval === "year" ? "text-primary-foreground" : "text-primary"}`}>Save 17%</span>
           </Button>
         </div>
       </div>
@@ -198,11 +201,22 @@ export function DynamicPricingTable({
                 </div>
               </CardHeader>
               <CardContent className="!pt-0">
-                <ul className="space-y-3">
+                <ul className="space-y-1.5">
                   {features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground">{feature}</span>
+                    <li key={index} className="flex items-start gap-1.5">
+                      {feature.enabled && (
+                        <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                      )}
+                      {!feature.enabled && (
+                        <span className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                      )}
+                      <span className={`text-sm ${
+                        feature.enabled 
+                          ? "text-foreground" 
+                          : "text-muted-foreground"
+                      }`}>
+                        {feature.label}
+                      </span>
                     </li>
                   ))}
                 </ul>

@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Scan receipt
+    // Scan receipt (includes saving to storage)
     const service = makeReceiptsService();
-    const result = await service.scanReceipt(file, buffer);
+    const result = await service.scanReceipt(userId, file, buffer);
 
     if (!result.success) {
       return NextResponse.json(

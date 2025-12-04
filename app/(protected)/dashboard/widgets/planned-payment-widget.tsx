@@ -7,7 +7,7 @@ import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, Calendar } from "lucide-react";
 import Link from "next/link";
-import type { PlannedPayment } from "@/lib/api/planned-payments";
+import type { BasePlannedPayment as PlannedPayment } from "@/src/domain/planned-payments/planned-payments.types";
 
 interface PlannedPaymentWidgetProps {
   upcomingTransactions: any[]; // Still accepts the old format for compatibility

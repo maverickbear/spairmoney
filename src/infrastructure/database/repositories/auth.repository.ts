@@ -45,6 +45,7 @@ export class AuthRepository {
 
   /**
    * Create user profile
+   * Uses service role client to bypass RLS during signup
    */
   async createUser(data: {
     id: string;
@@ -52,10 +53,11 @@ export class AuthRepository {
     name: string | null;
     role: string | null;
   }): Promise<UserRow> {
-    const supabase = await createServerClient();
+    const { createServiceRoleClient } = await import("../supabase-server");
+    const serviceRoleClient = createServiceRoleClient();
     const now = formatTimestamp(new Date());
 
-    const { data: user, error } = await supabase
+    const { data: user, error } = await serviceRoleClient
       .from("User")
       .insert({
         id: data.id,
@@ -108,6 +110,29 @@ export class AuthRepository {
   }
 
   /**
+   * Find multiple users by IDs
+   */
+  async findUsersByIds(ids: string[]): Promise<UserRow[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient();
+
+    const { data: users, error } = await supabase
+      .from("User")
+      .select("id, email, name")
+      .in("id", ids);
+
+    if (error) {
+      logger.error("[AuthRepository] Error fetching users by IDs:", error);
+      throw new Error(`Failed to fetch users: ${error.message}`);
+    }
+
+    return (users || []) as UserRow[];
+  }
+
+  /**
    * Check for pending invitation
    */
   async findPendingInvitation(email: string): Promise<{ id: string; householdId: string; createdBy: string } | null> {
@@ -130,6 +155,51 @@ export class AuthRepository {
       householdId: invitation.householdId,
       createdBy: household?.createdBy || "",
     };
+  }
+
+  /**
+   * Find user by email
+   */
+  async findByEmail(email: string): Promise<UserRow | null> {
+    const supabase = await createServerClient();
+
+    const { data: user, error } = await supabase
+      .from("User")
+      .select("id, email, name")
+      .eq("email", email.toLowerCase())
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      logger.error("[AuthRepository] Error fetching user by email:", error);
+      return null;
+    }
+
+    return user as UserRow;
+  }
+
+  /**
+   * Find users created between dates (for batch operations)
+   */
+  async findUsersByDateRange(startDate: Date, endDate: Date): Promise<UserRow[]> {
+    const { createServiceRoleClient } = await import("../supabase-server");
+    const serviceRoleClient = createServiceRoleClient();
+
+    const { data: users, error } = await serviceRoleClient
+      .from("User")
+      .select("id, email, name, createdAt")
+      .gte("createdAt", startDate.toISOString())
+      .lte("createdAt", endDate.toISOString())
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      logger.error("[AuthRepository] Error fetching users by date range:", error);
+      throw new Error(`Failed to fetch users: ${error.message}`);
+    }
+
+    return (users || []) as UserRow[];
   }
 }
 

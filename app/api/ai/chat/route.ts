@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { getTransactions } from "@/lib/api/transactions";
-import { getAccounts } from "@/lib/api/accounts";
-import { getBudgets } from "@/lib/api/budgets";
-import { getGoals } from "@/lib/api/goals";
-import { getDebts } from "@/lib/api/debts";
-import { getTotalInvestmentsValue } from "@/lib/api/simple-investments";
 import { calculateFinancialHealth } from "@/src/application/shared/financial-health";
-import { getProfile } from "@/lib/api/profile";
 import OpenAI from "openai";
 import { subMonths, startOfMonth, endOfMonth } from "date-fns";
+// Application Services
+import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
+import { makeAccountsService } from "@/src/application/accounts/accounts.factory";
+import { makeBudgetsService } from "@/src/application/budgets/budgets.factory";
+import { makeGoalsService } from "@/src/application/goals/goals.factory";
+import { makeDebtsService } from "@/src/application/debts/debts.factory";
+import { makeProfileService } from "@/src/application/profile/profile.factory";
+import { makeInvestmentsService } from "@/src/application/investments/investments.factory";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -39,6 +40,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Initialize Application Services
+    const transactionsService = makeTransactionsService();
+    const accountsService = makeAccountsService();
+    const budgetsService = makeBudgetsService();
+    const goalsService = makeGoalsService();
+    const debtsService = makeDebtsService();
+    const profileService = makeProfileService();
+    const investmentsService = makeInvestmentsService();
+
     // Fetch all financial data in parallel
     const currentDate = new Date();
     const currentMonthStart = startOfMonth(currentDate);
@@ -55,17 +65,17 @@ export async function POST(request: NextRequest) {
       financialHealth,
       profile,
     ] = await Promise.all([
-      getTransactions({
+      transactionsService.getTransactions({
         startDate: twelveMonthsAgo,
         endDate: currentDate,
       }),
-      getAccounts(),
-      getBudgets(currentDate),
-      getGoals(),
-      getDebts(),
-      getTotalInvestmentsValue(),
+      accountsService.getAccounts(),
+      budgetsService.getBudgets(currentDate),
+      goalsService.getGoals(),
+      debtsService.getDebts(),
+      investmentsService.getTotalInvestmentsValue(),
       calculateFinancialHealth(currentDate),
-      getProfile(),
+      profileService.getProfile(),
     ]);
 
     // Extract transactions array from result

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/create-user-profile
@@ -19,83 +20,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use service role client to bypass RLS
-    const serviceRoleClient = createServiceRoleClient();
-
-    // Check if user already exists
-    const { data: existingUser } = await serviceRoleClient
-      .from("User")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (existingUser) {
-      return NextResponse.json({ 
-        success: true,
-        message: "User profile already exists",
-        user: existingUser
-      });
-    }
-
-    // Create user profile using service role (bypasses RLS)
-    const { data: userData, error: userError } = await serviceRoleClient
-      .from("User")
-      .insert({
-        id: userId,
-        email: email,
-        name: name || null,
-        avatarUrl: avatarUrl || null,
-        role: "admin", // Owners who sign up directly are admins
-      })
-      .select()
-      .single();
-
-    if (userError) {
-      console.error("[CREATE-USER-PROFILE] Error creating user:", {
-        message: userError.message,
-        details: userError.details,
-        hint: userError.hint,
-        code: userError.code,
-        userId,
-        email,
-      });
-
-      // If it's a duplicate key error, try to fetch the existing user
-      if (userError.code === "23505" || 
-          userError.message?.includes("duplicate") || 
-          userError.message?.includes("unique")) {
-        const { data: existingUser } = await serviceRoleClient
-          .from("User")
-          .select("*")
-          .eq("id", userId)
-          .single();
-
-        if (existingUser) {
-          return NextResponse.json({ 
-            success: true,
-            message: "User profile already exists (fetched after duplicate error)",
-            user: existingUser
-          });
-        }
-      }
-
-      return NextResponse.json(
-        { error: "Failed to create user profile", details: userError.message },
-        { status: 500 }
-      );
-    }
-
-    // Note: Welcome email will be sent when subscription is created (see subscription creation handlers)
-
-    return NextResponse.json({ 
-      success: true,
-      message: "User profile created successfully",
-      user: userData
+    const service = makeAuthService();
+    const result = await service.createUserProfile({
+      userId,
+      email,
+      name,
+      avatarUrl,
     });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[CREATE-USER-PROFILE] Unexpected error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "An unexpected error occurred" },
+      { error: error instanceof Error ? error.message : "An unexpected error occurred" },
       { status: 500 }
     );
   }

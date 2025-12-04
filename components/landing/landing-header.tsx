@@ -30,19 +30,10 @@ function getInitials(name: string | undefined | null): string {
 }
 
 export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderProps = {}) {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth ?? false);
   const [user, setUser] = useState<BaseUser | null>(null);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   useEffect(() => {
     // Check authentication status and verify user exists in User table
@@ -119,47 +110,25 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
   const navItems = [
     { label: "Home", href: "#home" },
     { label: "Features", href: "#features" },
-    { label: "Testimonials", href: "#testimonials" },
+    // { label: "Testimonials", href: "#testimonials" },
     { label: "Pricing", href: "#pricing" },
   ];
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? "bg-background/95 backdrop-blur-sm shadow-sm"
-          : "bg-transparent"
-      }`}
+      className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-background/95 backdrop-blur-sm shadow-sm"
     >
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative flex items-center justify-between h-16 md:h-20">
           {/* Logo - À esquerda (mobile e desktop) */}
           <Link href="/" className="flex items-center gap-3 flex-1">
-            {(() => {
-              // When not scrolled, header is transparent over dark background - use white logo
-              if (!isScrolled) {
-                return (
-                  <Logo 
-                    variant="wordmark" 
-                    color="white" 
-                    width={150} 
-                    height={40}
-                    priority
-                  />
-                );
-              }
-              // When scrolled, check if dark mode - use auto to adapt to theme
-              const isDark = resolvedTheme === "dark" || theme === "dark";
-              return (
-                <Logo 
-                  variant="wordmark" 
-                  color={isDark ? "white" : "purple"} 
-                  width={150} 
-                  height={40}
-                  priority
-                />
-              );
-            })()}
+            <Logo 
+              variant="full" 
+              color="auto"
+              width={180} 
+              height={40}
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation - Centralizado */}
@@ -169,11 +138,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`text-base font-medium transition-colors flex items-center ${
-                    isScrolled
-                      ? "text-muted-foreground hover:text-foreground"
-                      : "text-white/90 hover:text-white"
-                  }`}
+                  className="text-base font-medium transition-colors flex items-center text-foreground hover:text-foreground/80"
                 >
                   {item.label}
                 </Link>
@@ -189,7 +154,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                   asChild
                   variant="ghost"
                   size="small"
-                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white text-sm" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white text-sm"}
+                  className="text-foreground hover:text-foreground/80 hover:bg-black/20 dark:hover:bg-black/20 border border-transparent hover:border-foreground/20 text-sm"
                 >
                   <Link href="/dashboard">Dashboard</Link>
                 </Button>
@@ -198,10 +163,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`relative rounded-full h-9 w-9 md:h-10 md:w-10 ${isScrolled 
-                      ? "hover:bg-muted" 
-                      : "hover:bg-white/10"
-                    }`}
+                    className="relative rounded-full h-9 w-9 md:h-10 md:w-10 hover:bg-muted"
                   >
                     {user?.avatarUrl ? (
                       <>
@@ -221,26 +183,16 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                             }
                           }}
                         />
-                        <div className={`h-9 w-9 md:h-10 md:w-10 rounded-full hidden items-center justify-center text-xs font-semibold border ${
-                          isScrolled 
-                            ? "bg-primary text-primary-foreground" 
-                            : "bg-white text-primary"
-                        }`}>
+                        <div className="h-9 w-9 md:h-10 md:w-10 rounded-full hidden items-center justify-center text-xs font-semibold border bg-primary text-primary-foreground">
                           {getInitials(user?.name)}
                         </div>
                       </>
                     ) : user?.name ? (
-                      <div className={`h-9 w-9 md:h-10 md:w-10 rounded-full flex items-center justify-center text-xs font-semibold border ${
-                        isScrolled 
-                          ? "bg-primary text-primary-foreground" 
-                          : "bg-white text-primary"
-                      }`}>
+                      <div className="h-9 w-9 md:h-10 md:w-10 rounded-full flex items-center justify-center text-xs font-semibold border bg-primary text-primary-foreground">
                         {getInitials(user.name)}
                       </div>
                     ) : (
-                      <div className={`h-9 w-9 md:h-10 md:w-10 rounded-full ${
-                        isScrolled ? "bg-muted" : "bg-white/20"
-                      } animate-pulse`} />
+                      <div className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-muted animate-pulse" />
                     )}
                   </Button>
                 </DropdownMenuTrigger>
@@ -261,10 +213,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                   variant="ghost"
                   size="icon"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className={`relative h-9 w-9 md:h-10 md:w-10 ${isScrolled 
-                    ? "text-foreground hover:bg-muted" 
-                    : "text-white hover:bg-white/10"
-                  }`}
+                  className="relative h-9 w-9 md:h-10 md:w-10 text-foreground hover:bg-muted"
                   aria-label="Toggle theme"
                 >
                   <Sun className="absolute h-4 w-4 md:h-5 md:w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -274,7 +223,7 @@ export function LandingHeader({ isAuthenticated: initialAuth }: LandingHeaderPro
                   asChild
                   variant="ghost"
                   size="small"
-                  className={isScrolled ? "text-foreground hover:text-white hover:bg-foreground border border-transparent hover:border-white text-sm" : "text-white hover:text-white hover:bg-white/10 border border-transparent hover:border-white text-sm"}
+                  className="text-foreground hover:text-foreground/80 hover:bg-black/20 dark:hover:bg-black/20 border border-transparent hover:border-foreground/20 text-sm"
                 >
                   <Link href="/auth/login">Sign In</Link>
                 </Button>

@@ -278,5 +278,117 @@ export class MembersRepository {
 
     return (members || []) as Array<HouseholdMemberRow & { household?: { type: string; createdBy: string } }>;
   }
+
+  /**
+   * Find pending invitation by email
+   */
+  async findPendingInvitationByEmail(email: string): Promise<(HouseholdMemberRow & { Household?: { createdBy: string } | null }) | null> {
+    const supabase = await createServerClient();
+
+    const { data: pendingInvitation, error } = await supabase
+      .from("HouseholdMemberNew")
+      .select("id, householdId, email, Household(createdBy)")
+      .eq("email", email.toLowerCase())
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return null;
+      }
+      logger.error("[MembersRepository] Error finding pending invitation:", error);
+      throw new Error(`Failed to find pending invitation: ${error.message}`);
+    }
+
+    return pendingInvitation as (HouseholdMemberRow & { Household?: { createdBy: string } | null }) | null;
+  }
+
+  /**
+   * Find households created by a user
+   */
+  async findHouseholdsByOwner(userId: string): Promise<Array<{ id: string; name: string; type: string; createdBy: string }>> {
+    const supabase = await createServerClient();
+
+    const { data: households, error } = await supabase
+      .from("Household")
+      .select("id, name, type, createdBy")
+      .eq("createdBy", userId);
+
+    if (error) {
+      logger.error("[MembersRepository] Error fetching households by owner:", error);
+      return [];
+    }
+
+    return (households || []) as Array<{ id: string; name: string; type: string; createdBy: string }>;
+  }
+
+  /**
+   * Count active members in a household (excluding a specific user)
+   */
+  async countActiveMembersExcludingUser(householdId: string, excludeUserId: string): Promise<number> {
+    const supabase = await createServerClient();
+
+    const { data: members, error } = await supabase
+      .from("HouseholdMemberNew")
+      .select("userId")
+      .eq("householdId", householdId)
+      .eq("status", "active")
+      .neq("userId", excludeUserId);
+
+    if (error) {
+      logger.error("[MembersRepository] Error counting members:", error);
+      return 0;
+    }
+
+    return members?.length || 0;
+  }
+
+  /**
+   * Count all active members in a household
+   */
+  async countActiveMembers(householdId: string): Promise<number> {
+    const supabase = await createServerClient();
+
+    const { data: members, error } = await supabase
+      .from("HouseholdMemberNew")
+      .select("userId")
+      .eq("householdId", householdId)
+      .eq("status", "active");
+
+    if (error) {
+      logger.error("[MembersRepository] Error counting members:", error);
+      return 0;
+    }
+
+    return members?.length || 0;
+  }
+
+  /**
+   * Get active household ID for user
+   */
+  async getActiveHouseholdId(userId: string): Promise<string | null> {
+    const supabase = await createServerClient();
+
+    const { data: activeHousehold } = await supabase
+      .from("UserActiveHousehold")
+      .select("householdId")
+      .eq("userId", userId)
+      .maybeSingle();
+
+    if (activeHousehold?.householdId) {
+      return activeHousehold.householdId;
+    }
+
+    // Fallback to default household
+    const { data: defaultMember } = await supabase
+      .from("HouseholdMemberNew")
+      .select("householdId")
+      .eq("userId", userId)
+      .eq("isDefault", true)
+      .eq("status", "active")
+      .maybeSingle();
+
+    return defaultMember?.householdId || null;
+  }
 }
 

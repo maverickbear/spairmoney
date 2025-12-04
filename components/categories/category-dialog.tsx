@@ -200,7 +200,7 @@ export function CategoryDialog({
       // For system categories, skip the category update and just refresh subcategories
       if (isSystemCategory && category) {
         // Refresh the subcategories list and close dialog
-        const res = await fetch(`/api/categories?all=true`);
+        const res = await fetch(`/api/v2/categories?all=true`);
         if (res.ok) {
           const allCategories = await res.json();
           const updatedCategory = allCategories.find((cat: any) => cat.id === category.id);
@@ -228,7 +228,7 @@ export function CategoryDialog({
         return;
       }
       
-      const url = category ? `/api/categories/${category.id}` : "/api/categories";
+      const url = category ? `/api/v2/categories/${category.id}` : "/api/v2/categories";
       const method = category ? "PATCH" : "POST";
 
       const res = await fetch(url, {
@@ -249,7 +249,7 @@ export function CategoryDialog({
       if (!category && pendingSubcategories.length > 0) {
         try {
           const subcategoryPromises = pendingSubcategories.map((pending) =>
-            fetch(`/api/categories/${savedCategory.id}/subcategories`, {
+            fetch(`/api/v2/categories/${savedCategory.id}/subcategories`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ name: pending.name }),
@@ -333,7 +333,7 @@ export function CategoryDialog({
     if (currentCategoryId) {
       try {
         setIsSubmittingSubcategory(true);
-        const res = await fetch(`/api/categories/${currentCategoryId}/subcategories`, {
+        const res = await fetch(`/api/v2/categories/${currentCategoryId}/subcategories`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, logo: newSubcategoryLogo.trim() || null }),
@@ -352,7 +352,7 @@ export function CategoryDialog({
         // Refresh data for system categories
         if (isSystemCategory && category) {
           // Fetch updated category with all subcategories
-          const res = await fetch(`/api/categories?all=true`);
+          const res = await fetch(`/api/v2/categories?all=true`);
           if (res.ok) {
             const allCategories = await res.json();
             const updatedCategory = allCategories.find((cat: any) => cat.id === category.id);
@@ -410,7 +410,7 @@ export function CategoryDialog({
 
     try {
       setIsSubmittingSubcategory(true);
-      const res = await fetch(`/api/categories/subcategories/${subcategoryId}`, {
+      const res = await fetch(`/api/v2/categories/subcategories/${subcategoryId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, logo: editingSubcategoryLogo.trim() || null }),
@@ -481,7 +481,7 @@ export function CategoryDialog({
     setDeletingSubcategoryId(subcategoryId);
     try {
       setIsSubmittingSubcategory(true);
-      const res = await fetch(`/api/categories/subcategories/${subcategoryId}`, {
+      const res = await fetch(`/api/v2/categories/subcategories/${subcategoryId}`, {
         method: "DELETE",
       });
 

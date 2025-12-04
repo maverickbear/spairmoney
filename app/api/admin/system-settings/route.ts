@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-
-async function isSuperAdmin(): Promise<boolean> {
-  try {
-    const supabase = await createServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return false;
-    }
-
-    const { data: userData } = await supabase
-      .from("User")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    return userData?.role === "super_admin";
-  } catch (error) {
-    console.error("Error checking super_admin status:", error);
-    return false;
-  }
-}
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * GET /api/admin/system-settings
@@ -30,44 +10,39 @@ async function isSuperAdmin(): Promise<boolean> {
  */
 export async function GET(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json(
         { error: "Unauthorized: Only super_admin can access this endpoint" },
         { status: 403 }
       );
     }
 
-    // Use service role client to bypass RLS and get settings
-    const supabase = createServiceRoleClient();
-
-    // Get system settings (should only have one row with id='default')
-    const { data: settings, error } = await supabase
-      .from("SystemSettings")
-      .select("*")
-      .eq("id", "default")
-      .single();
-
-    if (error && error.code !== "PGRST116") {
-      // PGRST116 is "not found" - we'll create default if it doesn't exist
-      console.error("Error fetching system settings:", error);
-      return NextResponse.json(
-        { error: "Failed to fetch system settings" },
-        { status: 500 }
-      );
-    }
-
-    // If no settings exist, return default
-    if (!settings) {
-      return NextResponse.json({
-        maintenanceMode: false,
-      });
-    }
-
+    const settings = await service.getSystemSettings();
     return NextResponse.json({
       maintenanceMode: settings.maintenanceMode || false,
     });
   } catch (error: any) {
     console.error("Error fetching system settings:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || "Failed to fetch system settings" },
       { status: 500 }
@@ -82,7 +57,19 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json(
         { error: "Unauthorized: Only super_admin can access this endpoint" },
         { status: 403 }
@@ -99,59 +86,20 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Use service role client to bypass RLS and update settings
-    const supabase = createServiceRoleClient();
-
-    // Try to update existing settings
-    const { data: updatedSettings, error: updateError } = await supabase
-      .from("SystemSettings")
-      .update({
-        maintenanceMode,
-        updatedAt: new Date().toISOString(),
-      })
-      .eq("id", "default")
-      .select()
-      .single();
-
-    // If update failed because row doesn't exist, create it
-    if (updateError && updateError.code === "PGRST116") {
-      const { data: newSettings, error: insertError } = await supabase
-        .from("SystemSettings")
-        .insert({
-          id: "default",
-          maintenanceMode,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error("Error creating system settings:", insertError);
-        return NextResponse.json(
-          { error: "Failed to create system settings" },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        maintenanceMode: newSettings.maintenanceMode,
-      });
-    }
-
-    if (updateError) {
-      console.error("Error updating system settings:", updateError);
-      return NextResponse.json(
-        { error: "Failed to update system settings" },
-        { status: 500 }
-      );
-    }
-
+    const settings = await service.updateSystemSettings({ maintenanceMode });
     return NextResponse.json({
-      maintenanceMode: updatedSettings?.maintenanceMode || false,
+      maintenanceMode: settings.maintenanceMode || false,
     });
   } catch (error: any) {
     console.error("Error updating system settings:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || "Failed to update system settings" },
       { status: 500 }

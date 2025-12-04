@@ -40,6 +40,12 @@ export async function getActiveHouseholdId(
     // Check if there's an actual error (Supabase errors have code or message)
     // Empty error objects {} might indicate "no results found" which is valid
     if (defaultError && (defaultError.code || defaultError.message)) {
+      // Handle permission denied errors gracefully (can happen during SSR)
+      if (defaultError.code === '42501' || defaultError.message?.includes('permission denied')) {
+        // Don't log permission denied errors - they're expected in some contexts
+        return null;
+      }
+      // Only log non-permission errors
       console.error("Error getting active household:", {
         userId,
         code: defaultError.code,

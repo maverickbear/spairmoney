@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { getPortfolioAccounts } from "@/lib/api/portfolio";
+import { makePortfolioService } from "@/src/application/portfolio/portfolio.factory";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { guardFeatureAccessReadOnly, getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET() {
   try {
@@ -22,10 +24,24 @@ export async function GET() {
       );
     }
 
-    const accounts = await getPortfolioAccounts();
+    // Get session tokens using AuthService
+    const { makeAuthService } = await import("@/src/application/auth/auth.factory");
+    const authService = makeAuthService();
+    const { accessToken, refreshToken } = await authService.getSessionTokens();
+
+    const service = makePortfolioService();
+    const accounts = await service.getPortfolioAccounts(accessToken, refreshToken);
     return NextResponse.json(accounts);
   } catch (error) {
     console.error("Error fetching portfolio accounts:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to fetch portfolio accounts" },
       { status: 500 }

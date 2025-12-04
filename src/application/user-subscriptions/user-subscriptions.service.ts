@@ -9,7 +9,6 @@ import { createServerClient } from "@/src/infrastructure/database/supabase-serve
 import { formatTimestamp, formatDateOnly } from "@/src/infrastructure/utils/timestamp";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { logger } from "@/src/infrastructure/utils/logger";
-import { invalidateSubscriptionCaches } from "@/src/infrastructure/cache/cache.manager";
 import { makeCategoriesService } from "../categories/categories.factory";
 import { makePlannedPaymentsService } from "../planned-payments/planned-payments.factory";
 import { AppError } from "../shared/app-error";
@@ -36,7 +35,9 @@ export class UserSubscriptionsService {
         `for user: ${userId}`
       );
 
-      const rows = await this.repository.findAll(userId);
+      // Get active household ID for filtering
+      const householdId = await getActiveHouseholdId(userId);
+      const rows = await this.repository.findAll(userId, householdId || undefined);
       
       // Enrich with related data
       const enriched = await Promise.all(
@@ -60,7 +61,12 @@ export class UserSubscriptionsService {
       }
 
       return enriched;
-    } catch (error) {
+    } catch (error: any) {
+      // Handle permission denied errors gracefully (can happen during SSR)
+      if (error?.code === '42501' || error?.message?.includes('permission denied')) {
+        logger.warn("[UserSubscriptionsService] Permission denied fetching subscriptions - user may not be authenticated");
+        return [];
+      }
       logger.error("[UserSubscriptionsService] Error fetching user service subscriptions:", error);
       throw new AppError("Failed to fetch subscriptions", 500);
     }
@@ -129,8 +135,6 @@ export class UserSubscriptionsService {
       // Enrich with related data
       const enriched = await this.enrichSubscription(row);
 
-      // Invalidate cache
-      invalidateSubscriptionCaches();
 
       return enriched;
     } catch (error) {
@@ -269,6 +273,210 @@ export class UserSubscriptionsService {
             );
           })
         )
+      );
+    }
+  }
+
+  /**
+   * Update an existing subscription
+   */
+  async updateUserSubscription(
+    userId: string,
+    id: string,
+    data: Partial<UserServiceSubscriptionFormData>
+  ): Promise<UserServiceSubscription> {
+    try {
+      // Verify ownership
+      const existing = await this.repository.findById(id);
+      if (!existing || existing.userId !== userId) {
+        throw new AppError("Subscription not found", 404);
+      }
+
+      let subcategoryId = data.subcategoryId;
+
+      // If creating a new subcategory
+      if (data.newSubcategoryName && data.categoryId) {
+        const categoriesService = makeCategoriesService();
+        const newSubcategory = await categoriesService.createSubcategory({
+          name: data.newSubcategoryName,
+          categoryId: data.categoryId,
+        });
+        subcategoryId = newSubcategory.id;
+      }
+
+      const updateData: any = {
+        updatedAt: formatTimestamp(new Date()),
+      };
+
+      if (data.serviceName !== undefined) {
+        updateData.serviceName = data.serviceName.trim();
+      }
+      if (subcategoryId !== undefined) {
+        updateData.subcategoryId = subcategoryId || null;
+      }
+      if (data.planId !== undefined) {
+        updateData.planId = data.planId || null;
+      }
+      if (data.amount !== undefined) {
+        updateData.amount = data.amount;
+      }
+      if (data.description !== undefined) {
+        updateData.description = data.description?.trim() || null;
+      }
+      if (data.billingFrequency !== undefined) {
+        updateData.billingFrequency = data.billingFrequency;
+      }
+      if (data.accountId !== undefined) {
+        updateData.accountId = data.accountId;
+      }
+      if (data.firstBillingDate !== undefined) {
+        updateData.firstBillingDate = formatDateOnly(new Date(data.firstBillingDate));
+      }
+
+      const updated = await this.repository.update(id, updateData);
+
+      // Delete existing planned payments and recreate if active
+      await this.deleteSubscriptionPlannedPayments(id);
+
+      if (updated.isActive) {
+        try {
+          await this.createSubscriptionPlannedPayments(updated);
+        } catch (error) {
+          logger.error("[UserSubscriptionsService] Error recreating subscription planned payments:", error);
+        }
+      }
+
+      // Enrich with related data
+      const enriched = await this.enrichSubscription(updated);
+
+
+      return enriched;
+    } catch (error) {
+      logger.error("[UserSubscriptionsService] Error updating subscription:", error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError("Failed to update subscription", 500);
+    }
+  }
+
+  /**
+   * Delete a subscription
+   */
+  async deleteUserSubscription(userId: string, id: string): Promise<void> {
+    try {
+      // Verify ownership
+      const existing = await this.repository.findById(id);
+      if (!existing || existing.userId !== userId) {
+        throw new AppError("Subscription not found", 404);
+      }
+
+      // Delete planned payments first
+      await this.deleteSubscriptionPlannedPayments(id);
+
+      await this.repository.delete(id);
+
+    } catch (error) {
+      logger.error("[UserSubscriptionsService] Error deleting subscription:", error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError("Failed to delete subscription", 500);
+    }
+  }
+
+  /**
+   * Pause a subscription
+   */
+  async pauseUserSubscription(userId: string, id: string): Promise<UserServiceSubscription> {
+    try {
+      // Verify ownership
+      const existing = await this.repository.findById(id);
+      if (!existing || existing.userId !== userId) {
+        throw new AppError("Subscription not found", 404);
+      }
+
+      if (!existing.isActive) {
+        throw new AppError("Subscription is already paused", 400);
+      }
+
+      const updated = await this.repository.update(id, {
+        isActive: false,
+        updatedAt: formatTimestamp(new Date()),
+      });
+
+      // Delete planned payments for paused subscription
+      await this.deleteSubscriptionPlannedPayments(id);
+
+      // Enrich with related data
+      const enriched = await this.enrichSubscription(updated);
+
+
+      return enriched;
+    } catch (error) {
+      logger.error("[UserSubscriptionsService] Error pausing subscription:", error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError("Failed to pause subscription", 500);
+    }
+  }
+
+  /**
+   * Resume a subscription
+   */
+  async resumeUserSubscription(userId: string, id: string): Promise<UserServiceSubscription> {
+    try {
+      // Verify ownership
+      const existing = await this.repository.findById(id);
+      if (!existing || existing.userId !== userId) {
+        throw new AppError("Subscription not found", 404);
+      }
+
+      if (existing.isActive) {
+        throw new AppError("Subscription is already active", 400);
+      }
+
+      const updated = await this.repository.update(id, {
+        isActive: true,
+        updatedAt: formatTimestamp(new Date()),
+      });
+
+      // Recreate planned payments for resumed subscription
+      try {
+        await this.createSubscriptionPlannedPayments(updated);
+      } catch (error) {
+        logger.error("[UserSubscriptionsService] Error recreating subscription planned payments:", error);
+      }
+
+      // Enrich with related data
+      const enriched = await this.enrichSubscription(updated);
+
+
+      return enriched;
+    } catch (error) {
+      logger.error("[UserSubscriptionsService] Error resuming subscription:", error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError("Failed to resume subscription", 500);
+    }
+  }
+
+  /**
+   * Delete planned payments for a subscription
+   */
+  private async deleteSubscriptionPlannedPayments(subscriptionId: string): Promise<void> {
+    const supabase = await createServerClient();
+    const { error } = await supabase
+      .from("PlannedPayment")
+      .delete()
+      .eq("subscriptionId", subscriptionId);
+
+    if (error) {
+      logger.error(
+        `[UserSubscriptionsService] Error deleting planned payments for subscription ${subscriptionId}:`,
+        error
       );
     }
   }

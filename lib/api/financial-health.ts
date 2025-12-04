@@ -1,6 +1,5 @@
 "use server";
 
-import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import { getTransactionsInternal } from "./transactions";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
@@ -473,8 +472,7 @@ export async function calculateFinancialHealth(
     try {
       finalUserId = await getCurrentUserId();
     } catch (error: any) {
-      // If we can't get userId (e.g., inside unstable_cache), continue without it
-      // The cache key will be less specific but still functional
+      // If we can't get userId, continue without it
       log.warn("Could not get userId:", error?.message);
     }
   }
@@ -499,27 +497,13 @@ export async function calculateFinancialHealth(
         }
       }
     } catch (error: any) {
-      // If we can't get tokens (e.g., inside unstable_cache), continue without them
+      // If we can't get tokens, continue without them
       log.warn("Could not get tokens:", error?.message);
     }
   }
   
-  // Use cache with userId in key to ensure proper isolation (if available)
-  // Cache for 60 seconds to reduce load while keeping data relatively fresh
-  const date = selectedDate || new Date();
-  const cacheKey = finalUserId 
-    ? `financial-health-${finalUserId}-${date.getFullYear()}-${date.getMonth()}`
-    : `financial-health-${date.getFullYear()}-${date.getMonth()}`;
-  
   try {
-    const result = await unstable_cache(
-      async () => calculateFinancialHealthInternal(selectedDate, finalAccessToken, finalRefreshToken, accounts),
-      [cacheKey],
-      { 
-        revalidate: 60, // 60 seconds
-        tags: ['financial-health', 'transactions', 'dashboard'] 
-      }
-    )();
+    const result = await calculateFinancialHealthInternal(selectedDate, finalAccessToken, finalRefreshToken, accounts);
     
     // Validate result before returning
     if (result.score === undefined || isNaN(result.score) || !isFinite(result.score)) {

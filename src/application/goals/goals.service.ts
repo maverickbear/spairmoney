@@ -12,7 +12,6 @@ import { formatTimestamp, formatDateStart, formatDateEnd } from "@/lib/utils/tim
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { requireGoalOwnership } from "@/lib/utils/security";
 import { logger } from "@/lib/utils/logger";
-import { invalidateGoalCaches } from "@/src/infrastructure/cache/cache.manager";
 import { calculateProgress } from "@/lib/utils/goals";
 import { startOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
 import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
@@ -151,65 +150,107 @@ export class GoalsService {
   ): Promise<GoalWithCalculations[]> {
     const rows = await this.repository.findAll(accessToken, refreshToken);
 
+    // OPTIMIZATION: Ensure emergency fund goal exists even if no other goals
+    // This ensures users always have at least the emergency fund goal
+    const hasEmergencyFund = rows.some(g => g.isSystemGoal && g.name?.toLowerCase().includes('emergency'));
+    
+    if (!hasEmergencyFund) {
+      // Try to create emergency fund goal
+      // First try calculateAndUpdateEmergencyFund (which calculates values)
+      // If that fails, try to create a basic emergency fund goal
+      try {
+        const createdGoal = await this.calculateAndUpdateEmergencyFund(accessToken, refreshToken);
+        if (createdGoal) {
+          // Re-fetch goals after creating emergency fund
+          const updatedRows = await this.repository.findAll(accessToken, refreshToken);
+          if (updatedRows.length > rows.length) {
+            // Emergency fund was created, use updated rows
+            rows.length = 0;
+            rows.push(...updatedRows);
+          }
+        }
+      } catch (error) {
+        // If calculateAndUpdateEmergencyFund fails, try to create basic emergency fund
+        // This can happen if user doesn't have household or insufficient data
+        logger.warn("[GoalsService] Could not calculate emergency fund, trying to create basic goal:", error);
+        
+        try {
+          const supabase = await createServerClient(accessToken, refreshToken);
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user) {
+            const householdId = await getActiveHouseholdId(user.id, accessToken, refreshToken);
+            if (householdId) {
+              // Create basic emergency fund goal
+              const basicGoal = await this.createGoal({
+                name: "Emergency Funds",
+                targetAmount: 0,
+                currentBalance: 0,
+                incomePercentage: 0,
+                priority: "High",
+                targetMonths: 0,
+                description: "Emergency fund for unexpected expenses",
+                isPaused: false,
+                isSystemGoal: true,
+              });
+              
+              if (basicGoal) {
+                // Re-fetch goals after creating emergency fund
+                const updatedRows = await this.repository.findAll(accessToken, refreshToken);
+                if (updatedRows.length > rows.length) {
+                  rows.length = 0;
+                  rows.push(...updatedRows);
+                }
+              }
+            }
+          }
+        } catch (basicError) {
+          logger.warn("[GoalsService] Could not create basic emergency fund goal:", basicError);
+        }
+      }
+    }
+
+    // Early return if still no goals after trying to create emergency fund
     if (rows.length === 0) {
       return [];
     }
 
-    // Calculate income basis
-    const incomeBasis = await this.calculateIncomeBasis(undefined, accessToken, refreshToken);
-
-    // Get accounts for goals with accountId (temporary import until Accounts is fully integrated)
+    // OPTIMIZATION: Fetch income basis and accounts in parallel
     const goalsWithAccount = rows.filter(g => g.accountId);
-    const accountsMap = new Map<string, any>();
     
-    if (goalsWithAccount.length > 0) {
-      const { makeAccountsService } = await import("../accounts/accounts.factory");
-      const accountsService = makeAccountsService();
-      const accounts = await accountsService.getAccounts(accessToken, refreshToken, { includeHoldings: false });
-      
-      accounts.forEach(acc => {
-        accountsMap.set(acc.id, acc);
-      });
-    }
+    const [incomeBasis, accounts] = await Promise.all([
+      // Calculate income basis
+      this.calculateIncomeBasis(undefined, accessToken, refreshToken),
+      // Get accounts only if needed
+      goalsWithAccount.length > 0
+        ? (async () => {
+            const { makeAccountsService } = await import("../accounts/accounts.factory");
+            const accountsService = makeAccountsService();
+            return await accountsService.getAccounts(accessToken, refreshToken, { includeHoldings: false });
+          })()
+        : Promise.resolve([]),
+    ]);
 
-    // Calculate progress for each goal and sync balances
+    const accountsMap = new Map<string, any>();
+    accounts.forEach(acc => {
+      accountsMap.set(acc.id, acc);
+    });
+
+    // OPTIMIZATION: Don't update database during getGoals - this is too slow
+    // Balance syncing should be done in background jobs or separate endpoints
+    // For now, just read the balance without updating
     const goalsWithCalculations: GoalWithCalculations[] = await Promise.all(
       rows.map(async (goal) => {
         let currentBalance = goal.currentBalance;
-        let needsUpdate = false;
 
-        // If goal has accountId, sync balance from account
+        // If goal has accountId, sync balance from account (read-only, no DB update)
         if (goal.accountId) {
           const account = accountsMap.get(goal.accountId);
           
           if (account) {
-            // For now, use account balance (holdings support can be added later)
+            // Use account balance for display, but don't update DB here (too slow)
             const accountBalance = account.balance || 0;
-            if (accountBalance !== currentBalance) {
-              currentBalance = accountBalance;
-              needsUpdate = true;
-            }
-          }
-        }
-
-        // Update balance in database if it changed
-        if (needsUpdate) {
-          try {
-            const isCompleted = currentBalance >= goal.targetAmount;
-            await this.repository.update(goal.id, {
-              currentBalance,
-              isCompleted,
-              completedAt: isCompleted && !goal.completedAt ? formatTimestamp(new Date()) : goal.completedAt,
-              updatedAt: formatTimestamp(new Date()),
-            });
-            
-            goal.currentBalance = currentBalance;
-            goal.isCompleted = isCompleted;
-            if (isCompleted && !goal.completedAt) {
-              goal.completedAt = formatTimestamp(new Date());
-            }
-          } catch (error) {
-            logger.error(`[GoalsService] Error updating balance for goal ${goal.id}:`, error);
+            currentBalance = accountBalance;
           }
         }
 
@@ -330,8 +371,6 @@ export class GoalsService {
       updatedAt: now,
     });
 
-    // Invalidate cache
-    invalidateGoalCaches();
 
     return GoalsMapper.toDomain(goalRow);
   }
@@ -416,8 +455,6 @@ export class GoalsService {
 
     const goalRow = await this.repository.update(id, updateData);
 
-    // Invalidate cache
-    invalidateGoalCaches();
 
     return GoalsMapper.toDomain(goalRow);
   }
@@ -431,8 +468,6 @@ export class GoalsService {
 
     await this.repository.delete(id);
 
-    // Invalidate cache
-    invalidateGoalCaches();
   }
 
   /**
@@ -457,8 +492,6 @@ export class GoalsService {
       updatedAt: formatTimestamp(new Date()),
     });
 
-    // Invalidate cache
-    invalidateGoalCaches();
 
     return GoalsMapper.toDomain(goalRow);
   }
@@ -489,8 +522,6 @@ export class GoalsService {
       updatedAt: formatTimestamp(new Date()),
     });
 
-    // Invalidate cache
-    invalidateGoalCaches();
 
     return GoalsMapper.toDomain(goalRow);
   }
@@ -652,12 +683,74 @@ export class GoalsService {
       updatedAt: formatTimestamp(new Date()),
     });
 
-    // Invalidate cache
-    invalidateGoalCaches();
 
     logger.info(`[GoalsService] Updated emergency fund goal: target=${targetAmount.toFixed(2)}, incomePercentage=${incomePercentage.toFixed(2)}%, monthlyIncome=${monthlyIncome.toFixed(2)}, monthlyExpenses=${monthlyExpenses.toFixed(2)}`);
 
     return GoalsMapper.toDomain(updatedGoal);
+  }
+
+  /**
+   * Ensure emergency fund goal exists
+   * Creates it if it doesn't exist, or returns existing one
+   */
+  async ensureEmergencyFundGoal(userId: string, householdId: string): Promise<BaseGoal | null> {
+    try {
+      // Check if emergency fund goal already exists
+      const existingGoal = await this.repository.findEmergencyFundGoal(householdId);
+
+      if (existingGoal) {
+        // Check for duplicates
+        const supabase = await createServerClient();
+        const { data: allEmergencyGoals, error: checkError } = await supabase
+          .from("Goal")
+          .select("id")
+          .eq("householdId", householdId)
+          .eq("name", "Emergency Funds")
+          .eq("isSystemGoal", true);
+
+        if (checkError) {
+          logger.error("[GoalsService] Error checking for duplicate emergency fund goals:", checkError);
+        } else if (allEmergencyGoals && allEmergencyGoals.length > 1) {
+          // Delete duplicates, keep the first one
+          logger.warn(`[GoalsService] Found ${allEmergencyGoals.length} duplicate emergency fund goals. Cleaning up...`);
+          const goalToKeep = existingGoal.id;
+          const duplicateIds = allEmergencyGoals
+            .filter(g => g.id !== goalToKeep)
+            .map(g => g.id);
+
+          if (duplicateIds.length > 0) {
+            for (const id of duplicateIds) {
+              try {
+                await this.repository.delete(id);
+              } catch (deleteError) {
+                logger.error(`[GoalsService] Error deleting duplicate emergency fund goal ${id}:`, deleteError);
+              }
+            }
+            logger.log(`[GoalsService] Deleted ${duplicateIds.length} duplicate emergency fund goals`);
+          }
+        }
+
+        return GoalsMapper.toDomain(existingGoal);
+      }
+
+      // No goal exists, create new emergency fund goal
+      const goal = await this.createGoal({
+        name: "Emergency Funds",
+        targetAmount: 0.00,
+        currentBalance: 0.00,
+        incomePercentage: 0.00,
+        priority: "High",
+        targetMonths: 0,
+        description: "Emergency fund for unexpected expenses",
+        isPaused: false,
+        isSystemGoal: true,
+      });
+
+      return goal;
+    } catch (error) {
+      logger.error("[GoalsService] Error ensuring emergency fund goal:", error);
+      return null;
+    }
   }
 }
 

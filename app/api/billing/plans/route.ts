@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPlans, getCurrentUserSubscriptionData } from "@/lib/api/subscription";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -16,21 +16,20 @@ export async function GET() {
   console.log("[API/BILLING/PLANS] GET request received");
   try {
     console.log("[API/BILLING/PLANS] Fetching plans");
-    const plans = await getPlans();
+    const subscriptionsService = makeSubscriptionsService();
+    const plans = await subscriptionsService.getPlans();
     console.log("[API/BILLING/PLANS] Plans fetched:", plans.length, "plans");
 
     // Get current user's plan and interval (optional - only if authenticated)
     let currentPlanId: string | undefined;
     let currentInterval: "month" | "year" | null = null;
     try {
-      console.log("[API/BILLING/PLANS] Creating server client");
-      const supabase = await createServerClient();
       console.log("[API/BILLING/PLANS] Getting user");
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      const userId = await getCurrentUserId();
       
       // If user is not authenticated, return plans without currentPlanId (public access)
-      if (authError || !authUser) {
-        console.log("[API/BILLING/PLANS] User not authenticated, returning public plans:", { authError: authError?.message, hasUser: !!authUser });
+      if (!userId) {
+        console.log("[API/BILLING/PLANS] User not authenticated, returning public plans");
         return NextResponse.json({
           plans,
           currentPlanId: undefined,
@@ -38,10 +37,10 @@ export async function GET() {
         });
       }
       
-      console.log("[API/BILLING/PLANS] User authenticated:", authUser.id);
-      // User is authenticated, get their subscription data using unified API
+      console.log("[API/BILLING/PLANS] User authenticated:", userId);
+      // User is authenticated, get their subscription data using SubscriptionsService
       console.log("[API/BILLING/PLANS] Getting current user subscription data");
-      const { subscription, plan } = await getCurrentUserSubscriptionData();
+      const { subscription, plan } = await subscriptionsService.getUserSubscriptionData(userId);
       console.log("[API/BILLING/PLANS] Subscription:", subscription);
       // getCurrentUserSubscriptionData returns null subscription if user has no subscription
       // User must select a plan on /select-plan page

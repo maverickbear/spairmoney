@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { changePassword } from "@/lib/api/auth";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { changePasswordSchema } from "@/src/domain/auth/auth.validations";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/change-password
@@ -31,7 +32,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Change password (includes current password verification and HIBP validation)
-    const result = await changePassword({ currentPassword, newPassword, confirmPassword });
+    const service = makeAuthService();
+    const result = await service.changePassword({ currentPassword, newPassword, confirmPassword });
 
     if (result.error) {
       console.error("[CHANGE-PASSWORD] Error changing password:", result.error);
@@ -48,6 +50,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[CHANGE-PASSWORD] Unexpected error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

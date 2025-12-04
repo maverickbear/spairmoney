@@ -26,6 +26,7 @@ export interface BaseTransaction {
   suggestedCategoryId?: string | null;
   suggestedSubcategoryId?: string | null;
   plaidMetadata?: Record<string, unknown> | null;
+  receiptUrl?: string | null;
 }
 
 export interface TransactionWithRelations extends BaseTransaction {

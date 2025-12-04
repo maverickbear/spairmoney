@@ -5,7 +5,7 @@ export function ExpenseTrackingMockup() {
     <div className="relative w-full h-full flex items-center justify-center">
       {/* Credit Card */}
       <div className="relative w-full max-w-[280px]">
-        <div className="bg-gradient-to-br from-primary via-primary/90 to-primary/80 rounded-2xl p-5 text-white shadow-xl">
+        <div className="bg-gradient-to-br from-primary via-primary/90 to-primary/80 rounded-2xl p-5 text-foreground shadow-xl">
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-xs opacity-80 mb-1">Spare Finance</p>

@@ -265,10 +265,10 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
         finalOwnerIds = [currentUserId, ...selectedOwnerIds];
       }
 
-      const url = account ? `/api/accounts/${account.id}` : "/api/accounts";
+      const url = account ? `/api/v2/accounts/${account.id}` : "/api/v2/accounts";
       const method = account ? "PATCH" : "POST";
 
-      // Prepare data: include creditLimit and dueDayOfMonth if type is credit, initialBalance if checking/savings
+      // Prepare data: include creditLimit and dueDayOfMonth if type is credit, initialBalance if checking/savings/cash
       // Always include ownerIds to ensure they are saved in AccountOwner table
       const payload: AccountFormData = {
         name: data.name,
@@ -280,7 +280,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
         ...(data.type === "credit" && data.dueDayOfMonth !== undefined 
           ? { dueDayOfMonth: data.dueDayOfMonth } 
           : {}),
-        ...((data.type === "checking" || data.type === "savings")
+        ...((data.type === "checking" || data.type === "savings" || data.type === "cash")
           ? { 
               initialBalance: account 
                 ? (data.initialBalance !== undefined ? data.initialBalance : account.initialBalance ?? 0)
@@ -324,6 +324,12 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
       // Close modal and reset form after successful request
       onOpenChange(false);
       form.reset();
+
+      // Dispatch custom event to notify other components (e.g., OnboardingWidget)
+      if (!account) {
+        // Only dispatch for new accounts, not updates
+        window.dispatchEvent(new CustomEvent("account-created"));
+      }
 
       // Reload accounts after successful save
       onSuccess?.();
@@ -391,8 +397,8 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                     if (value !== "credit") {
                       form.setValue("creditLimit", undefined);
                     }
-                    // Clear initial balance when changing away from checking/savings
-                    if (value !== "checking" && value !== "savings") {
+                    // Clear initial balance when changing away from checking/savings/cash
+                    if (value !== "checking" && value !== "savings" && value !== "cash") {
                       form.setValue("initialBalance", undefined);
                     }
                   }}
@@ -449,7 +455,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                 </>
               )}
 
-              {(accountType === "checking" || accountType === "savings") && (
+              {(accountType === "checking" || accountType === "savings" || accountType === "cash") && (
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Initial Balance</label>
                   <DollarAmountInput
@@ -476,7 +482,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                       {households.filter((household) => household.id !== currentUserId).length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                           You haven't invited any member yet.{" "}
-                          <Link href="/members" className="text-primary hover:underline font-medium">
+                          <Link href="/members" className="text-foreground hover:underline font-medium">
                             Invite
                           </Link>{" "}
                           now

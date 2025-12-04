@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { createServerClient } from '@/src/infrastructure/database/supabase-server';
-import { exchangePublicToken, syncAccountBalances } from '@/lib/api/plaid/connect';
-import { syncAccountTransactions } from '@/lib/api/plaid/sync';
-import { syncAccountLiabilities } from '@/lib/api/plaid/liabilities';
-import { syncInvestmentAccounts } from '@/lib/api/plaid/investments';
 import { guardBankIntegration, getCurrentUserId } from '@/src/application/shared/feature-guard';
 import { throwIfNotAllowed } from '@/src/application/shared/feature-guard';
 import { formatTimestamp, formatDateOnly, parseDateWithoutTimezone } from '@/src/infrastructure/utils/timestamp';
 import { getActiveCreditCardDebt, calculateNextDueDate } from '@/lib/utils/credit-card-debt';
-import { createDebt } from '@/lib/api/debts';
-import { plaidClient } from '@/lib/api/plaid/index';
+import { makeDebtsService } from '@/src/application/debts/debts.factory';
+import { getPlaidClient } from '@/src/infrastructure/external/plaid/plaid-client';
+import { AppError } from '@/src/application/shared/app-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -87,7 +85,7 @@ export async function POST(req: NextRequest) {
       };
 
       // Get accounts using access token
-      const { plaidClient } = await import('@/lib/api/plaid/index');
+      const plaidClient = getPlaidClient();
       const accountsResponse = await plaidClient.accountsGet({
         access_token: accessToken,
       });
@@ -108,9 +106,12 @@ export async function POST(req: NextRequest) {
 
       institutionMetadata = metadata.institution || null;
 
-      const exchangeResult = await exchangePublicToken(
+      // Use PlaidService to exchange token
+      const plaidService = makePlaidService();
+      const exchangeResult = await plaidService.exchangePublicToken(
         publicToken,
-        metadata
+        metadata,
+        userId
       );
       itemId = exchangeResult.itemId;
       accessToken = exchangeResult.accessToken;
@@ -402,7 +403,8 @@ export async function POST(req: NextRequest) {
               nextDueDate.setMonth(nextDueDate.getMonth() + 1);
               nextDueDate.setDate(1);
               
-              await createDebt({
+              const debtsService = makeDebtsService();
+              await debtsService.createDebt({
                 name: `${plaidAccount.name} – Current Bill`,
                 loanType: "credit_card",
                 initialAmount: balanceAmount,
@@ -513,12 +515,12 @@ export async function POST(req: NextRequest) {
             }
 
             if (estimatedTransactionCount < TRANSACTION_THRESHOLD) {
-              // Small import: process immediately
-              const syncResult = await syncAccountTransactions(
+              // Small import: process immediately using PlaidService
+              const plaidService = makePlaidService();
+              const syncResult = await plaidService.syncAccountTransactions(
                 accountId,
                 account.plaidAccountId,
-                accessToken,
-                30 // Sync last 30 days
+                accessToken
               );
               syncResults.push({
                 accountId,
@@ -590,10 +592,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Sync liabilities for this item
+    // Sync liabilities, investments, and balances using PlaidService
+    const plaidService = makePlaidService();
     let liabilitySyncResult = null;
     try {
-      liabilitySyncResult = await syncAccountLiabilities(itemId, accessToken);
+      liabilitySyncResult = await plaidService.syncAccountLiabilities(itemId, accessToken);
     } catch (error) {
       console.error('Error syncing liabilities:', error);
       // Don't fail the whole request if liability sync fails
@@ -602,7 +605,7 @@ export async function POST(req: NextRequest) {
     // Sync investment accounts, holdings, and transactions
     let investmentSyncResult = null;
     try {
-      investmentSyncResult = await syncInvestmentAccounts(itemId, accessToken);
+      investmentSyncResult = await plaidService.syncInvestmentAccounts(itemId, accessToken);
     } catch (error) {
       console.error('Error syncing investment accounts:', error);
       // Don't fail the whole request if investment sync fails
@@ -613,7 +616,7 @@ export async function POST(req: NextRequest) {
     // but this call ensures all accounts have their balances properly synced after creation
     let balanceSyncResult = null;
     try {
-      balanceSyncResult = await syncAccountBalances(itemId, accessToken);
+      balanceSyncResult = await plaidService.syncAccountBalances(itemId, accessToken);
       console.log('Balance sync result:', balanceSyncResult);
     } catch (error) {
       console.error('Error syncing account balances:', error);

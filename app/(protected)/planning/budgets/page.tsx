@@ -12,10 +12,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Wallet, Edit, Trash2, Loader2 } from "lucide-react";
+import { Plus, Wallet, Edit, Trash2, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { BudgetForm } from "@/components/forms/budget-form";
 import { BudgetMobileCard } from "@/components/budgets/budget-mobile-card";
+import { BudgetRuleSelector } from "@/src/presentation/components/features/budgets/budget-rule-selector";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { BudgetRuleProfile } from "@/src/domain/budgets/budget-rules.types";
 import { useToast } from "@/components/toast-provider";
 import { formatMoney } from "@/components/common/money";
 import { EmptyState } from "@/components/common/empty-state";
@@ -88,6 +98,9 @@ export default function BudgetsPage() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedBudgetIds, setSelectedBudgetIds] = useState<Set<string>>(new Set());
+  const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
+  const [selectedRule, setSelectedRule] = useState<BudgetRuleProfile | null>(null);
+  const [applyingRule, setApplyingRule] = useState(false);
   const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
   const now = new Date();
 
@@ -130,6 +143,49 @@ export default function BudgetsPage() {
     }
   }
 
+  async function handleApplyRule(rule: BudgetRuleProfile) {
+    if (!checkWriteAccess()) return;
+    
+    try {
+      setApplyingRule(true);
+      
+      const response = await fetch("/api/v2/budgets/rules", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ruleType: rule.id,
+          period: now.toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to apply budget rule");
+      }
+
+      toast({
+        title: "Budget rule applied",
+        description: `Budgets have been updated based on the ${rule.name} rule.`,
+        variant: "success",
+      });
+
+      setIsRuleDialogOpen(false);
+      setSelectedRule(null);
+      await loadData(); // Reload budgets
+    } catch (error) {
+      console.error("Error applying budget rule:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to apply budget rule. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setApplyingRule(false);
+    }
+  }
+
   function handleDelete(id: string) {
     if (!checkWriteAccess()) return;
     openDialog(
@@ -169,6 +225,61 @@ export default function BudgetsPage() {
           toast({
             title: "Error",
             description: error instanceof Error ? error.message : "Failed to delete budget",
+            variant: "destructive",
+          });
+        } finally {
+          setDeletingId(null);
+        }
+      }
+    );
+  }
+
+  function handleDeleteSelected() {
+    if (!checkWriteAccess()) return;
+    if (selectedBudgetIds.size === 0) return;
+
+    const count = selectedBudgetIds.size;
+    openDialog(
+      {
+        title: "Delete Selected Budgets",
+        description: `Are you sure you want to delete ${count} budget${count > 1 ? 's' : ''}? This action cannot be undone.`,
+        variant: "destructive",
+        confirmLabel: "Delete",
+      },
+      async () => {
+        const budgetsToDelete = budgets.filter(b => selectedBudgetIds.has(b.id));
+        const idsToDelete = Array.from(selectedBudgetIds);
+        
+        // Optimistic update: remove from UI immediately
+        setBudgets(prev => prev.filter(b => !selectedBudgetIds.has(b.id)));
+        setSelectedBudgetIds(new Set());
+        setDeletingId(idsToDelete[0] || null);
+
+        try {
+          // Delete all selected budgets in parallel
+          const deletePromises = idsToDelete.map(id =>
+            fetch(`/api/v2/budgets/${id}`, { method: "DELETE" })
+          );
+          
+          const responses = await Promise.all(deletePromises);
+          const errors = responses.filter(r => !r.ok);
+          
+          if (errors.length > 0) {
+            throw new Error(`Failed to delete ${errors.length} budget${errors.length > 1 ? 's' : ''}`);
+          }
+
+          toast({
+            title: "Budgets deleted",
+            description: `Successfully deleted ${count} budget${count > 1 ? 's' : ''}.`,
+            variant: "success",
+          });
+        } catch (error) {
+          console.error("Error deleting budgets:", error);
+          // Revert optimistic update on error
+          setBudgets(prev => [...prev, ...budgetsToDelete]);
+          toast({
+            title: "Error",
+            description: error instanceof Error ? error.message : "Failed to delete budgets",
             variant: "destructive",
           });
         } finally {
@@ -246,22 +357,65 @@ export default function BudgetsPage() {
         title="Budgets"
       >
         {canWrite && (
-          <Button
-            onClick={() => {
-              if (!checkWriteAccess()) return;
-              setSelectedBudget(null);
-              setIsFormOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Budget
-          </Button>
+          <div className="flex items-center gap-2">
+            {allSelected && (
+              <Button
+                variant="destructive"
+                onClick={handleDeleteSelected}
+                disabled={deletingId !== null}
+              >
+                {deletingId ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete Selected
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!checkWriteAccess()) return;
+                setIsRuleDialogOpen(true);
+              }}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Apply Budget Rule
+            </Button>
+            <Button
+              onClick={() => {
+                if (!checkWriteAccess()) return;
+                setSelectedBudget(null);
+                setIsFormOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Budget
+            </Button>
+          </div>
         )}
       </PageHeader>
 
       <div className="w-full p-4 lg:p-8">
         {/* Mobile Card View */}
         <div className="lg:hidden space-y-3">
+          {allSelected && canWrite && (
+            <div className="sticky top-0 z-10 bg-background pb-2">
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={handleDeleteSelected}
+                disabled={deletingId !== null}
+              >
+                {deletingId ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete Selected ({selectedBudgetIds.size})
+              </Button>
+            </div>
+          )}
           {loading && !hasLoaded ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -459,6 +613,48 @@ export default function BudgetsPage() {
             </TableBody>
           </Table>
         </div>
+
+      <Dialog open={isRuleDialogOpen} onOpenChange={setIsRuleDialogOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Apply Budget Rule</DialogTitle>
+            <DialogDescription>
+              Select a budget rule to automatically generate or update your budgets for the current month.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="pt-4">
+            <BudgetRuleSelector
+              selectedRule={selectedRule?.id}
+              onSelect={(rule) => setSelectedRule(rule)}
+              showCancel
+              onCancel={() => setIsRuleDialogOpen(false)}
+              loading={applyingRule}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsRuleDialogOpen(false)}
+              disabled={applyingRule}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => selectedRule && handleApplyRule(selectedRule)}
+              disabled={applyingRule || !selectedRule}
+            >
+              {applyingRule ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Applying...
+                </>
+              ) : (
+                "Apply Rule"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <BudgetForm 
         macros={macros}

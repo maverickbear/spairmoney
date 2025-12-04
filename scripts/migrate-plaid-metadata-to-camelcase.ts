@@ -12,7 +12,7 @@
  */
 
 import { createServerClient } from '../lib/supabase-server';
-import { convertPlaidTransactionToCamelCase } from '../lib/api/plaid/utils';
+import { convertPlaidTransactionToCamelCase } from '../src/infrastructure/utils/plaid-utils';
 
 async function migratePlaidMetadata() {
   console.log('Starting migration of plaidMetadata from snake_case to camelCase...');

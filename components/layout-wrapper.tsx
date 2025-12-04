@@ -61,14 +61,13 @@ export const LayoutWrapper = memo(function LayoutWrapper({ children }: { childre
     const isSelectPlanPage = pathname === "/select-plan";
     const isWelcomePage = pathname === "/welcome";
     const isLandingPage = pathname === "/";
-    const isPricingPage = pathname === "/pricing";
     const isPrivacyPolicyPage = pathname === "/privacy-policy";
     const isTermsOfServicePage = pathname === "/terms-of-service";
     const isFAQPage = pathname === "/faq";
     const isSubscriptionSuccessPage = pathname === "/subscription/success";
     const isMaintenancePage = pathname === "/maintenance";
     const isSpareDSPage = pathname?.startsWith("/spareds");
-    const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPricingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage || isMaintenancePage || isSpareDSPage;
+    const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage || isMaintenancePage || isSpareDSPage;
     const isDashboardRoute = !isPublicPage && !isApiRoute && !isSelectPlanPage && !isWelcomePage;
     
     return {

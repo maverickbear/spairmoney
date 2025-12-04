@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAdminService } from "@/src/application/admin/admin.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { updateSystemSettingsSchema } from "@/src/domain/admin/admin.validations";
 import { z } from "zod";
 import { AppError } from "@/src/application/shared/app-error";
-
-const updateSystemSettingsSchema = z.object({
-  maintenanceMode: z.boolean(),
-});
 
 /**
  * GET /api/v2/admin/system-settings

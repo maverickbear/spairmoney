@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PortfolioSummary, HistoricalDataPoint, Holding } from "@/lib/api/portfolio";
+import type { PortfolioSummary, HistoricalDataPoint, Holding } from "@/src/domain/portfolio/portfolio.types";
 import { PortfolioPerformanceChart } from "@/components/portfolio/portfolio-performance-chart";
 
 interface InvestmentPerformanceSectionProps {

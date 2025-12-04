@@ -406,7 +406,7 @@ export function GoalForm({
 
       if (goal) {
         // Update existing goal
-        const res = await fetch(`/api/goals/${goal.id}`, {
+        const res = await fetch(`/api/v2/goals/${goal.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

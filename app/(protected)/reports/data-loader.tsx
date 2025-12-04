@@ -9,7 +9,7 @@ export type { ReportsData } from "@/src/domain/reports/reports.types";
 
 // Load reports data with caching
 export async function loadReportsData(period: ReportPeriod): Promise<ReportsData> {
-  // Get userId and session tokens BEFORE caching (cookies can't be accessed inside unstable_cache)
+  // Get userId and session tokens
   const userId = await getCurrentUserId();
   
   if (!userId) {
@@ -38,32 +38,9 @@ export async function loadReportsData(period: ReportPeriod): Promise<ReportsData
     // Continue without tokens - service will try to get them itself
   }
   
-  // Import cache utilities
-  const { withCache, generateCacheKey, CACHE_TAGS } = await import("@/lib/services/cache-manager");
-  
   try {
-    // Use centralized cache manager with proper tags
-    const cacheKey = generateCacheKey.reports({
-      userId: userId || undefined,
-      period,
-    });
-    
     const service = makeReportsService();
-    
-    return await withCache(
-      async () => service.getReportsData(userId, period, accessToken, refreshToken),
-      {
-        key: cacheKey,
-        tags: [
-          CACHE_TAGS.REPORTS,
-          CACHE_TAGS.TRANSACTIONS,
-          CACHE_TAGS.ACCOUNTS,
-          CACHE_TAGS.BUDGETS,
-          CACHE_TAGS.GOALS,
-        ],
-        revalidate: 300, // 300 seconds (5 minutes) - same as dashboard
-      }
-    );
+    return await service.getReportsData(userId, period, accessToken, refreshToken);
   } catch (error) {
     logger.error("[Reports] Error loading data:", error);
     throw error;

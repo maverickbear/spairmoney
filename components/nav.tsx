@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, createContext, useContext, memo, useMemo, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/src/infrastructure/utils/logger";
@@ -55,8 +55,6 @@ const baseNavSections: NavSection[] = [
       { href: "/transactions", label: "Transactions", icon: Receipt },
       { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
       { href: "/planned-payment", label: "Planned Payments", icon: Calendar },
-      { href: "/categories", label: "Categories", icon: FolderTree },
-      { href: "/members", label: "Household", icon: Users },
     ],
   },
   {
@@ -129,6 +127,7 @@ if (typeof window !== 'undefined') {
 function NavComponent({ hasSubscription = true }: NavProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -197,19 +196,20 @@ function NavComponent({ hasSubscription = true }: NavProps) {
         
         // Create fetch promise and cache it
         const fetchPromise = (async () => {
-          // Fetch user data and role in parallel using API routes
-          const [userResponse, membersResponse] = await Promise.all([
+          // OPTIMIZATION: Use fast /api/v2/user/role endpoint instead of /api/v2/members
+          // We only need userRole, not all members
+          const [userResponse, roleResponse] = await Promise.all([
             fetch("/api/v2/user"),
-            fetch("/api/v2/members"),
+            fetch("/api/v2/user/role"),
           ]);
           
-          if (!userResponse.ok || !membersResponse.ok) {
+          if (!userResponse.ok || !roleResponse.ok) {
             throw new Error("Failed to fetch user data");
           }
           
-          const [userData, membersData] = await Promise.all([
+          const [userData, roleData] = await Promise.all([
             userResponse.json(),
-            membersResponse.json(),
+            roleResponse.json(),
           ]);
           
           const result: UserData = {
@@ -218,7 +218,7 @@ function NavComponent({ hasSubscription = true }: NavProps) {
             subscription: userData.subscription,
           };
           
-          const role = membersData.userRole;
+          const role = roleData.userRole;
           
           // Update cache
           navUserDataCache.data = result;
@@ -281,6 +281,17 @@ function NavComponent({ hasSubscription = true }: NavProps) {
       window.removeEventListener("profile-saved", handleProfileUpdate as EventListener);
     };
   }, [hasSubscription]);
+
+  // Set Portal Management section as collapsed by default when user is super admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      setCollapsedSections(prev => {
+        const next = new Set(prev);
+        next.add("Portal Management");
+        return next;
+      });
+    }
+  }, [isSuperAdmin]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -546,10 +557,15 @@ function NavComponent({ hasSubscription = true }: NavProps) {
                     
                     // Regular link item
                     const basePath = item.href.split("?")[0];
+                    const hrefSearchParams = item.href.includes("?") ? item.href.split("?")[1] : null;
+                    const currentTab = searchParams.get("tab");
+                    const hrefTab = hrefSearchParams?.split("&").find(p => p.startsWith("tab="))?.split("=")[1];
                     const isActive =
                       pathname === item.href ||
                       pathname === basePath ||
-                      (basePath !== "/" && pathname.startsWith(basePath));
+                      (basePath !== "/" && pathname.startsWith(basePath)) ||
+                      // Handle Settings tabs: if href is /settings?tab=X, also check if we're on /settings with that tab
+                      (basePath === "/settings" && hrefTab && pathname === "/settings" && currentTab === hrefTab);
                     
                     const linkElement = (
                       <Link

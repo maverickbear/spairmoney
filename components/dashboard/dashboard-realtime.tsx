@@ -41,6 +41,7 @@ export function DashboardRealtime() {
     lastFailureTime: 0,
     isOpen: false,
   });
+  const lastRefreshTimeRef = useRef(0);
 
   useEffect(() => {
     // Only set up subscriptions on dashboard page
@@ -65,17 +66,29 @@ export function DashboardRealtime() {
     }
 
     // Debounce refresh calls to avoid too many refreshes
-    // OPTIMIZED: Reduced from 2000ms to 800ms to improve responsiveness while still preventing excessive refreshes
+    // OPTIMIZED: Increased debounce to prevent excessive refreshes
     let refreshTimeout: NodeJS.Timeout | null = null;
+    const MIN_REFRESH_INTERVAL = 5000; // Minimum 5 seconds between refreshes
+    
     const scheduleRefresh = async () => {
+      const now = Date.now();
+      
+      // Prevent refreshes if we just refreshed recently
+      if (now - lastRefreshTimeRef.current < MIN_REFRESH_INTERVAL) {
+        console.debug(`[DashboardRealtime-${instanceIdRef.current}] Skipping refresh - too soon since last refresh (${Math.round((now - lastRefreshTimeRef.current) / 1000)}s ago)`);
+        return;
+      }
+      
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
       }
       refreshTimeout = setTimeout(async () => {
         // Only refresh the router - cache invalidation is handled by revalidateTag in API functions
         // This avoids invalidating cache on initial page load
+        lastRefreshTimeRef.current = Date.now();
+        console.debug(`[DashboardRealtime-${instanceIdRef.current}] Refreshing dashboard`);
         router.refresh();
-      }, 800); // Debounce for 800ms (reduced from 2000ms for better UX)
+      }, 2000); // Debounce for 2 seconds to prevent excessive refreshes
     };
 
     // Performance logging for monitoring outliers

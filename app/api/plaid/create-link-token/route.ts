@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/src/infrastructure/database/supabase-server';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { guardBankIntegration, getCurrentUserId } from '@/src/application/shared/feature-guard';
 import { throwIfNotAllowed } from '@/src/application/shared/feature-guard';
 import { CountryCode } from 'plaid';
+import { AppError } from '@/src/application/shared/app-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,9 +28,9 @@ export async function POST(req: NextRequest) {
     // Map country string to CountryCode
     const countryCode = country.toUpperCase() === 'CA' ? CountryCode.Ca : CountryCode.Us;
 
-    // Create link token using Plaid API with account type and country
-    const { createLinkToken } = await import('@/lib/api/plaid/connect');
-    const linkToken = await createLinkToken(userId, accountType, countryCode);
+    // Create link token using PlaidService
+    const plaidService = makePlaidService();
+    const linkToken = await plaidService.createLinkToken(userId, accountType, countryCode);
 
     return NextResponse.json({ link_token: linkToken });
   } catch (error: any) {
@@ -44,6 +45,13 @@ export async function POST(req: NextRequest) {
           planError: error.planError,
         },
         { status: 403 }
+      );
+    }
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
 

@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
-import type { AdminUser } from "@/lib/api/admin";
+import type { AdminUser } from "@/src/domain/admin/admin.types";
 
 interface TrialEditDialogProps {
   user: AdminUser | null;

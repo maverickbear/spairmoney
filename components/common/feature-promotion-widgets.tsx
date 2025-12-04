@@ -450,7 +450,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
             </div>
           </div>
         </div>
-        <div className="pt-3 border-t">
+        <div className="pt-3 border-t border-border">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Debt-free date</span>
             <span className="font-semibold">Mar 2027</span>
@@ -489,7 +489,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
             </div>
           </div>
         </div>
-        <div className="pt-3 border-t">
+        <div className="pt-3 border-t border-border">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Total Household</span>
             <span className="font-semibold">$27,010</span>
@@ -537,7 +537,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
             </div>
           </div>
         </div>
-        <div className="pt-3 border-t">
+        <div className="pt-3 border-t border-border">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <CheckCircle2 className="h-3 w-3 text-green-600" />
             <span>Last sync: 2 minutes ago</span>
@@ -563,13 +563,13 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
               <span className="text-muted-foreground">Expenses</span>
               <span className="font-medium text-red-600">$4,230</span>
             </div>
-            <div className="flex justify-between pt-2 border-t">
+            <div className="flex justify-between pt-2 border-t border-border">
               <span className="font-semibold">Net</span>
               <span className="font-semibold text-green-600">+$1,220</span>
             </div>
           </div>
         </div>
-        <div className="pt-3 border-t">
+        <div className="pt-3 border-t border-border">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <CheckCircle2 className="h-3 w-3 text-green-600" />
             <span>No limits - track everything</span>

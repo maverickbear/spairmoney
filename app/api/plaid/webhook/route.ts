@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { createServerClient } from '@/src/infrastructure/database/supabase-server';
-import { syncAccountTransactions } from '@/lib/api/plaid/sync';
-import { syncAccountLiabilities } from '@/lib/api/plaid/liabilities';
-import { syncInvestmentAccounts } from '@/lib/api/plaid/investments';
-import { syncAccountBalances } from '@/lib/api/plaid/connect';
 
 /**
  * Plaid Webhook Handler
@@ -123,17 +120,16 @@ async function handleTransactionsWebhook(
         return;
       }
 
-      // Sync transactions for each account (except investment accounts)
+      // Sync transactions for each account (except investment accounts) using PlaidService
+      const plaidService = makePlaidService();
       for (const account of accounts) {
         if (account.plaidAccountId && account.type !== 'investment') {
           try {
             // Use /transactions/sync which handles cursor automatically
-            // The daysBack parameter is ignored when using /transactions/sync
-            await syncAccountTransactions(
+            await plaidService.syncAccountTransactions(
               account.id,
               account.plaidAccountId,
-              connection.accessToken,
-              0 // Not used with /transactions/sync, but kept for compatibility
+              connection.accessToken
             );
             console.log(`[PLAID WEBHOOK] Synced transactions for account ${account.id}`, {
               initial_update_complete,
@@ -148,7 +144,7 @@ async function handleTransactionsWebhook(
       // Sync account balances after syncing transactions
       // This ensures we have the latest balance from Plaid
       try {
-        const balanceResult = await syncAccountBalances(item_id, connection.accessToken);
+        const balanceResult = await plaidService.syncAccountBalances(item_id, connection.accessToken);
         console.log(`[PLAID WEBHOOK] Synced balances for item ${item_id}:`, balanceResult);
       } catch (error) {
         console.error(`[PLAID WEBHOOK] Error syncing balances for item ${item_id}:`, error);
@@ -177,15 +173,15 @@ async function handleTransactionsWebhook(
         return;
       }
 
-      // Sync transactions for each account (except investment accounts)
+      // Sync transactions for each account (except investment accounts) using PlaidService
+      const plaidService = makePlaidService();
       for (const account of accounts) {
         if (account.plaidAccountId && account.type !== 'investment') {
           try {
-            await syncAccountTransactions(
+            await plaidService.syncAccountTransactions(
               account.id,
               account.plaidAccountId,
-              connection.accessToken,
-              0 // Not used with /transactions/sync
+              connection.accessToken
             );
             console.log(`[PLAID WEBHOOK] Synced transactions for account ${account.id}`);
           } catch (error) {
@@ -196,7 +192,7 @@ async function handleTransactionsWebhook(
 
       // Sync account balances after syncing transactions
       try {
-        const balanceResult = await syncAccountBalances(item_id, connection.accessToken);
+        const balanceResult = await plaidService.syncAccountBalances(item_id, connection.accessToken);
         console.log(`[PLAID WEBHOOK] Synced balances for item ${item_id}:`, balanceResult);
       } catch (error) {
         console.error(`[PLAID WEBHOOK] Error syncing balances for item ${item_id}:`, error);
@@ -346,7 +342,8 @@ async function handleInvestmentsTransactionsWebhook(
   console.log('[PLAID WEBHOOK] Processing INVESTMENTS_TRANSACTIONS webhook');
 
   try {
-    await syncInvestmentAccounts(item_id, connection.accessToken);
+    const plaidService = makePlaidService();
+    await plaidService.syncInvestmentAccounts(item_id, connection.accessToken);
     console.log('[PLAID WEBHOOK] Synced investment transactions');
   } catch (error) {
     console.error('[PLAID WEBHOOK] Error syncing investment transactions:', error);
@@ -364,7 +361,8 @@ async function handleLiabilitiesWebhook(
   console.log('[PLAID WEBHOOK] Processing LIABILITIES webhook');
 
   try {
-    await syncAccountLiabilities(item_id, connection.accessToken);
+    const plaidService = makePlaidService();
+    await plaidService.syncAccountLiabilities(item_id, connection.accessToken);
     console.log('[PLAID WEBHOOK] Synced liabilities');
   } catch (error) {
     console.error('[PLAID WEBHOOK] Error syncing liabilities:', error);

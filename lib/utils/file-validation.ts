@@ -29,9 +29,9 @@ const MAGIC_BYTES: Record<string, number[][]> = {
 };
 
 /**
- * Maximum file size in bytes (5MB)
+ * Default maximum file size in bytes (5MB)
  */
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 /**
  * Sanitize filename to prevent path traversal and other attacks
@@ -172,8 +172,8 @@ export function validateFileContent(buffer: Buffer, declaredMimeType: string): b
 /**
  * Validate file size
  */
-export function validateFileSize(size: number): boolean {
-  return size > 0 && size <= MAX_FILE_SIZE;
+export function validateFileSize(size: number, maxSize: number = DEFAULT_MAX_FILE_SIZE): boolean {
+  return size > 0 && size <= maxSize;
 }
 
 /**
@@ -186,13 +186,14 @@ export interface FileValidationResult {
 
 export async function validateImageFile(
   file: File,
-  buffer: Buffer
+  buffer: Buffer,
+  maxFileSize: number = DEFAULT_MAX_FILE_SIZE
 ): Promise<FileValidationResult> {
   // Validate file size
-  if (!validateFileSize(file.size)) {
+  if (!validateFileSize(file.size, maxFileSize)) {
     return {
       valid: false,
-      error: `File size must be between 1 byte and ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+      error: `File size must be between 1 byte and ${maxFileSize / 1024 / 1024}MB`,
     };
   }
 

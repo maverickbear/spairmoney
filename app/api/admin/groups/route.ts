@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getAllSystemGroups,
-  createSystemGroup,
-  updateSystemGroup,
-  deleteSystemGroup,
-} from "@/lib/api/admin";
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
-    const groups = await getAllSystemGroups();
+    const service = makeAdminService();
+    const groups = await service.getAllSystemGroups();
     return NextResponse.json(groups, { status: 200 });
   } catch (error) {
     console.error("Error fetching system groups:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch system groups" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }
@@ -38,13 +43,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const group = await createSystemGroup({ 
+    const service = makeAdminService();
+    const group = await service.createSystemGroup({ 
       name: name.trim(),
       type: type || "expense"
     });
     return NextResponse.json(group, { status: 201 });
   } catch (error) {
     console.error("Error creating system group:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create system group" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }
@@ -86,10 +100,19 @@ export async function PUT(request: NextRequest) {
       updateData.type = type;
     }
 
-    const group = await updateSystemGroup(id, updateData);
+    const service = makeAdminService();
+    const group = await service.updateSystemGroup(id, updateData);
     return NextResponse.json(group, { status: 200 });
   } catch (error) {
     console.error("Error updating system group:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update system group" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }
@@ -109,10 +132,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await deleteSystemGroup(id);
+    const service = makeAdminService();
+    await service.deleteSystemGroup(id);
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting system group:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete system group" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }

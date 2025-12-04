@@ -1,20 +1,20 @@
-import { unstable_cache } from "next/cache";
-import { getTransactions } from "@/lib/api/transactions";
-import { getBudgets } from "@/lib/api/budgets";
-import { getUpcomingTransactions } from "@/lib/api/transactions";
 import { calculateFinancialHealth } from "@/src/application/shared/financial-health";
-import { getGoals } from "@/lib/api/goals";
-import { getAccounts } from "@/lib/api/accounts";
-import { checkOnboardingStatus, type OnboardingStatus } from "@/lib/api/onboarding";
-import { OnboardingStatusExtended } from "@/src/domain/onboarding/onboarding.types";
-import { getUserLiabilities } from "@/lib/api/plaid/liabilities";
-import { getDebts } from "@/lib/api/debts";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { getUserSubscriptions } from "@/lib/api/user-subscriptions";
+import { makeUserSubscriptionsService } from "@/src/application/user-subscriptions/user-subscriptions.factory";
 import { startOfMonth } from "date-fns/startOfMonth";
 import { endOfMonth } from "date-fns/endOfMonth";
 import { subMonths } from "date-fns/subMonths";
 import { logger } from "@/src/infrastructure/utils/logger";
+// Application Services
+import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
+import { makeBudgetsService } from "@/src/application/budgets/budgets.factory";
+import { makeGoalsService } from "@/src/application/goals/goals.factory";
+import { makeAccountsService } from "@/src/application/accounts/accounts.factory";
+import { makeDebtsService } from "@/src/application/debts/debts.factory";
+import { makeProfileService } from "@/src/application/profile/profile.factory";
+import { makeOnboardingService } from "@/src/application/onboarding/onboarding.factory";
+import { makePlaidService } from "@/src/application/plaid/plaid.factory";
+import { OnboardingStatusExtended, ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
 
 interface DashboardData {
   selectedMonthTransactions: any[];
@@ -60,31 +60,49 @@ async function loadDashboardDataInternal(
   const chartStart = startOfMonth(sixMonthsAgo);
   const chartEnd = endDate;
 
-  // Import internal functions that accept tokens
-  const { getTransactionsInternal } = await import('@/lib/api/transactions');
-  const { getBudgetsInternal } = await import('@/lib/api/budgets');
-  const { getGoalsInternal } = await import('@/lib/api/goals');
-  const { createServerClient } = await import('@/lib/supabase-server');
-  const { getProfile } = await import('@/lib/api/profile');
+  // Initialize Application Services
+  const transactionsService = makeTransactionsService();
+  const budgetsService = makeBudgetsService();
+  const goalsService = makeGoalsService();
+  const accountsService = makeAccountsService();
+  const debtsService = makeDebtsService();
+  const profileService = makeProfileService();
+  const onboardingService = makeOnboardingService();
+  
+  // Import createServerClient for AccountOwner queries
+  const { createServerClient } = await import('@/src/infrastructure/database/supabase-server');
 
   // Helper function to get accounts with tokens
-  // OPTIMIZED: Uses getAccounts() which already has optimized balance calculation
+  // OPTIMIZED: Uses AccountsService which already has optimized balance calculation
   // and proper RLS filtering by userId
   // OPTIMIZATION: Include holdings for dashboard to show accurate investment balances
   async function getAccountsWithTokens(accessToken?: string, refreshToken?: string) {
-    // Use the existing optimized getAccounts function which:
+    // Use Application Service which:
     // 1. Properly filters by userId via RLS
     // 2. Has optimized balance calculation
     // 3. Handles investment accounts correctly
     // Pass tokens to ensure proper authentication
     // Include holdings for dashboard to show accurate investment account balances
-    const accounts = await getAccounts(accessToken, refreshToken, { includeHoldings: true });
+    logger.debug("[Dashboard] Fetching accounts via AccountsService...");
+    const accounts = await accountsService.getAccounts(accessToken, refreshToken, { includeHoldings: true });
+    
+    logger.debug("[Dashboard] AccountsService returned accounts:", {
+      count: accounts.length,
+      accounts: accounts.map((acc: any) => ({
+        id: acc.id,
+        name: acc.name,
+        type: acc.type,
+        balance: acc.balance,
+        userId: acc.userId,
+      })),
+    });
     
     // Still need to fetch AccountOwner relationships and owner names
     const supabase = await createServerClient(accessToken, refreshToken);
     
     const accountIds = accounts.map(acc => acc.id);
     if (accountIds.length === 0) {
+      logger.warn("[Dashboard] No accounts found - returning empty array");
       return [];
     }
 
@@ -136,29 +154,50 @@ async function loadDashboardDataInternal(
       const ownerIds = accountOwnersMap.get(account.id) || (account.userId ? [account.userId] : []);
       const ownerNames = ownerIds.map(id => ownerNameMap.get(id) || 'Unknown').filter(Boolean);
       
-      return {
+      // Ensure balance is always a number (should be set by AccountsService, but validate)
+      const balance = account.balance !== undefined && account.balance !== null && !isNaN(account.balance)
+        ? Number(account.balance)
+        : 0;
+      
+      // Log warning if account doesn't have balance (shouldn't happen)
+      if (account.balance === undefined || account.balance === null) {
+        logger.warn(`[Dashboard] Account ${account.id} (${account.name}) missing balance property`);
+      }
+      
+      const accountWithBalance = {
         ...account,
+        balance,
         ownerIds,
         ownerNames,
       };
+      
+      logger.debug(`[Dashboard] Account ${account.id} (${account.name}) final data:`, {
+        id: accountWithBalance.id,
+        name: accountWithBalance.name,
+        type: accountWithBalance.type,
+        balance: accountWithBalance.balance,
+        originalBalance: account.balance,
+        calculatedBalance: balance,
+      });
+      
+      return accountWithBalance;
     });
   }
 
   // Helper function to get debts with tokens
-  // PERFORMANCE: Use optimized getDebts function instead of direct query
+  // PERFORMANCE: Use DebtsService instead of direct query
   // This ensures consistent field selection and calculation logic
   async function getDebtsWithTokens(accessToken?: string, refreshToken?: string) {
-    // Use the optimized getDebts function which:
+    // Use Application Service which:
     // 1. Selects only necessary fields (not *)
     // 2. Includes proper calculations
     // 3. Has consistent error handling
-    const { getDebts } = await import('@/lib/api/debts');
-    return await getDebts(accessToken, refreshToken);
+    return await debtsService.getDebts(accessToken, refreshToken);
   }
 
   // Helper function to check onboarding status with tokens
-  // OPTIMIZED: Reuses accounts from Promise.all to avoid duplicate query
-  // PERFORMANCE: Accepts optional user parameter to avoid duplicate getUser() call
+  // FIXED: Now uses onboardingService.getOnboardingStatus() which properly checks hasPlan
+  // This ensures the status includes all 3 steps: personal data, income, and plan
   async function checkOnboardingStatusWithTokens(
     accounts: any[],
     accessToken?: string, 
@@ -166,13 +205,8 @@ async function loadDashboardDataInternal(
     user?: { id: string } | null
   ) {
     try {
-      const hasAccount = accounts.length > 0;
-      const totalBalance = accounts.reduce((sum: number, acc: any) => sum + (acc.balance || 0), 0);
-
-      // Get profile with tokens
+      // Get user ID
       const supabase = await createServerClient(accessToken, refreshToken);
-      
-      // PERFORMANCE: Use provided user or fetch if not provided
       let authUser = user;
       if (!authUser) {
         const { data: { user: fetchedUser }, error: userError } = await supabase.auth.getUser();
@@ -181,7 +215,9 @@ async function loadDashboardDataInternal(
           return {
             hasAccount: false,
             hasCompleteProfile: false,
+            hasPersonalData: false,
             hasExpectedIncome: false,
+            hasPlan: false,
             completedCount: 0,
             totalCount: 3,
           };
@@ -189,63 +225,40 @@ async function loadDashboardDataInternal(
         authUser = fetchedUser;
       }
 
-      const { data: profileData, error: profileError } = await supabase
-        .from("User")
-        .select("name")
-        .eq("id", authUser.id)
-        .single();
-
-      if (profileError) {
-        logger.warn("Could not get profile for onboarding status check:", profileError.message);
-        return {
-          hasAccount,
-          hasCompleteProfile: false,
-          hasExpectedIncome: false,
-          completedCount: hasAccount ? 1 : 0,
-          totalCount: 3,
-          totalBalance: hasAccount ? totalBalance : undefined,
-        };
-      }
-
-      const hasCompleteProfile = profileData?.name !== null && profileData?.name !== undefined && profileData.name.trim() !== "";
+      // Use the onboarding service which properly checks all steps including hasPlan
+      const status = await onboardingService.getOnboardingStatus(authUser.id, accessToken, refreshToken);
       
-      // Check expected income status
-      let hasExpectedIncome = false;
-      try {
-        const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
-        const onboardingService = makeOnboardingService();
-        hasExpectedIncome = await onboardingService.checkIncomeOnboardingStatus(authUser.id, accessToken, refreshToken);
-      } catch (error) {
-        logger.warn("Could not check income onboarding status:", error);
-      }
-
-      const completedCount = [hasAccount, hasCompleteProfile, hasExpectedIncome].filter(Boolean).length;
+      // Calculate total balance from accounts
+      const totalBalance = accounts.length > 0
+        ? accounts.reduce((sum: number, acc: any) => sum + (acc.balance || 0), 0)
+        : undefined;
 
       logger.debug("Onboarding status check:", {
-        hasAccount,
-        hasCompleteProfile,
-        hasExpectedIncome,
-        completedCount,
-        totalCount: 3,
-        userName: profileData?.name,
+        hasAccount: status.hasAccount,
+        hasCompleteProfile: status.hasCompleteProfile,
+        hasPersonalData: status.hasPersonalData,
+        hasExpectedIncome: status.hasExpectedIncome,
+        hasPlan: status.hasPlan,
+        expectedIncome: status.expectedIncome,
+        completedCount: status.completedCount,
+        totalCount: status.totalCount,
       });
 
       return {
-        hasAccount,
-        hasCompleteProfile,
-        hasExpectedIncome,
-        completedCount,
-        totalCount: 3,
-        totalBalance: hasAccount ? totalBalance : undefined,
+        ...status,
+        totalBalance: totalBalance ?? status.totalBalance,
       };
     } catch (error) {
       logger.error("Error checking onboarding status:", error);
       return {
         hasAccount: false,
         hasCompleteProfile: false,
+        hasPersonalData: false,
         hasExpectedIncome: false,
+        hasPlan: false,
         completedCount: 0,
         totalCount: 3,
+        expectedIncome: null,
       };
     }
   }
@@ -264,46 +277,52 @@ async function loadDashboardDataInternal(
     recurringPaymentsResult,
     subscriptions,
   ] = await Promise.all([
-    getTransactionsInternal({ startDate: selectedMonth, endDate: selectedMonthEnd }, accessToken, refreshToken).catch((error) => {
+    transactionsService.getTransactions({ startDate: selectedMonth, endDate: selectedMonthEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching selected month transactions:", error);
       return { transactions: [], total: 0 };
     }),
-    getTransactionsInternal({ startDate: lastMonth, endDate: lastMonthEnd }, accessToken, refreshToken).catch((error) => {
+    transactionsService.getTransactions({ startDate: lastMonth, endDate: lastMonthEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching last month transactions:", error);
       return { transactions: [], total: 0 };
     }),
-    getBudgetsInternal(selectedMonth, accessToken, refreshToken).catch((error) => {
+    budgetsService.getBudgets(selectedMonth, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching budgets:", error);
       return [];
     }),
-    getUpcomingTransactions(50, accessToken, refreshToken).catch((error) => {
+    transactionsService.getUpcomingTransactions(50, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching upcoming transactions:", error);
       return [];
     }),
-    getTransactionsInternal({ startDate: chartStart, endDate: chartEnd }, accessToken, refreshToken).catch((error) => {
+    transactionsService.getTransactions({ startDate: chartStart, endDate: chartEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching chart transactions:", error);
       return { transactions: [], total: 0 };
     }),
     getAccountsWithTokens(accessToken, refreshToken).catch((error) => {
-      logger.error("Error fetching accounts:", error);
+      logger.error("[Dashboard] Error fetching accounts:", error);
       return [];
     }),
-    userId ? getUserLiabilities(userId, accessToken, refreshToken).catch((error) => {
-      logger.error("Error fetching liabilities:", error);
-      return [];
-    }) : Promise.resolve([]),
+    userId ? (async () => {
+      try {
+        const plaidService = makePlaidService();
+        return await plaidService.getUserLiabilities(userId, accessToken, refreshToken);
+      } catch (error) {
+        logger.error("Error fetching liabilities:", error);
+        return [];
+      }
+    })() : Promise.resolve([]),
     getDebtsWithTokens(accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching debts:", error);
       return [];
     }),
-    getTransactionsInternal({ recurring: true }, accessToken, refreshToken).catch((error) => {
+    transactionsService.getTransactions({ recurring: true }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching recurring payments:", error);
       return { transactions: [], total: 0 };
     }),
     (async () => {
       try {
-        const { getUserSubscriptionsInternal } = await import('@/lib/api/user-subscriptions');
-        const subs = await getUserSubscriptionsInternal(accessToken, refreshToken);
+        if (!userId) return [];
+        const userSubscriptionsService = makeUserSubscriptionsService();
+        const subs = await userSubscriptionsService.getUserSubscriptions(userId);
         logger.debug(
           `[Dashboard] Loaded ${subs.length} user service subscription(s) (Netflix, Spotify, etc.) ` +
           `for dashboard. Note: This is separate from Stripe subscription plans.`
@@ -343,7 +362,7 @@ async function loadDashboardDataInternal(
   // OPTIMIZED: Now fetch goals and financial-health using already-loaded accounts
   // This eliminates duplicate getAccounts() calls
   const [goals, financialHealth] = await Promise.all([
-    getGoalsInternal(accessToken, refreshToken, accounts).catch((error) => {
+    goalsService.getGoals(accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching goals:", error);
       return [];
     }),
@@ -373,7 +392,9 @@ async function loadDashboardDataInternal(
     return {
       hasAccount: false,
       hasCompleteProfile: false,
+      hasPersonalData: false,
       hasExpectedIncome: false,
+      hasPlan: false,
       completedCount: 0,
       totalCount: 3,
     };
@@ -394,10 +415,34 @@ async function loadDashboardDataInternal(
     : (recurringPaymentsResult?.transactions || []);
 
   // Calculate total balance for ALL accounts (all households)
+  // Ensure balance is always a valid number
   const totalBalance = accounts.reduce(
-    (sum: number, acc: any) => sum + (acc.balance || 0),
+    (sum: number, acc: any) => {
+      // Get balance, defaulting to 0 if undefined/null/NaN
+      let balance = acc.balance;
+      if (balance === undefined || balance === null || isNaN(balance)) {
+        balance = 0;
+      }
+      balance = Number(balance);
+      if (!isFinite(balance)) {
+        balance = 0;
+      }
+      return sum + balance;
+    },
     0
   );
+  
+  logger.debug("[Dashboard] Balance calculation:", {
+    accountCount: accounts.length,
+    totalBalance,
+    accountBalances: accounts.map((acc: any) => ({
+      id: acc.id,
+      name: acc.name,
+      type: acc.type,
+      balance: acc.balance,
+      calculatedBalance: acc.balance ?? 0,
+    })),
+  });
 
   // Calculate savings as the sum of balances from savings accounts
   const savings = accounts
@@ -440,7 +485,7 @@ export async function loadDashboardData(
   startDate: Date,
   endDate: Date
 ): Promise<DashboardData> {
-  // Get userId and session tokens BEFORE caching (cookies can't be accessed inside unstable_cache)
+  // Get userId and session tokens
   const userId = await getCurrentUserId();
   
   // Get session tokens before entering cache
@@ -465,34 +510,8 @@ export async function loadDashboardData(
     // Continue without tokens - functions will try to get them themselves
   }
   
-  // Import cache utilities
-  const { withCache, generateCacheKey, CACHE_TAGS, CACHE_DURATIONS } = await import('@/lib/services/cache-manager');
-  
   try {
-    // Use centralized cache manager with proper tags
-    // Include date range in cache key to ensure different ranges are cached separately
-    const cacheKey = generateCacheKey.dashboard({
-      userId: userId || undefined,
-      month: selectedMonthDate,
-      startDate: startDate,
-      endDate: endDate,
-    });
-    
-    return await withCache(
-      async () => loadDashboardDataInternal(selectedMonthDate, startDate, endDate, userId, accessToken, refreshToken),
-      {
-        key: cacheKey,
-        tags: [
-          CACHE_TAGS.DASHBOARD,
-          CACHE_TAGS.TRANSACTIONS,
-          CACHE_TAGS.ACCOUNTS,
-          CACHE_TAGS.BUDGETS,
-          CACHE_TAGS.GOALS,
-          CACHE_TAGS.SUBSCRIPTIONS,
-        ],
-        revalidate: 300, // 300 seconds (5 minutes) - increased since manual refresh is available
-      }
-    );
+    return await loadDashboardDataInternal(selectedMonthDate, startDate, endDate, userId, accessToken, refreshToken);
   } catch (error) {
     logger.error('[Dashboard] Error loading data:', error);
     throw error;

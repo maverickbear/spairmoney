@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { AdminUser } from "@/lib/api/admin";
+import type { AdminUser } from "@/src/domain/admin/admin.types";
 
 interface EndTrialOrCancelDialogProps {
   user: AdminUser | null;

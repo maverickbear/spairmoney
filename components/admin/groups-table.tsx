@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Loader2, Edit, Trash2, FolderTree } from "lucide-react";
-import type { SystemGroup } from "@/lib/api/admin";
+import type { SystemGroup } from "@/src/domain/admin/admin.types";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { formatAdminDate } from "@/src/infrastructure/utils/timestamp";
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeMembersService } from "@/src/application/members/members.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * GET /api/members/invite/check-pending
@@ -17,27 +18,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerClient();
+    const service = makeMembersService();
+    const result = await service.checkPendingInvitation(email);
 
-    // Check if email has a pending invitation
-    const { data: pendingInvitation } = await supabase
-      .from("HouseholdMemberNew")
-      .select("id, householdId, email, Household(createdBy)")
-      .eq("email", email.toLowerCase())
-      .eq("status", "pending")
-      .maybeSingle();
-
-    const household = pendingInvitation?.Household as any;
-    return NextResponse.json({
-      hasPendingInvitation: !!pendingInvitation,
-      invitation: pendingInvitation ? {
-        id: pendingInvitation.id,
-        householdId: pendingInvitation.householdId,
-        ownerId: household?.createdBy || null,
-      } : null,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error checking pending invitation:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     const errorMessage = error instanceof Error ? error.message : "Failed to check pending invitation";
     return NextResponse.json(
       { error: errorMessage },

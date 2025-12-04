@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAdminService } from "@/src/application/admin/admin.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { blockUserSchema } from "@/src/domain/admin/admin.validations";
 import { z } from "zod";
 import { AppError } from "@/src/application/shared/app-error";
-
-const blockUserSchema = z.object({
-  userId: z.string(),
-  isBlocked: z.boolean(),
-  reason: z.string().optional(),
-  pauseSubscription: z.boolean().optional(),
-});
 
 /**
  * PUT /api/v2/admin/users/block

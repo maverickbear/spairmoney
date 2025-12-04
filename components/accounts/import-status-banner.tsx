@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Database, Clock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -29,55 +28,35 @@ export function ImportStatusBanner() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let userId: string | null = null;
-
     // Initial fetch
     const fetchActiveJobs = async () => {
       try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setLoading(false);
-          return;
-        }
-        userId = user.id;
-
-        // Fetch active jobs (pending or processing)
-        const { data: jobs, error } = await supabase
-          .from('ImportJob')
-          .select('id, status, progress, totalItems, processedItems, syncedItems, accountId, createdAt, type')
-          .eq('userId', user.id)
-          .in('status', ['pending', 'processing'])
-          .order('createdAt', { ascending: false });
-
-        if (error) {
-          console.error('Error fetching import jobs:', error);
+        const response = await fetch("/api/v2/import-jobs/active");
+        if (!response.ok) {
+          if (response.status === 401) {
+            // User not authenticated, no jobs to show
+            setActiveJobs([]);
+            setLoading(false);
+            return;
+          }
+          console.error('Error fetching import jobs:', response.statusText);
           setLoading(false);
           return;
         }
 
-        if (jobs && jobs.length > 0) {
+        const data = await response.json();
+        const jobs = data.jobs || [];
+        const accountsData = data.accounts || [];
+
+        if (jobs.length > 0) {
           setActiveJobs(jobs as ImportJob[]);
 
-          // Fetch account names for display
-          const accountIds = jobs
-            .map(j => j.accountId)
-            .filter((id): id is string => id !== null);
-          
-          if (accountIds.length > 0) {
-            const { data: accountData } = await supabase
-              .from('Account')
-              .select('id, name')
-              .in('id', accountIds);
-
-            if (accountData) {
-              const accountMap = new Map<string, AccountInfo>();
-              accountData.forEach(acc => {
-                accountMap.set(acc.id, { id: acc.id, name: acc.name });
-              });
-              setAccounts(accountMap);
-            }
-          }
+          // Map accounts
+          const accountMap = new Map<string, AccountInfo>();
+          accountsData.forEach((acc: AccountInfo) => {
+            accountMap.set(acc.id, acc);
+          });
+          setAccounts(accountMap);
         } else {
           setActiveJobs([]);
         }
@@ -90,29 +69,7 @@ export function ImportStatusBanner() {
 
     fetchActiveJobs();
 
-    // Set up Realtime subscription for ImportJob table
-    const channel = supabase
-      .channel('import-jobs-status')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ImportJob',
-        },
-        async (payload) => {
-          // Refetch to ensure we only get jobs for current user (RLS handles security)
-          // This is simpler than trying to filter in Realtime
-          fetchActiveJobs();
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[ImportStatusBanner] Realtime subscription active');
-        }
-      });
-
-    // Poll every 5 seconds as backup (in case Realtime fails or is slow)
+    // Poll every 5 seconds to check for updates
     const pollInterval = setInterval(() => {
       fetchActiveJobs();
     }, 5000);
@@ -120,7 +77,6 @@ export function ImportStatusBanner() {
     // Cleanup
     return () => {
       clearInterval(pollInterval);
-      supabase.removeChannel(channel);
     };
   }, []);
 

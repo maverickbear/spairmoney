@@ -69,7 +69,7 @@ export function BenefitsSection() {
               
               {/* Text Content */}
               <div className="flex flex-col justify-center">
-                <p className="text-sm font-medium text-primary mb-3">• {benefits[0].subtitle}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-3">• {benefits[0].subtitle}</p>
                 <h3 className="text-3xl font-bold mb-4">
                   {benefits[0].title}
                 </h3>

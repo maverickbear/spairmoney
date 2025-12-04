@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
 import { AppError } from "@/src/application/shared/app-error";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 
 /**
  * POST /api/transactions/[id]/apply-suggestion
@@ -15,38 +14,8 @@ export async function POST(
   try {
     const { id } = await params;
     
-    const supabase = await createServerClient();
-    
-    // Get the transaction to check for suggested category
-    const { data: transaction, error: fetchError } = await supabase
-      .from("Transaction")
-      .select("suggestedCategoryId, suggestedSubcategoryId")
-      .eq("id", id)
-      .single();
-    
-    if (fetchError || !transaction) {
-      throw new AppError("Transaction not found", 404);
-    }
-    
-    if (!transaction.suggestedCategoryId) {
-      throw new AppError("No suggested category found for this transaction", 400);
-    }
-    
-    // Apply the suggestion by moving it to the actual category
     const service = makeTransactionsService();
-    const updatedTransaction = await service.updateTransaction(id, {
-      categoryId: transaction.suggestedCategoryId,
-      subcategoryId: transaction.suggestedSubcategoryId || undefined,
-    });
-    
-    // Clear suggested fields
-    await supabase
-      .from("Transaction")
-      .update({
-        suggestedCategoryId: null,
-        suggestedSubcategoryId: null,
-      })
-      .eq("id", id);
+    const updatedTransaction = await service.applySuggestion(id);
     
     return NextResponse.json(updatedTransaction, { status: 200 });
   } catch (error) {

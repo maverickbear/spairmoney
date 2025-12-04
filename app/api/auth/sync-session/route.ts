@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/sync-session
@@ -12,38 +13,29 @@ import { createServerClient } from "@/src/infrastructure/database/supabase-serve
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
+    const service = makeAuthService();
+    const result = await service.syncSession();
     
-    // SECURITY: Use getUser() first to verify authentication
-    // getSession() reads from storage and may not be authentic
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
+    if (!result.success) {
       return NextResponse.json(
         { error: "No active session found", success: false },
         { status: 401 }
       );
     }
     
-    // Now get session tokens (after verifying user is authenticated)
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const response = NextResponse.json({
+      success: true,
+      user: result.user,
+      warning: result.warning,
+    });
     
-    // If we have a session, use it
-    if (session && session.user && session.user.id === user.id) {
-      const response = NextResponse.json({
-        success: true,
-        user: {
-          id: session.user.id,
-          email: session.user.email,
-        },
-      });
-      
-      // Set cookies explicitly to ensure they're set correctly in production
-      const expiresIn = session.expires_in || 3600;
+    // Set cookies explicitly if we have a session
+    if (result.session) {
+      const expiresIn = result.session.expires_in || 3600;
       const maxAge = expiresIn;
       const refreshMaxAge = 7 * 24 * 60 * 60; // 7 days for refresh token
       
-      response.cookies.set("sb-access-token", session.access_token, {
+      response.cookies.set("sb-access-token", result.session.access_token, {
         path: "/",
         maxAge: maxAge,
         httpOnly: false, // Allow client-side access for Supabase client
@@ -51,67 +43,26 @@ export async function POST(request: NextRequest) {
         secure: process.env.NODE_ENV === "production",
       });
       
-      response.cookies.set("sb-refresh-token", session.refresh_token, {
+      response.cookies.set("sb-refresh-token", result.session.refresh_token, {
         path: "/",
         maxAge: refreshMaxAge,
         httpOnly: false, // Allow client-side access for Supabase client
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
       });
-      
-      return response;
     }
-    
-    // If we have a user but no session, try to refresh
-    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-    
-    if (refreshError || !refreshedSession) {
-      console.warn("[SYNC-SESSION] Failed to refresh session:", refreshError?.message);
-      // Even if refresh fails, return success if we have a user
-      // The client-side session might still be valid
-      return NextResponse.json({
-        success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-        },
-        warning: "Session refresh failed, but user is authenticated",
-      });
-    }
-    
-    // Create response with success
-    const response = NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-      },
-    });
-    
-    // Set cookies explicitly to ensure they're set correctly in production
-    const expiresIn = refreshedSession.expires_in || 3600;
-    const maxAge = expiresIn;
-    const refreshMaxAge = 7 * 24 * 60 * 60; // 7 days for refresh token
-    
-    response.cookies.set("sb-access-token", refreshedSession.access_token, {
-      path: "/",
-      maxAge: maxAge,
-      httpOnly: false, // Allow client-side access for Supabase client
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    });
-    
-    response.cookies.set("sb-refresh-token", refreshedSession.refresh_token, {
-      path: "/",
-      maxAge: refreshMaxAge,
-      httpOnly: false, // Allow client-side access for Supabase client
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    });
     
     return response;
   } catch (error) {
     console.error("[SYNC-SESSION] Error syncing session:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message, success: false },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to sync session", success: false },
       { status: 500 }

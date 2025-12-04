@@ -12,10 +12,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const service = makeGoalsService();
-    const goals = await service.getGoals();
+    // Get session tokens
+    // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
+    let accessToken: string | undefined;
+    let refreshToken: string | undefined;
+    try {
+      const { createServerClient } = await import("@/src/infrastructure/database/supabase-server");
+      const supabase = await createServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Only get session tokens if user is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          accessToken = session.access_token;
+          refreshToken = session.refresh_token;
+        }
+      }
+    } catch (error: any) {
+      console.warn("[Goals API] Could not get session tokens:", error?.message);
+      // Continue without tokens - service will try to get them itself
+    }
     
-    return NextResponse.json(goals, { status: 200 });
+    const service = makeGoalsService();
+    const goals = await service.getGoals(accessToken, refreshToken);
+    
+    return NextResponse.json(goals, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'private, s-maxage=300, stale-while-revalidate=600',
+      },
+    });
   } catch (error) {
     console.error("Error fetching goals:", error);
     

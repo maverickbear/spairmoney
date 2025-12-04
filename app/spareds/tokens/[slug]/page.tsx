@@ -83,7 +83,7 @@ export default function TokenPage({ params }: { params: Promise<{ slug: string }
       return (
         <div className="ml-4 space-y-2">
           {Object.entries(value).map(([key, val]) => (
-            <div key={key} className="border-l-2 border-gray-200 dark:border-gray-700 pl-4">
+            <div key={key} className="border-l-2 border-border pl-4">
               <div className="font-semibold text-sm mb-1">{key}</div>
               {renderTokenValue(val, depth + 1)}
             </div>

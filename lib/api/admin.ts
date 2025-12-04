@@ -1,7 +1,7 @@
 "use server";
 
 import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-import { invalidateAllCategoriesCache } from "@/lib/api/categories";
+import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -735,7 +735,8 @@ export async function createSystemGroup(data: { name: string; type?: "income" | 
     }
 
     // Invalidate cache for all users since system group was created
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
 
     return {
       id: group.id,
@@ -815,7 +816,8 @@ export async function updateSystemGroup(id: string, data: { name?: string; type?
     }
 
     // Invalidate cache for all users since system group was updated
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
 
     return {
       id: group.id,
@@ -869,7 +871,8 @@ export async function deleteSystemGroup(id: string): Promise<void> {
     }
 
     // Invalidate cache for all users since system group was deleted
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
   } catch (error) {
     console.error("Error in deleteSystemGroup:", error);
     throw error;
@@ -997,7 +1000,8 @@ export async function createSystemCategory(data: { name: string; macroId: string
     }
 
     // Invalidate cache for all users since system category was created
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
 
     return {
       id: category.id,
@@ -1126,7 +1130,8 @@ export async function updateSystemCategory(
     }
 
     // Invalidate cache for all users since system category was updated
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
 
     return {
       id: category.id,
@@ -1198,7 +1203,8 @@ export async function deleteSystemCategory(id: string): Promise<void> {
     }
 
     // Invalidate cache for all users since system category was deleted
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
   } catch (error) {
     console.error("Error in deleteSystemCategory:", error);
     throw error;
@@ -1354,7 +1360,8 @@ export async function createSystemSubcategory(data: { name: string; categoryId: 
     }
 
     // Invalidate cache for all users since system subcategory was created
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
 
     return {
       id: subcategory.id,
@@ -1443,7 +1450,8 @@ export async function updateSystemSubcategory(id: string, data: { name?: string;
     }
 
     // Invalidate cache for all users since system subcategory was updated
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
 
     return {
       id: subcategory.id,
@@ -1498,7 +1506,8 @@ export async function deleteSystemSubcategory(id: string): Promise<void> {
     }
 
     // Invalidate cache for all users since system subcategory was deleted
-    await invalidateAllCategoriesCache();
+    const categoriesService = makeCategoriesService();
+    await categoriesService.invalidateAllCategoriesCache();
   } catch (error) {
     console.error("Error in deleteSystemSubcategory:", error);
     throw error;

@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAdminService } from "@/src/application/admin/admin.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { updateContactFormSchema } from "@/src/domain/admin/admin.validations";
 import { z } from "zod";
 import { AppError } from "@/src/application/shared/app-error";
-
-const updateContactFormSchema = z.object({
-  id: z.string().min(1, "ID is required"),
-  status: z.string().optional(),
-  adminNotes: z.string().optional(),
-});
 
 /**
  * GET /api/v2/admin/contact-forms

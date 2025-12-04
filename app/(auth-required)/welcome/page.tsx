@@ -175,28 +175,28 @@ function WelcomeContent() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium mb-2">Pro benefits:</p>
-              <ul className="space-y-2">
-                <li className="flex items-center gap-2 text-sm">
+              <ul className="space-y-1">
+                <li className="flex items-center gap-1.5 text-sm">
                   <Check className="w-4 h-4 text-primary" />
                   Unlimited transactions
                 </li>
-                <li className="flex items-center gap-2 text-sm">
+                <li className="flex items-center gap-1.5 text-sm">
                   <Check className="w-4 h-4 text-primary" />
                   Unlimited accounts
                 </li>
-                <li className="flex items-center gap-2 text-sm">
+                <li className="flex items-center gap-1.5 text-sm">
                   <Check className="w-4 h-4 text-primary" />
                   Investment tracking
                 </li>
-                <li className="flex items-center gap-2 text-sm">
+                <li className="flex items-center gap-1.5 text-sm">
                   <Check className="w-4 h-4 text-primary" />
                   Advanced reports
                 </li>
-                <li className="flex items-center gap-2 text-sm">
+                <li className="flex items-center gap-1.5 text-sm">
                   <Check className="w-4 h-4 text-primary" />
                   CSV export
                 </li>
-                <li className="flex items-center gap-2 text-sm">
+                <li className="flex items-center gap-1.5 text-sm">
                   <Check className="w-4 h-4 text-primary" />
                   Priority support
                 </li>

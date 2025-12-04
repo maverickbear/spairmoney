@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateTransaction } from "@/lib/api/transactions";
+import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
+import { AppError } from "@/src/application/shared/app-error";
 import { requireTransactionOwnership } from "@/src/infrastructure/utils/security";
 
 export async function PATCH(request: NextRequest) {
@@ -51,8 +52,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update all transactions
+    const service = makeTransactionsService();
     const results = await Promise.allSettled(
-      transactionIds.map(id => updateTransaction(id, updateData))
+      transactionIds.map(id => service.updateTransaction(id, updateData))
     );
 
     // Check for failures
@@ -83,6 +85,13 @@ export async function PATCH(request: NextRequest) {
     }, { status: 200 });
   } catch (error) {
     console.error("Error bulk updating transactions:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     const errorMessage = error instanceof Error ? error.message : "Failed to bulk update transactions";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;

@@ -14,6 +14,7 @@ export const goalSchema = z.object({
   accountId: z.string().optional(),
   holdingId: z.string().optional(),
   isSystemGoal: z.boolean().optional().default(false),
+  isPaused: z.boolean().optional().default(false),
 }).refine(
   (data) => {
     // Allow targetAmount = 0 only for system goals

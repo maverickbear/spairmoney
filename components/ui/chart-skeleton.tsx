@@ -14,7 +14,7 @@ export function ChartSkeleton({ className, height = 240 }: ChartSkeletonProps) {
         <Skeleton className="h-3 w-48 mt-2" />
       </CardHeader>
       <CardContent>
-        <div className="mb-4 border-b pb-3">
+        <div className="mb-4 border-b border-border pb-3">
           <Skeleton className="h-6 w-24" />
         </div>
         <Skeleton className="w-full" style={{ height: `${height}px` }} />
@@ -31,7 +31,7 @@ export function BudgetExecutionSkeleton({ className }: ChartSkeletonProps) {
         <Skeleton className="h-3 w-48 mt-2" />
       </CardHeader>
       <CardContent>
-        <div className="mb-6 border-b pb-4">
+        <div className="mb-6 border-b border-border pb-4">
           <Skeleton className="h-8 w-20" />
           <Skeleton className="h-3 w-32 mt-2" />
         </div>

@@ -1,6 +1,6 @@
 "use server";
 
-import { getAllCategories, getSubcategoriesByCategory, createCategory, createSubcategory, getGroups } from "@/lib/api/categories";
+import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 
 export interface DebtCategoryMapping {
   categoryId: string;
@@ -11,8 +11,9 @@ export interface DebtCategoryMapping {
  * Get or create category/subcategory mapping for a debt loan type
  */
 export async function getDebtCategoryMapping(loanType: string): Promise<DebtCategoryMapping | null> {
-  const allCategories = await getAllCategories();
-  const groups = await getGroups();
+  const categoriesService = makeCategoriesService();
+  const allCategories = await categoriesService.getAllCategories();
+  const groups = await categoriesService.getGroups();
 
   // Find group IDs
   const groupMap = groups.reduce((acc, group) => {
@@ -33,7 +34,7 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
       if (found) return found;
     }
     // If not found in loaded categories, try fetching directly
-    const subcategories = await getSubcategoriesByCategory(categoryId);
+    const subcategories = await categoriesService.getSubcategoriesByCategory(categoryId);
     return subcategories.find((sub) => sub.name === name) || null;
   };
 
@@ -46,7 +47,7 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
         console.error(`Group ${groupName} not found`);
         return null;
       }
-      category = await createCategory({ name, groupId });
+      category = await categoriesService.createCategory({ name, groupId });
     }
     return category;
   };
@@ -55,7 +56,7 @@ export async function getDebtCategoryMapping(loanType: string): Promise<DebtCate
   const getOrCreateSubcategory = async (name: string, categoryId: string) => {
     let subcategory = await findSubcategory(name, categoryId);
     if (!subcategory) {
-      subcategory = await createSubcategory({ name, categoryId });
+      subcategory = await categoriesService.createSubcategory({ name, categoryId });
     }
     return subcategory;
   };

@@ -5,48 +5,66 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    --foreground: 240 10% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 240 10% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 240 87% 62%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 13%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 103 60% 67%;
+    --primary-foreground: 240 10% 10%;
+    --secondary: 240 10% 10%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 96%;
+    --muted: 0 0% 87%;
     --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 9%;
+    --accent: 0 0% 87%;
+    --accent-foreground: 240 10% 10%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 240 87% 62%;
+    --border: 235 15% 45% / 0.14;
+    --input: 235 15% 45% / 0.14;
+    --ring: 103 60% 67%;
     --radius: 12px;
     
     /* Grey scale */
     --grey-50: 0 0% 98%;
     --grey-100: 0 0% 96%;
-    --grey-200: 0 0% 90%;
+    --grey-200: 0 0% 87%;
     --grey-300: 0 0% 83%;
     --grey-400: 0 0% 64%;
     --grey-500: 0 0% 45%;
     --grey-600: 0 0% 32%;
     --grey-700: 0 0% 23%;
     --grey-800: 0 0% 15%;
-    --grey-900: 0 0% 9%;
+    --grey-900: 240 10% 10%;
+    
+    /* Primary color scale (from colors.ts) */
+    --primary-900: 240 10% 10%;  /* #16161B */
+    --primary-800: 240 10% 10%;  /* #16161B */
+    --primary-700: 240 10% 10%;  /* #16161B */
+    --primary-600: 103 60% 50%;  /* #7BC85A */
+    --primary-500: 103 60% 67%;  /* #94DD78 */
+    --primary-400: 103 60% 75%;  /* #B0E89A */
+    --primary-300: 103 60% 80%;  /* #C5F0B0 */
+    
+    /* Neutral colors */
+    --neutral-50: 0 0% 100%;     /* #FFFFFF */
+    --neutral-100: 0 0% 87%;     /* #DDDDDD */
+    --neutral-200: 0 0% 87%;     /* #DDDDDD */
+    --neutral-300: 220 13% 66%;   /* #9ca3af */
+    --neutral-400: 215 16% 25%;   /* #374151 */
+    --neutral-500: 240 10% 10%;  /* #16161B */
+    --neutral-600: 0 0% 12%;     /* #1d1d1f */
   }
 
   .dark {
-    --background: 0 0% 9%;
+    --background: 240 10% 10%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 13%;
+    --card: 240 10% 13%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 13%;
+    --popover: 240 10% 13%;
     --popover-foreground: 0 0% 98%;
-    --primary: 240 87% 70%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 103 60% 72%;
+    --primary-foreground: 240 10% 10%;
     --secondary: 0 0% 20%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 20%;
@@ -55,12 +73,12 @@
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 240 87% 70%;
+    --border: 235 15% 45% / 0.14;
+    --input: 235 15% 45% / 0.14;
+    --ring: 103 60% 72%;
     
     /* Grey scale for dark mode */
-    --grey-50: 0 0% 9%;
+    --grey-50: 240 10% 10%;
     --grey-100: 0 0% 15%;
     --grey-200: 0 0% 23%;
     --grey-300: 0 0% 32%;
@@ -70,6 +88,24 @@
     --grey-700: 0 0% 90%;
     --grey-800: 0 0% 96%;
     --grey-900: 0 0% 98%;
+    
+    /* Primary color scale for dark mode */
+    --primary-900: 240 10% 10%;  /* #16161B */
+    --primary-800: 240 10% 10%;  /* #16161B */
+    --primary-700: 240 10% 10%;  /* #16161B */
+    --primary-600: 103 60% 50%;  /* #7BC85A */
+    --primary-500: 103 60% 72%;  /* #94DD78 (lighter in dark mode) */
+    --primary-400: 103 60% 75%;  /* #B0E89A */
+    --primary-300: 103 60% 80%;  /* #C5F0B0 */
+    
+    /* Neutral colors for dark mode */
+    --neutral-50: 240 10% 10%;   /* #16161B */
+    --neutral-100: 0 0% 15%;     /* #DDDDDD equivalent */
+    --neutral-200: 0 0% 23%;     /* #DDDDDD equivalent */
+    --neutral-300: 0 0% 32%;     /* #9ca3af equivalent */
+    --neutral-400: 0 0% 45%;     /* #374151 equivalent */
+    --neutral-500: 0 0% 64%;     /* #16161B equivalent */
+    --neutral-600: 0 0% 12%;     /* #1d1d1f */
   }
 }
 
@@ -95,18 +131,18 @@
 @layer utilities {
   .bg-grid-pattern {
     background-image: 
-      linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px);
+      linear-gradient(to right, hsla(var(--border)) 1px, transparent 1px),
+      linear-gradient(to bottom, hsla(var(--border)) 1px, transparent 1px);
     background-size: 20px 20px;
   }
 
   /* Landing page specific styles */
   .landing-gradient-dark {
-    background: linear-gradient(135deg, #1a5f3f 0%, #1e7a4e 50%, #155a3a 100%);
+    background: linear-gradient(135deg, hsl(var(--primary-900)) 0%, hsl(var(--primary-600)) 50%, hsl(var(--primary-900)) 100%);
   }
 
   .landing-gradient-light {
-    background: linear-gradient(135deg, #4ade80 0%, #34d399 100%);
+    background: linear-gradient(135deg, hsl(var(--primary-500)) 0%, hsl(var(--primary-400)) 100%);
   }
 
   /* Smooth scroll for anchor links */
@@ -161,12 +197,13 @@
 
   /* Hero section gradient with smooth transition */
   .hero-gradient {
-    background: linear-gradient(to bottom right, #1A1A8F, #2A2AB8, #4A4AF2);
+    background: linear-gradient(to bottom right, hsl(var(--primary-500)), hsl(var(--primary-400)), hsl(var(--primary-300)));
     transition: background 1s ease-in-out;
   }
 
+  /* Keep same background color in dark mode */
   .dark .hero-gradient {
-    background: linear-gradient(to bottom right, #0D0D5A, #1A1A7A, #2A2AB8);
+    background: linear-gradient(to bottom right, hsl(var(--primary-500)), hsl(var(--primary-400)), hsl(var(--primary-300)));
   }
 
   /* Responsive improvements for tablets and mobile */

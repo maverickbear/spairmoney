@@ -44,7 +44,7 @@ export function BankConnectionStatus({
   async function loadStatus() {
     try {
       setLoading(true);
-      const response = await fetch(`/api/accounts/${accountId}`);
+      const response = await fetch(`/api/v2/accounts/${accountId}`);
       const data = await response.json();
 
       if (response.ok && data) {

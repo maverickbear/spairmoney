@@ -1,6 +1,5 @@
 "use server";
 
-import { unstable_cache, revalidateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { TransactionFormData } from "@/src/domain/transactions/transactions.validations";
@@ -199,9 +198,6 @@ export async function createTransaction(data: TransactionFormData, providedUserI
       }
     }
 
-    // Invalidate cache to ensure dashboard shows updated data
-    const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
-    invalidateTransactionCaches();
 
     // Update category_learning if category was provided (shouldn't happen for transfers, but just in case)
     if (finalCategoryId) {
@@ -405,10 +401,6 @@ export async function createTransaction(data: TransactionFormData, providedUserI
       // Don't fail transaction creation
     }
 
-    // Invalidate cache
-    const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
-    invalidateTransactionCaches();
-
     return transaction;
   }
 
@@ -568,10 +560,6 @@ export async function createTransaction(data: TransactionFormData, providedUserI
   if (finalCategoryId) {
     await updateCategoryLearning(userId, descriptionSearch, data.type, finalCategoryId, finalSubcategoryId, data.amount);
   }
-
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
-  invalidateTransactionCaches();
 
   // If transaction is recurring, generate PlannedPayments for future occurrences
   if (data.recurring) {
@@ -818,10 +806,6 @@ export async function updateTransaction(id: string, data: Partial<TransactionFor
     }
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
-  invalidateTransactionCaches();
-
   const wasRecurring = transactionBeforeUpdate?.recurring ?? false;
   const isNowRecurring = transaction.recurring;
 
@@ -911,9 +895,6 @@ export async function deleteTransaction(id: string) {
     throw new Error(`Failed to delete transaction: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
-  invalidateTransactionCaches();
 }
 
 export async function deleteMultipleTransactions(ids: string[]) {
@@ -949,9 +930,6 @@ export async function deleteMultipleTransactions(ids: string[]) {
     throw new Error(`Failed to delete transactions: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
-  invalidateTransactionCaches();
 }
 
 export async function getTransactionsInternal(
@@ -1221,20 +1199,8 @@ export async function getTransactions(filters?: {
       }
     }
   } catch (error: any) {
-      // If we can't get tokens (e.g., inside unstable_cache), continue without them
+      // If we can't get tokens, continue without them
       logger.warn("Could not get tokens:", error?.message);
-  }
-  
-  // Cache for 10 seconds if no search filter (searches should be real-time)
-  // Cache is invalidated via revalidateTag('transactions') when transactions are created/updated/deleted
-  // Shorter cache time ensures fresh data while maintaining performance
-  if (!filters?.search) {
-    const cacheKey = `transactions-${filters?.startDate?.toISOString()}-${filters?.endDate?.toISOString()}-${filters?.categoryId || 'all'}-${filters?.accountId || 'all'}-${filters?.type || 'all'}-${filters?.recurring || 'all'}`;
-    return unstable_cache(
-      async () => getTransactionsInternal(filters, accessToken, refreshToken),
-      [cacheKey],
-      { revalidate: 10, tags: ['transactions'] }
-    )();
   }
   
   return getTransactionsInternal(filters, accessToken, refreshToken);

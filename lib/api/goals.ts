@@ -1,6 +1,5 @@
 "use server";
 
-import { unstable_cache, revalidateTag } from "next/cache";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/src/infrastructure/utils/timestamp";
 import { startOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
@@ -367,15 +366,11 @@ export async function getGoals(): Promise<GoalWithCalculations[]> {
     }
     
   } catch (error: any) {
-    // If we can't get tokens (e.g., inside unstable_cache), continue without them
+    // If we can't get tokens, continue without them
     logger.warn("⚠️ [getGoals] Could not get tokens:", error?.message);
   }
   
-  return unstable_cache(
-    async () => getGoalsInternal(accessToken, refreshToken),
-    ['goals'],
-    { revalidate: 60, tags: ['goals', 'transactions'] }
-  )();
+  return getGoalsInternal(accessToken, refreshToken);
 }
 
 /**
@@ -478,9 +473,6 @@ export async function createGoal(data: {
     throw new Error(`Failed to create goal: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals', 'max');
-  revalidateTag('dashboard', 'max');
 
   return goal;
 }
@@ -595,9 +587,6 @@ export async function updateGoal(
     throw new Error(`Failed to update goal: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals', 'max');
-  revalidateTag('dashboard', 'max');
 
   return goal;
 }
@@ -702,9 +691,6 @@ export async function deleteGoal(id: string): Promise<void> {
     throw new Error(`Failed to delete goal: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals', 'max');
-  revalidateTag('dashboard', 'max');
 }
 
 /**
@@ -753,9 +739,6 @@ export async function addTopUp(id: string, amount: number): Promise<Goal> {
     throw new Error(`Failed to add top-up: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals', 'max');
-  revalidateTag('dashboard', 'max');
 
   return updatedGoal;
 }
@@ -806,9 +789,6 @@ export async function withdraw(id: string, amount: number): Promise<Goal> {
     throw new Error(`Failed to withdraw: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure fresh data on next fetch
-  revalidateTag('goals', 'max');
-  revalidateTag('dashboard', 'max');
 
   return updatedGoal;
 }

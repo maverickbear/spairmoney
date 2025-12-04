@@ -101,6 +101,11 @@ export function ChangePlanConfirmationModal({
       lostFeatures.push("Bank account integration");
     }
 
+    // Check receipt scanner
+    if (current.features.hasReceiptScanner && !target.features.hasReceiptScanner) {
+      lostFeatures.push("Receipt scanner");
+    }
+
     return lostFeatures;
   }
 
@@ -152,6 +157,11 @@ export function ChangePlanConfirmationModal({
       gainedFeatures.push("Bank account integration");
     }
 
+    // Check receipt scanner
+    if (!current.features.hasReceiptScanner && target.features.hasReceiptScanner) {
+      gainedFeatures.push("Receipt scanner");
+    }
+
     return gainedFeatures;
   }
 
@@ -193,6 +203,7 @@ export function ChangePlanConfirmationModal({
                   {currentPlan.features.hasCsvImport && <li>CSV import</li>}
                   {currentPlan.features.hasBudgets && <li>Budgets</li>}
                   {currentPlan.features.hasHousehold && <li>Household members</li>}
+                  {currentPlan.features.hasReceiptScanner && <li>Receipt scanner</li>}
                 </ul>
               </div>
             )}

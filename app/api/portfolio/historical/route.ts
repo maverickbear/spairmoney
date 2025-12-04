@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPortfolioHistoricalData } from "@/lib/api/portfolio";
+import { makePortfolioService } from "@/src/application/portfolio/portfolio.factory";
 import { guardFeatureAccessReadOnly, getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: Request) {
   try {
@@ -25,10 +26,19 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const days = searchParams.get("days") ? parseInt(searchParams.get("days")!) : 365;
 
-    const historicalData = await getPortfolioHistoricalData(days);
+    const service = makePortfolioService();
+    const historicalData = await service.getPortfolioHistoricalData(days, userId);
     return NextResponse.json(historicalData);
   } catch (error) {
     console.error("Error fetching portfolio historical data:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to fetch portfolio historical data" },
       { status: 500 }

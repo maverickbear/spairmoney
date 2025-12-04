@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-import { getCurrentUserSubscriptionData, invalidateSubscriptionCache, type Subscription, type Plan } from "@/lib/api/subscription";
+import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { makeMembersService } from "@/src/application/members/members.factory";
 import { verifyUserExists } from "@/lib/utils/verify-user-exists";
 import { SubscriptionGuard } from "@/components/subscription-guard";
 import { SubscriptionProvider } from "@/contexts/subscription-context";
-import { Suspense } from "react";
 import { logger } from "@/src/infrastructure/utils/logger";
+import type { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 
 /**
  * Protected Layout
@@ -86,14 +88,9 @@ export default async function ProtectedLayout({
   // Check maintenance mode
   let isMaintenanceMode = false;
   try {
-    const serviceSupabase = createServiceRoleClient();
-    const { data: settings } = await serviceSupabase
-      .from("SystemSettings")
-      .select("maintenanceMode")
-      .eq("id", "default")
-      .single();
-
-    isMaintenanceMode = settings?.maintenanceMode || false;
+    const adminService = makeAdminService();
+    const settings = await adminService.getPublicSystemSettings();
+    isMaintenanceMode = settings.maintenanceMode || false;
   } catch (error) {
     // If error checking maintenance mode, log but don't block access
     log.error("Error checking maintenance mode:", error);
@@ -112,17 +109,18 @@ export default async function ProtectedLayout({
     log.debug("Maintenance mode active, but user is super_admin - allowing access");
   }
 
-  // Check subscription - use unified API (single source of truth)
+  // Check subscription - use SubscriptionsService (single source of truth)
   let shouldOpenModal = false;
   let reason: "no_subscription" | "trial_expired" | "subscription_inactive" | undefined;
   let subscription: Subscription | null = null;
   let plan: Plan | null = null;
   
   try {
-    // Get subscription data using unified API (already has internal caching)
+    // Get subscription data using SubscriptionsService (already has internal caching)
     // Note: We don't invalidate cache here to avoid performance issues
     // If subscription is not found, it may be a real issue or cache problem
-    const subscriptionData = await getCurrentUserSubscriptionData();
+    const subscriptionsService = makeSubscriptionsService();
+    const subscriptionData = await subscriptionsService.getCurrentUserSubscriptionData();
     subscription = subscriptionData.subscription;
     plan = subscriptionData.plan;
     
@@ -140,8 +138,8 @@ export default async function ProtectedLayout({
     // This handles cases where cache might be stale
     if (!subscription && userId) {
       log.debug("No subscription found in first attempt, invalidating cache and retrying");
-      await invalidateSubscriptionCache(userId);
-      const retryData = await getCurrentUserSubscriptionData();
+      subscriptionsService.invalidateSubscriptionCache(userId);
+      const retryData = await subscriptionsService.getCurrentUserSubscriptionData();
       subscription = retryData.subscription;
       plan = retryData.plan;
       
@@ -156,11 +154,61 @@ export default async function ProtectedLayout({
       });
     }
     
-    // If no subscription found after retry, user needs to select a plan
+    // If no subscription found after retry, check if user is a household member
+    // Household members should inherit the owner's subscription, so we need to be extra careful
     if (!subscription) {
-      log.debug("No subscription found after retry, redirecting to pricing");
-      shouldOpenModal = true;
-      reason = "no_subscription";
+      log.debug("No subscription found after retry, checking if user is household member");
+      
+      // Check if user is a household member who should inherit subscription
+      try {
+        const membersService = makeMembersService();
+        const householdInfo = await membersService.getUserHouseholdInfo(userId);
+        
+        if (householdInfo?.isMember) {
+          // User is a household member - they should inherit owner's subscription
+          // Invalidate cache one more time and retry (in case cache was stale)
+          log.debug("User is household member, invalidating cache and retrying subscription check", {
+            userId,
+            ownerId: householdInfo.ownerId,
+          });
+          
+          subscriptionsService.invalidateSubscriptionCache(userId);
+          const finalRetryData = await subscriptionsService.getCurrentUserSubscriptionData();
+          subscription = finalRetryData.subscription;
+          plan = finalRetryData.plan;
+          
+          log.debug("Subscription check result after household member retry:", {
+            hasSubscription: !!subscription,
+            subscriptionId: subscription?.id,
+            planId: subscription?.planId,
+            status: subscription?.status,
+            userId: userId,
+          });
+          
+          // If still no subscription found for household member, don't open pricing dialog
+          // Let the onboarding dialog handle it (user needs to complete onboarding)
+          if (!subscription) {
+            log.debug("Household member has no subscription - onboarding will handle plan selection", {
+              userId,
+              ownerId: householdInfo.ownerId,
+            });
+            shouldOpenModal = false; // Don't open pricing dialog, let onboarding handle it
+          } else {
+            // Found subscription for household member - allow access
+            shouldOpenModal = false;
+          }
+        } else {
+          // User is not a household member and has no subscription
+          // Don't open pricing dialog - let onboarding handle it (user needs to complete onboarding)
+          log.debug("User is not a household member and has no subscription - onboarding will handle plan selection");
+          shouldOpenModal = false; // Don't open pricing dialog, let onboarding handle it
+        }
+      } catch (householdCheckError) {
+        // If error checking household membership, don't open pricing dialog
+        // Let onboarding handle it
+        log.error("Error checking household membership:", householdCheckError);
+        shouldOpenModal = false; // Don't open pricing dialog, let onboarding handle it
+      }
     } else {
       // Check if subscription status allows access
       const isActiveStatus = subscription.status === "active";
@@ -170,13 +218,17 @@ export default async function ProtectedLayout({
       if (isActiveStatus || isTrialingStatus) {
         shouldOpenModal = false;
       } else {
-        // Only open modal for "past_due" status
-        if (subscription.status === "past_due") {
-          log.debug("Subscription is past_due, redirecting to pricing");
+        // Open modal for "cancelled" status (user needs to reactivate)
+        if (subscription.status === "cancelled") {
+          log.debug("Subscription is cancelled, opening pricing dialog");
+          shouldOpenModal = true;
+          reason = "no_subscription"; // Use no_subscription reason to show dialog
+        } else if (subscription.status === "past_due") {
+          log.debug("Subscription is past_due, opening pricing dialog");
           shouldOpenModal = true;
           reason = "subscription_inactive";
         } else {
-          // Allow access for other statuses (cancelled, expired, etc.)
+          // Allow access for other statuses (unpaid, etc.)
           log.debug("Subscription has other status, allowing access:", subscription.status);
           shouldOpenModal = false;
         }
@@ -190,18 +242,42 @@ export default async function ProtectedLayout({
       });
     }
   } catch (error) {
-    // If error checking subscription, open modal
+    // If error checking subscription, don't open pricing dialog
+    // Let onboarding handle it (user might be new and needs onboarding)
     log.error("Error checking subscription:", error);
-    shouldOpenModal = true;
-    reason = "no_subscription";
+    shouldOpenModal = false; // Don't open pricing dialog, let onboarding handle it
   }
+
+  // Get current plan ID and interval for the dialog
+  const currentPlanId = subscription?.planId;
+  let currentInterval: "month" | "year" | null = null;
+  
+  // Try to determine interval from subscription if available
+  // Note: This is a simplified check - full interval detection requires Stripe API call
+  // The dialog will handle fetching the correct interval if needed
+  if (subscription && plan) {
+    // Default to null - dialog can fetch from API if needed
+    currentInterval = null;
+  }
+
+  // Determine subscription status for dialog
+  // Only show pricing dialog for cancelled subscriptions
+  // For no subscription, let onboarding dialog handle it
+  const subscriptionStatus = 
+    subscription && subscription.status === "cancelled" 
+      ? "cancelled" 
+      : null;
 
   return (
     <SubscriptionProvider initialData={{ subscription, plan }}>
-      <Suspense fallback={null}>
-        <SubscriptionGuard shouldOpenModal={shouldOpenModal} reason={reason} />
-      </Suspense>
       {children}
+      <SubscriptionGuard 
+        shouldOpenModal={shouldOpenModal} 
+        reason={reason}
+        currentPlanId={currentPlanId}
+        currentInterval={currentInterval}
+        subscriptionStatus={subscriptionStatus}
+      />
     </SubscriptionProvider>
   );
 }

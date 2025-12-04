@@ -2,19 +2,19 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
-import { LimitCheckResult } from "@/lib/api/subscription";
+import { BaseLimitCheckResult } from "@/src/domain/subscriptions/subscriptions.types";
 import { AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface UsageLimitsProps {
   limits: PlanFeatures;
-  transactionLimit: LimitCheckResult;
-  accountLimit: LimitCheckResult;
+  transactionLimit: BaseLimitCheckResult;
+  accountLimit: BaseLimitCheckResult;
 }
 
 export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLimitsProps) {
   
-  const getProgress = (limit: LimitCheckResult) => {
+  const getProgress = (limit: BaseLimitCheckResult) => {
     if (limit.limit === -1) return 0; // Unlimited
     return Math.min((limit.current / limit.limit) * 100, 100);
   };
@@ -24,11 +24,11 @@ export function UsageLimits({ limits, transactionLimit, accountLimit }: UsageLim
     return limit.toString();
   };
 
-  const isAtLimit = (limit: LimitCheckResult) => {
+  const isAtLimit = (limit: BaseLimitCheckResult) => {
     return limit.limit !== -1 && limit.current >= limit.limit;
   };
 
-  const isNearLimit = (limit: LimitCheckResult) => {
+  const isNearLimit = (limit: BaseLimitCheckResult) => {
     if (limit.limit === -1) return false;
     const percentage = (limit.current / limit.limit) * 100;
     return percentage >= 80;

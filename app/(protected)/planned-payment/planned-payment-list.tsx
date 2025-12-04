@@ -7,8 +7,8 @@ import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar, Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
-import type { PlannedPayment } from "@/lib/api/planned-payments-types";
-import { PLANNED_HORIZON_DAYS } from "@/lib/api/planned-payments-types";
+import type { BasePlannedPayment as PlannedPayment } from "@/src/domain/planned-payments/planned-payments.types";
+import { PLANNED_HORIZON_DAYS } from "@/src/domain/planned-payments/planned-payments.types";
 import { Loader2 } from "lucide-react";
 import {
   DropdownMenu,

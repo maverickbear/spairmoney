@@ -17,16 +17,18 @@ const DialogClose = DialogPrimitive.Close;
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
-    )}
-    {...props}
-  />
-));
+>(({ className, ...props }, ref) => {
+  return (
+    <DialogPrimitive.Overlay
+      ref={ref}
+      className={cn(
+        "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        className
+      )}
+      {...props}
+    />
+  );
+});
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
@@ -54,14 +56,17 @@ const DialogContent = React.forwardRef<
     }
   });
 
+  // Memoize overlay to prevent infinite re-renders
+  const overlay = React.useMemo(() => <DialogOverlay />, []);
+
   return (
     <DialogPortal>
-      <DialogOverlay />
+      {overlay}
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
           // Mobile: fullscreen
-          "fixed z-50 flex flex-col w-screen h-screen max-w-screen max-h-screen m-0 rounded-none border bg-background p-0 overflow-clip",
+          "fixed z-50 flex flex-col w-screen h-screen max-w-screen max-h-screen m-0 rounded-none border border-border bg-background p-0 overflow-clip",
           "left-0 top-0 translate-x-0 translate-y-0",
           "duration-200",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -106,7 +111,7 @@ const DialogHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col space-y-1.5 text-center sm:text-left px-6 pt-6 pb-4 border-b flex-shrink-0 bg-background",
+      "flex flex-col space-y-1.5 text-center sm:text-left px-6 pt-6 pb-4 border-b border-border flex-shrink-0 bg-background",
       className
     )}
     {...props}
@@ -120,7 +125,7 @@ const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 px-6 py-4 border-t flex-shrink-0 bg-background",
+      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 px-6 py-4 border-t border-border flex-shrink-0 bg-background",
       className
     )}
     {...props}

@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense, lazy } from "react";
 import { usePagePerformance } from "@/hooks/use-page-performance";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams, useRouter } from "next/navigation";
 import { profileSchema, ProfileFormData } from "@/src/domain/profile/profile.validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 import {
   Card,
   CardContent,
@@ -27,13 +28,12 @@ import { SubscriptionManagementEmbedded } from "@/components/billing/subscriptio
 import { PaymentMethodManager } from "@/components/billing/payment-method-manager";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
-import { LimitCheckResult } from "@/lib/api/subscription";
+import { BaseLimitCheckResult } from "@/src/domain/subscriptions/subscriptions.types";
 import { PageHeader } from "@/components/common/page-header";
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
-// OPTIMIZED: Use shared billing cache from lib/api/billing-cache.ts
-// This cache is shared across the entire application to prevent duplicate API calls
-import { billingDataCache, getBillingCacheData, getOrCreateBillingPromise, invalidateBillingCache } from "@/lib/api/billing-cache";
+import { CategoriesModule } from "@/src/presentation/components/features/categories/categories-module";
+import { HouseholdModule } from "@/src/presentation/components/features/household/household-module";
 
 // Lazy load PaymentHistory to improve initial load time
 const PaymentHistory = lazy(() => 
@@ -336,7 +336,7 @@ function ProfileModule() {
       formData.append("file", file);
 
       // Upload to Supabase Storage
-      const res = await fetch("/api/profile/avatar", {
+      const res = await fetch("/api/v2/profile/avatar", {
         method: "POST",
         body: formData,
       });
@@ -544,18 +544,28 @@ function ProfileModule() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="phoneNumber">Phone Number</Label>
-                  <Input
-                    {...form.register("phoneNumber")}
-                    id="phoneNumber"
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    size="medium"
+                  <Controller
+                    name="phoneNumber"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <>
+                        <PhoneNumberInput
+                          id="phoneNumber"
+                          value={field.value || undefined}
+                          onChange={(value) => field.onChange(value ?? "")}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          placeholder="(XXX) XXX-XXXX"
+                          size="medium"
+                        />
+                        {fieldState.error && (
+                          <p className="text-xs text-destructive">
+                            {fieldState.error.message}
+                          </p>
+                        )}
+                      </>
+                    )}
                   />
-                  {form.formState.errors.phoneNumber && (
-                    <p className="text-xs text-destructive">
-                      {form.formState.errors.phoneNumber.message}
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -604,8 +614,8 @@ function BillingModuleContent() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [limits, setLimits] = useState<PlanFeatures | null>(null);
-  const [transactionLimit, setTransactionLimit] = useState<LimitCheckResult | null>(null);
-  const [accountLimit, setAccountLimit] = useState<LimitCheckResult | null>(null);
+  const [transactionLimit, setTransactionLimit] = useState<BaseLimitCheckResult | null>(null);
+  const [accountLimit, setAccountLimit] = useState<BaseLimitCheckResult | null>(null);
   const [billingInterval, setBillingInterval] = useState<"month" | "year" | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -629,10 +639,6 @@ function BillingModuleContent() {
       if (response.ok && data.success) {
         console.log("[BILLING] Subscription synced successfully:", data.subscription);
         
-        // Invalidate cache after sync
-        billingDataCache.data = null;
-        billingDataCache.timestamp = 0;
-        billingDataCache.promise = null;
         
         toast({
           title: "Subscription Updated",
@@ -657,74 +663,35 @@ function BillingModuleContent() {
       return;
     }
 
-    // Check cache first (unless forced)
-    if (!force) {
-      const cached = getBillingCacheData();
-      if (cached) {
-        // Use cached data
-        setSubscription(cached.subscription);
-        setPlan(cached.plan);
-        setLimits(cached.limits);
-        setTransactionLimit(cached.transactionLimit);
-        setAccountLimit(cached.accountLimit);
-        setBillingInterval(cached.interval);
+    try {
+      setLoading(true);
+      
+      // Single API call that returns everything (subscription, plan, limits, transactionLimit, accountLimit)
+      const subResponse = await fetch("/api/v2/billing/subscription", {
+        cache: "no-store",
+      });
+      
+      if (!subResponse.ok) {
+        console.error("Failed to fetch subscription:", subResponse.status);
+        setSubscription(null);
+        setPlan(null);
+        setLimits(null);
+        setTransactionLimit(null);
+        setAccountLimit(null);
+        setBillingInterval(null);
         setHasLoaded(true);
         return;
       }
 
-      // Reuse in-flight request if exists (CRITICAL: Check before creating new promise)
-      if (billingDataCache.promise) {
-        try {
-          const result = await billingDataCache.promise;
-          setSubscription(result.subscription);
-          setPlan(result.plan);
-          setLimits(result.limits);
-          setTransactionLimit(result.transactionLimit);
-          setAccountLimit(result.accountLimit);
-          setBillingInterval(result.interval);
-          setHasLoaded(true);
-          return;
-        } catch (error) {
-          // If promise failed, continue to fetch new data
-          console.error("Cached promise failed:", error);
-        }
-      }
-    }
-
-    try {
-      setLoading(true);
-      
-      // OPTIMIZATION: Single API call that returns everything (subscription, plan, limits, transactionLimit, accountLimit)
-      // This avoids duplicate queries and reduces latency
-      // Use shared cache to prevent duplicate calls from SubscriptionProvider
-      // getOrCreateBillingPromise will reuse existing promise if one exists
-      const result = await getOrCreateBillingPromise(async () => {
-        const subResponse = await fetch("/api/billing/subscription", {
-        cache: "no-store",
-        });
-        
-        if (!subResponse.ok) {
-          console.error("Failed to fetch subscription:", subResponse.status);
-          return {
-            subscription: null,
-            plan: null,
-            limits: null,
-            transactionLimit: null,
-            accountLimit: null,
-            interval: null,
-          };
-        }
-
-        const subData = await subResponse.json();
-        return {
-          subscription: subData.subscription ?? null,
-          plan: subData.plan ?? null,
-          limits: subData.limits ?? null,
-          transactionLimit: subData.transactionLimit ?? null,
-          accountLimit: subData.accountLimit ?? null,
-          interval: subData.interval ?? null,
-        };
-      });
+      const subData = await subResponse.json();
+      const result = {
+        subscription: subData.subscription ?? null,
+        plan: subData.plan ?? null,
+        limits: subData.limits ?? null,
+        transactionLimit: subData.transactionLimit ?? null,
+        accountLimit: subData.accountLimit ?? null,
+        interval: subData.interval ?? null,
+      };
 
       // Update state
       setSubscription(result.subscription);
@@ -768,7 +735,7 @@ function BillingModuleContent() {
   useEffect(() => {
     async function loadHouseholdInfo() {
       try {
-        const response = await fetch("/api/household/info");
+        const response = await fetch("/api/v2/household/info");
         if (response.ok) {
           const data = await response.json();
           setHouseholdInfo(data);
@@ -830,8 +797,6 @@ function BillingModuleContent() {
         interval={billingInterval}
         householdInfo={householdInfo}
         onSubscriptionUpdated={() => {
-          // Invalidate cache when subscription is updated
-          invalidateBillingCache();
           loadBillingData(true);
         }}
       />
@@ -871,46 +836,13 @@ function useBillingPreload(activeTab: string) {
     
     // Preload billing data in background when page loads
     // This ensures data is ready when user clicks on Billing tab
-    // OPTIMIZATION: Use shared cache to avoid duplicate calls
     const preloadBillingData = async () => {
       try {
-        // Check cache first - if already cached, no need to preload
-        if (getBillingCacheData()) {
-          return; // Already cached
-        }
-        
-        // CRITICAL: Check for in-flight promise BEFORE creating new one
-        // This prevents duplicate calls when multiple components try to fetch simultaneously
-        if (billingDataCache.promise) {
-          // Wait for existing promise to complete
-          await billingDataCache.promise;
+        const response = await fetch("/api/v2/billing/subscription", { cache: "no-store" });
+        if (!response.ok) {
           return;
         }
-        
-        // Create new request and cache it using shared cache
-        // getOrCreateBillingPromise will handle promise deduplication
-        await getOrCreateBillingPromise(async () => {
-          const response = await fetch("/api/billing/subscription", { cache: "no-store" });
-          if (!response.ok) {
-            return {
-              subscription: null,
-              plan: null,
-              limits: null,
-              transactionLimit: null,
-              accountLimit: null,
-              interval: null,
-            };
-          }
-          const data = await response.json();
-          return {
-            subscription: data.subscription ?? null,
-            plan: data.plan ?? null,
-            limits: data.limits ?? null,
-            transactionLimit: data.transactionLimit ?? null,
-            accountLimit: data.accountLimit ?? null,
-            interval: data.interval ?? null,
-          };
-        });
+        // Data is fetched but not stored - will be fetched again when tab is opened
       } catch (error) {
         // Silently fail - data will load when tab is opened
         console.debug("Billing preload failed:", error);
@@ -930,7 +862,10 @@ export default function MyAccountPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get("tab");
-    return tab === "billing" ? "billing" : "profile";
+    if (tab === "billing") return "billing";
+    if (tab === "categories") return "categories";
+    if (tab === "household") return "household";
+    return "profile";
   });
 
   // Preload billing data in background (only if billing tab is not active)
@@ -949,6 +884,10 @@ export default function MyAccountPage() {
     const tab = searchParams.get("tab");
     if (tab === "billing") {
       setActiveTab("billing");
+    } else if (tab === "categories") {
+      setActiveTab("categories");
+    } else if (tab === "household") {
+      setActiveTab("household");
     } else {
       setActiveTab("profile");
     }
@@ -958,6 +897,10 @@ export default function MyAccountPage() {
     setActiveTab(value);
     if (value === "billing") {
       router.replace("/settings?tab=billing", { scroll: false });
+    } else if (value === "categories") {
+      router.replace("/settings?tab=categories", { scroll: false });
+    } else if (value === "household") {
+      router.replace("/settings?tab=household", { scroll: false });
     } else {
       router.replace("/settings", { scroll: false });
     }
@@ -978,6 +921,8 @@ export default function MyAccountPage() {
           <SimpleTabsList>
             <SimpleTabsTrigger value="profile">Profile</SimpleTabsTrigger>
             <SimpleTabsTrigger value="billing">Billing</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="categories">Categories</SimpleTabsTrigger>
+            <SimpleTabsTrigger value="household">Household</SimpleTabsTrigger>
           </SimpleTabsList>
       </FixedTabsWrapper>
 
@@ -1000,6 +945,12 @@ export default function MyAccountPage() {
               <SimpleTabsTrigger value="billing" className="flex-shrink-0 whitespace-nowrap">
                 Billing
               </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="categories" className="flex-shrink-0 whitespace-nowrap">
+                Categories
+              </SimpleTabsTrigger>
+              <SimpleTabsTrigger value="household" className="flex-shrink-0 whitespace-nowrap">
+                Household
+              </SimpleTabsTrigger>
             </SimpleTabsList>
         </div>
       </div>
@@ -1014,9 +965,17 @@ export default function MyAccountPage() {
           </div>
         </SimpleTabsContent>
 
-      <SimpleTabsContent value="billing">
-        <BillingModule />
-      </SimpleTabsContent>
+        <SimpleTabsContent value="billing">
+          <BillingModule />
+        </SimpleTabsContent>
+
+        <SimpleTabsContent value="categories">
+          <CategoriesModule />
+        </SimpleTabsContent>
+
+        <SimpleTabsContent value="household">
+          <HouseholdModule />
+        </SimpleTabsContent>
       </div>
       </SimpleTabs>
   );

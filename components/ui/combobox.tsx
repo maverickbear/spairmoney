@@ -300,7 +300,7 @@ export function Combobox({
           disabled={disabled}
           className={cn(
             "w-full border border-input rounded-lg bg-background",
-            "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
+            "hover:border-ring active:border-ring focus:outline-none",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             // Padding left: icon position (left-3 = 12px) + icon width + gap (8px)
             // small/medium: icon w-4 (16px) = 12 + 16 + 8 = 36px (pl-9)

@@ -86,6 +86,7 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
         ownerEmail: data.ownerEmail,
         invitationLink,
         memberEmail: data.to,
+        appUrl,
       }),
     };
     console.log("[EMAIL] Email payload (from field):", JSON.stringify(emailPayload.from));
@@ -179,12 +180,17 @@ Once verified, emails will be sent from: noreply@sparefinance.com
   }
 }
 
+function getLogoUrl(appUrl?: string): string {
+  return "https://app.sparefinance.com/storage/v1/object/public/images/sparefiance-logo-email.png";
+}
+
 function getInvitationEmailTemplate(data: {
   memberName: string;
   ownerName: string;
   ownerEmail: string;
   invitationLink: string;
   memberEmail?: string;
+  appUrl?: string;
 }): string {
   try {
     const templatePath = path.join(process.cwd(), 'email-templates/household-invitation.html');
@@ -193,6 +199,8 @@ function getInvitationEmailTemplate(data: {
     let html = fs.readFileSync(templatePath, 'utf-8');
     console.log("[EMAIL] Template loaded successfully, length:", html.length);
     
+    const logoUrl = getLogoUrl(data.appUrl);
+    
     // Replace template variables
     html = html.replace(/\{\{ \.MemberName \}\}/g, data.memberName || "there");
     html = html.replace(/\{\{ \.OwnerName \}\}/g, data.ownerName || "A user");
@@ -200,6 +208,7 @@ function getInvitationEmailTemplate(data: {
     html = html.replace(/\{\{ \.InvitationLink \}\}/g, data.invitationLink);
     html = html.replace(/\{\{ \.MemberEmail \}\}/g, data.memberEmail || "");
     html = html.replace(/\{\{ \.Year \}\}/g, new Date().getFullYear().toString());
+    html = html.replace(/\{\{ \.LogoURL \}\}/g, logoUrl);
     
     console.log("[EMAIL] Template variables replaced successfully");
     return html;
@@ -221,7 +230,7 @@ function getInvitationEmailTemplate(data: {
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #7BC85A; border-radius: 8px 8px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Spare Finance</h1>
             </td>
           </tr>
@@ -247,7 +256,7 @@ function getInvitationEmailTemplate(data: {
               <table role="presentation" style="width: 100%; border-collapse: collapse;">
                 <tr>
                   <td style="text-align: center; padding: 20px 0;">
-                    <a href="${data.invitationLink}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Accept Invitation</a>
+                    <a href="${data.invitationLink}" style="display: inline-block; padding: 14px 32px; background-color: #7BC85A; color: #16161B; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Accept Invitation</a>
                   </td>
                 </tr>
               </table>
@@ -255,7 +264,7 @@ function getInvitationEmailTemplate(data: {
               <p style="margin: 30px 0 0; color: #8a8a8a; font-size: 14px; line-height: 1.6;">
                 Or copy and paste this link into your browser:
               </p>
-              <p style="margin: 10px 0 0; color: #667eea; font-size: 14px; word-break: break-all;">
+              <p style="margin: 10px 0 0; color: #7BC85A; font-size: 14px; word-break: break-all;">
                 ${data.invitationLink}
               </p>
               
@@ -393,7 +402,7 @@ function getCheckoutPendingEmailTemplate(data: {
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: #7BC85A; border-radius: 8px 8px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Spare Finance</h1>
             </td>
           </tr>
@@ -419,7 +428,7 @@ function getCheckoutPendingEmailTemplate(data: {
               <table role="presentation" style="width: 100%; border-collapse: collapse;">
                 <tr>
                   <td style="text-align: center; padding: 20px 0;">
-                    <a href="${data.signupUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Complete Account Setup</a>
+                    <a href="${data.signupUrl}" style="display: inline-block; padding: 14px 32px; background-color: #7BC85A; color: #16161B; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Complete Account Setup</a>
                   </td>
                 </tr>
               </table>
@@ -427,11 +436,11 @@ function getCheckoutPendingEmailTemplate(data: {
               <p style="margin: 30px 0 0; color: #8a8a8a; font-size: 14px; line-height: 1.6;">
                 Or copy and paste this link into your browser:
               </p>
-              <p style="margin: 10px 0 0; color: #667eea; font-size: 14px; word-break: break-all;">
+              <p style="margin: 10px 0 0; color: #7BC85A; font-size: 14px; word-break: break-all;">
                 ${data.signupUrl}
               </p>
               
-              <div style="margin: 30px 0 0; padding: 20px; background-color: #f9f9f9; border-radius: 6px; border-left: 4px solid #667eea;">
+              <div style="margin: 30px 0 0; padding: 20px; background-color: #f9f9f9; border-radius: 6px; border-left: 4px solid #7BC85A;">
                 <p style="margin: 0 0 10px; color: #1a1a1a; font-size: 14px; font-weight: 600;">What's next?</p>
                 <ul style="margin: 0; padding-left: 20px; color: #4a4a4a; font-size: 14px; line-height: 1.8;">
                   <li>Create your account password</li>
@@ -603,11 +612,15 @@ function getPasswordResetEmailTemplate(data: {
     let html = fs.readFileSync(templatePath, 'utf-8');
     console.log("[EMAIL] Template loaded successfully, length:", html.length);
     
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+    const logoUrl = getLogoUrl(appUrl);
+    
     // Replace template variables
     html = html.replace(/\{\{ if \.Name \}\} \{\{ \.Name \}\}\{\{ end \}\}/g, data.userName || "");
     html = html.replace(/\{\{ \.ConfirmationURL \}\}/g, data.resetLink);
     html = html.replace(/\{\{ \.Email \}\}/g, data.userEmail || "");
     html = html.replace(/\{\{ \.Year \}\}/g, new Date().getFullYear().toString());
+    html = html.replace(/\{\{ \.LogoURL \}\}/g, logoUrl);
     
     console.log("[EMAIL] Template variables replaced successfully");
     return html;
@@ -629,7 +642,7 @@ function getPasswordResetEmailTemplate(data: {
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
           <tr>
             <td style="padding: 30px 40px 20px; text-align: left;">
-              <img src="https://dvshwrtzazoetkbzxolv.supabase.co/storage/v1/object/public/images/spare-logo-purple.png" alt="Spare Finance" style="height: 32px; width: auto;" />
+              <img src="${getLogoUrl()}" alt="Spare Finance" style="height: 32px; width: auto;" />
             </td>
           </tr>
           <tr>
@@ -647,7 +660,7 @@ function getPasswordResetEmailTemplate(data: {
               </p>
               
               <div style="text-align: left; margin: 0 0 24px;">
-                <a href="${data.resetLink}" style="display: inline-block; padding: 14px 32px; background-color: #4A4AF2; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                <a href="${data.resetLink}" style="display: inline-block; padding: 14px 32px; background-color: #7BC85A; color: #16161B; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
                   Reset Password
                 </a>
               </div>
@@ -746,10 +759,14 @@ function getWelcomeEmailTemplate(data: {
     const templatePath = path.join(process.cwd(), 'email-templates/welcome.html');
     let html = fs.readFileSync(templatePath, 'utf-8');
     
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+    const logoUrl = getLogoUrl(appUrl);
+    
     // Replace variables
     html = html.replace(/\{\{ \.FounderName \}\}/g, data.founderName);
     html = html.replace(/\{\{ \.Email \}\}/g, data.email);
     html = html.replace(/\{\{ \.Year \}\}/g, new Date().getFullYear().toString());
+    html = html.replace(/\{\{ \.LogoURL \}\}/g, logoUrl);
     
     return html;
   } catch (error) {
@@ -770,7 +787,7 @@ function getWelcomeEmailTemplate(data: {
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
           <tr>
             <td style="padding: 30px 40px 20px; text-align: left;">
-              <img src="https://dvshwrtzazoetkbzxolv.supabase.co/storage/v1/object/public/images/spare-logo-purple.png" alt="Spare Finance" style="height: 32px; width: auto;" />
+              <img src="${getLogoUrl()}" alt="Spare Finance" style="height: 32px; width: auto;" />
             </td>
           </tr>
           <tr>

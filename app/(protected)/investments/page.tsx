@@ -6,8 +6,9 @@ import dynamic from "next/dynamic";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { PortfolioSummaryCards } from "@/components/portfolio/portfolio-summary-cards";
 import { Loader2 } from "lucide-react";
-import type { Holding as SupabaseHolding } from "@/lib/api/investments";
-import { convertSupabaseHoldingToHolding, type Holding, type Account, type HistoricalDataPoint } from "@/lib/api/portfolio";
+import { PortfolioMapper } from "@/src/application/portfolio/portfolio.mapper";
+import type { Holding, BasePortfolioAccount as Account, HistoricalDataPoint } from "@/src/domain/portfolio/portfolio.types";
+import type { BaseHolding as SupabaseHolding } from "@/src/domain/investments/investments.types";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Button } from "@/components/ui/button";
@@ -119,15 +120,12 @@ export default function InvestmentsPage() {
       const accountsData = allData.accounts || null;
       const historical = allData.historical || null;
       
-      // Debug logging
-      console.log("[Investments Page] Summary:", summary);
-      console.log("[Investments Page] Holdings count:", holdingsData?.length || 0);
-      console.log("[Investments Page] Accounts count:", accountsData?.length || 0);
-      console.log("[Investments Page] Historical data points:", historical?.length || 0);
-      
-      // Log if we're getting zero values (development only)
-      if (process.env.NODE_ENV === 'development' && summary && summary.totalValue === 0 && summary.holdingsCount === 0) {
-        console.warn("[Investments Page] WARNING: Summary shows zero values. This might indicate a problem.");
+      // Debug logging (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[Investments Page] Summary:", summary);
+        console.log("[Investments Page] Holdings count:", holdingsData?.length || 0);
+        console.log("[Investments Page] Accounts count:", accountsData?.length || 0);
+        console.log("[Investments Page] Historical data points:", historical?.length || 0);
       }
 
       // Always show dashboard, use zero values if no data
@@ -145,7 +143,7 @@ export default function InvestmentsPage() {
       setPortfolioSummary(summary || defaultSummary);
       setHoldings(
         holdingsData && Array.isArray(holdingsData) && holdingsData.length > 0
-          ? await Promise.all(holdingsData.map(convertSupabaseHoldingToHolding))
+          ? PortfolioMapper.investmentHoldingsToPortfolioHoldings(holdingsData)
           : []
       );
       setAccounts(accountsData && Array.isArray(accountsData) ? accountsData : []);

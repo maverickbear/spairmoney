@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-
-async function isSuperAdmin(): Promise<boolean> {
-  try {
-    const supabase = await createServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return false;
-    }
-
-    const { data: userData } = await supabase
-      .from("User")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    return userData?.role === "super_admin";
-  } catch (error) {
-    console.error("Error checking super_admin status:", error);
-    return false;
-  }
-}
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/admin/subscription-services/services
@@ -29,49 +9,40 @@ async function isSuperAdmin(): Promise<boolean> {
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();
     const { categoryId, name, logo, isActive } = body;
 
-    if (!categoryId || !name) {
-      return NextResponse.json(
-        { error: "Category ID and service name are required" },
-        { status: 400 }
-      );
-    }
+    const createdService = await service.createSubscriptionService({
+      categoryId,
+      name,
+      logo,
+      isActive,
+    });
 
-    const supabase = createServiceRoleClient();
-    const id = `svc_${name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
-
-    const { data: service, error } = await supabase
-      .from("SubscriptionService")
-      .insert({
-        id,
-        categoryId,
-        name: name.trim(),
-        logo: logo || null,
-        displayOrder: 0, // Not used anymore, services are sorted alphabetically
-        isActive: isActive ?? true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error creating service:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to create service" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ service });
+    return NextResponse.json({ service: createdService });
   } catch (error) {
     console.error("Error in POST /api/admin/subscription-services/services:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -85,49 +56,40 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();
     const { id, categoryId, name, logo, isActive } = body;
 
-    if (!id) {
-      return NextResponse.json(
-        { error: "Service ID is required" },
-        { status: 400 }
-      );
-    }
+    const updatedService = await service.updateSubscriptionService(id, {
+      categoryId,
+      name,
+      logo,
+      isActive,
+    });
 
-    const supabase = createServiceRoleClient();
-    const updateData: any = {
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (categoryId !== undefined) updateData.categoryId = categoryId;
-    if (name !== undefined) updateData.name = name.trim();
-    if (logo !== undefined) updateData.logo = logo || null;
-    // displayOrder is not updated - services are sorted alphabetically
-    if (isActive !== undefined) updateData.isActive = isActive;
-
-    const { data: service, error } = await supabase
-      .from("SubscriptionService")
-      .update(updateData)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error updating service:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to update service" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ service });
+    return NextResponse.json({ service: updatedService });
   } catch (error) {
     console.error("Error in PUT /api/admin/subscription-services/services:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -141,7 +103,16 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -155,33 +126,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = createServiceRoleClient();
-
-    // Check if service is used in any user subscriptions
-    const { data: userSubscriptions, error: checkError } = await supabase
-      .from("UserServiceSubscription")
-      .select("id")
-      .eq("serviceName", (await supabase.from("SubscriptionService").select("name").eq("id", id).single()).data?.name || "")
-      .limit(1);
-
-    // Note: This is a simple check. In production, you might want to link UserServiceSubscription to SubscriptionService via a foreign key
-
-    const { error } = await supabase
-      .from("SubscriptionService")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      console.error("Error deleting service:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to delete service" },
-        { status: 500 }
-      );
-    }
+    await service.deleteSubscriptionService(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error in DELETE /api/admin/subscription-services/services:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

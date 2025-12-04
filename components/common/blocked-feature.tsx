@@ -149,11 +149,12 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
         // Redirect to billing settings to change plan
         router.push("/settings?tab=billing");
       } else {
-        // Redirect to pricing page to start trial
-        router.push("/pricing");
+        // Redirect to dashboard - pricing dialog will open automatically
+        router.push("/dashboard?openPricingModal=true");
       }
     } else {
-      router.push("/pricing");
+      // Redirect to dashboard - pricing dialog will open automatically
+      router.push("/dashboard?openPricingModal=true");
     }
   }
 
@@ -197,7 +198,7 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
                   Free 30-day trial. After this period, you will be charged ${price.toFixed(2)}/month.{" "}
                   <a 
                     href="/terms-of-service" 
-                    className="text-primary hover:underline"
+                    className="text-foreground hover:underline"
                   >
                     Terms of service
                   </a>
@@ -219,7 +220,7 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
               <Button
                 variant="outline"
                 size="large"
-                onClick={() => router.push("/pricing")}
+                onClick={() => router.push("/dashboard?openPricingModal=true")}
                 className="w-full sm:w-auto text-base"
               >
                 See pricing details
@@ -231,7 +232,7 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
               Need help getting started?{" "}
               <a 
                 href="/help-support" 
-                className="text-primary hover:underline font-medium"
+                className="text-foreground hover:underline font-medium"
               >
                 Contact support
               </a>
@@ -257,7 +258,7 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
           </p>
           <a 
             href="/help-support" 
-            className="text-sm md:text-base text-primary hover:underline font-medium inline-flex items-center gap-1"
+            className="text-sm md:text-base text-foreground hover:underline font-medium inline-flex items-center gap-1"
           >
             View documentation
             <ArrowRight className="h-4 w-4" />
@@ -274,7 +275,7 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
           </p>
           <a 
             href="/reports" 
-            className="text-sm md:text-base text-primary hover:underline font-medium inline-flex items-center gap-1"
+            className="text-sm md:text-base text-foreground hover:underline font-medium inline-flex items-center gap-1"
           >
             View data schema
             <ArrowRight className="h-4 w-4" />

@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { 
-  getPaymentMethods, 
-  createSetupIntent, 
-  deletePaymentMethod, 
-  setDefaultPaymentMethod 
-} from "@/lib/api/stripe";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
 
@@ -18,7 +13,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { paymentMethods, error } = await getPaymentMethods(userId);
+    const stripeService = makeStripeService();
+    const { paymentMethods, error } = await stripeService.getPaymentMethods(userId);
 
     if (error) {
       throw new AppError(error, 500);
@@ -52,7 +48,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { clientSecret, error } = await createSetupIntent(userId);
+    const stripeService = makeStripeService();
+    const { clientSecret, error } = await stripeService.createSetupIntent(userId);
 
     if (error || !clientSecret) {
       throw new AppError(error || "Failed to create setup intent", 500);
@@ -93,7 +90,8 @@ export async function DELETE(request: NextRequest) {
       throw new AppError("paymentMethodId is required", 400);
     }
 
-    const { success, error } = await deletePaymentMethod(
+    const stripeService = makeStripeService();
+    const { success, error } = await stripeService.deletePaymentMethod(
       userId,
       paymentMethodId
     );
@@ -137,7 +135,8 @@ export async function PUT(request: NextRequest) {
       throw new AppError("paymentMethodId is required", 400);
     }
 
-    const { success, error } = await setDefaultPaymentMethod(
+    const stripeService = makeStripeService();
+    const { success, error } = await stripeService.setDefaultPaymentMethod(
       userId,
       paymentMethodId
     );

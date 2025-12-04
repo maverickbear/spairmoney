@@ -34,8 +34,8 @@ export function SignUpFormWrapperContent() {
 
           <div className="space-y-6 pt-8">
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <TrendingUp className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <TrendingUp className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Track Your Finances</h3>
@@ -46,8 +46,8 @@ export function SignUpFormWrapperContent() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Shield className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Shield className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Secure Data</h3>
@@ -58,8 +58,8 @@ export function SignUpFormWrapperContent() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Zap className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Zap className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Smart Analytics</h3>

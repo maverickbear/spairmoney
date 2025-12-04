@@ -58,7 +58,7 @@ async function preloadUserData() {
       }).catch(() => null),
       // Preload subscription/billing data (without limits - loaded later when needed)
       // Optimized: Stripe API call is now opt-in (includeStripe=true) for faster loading
-      fetch("/api/billing/subscription", { cache: "no-store" }).then(async (r) => {
+      fetch("/api/v2/billing/subscription", { cache: "no-store" }).then(async (r) => {
         if (!r.ok) return null;
         const subData = await r.json();
         if (!subData) return null;
@@ -227,7 +227,7 @@ function LoginFormContent() {
           // Handle invitation if present
           if (invitationToken) {
             try {
-              const acceptResponse = await fetch("/api/members/invite/accept", {
+              const acceptResponse = await fetch("/api/v2/members/accept", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token: invitationToken }),
@@ -370,7 +370,7 @@ function LoginFormContent() {
             </label>
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-primary hover:underline font-medium transition-colors"
+              className="text-sm text-foreground hover:underline font-medium transition-colors"
             >
               Forgot password?
             </Link>
@@ -426,7 +426,7 @@ function LoginFormContent() {
         Don't have an account?{" "}
         <Link 
           href="/auth/signup" 
-          className="text-primary hover:underline font-medium transition-colors"
+          className="text-foreground hover:underline font-medium transition-colors"
         >
           Sign up
         </Link>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/update-user-metadata
@@ -9,54 +9,15 @@ import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    
-    // Get authenticated user
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    const service = makeAuthService();
+    const result = await service.updateUserMetadata();
 
-    if (authError || !authUser) {
+    if (!result.success) {
+      const statusCode = result.error?.includes("Not authenticated") ? 401 :
+                        result.error?.includes("not found") ? 404 : 500;
       return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
-    }
-
-    // Get user name from User table
-    const { data: userData, error: userError } = await supabase
-      .from("User")
-      .select("name")
-      .eq("id", authUser.id)
-      .single();
-
-    if (userError || !userData) {
-      console.error("[UPDATE-USER-METADATA] Error fetching user:", userError);
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    // Update user_metadata in Supabase Auth using service role client
-    // This requires admin privileges
-    // Use both 'name' and 'full_name' for compatibility
-    const serviceRoleClient = createServiceRoleClient();
-    
-    const { data: updatedUser, error: updateError } = await serviceRoleClient.auth.admin.updateUserById(
-      authUser.id,
-      {
-        user_metadata: {
-          ...authUser.user_metadata,
-          name: userData.name || "",
-          full_name: userData.name || "",
-        },
-      }
-    );
-
-    if (updateError) {
-      console.error("[UPDATE-USER-METADATA] Error updating user metadata:", updateError);
-      return NextResponse.json(
-        { error: "Failed to update user metadata" },
-        { status: 500 }
+        { error: result.error || "Failed to update user metadata" },
+        { status: statusCode }
       );
     }
 
@@ -66,6 +27,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[UPDATE-USER-METADATA] Unexpected error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

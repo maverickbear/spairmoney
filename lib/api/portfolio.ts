@@ -1,90 +1,42 @@
 "use server";
 
 import { getHoldings, getInvestmentAccounts, getInvestmentTransactions } from "@/lib/api/investments";
-import { Holding as SupabaseHolding } from "@/lib/api/investments";
+import type { BaseHolding as SupabaseHolding } from "@/src/domain/investments/investments.types";
 import { formatDateStart, formatDateEnd } from "@/src/infrastructure/utils/timestamp";
 import { subDays, startOfDay, endOfDay } from "date-fns";
-import { unstable_cache } from "next/cache";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { cache } from "@/src/infrastructure/external/redis";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { PortfolioMapper } from "@/src/application/portfolio/portfolio.mapper";
 
-// Portfolio types - exported for use across the application
-export interface Holding {
-  id: string;
-  symbol: string;
-  name: string;
-  assetType: "Stock" | "ETF" | "Crypto" | "Fund";
-  sector: string;
-  quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-  marketValue: number;
-  bookValue: number;
-  unrealizedPnL: number;
-  unrealizedPnLPercent: number;
-  accountId: string;
-  accountName: string;
-}
+// Import types for internal use
+import type {
+  Holding,
+  PortfolioSummary,
+  BasePortfolioAccount as Account,
+  HistoricalDataPoint,
+  BasePortfolioTransaction as Transaction,
+} from "@/src/domain/portfolio/portfolio.types";
 
-export interface PortfolioSummary {
-  totalValue: number;
-  dayChange: number;
-  dayChangePercent: number;
-  totalReturn: number;
-  totalReturnPercent: number;
-  totalCost: number;
-  holdingsCount: number;
-}
+// Re-export portfolio types from domain layer for backward compatibility
+export type {
+  Holding,
+  PortfolioSummary,
+  BasePortfolioAccount as Account,
+  HistoricalDataPoint,
+  BasePortfolioTransaction as Transaction,
+} from "@/src/domain/portfolio/portfolio.types";
 
-export interface Account {
-  id: string;
-  name: string;
-  type: string;
-  value: number;
-  allocationPercent: number;
-}
-
-export interface HistoricalDataPoint {
-  date: string;
-  value: number;
-}
-
-export interface Transaction {
-  id: string;
-  date: string;
-  type: "buy" | "sell" | "dividend" | "interest";
-  symbol: string;
-  name: string;
-  quantity?: number;
-  price?: number;
-  amount: number;
-  accountName: string;
-}
-
-// Helper function to convert Supabase Holding to portfolio Holding format
+/**
+ * @deprecated Use PortfolioMapper.investmentHoldingToPortfolioHolding() instead
+ * This function is kept for backward compatibility only
+ */
 export async function convertSupabaseHoldingToHolding(supabaseHolding: SupabaseHolding): Promise<Holding> {
-  return {
-    id: supabaseHolding.securityId,
-    symbol: supabaseHolding.symbol,
-    name: supabaseHolding.name,
-    assetType: supabaseHolding.assetType as "Stock" | "ETF" | "Crypto" | "Fund",
-    sector: supabaseHolding.sector,
-    quantity: supabaseHolding.quantity,
-    avgPrice: supabaseHolding.avgPrice,
-    currentPrice: supabaseHolding.lastPrice,
-    marketValue: supabaseHolding.marketValue,
-    bookValue: supabaseHolding.bookValue,
-    unrealizedPnL: supabaseHolding.unrealizedPnL,
-    unrealizedPnLPercent: supabaseHolding.unrealizedPnLPercent,
-    accountId: supabaseHolding.accountId,
-    accountName: supabaseHolding.accountName,
-  };
+  return PortfolioMapper.investmentHoldingToPortfolioHolding(supabaseHolding);
 }
 
 // Internal data structure to share between portfolio functions
 interface PortfolioInternalData {
-  holdings: import("@/lib/api/investments").Holding[]; // Use the Holding type from investments
+  holdings: import("@/src/domain/investments/investments.types").BaseHolding[]; // Use the Holding type from investments domain
   accounts: any[];
   investmentAccounts: any[];
 }
@@ -256,14 +208,14 @@ export async function getPortfolioSummaryInternal(
   };
 }
 
-// Get portfolio summary with caching
+// Get portfolio summary
 export async function getPortfolioSummary(): Promise<PortfolioSummary> {
   const userId = await getCurrentUserId();
   if (!userId) {
     throw new Error("Unauthorized");
   }
 
-  // Get session tokens before checking cache (needed for cache validation check)
+  // Get session tokens
   let accessToken: string | undefined;
   let refreshToken: string | undefined;
   try {
@@ -281,52 +233,11 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
       }
     }
   } catch (error: any) {
-    logger.warn("[Portfolio Summary] Could not get session tokens for cache check:", error?.message);
+    logger.warn("[Portfolio Summary] Could not get session tokens:", error?.message);
     // Continue without tokens - functions will try to get them themselves
   }
 
-  // OPTIMIZED: Try Redis cache first (5 minutes TTL for portfolio data)
-  const cacheKey = `portfolio:summary:${userId}`;
-  const cached = await cache.get<PortfolioSummary>(cacheKey);
-  if (cached) {
-    // OPTIMIZED: Removed unnecessary validation that called getHoldings() even when cache is valid
-    // The cache is trusted - if it shows zero, it's likely correct (user has no holdings)
-    // Cache invalidation happens when transactions are created/updated via invalidatePortfolioCache()
-    logger.log("[Portfolio Summary] Using cached data:", cached);
-    return cached;
-  }
-
-  // Use tokens already retrieved above (or get them if not retrieved yet)
-  if (!accessToken || !refreshToken) {
-    try {
-      const { createServerClient } = await import("@/lib/supabase-server");
-      const supabase = await createServerClient();
-      // SECURITY: Use getUser() first to verify authentication, then getSession() for tokens
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // Only get session tokens if user is authenticated
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          accessToken = session.access_token;
-          refreshToken = session.refresh_token;
-        }
-      }
-    } catch (error: any) {
-      logger.warn("[Portfolio Summary] Could not get session tokens:", error?.message);
-      // Continue without tokens - functions will try to get them themselves
-    }
-  }
-
-  // Fallback to Next.js cache if Redis not available
-  const result = await unstable_cache(
-    async () => getPortfolioSummaryInternal(accessToken, refreshToken),
-    [`portfolio-summary-${userId}`],
-    {
-      tags: ['investments', 'portfolio'],
-      revalidate: 30, // 30 seconds
-    }
-  )();
+  const result = await getPortfolioSummaryInternal(accessToken, refreshToken);
 
   // Only log errors or warnings, not every successful calculation
   if (result.totalValue === 0 && result.holdingsCount > 0) {
@@ -334,40 +245,14 @@ export async function getPortfolioSummary(): Promise<PortfolioSummary> {
     logger.error("[Portfolio Summary] This indicates holdings have zero marketValue. Check price data.");
   }
 
-  // Store in Redis cache (5 minutes TTL)
-  await cache.set(cacheKey, result, 300);
-
   return result;
 }
 
-// Invalidate portfolio cache (useful after transactions are created/updated)
-export async function invalidatePortfolioCache(userId?: string): Promise<void> {
-  const targetUserId = userId || await getCurrentUserId();
-  if (!targetUserId) {
-    return;
-  }
-
-  const cacheKey = `portfolio:summary:${targetUserId}`;
-  await cache.delete(cacheKey);
-  
-  // Also invalidate Next.js cache
-  const { revalidateTag } = await import("next/cache");
-  revalidateTag('investments', 'layout');
-  revalidateTag('portfolio', 'layout');
-  
-  // Clear in-memory holdings cache for this user
-  const { clearHoldingsCache } = await import("@/lib/api/investments");
-  clearHoldingsCache(targetUserId);
-  
-  if (process.env.NODE_ENV === "development") {
-    logger.log("[Portfolio Cache] Invalidated cache for user:", targetUserId);
-  }
-}
 
 // Get portfolio holdings (convert from Supabase format)
 export async function getPortfolioHoldings(accessToken?: string, refreshToken?: string): Promise<Holding[]> {
   const supabaseHoldings = await getHoldings(undefined, accessToken, refreshToken);
-  return Promise.all(supabaseHoldings.map(convertSupabaseHoldingToHolding));
+  return PortfolioMapper.investmentHoldingsToPortfolioHoldings(supabaseHoldings);
 }
 
 // Internal function to calculate portfolio accounts (without fetching data)
@@ -470,9 +355,7 @@ export async function getPortfolioHistoricalDataInternal(
   const currentValue = summary.totalValue;
   
   // Convert holdings to portfolio format (reuse the same holdings)
-  const portfolioHoldings = await Promise.all(
-    supabaseHoldings.map(convertSupabaseHoldingToHolding)
-  );
+  const portfolioHoldings = PortfolioMapper.investmentHoldingsToPortfolioHoldings(supabaseHoldings);
   
   // Try to get historical data from SecurityPrice table
   const endDate = new Date();
@@ -775,14 +658,7 @@ export async function getPortfolioHistoricalData(days: number = 365): Promise<Hi
     throw new Error("Unauthorized");
   }
 
-  // OPTIMIZED: Try Redis cache first (5 minutes TTL for historical data)
-  const cacheKey = `portfolio:historical:${userId}:${days}`;
-  const cached = await cache.get<HistoricalDataPoint[]>(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  // Get session tokens before entering cache (cookies can't be accessed inside unstable_cache)
+  // Get session tokens
   let accessToken: string | undefined;
   let refreshToken: string | undefined;
   try {
@@ -804,20 +680,7 @@ export async function getPortfolioHistoricalData(days: number = 365): Promise<Hi
     // Continue without tokens - functions will try to get them themselves
   }
 
-  // Fallback to Next.js cache if Redis not available
-  const result = await unstable_cache(
-    async () => getPortfolioHistoricalDataInternal(days, accessToken, refreshToken),
-    [`portfolio-historical-${userId}-${days}`],
-    {
-      tags: ['investments', 'portfolio'],
-      revalidate: 60, // 60 seconds
-    }
-  )();
-
-  // Store in Redis cache (5 minutes TTL)
-  await cache.set(cacheKey, result, 300);
-
-  return result;
+  return getPortfolioHistoricalDataInternal(days, accessToken, refreshToken);
 }
 
 // Get recent portfolio transactions

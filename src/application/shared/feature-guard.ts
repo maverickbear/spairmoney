@@ -12,12 +12,12 @@ async function getUserSubscriptionData(userId: string): Promise<BaseSubscription
   return service.getUserSubscriptionData(userId);
 }
 
-async function checkTransactionLimit(userId: string, month: Date = new Date()): Promise<BaseLimitCheckResult> {
+export async function checkTransactionLimit(userId: string, month: Date = new Date()): Promise<BaseLimitCheckResult> {
   const service = makeSubscriptionsService();
   return service.checkTransactionLimit(userId, month);
 }
 
-async function checkAccountLimit(userId: string): Promise<BaseLimitCheckResult> {
+export async function checkAccountLimit(userId: string): Promise<BaseLimitCheckResult> {
   const service = makeSubscriptionsService();
   return service.checkAccountLimit(userId);
 }
@@ -177,49 +177,16 @@ export async function guardTransactionLimit(
       return { allowed: true };
     }
 
-    const supabase = await createServerClient();
-    
     // Calculate month_date (first day of month) - work directly with date, no toISOString()
     const checkMonth = month || new Date();
     const monthDate = new Date(checkMonth.getFullYear(), checkMonth.getMonth(), 1);
-    const monthDateStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(monthDate.getDate()).padStart(2, '0')}`;
+    
+    // Use SubscriptionsRepository to get monthly usage
+    const { SubscriptionsRepository } = await import("@/src/infrastructure/database/repositories/subscriptions.repository");
+    const subscriptionsRepository = new SubscriptionsRepository();
+    const transactionsCount = await subscriptionsRepository.getUserMonthlyUsage(userId, monthDate);
 
-    // Read from user_monthly_usage (fast lookup, no COUNT)
-    const { data: usage, error } = await supabase
-      .from("user_monthly_usage")
-      .select("transactions_count")
-      .eq("user_id", userId)
-      .eq("month_date", monthDateStr)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error("Error checking transaction limit:", error);
-      // Fallback: if table doesn't exist or error, do COUNT for historical data
-      const { count } = await supabase
-        .from("Transaction")
-        .select("*", { count: "exact", head: true })
-        .eq("userId", userId)
-        .gte("date", monthDateStr)
-        .lte("date", `${checkMonth.getFullYear()}-${String(checkMonth.getMonth() + 1).padStart(2, '0')}-${new Date(checkMonth.getFullYear(), checkMonth.getMonth() + 1, 0).getDate()}`);
-      
-      const current = count || 0;
-      const allowed = current < limits.maxTransactions;
-      
-      if (!allowed) {
-        return {
-          allowed: false,
-          error: createPlanError(PlanErrorCode.TRANSACTION_LIMIT_REACHED, {
-            limit: limits.maxTransactions,
-            current,
-            currentPlan: plan?.name,
-          }),
-        };
-      }
-      
-      return { allowed: true };
-    }
-
-    const current = usage?.transactions_count || 0;
+    const current = transactionsCount;
     const allowed = current < limits.maxTransactions;
     
     if (!allowed) {
@@ -262,45 +229,12 @@ export async function guardAccountLimit(userId: string): Promise<GuardResult> {
       return { allowed: true };
     }
 
-    const supabase = await createServerClient();
+    // Use SubscriptionsRepository to get account count
+    const { SubscriptionsRepository } = await import("@/src/infrastructure/database/repositories/subscriptions.repository");
+    const subscriptionsRepository = new SubscriptionsRepository();
+    const accountCount = await subscriptionsRepository.getUserAccountCount(userId);
     
-    // Count current accounts for this user
-    // Note: This should match the logic in checkAccountLimit
-    const { data: accountOwners } = await supabase
-      .from("AccountOwner")
-      .select("accountId")
-      .eq("ownerId", userId);
-
-    const ownedAccountIds = accountOwners?.map(ao => ao.accountId) || [];
-    const accountIds = new Set<string>();
-    
-    // Get accounts with userId = userId
-    const { data: directAccounts, error: directError } = await supabase
-      .from("Account")
-      .select("id")
-      .eq("userId", userId);
-
-    if (directError) {
-      console.error("Error fetching direct accounts:", directError);
-    } else {
-      directAccounts?.forEach(acc => accountIds.add(acc.id));
-    }
-
-    // Get accounts owned via AccountOwner
-    if (ownedAccountIds.length > 0) {
-      const { data: ownedAccounts, error: ownedError } = await supabase
-        .from("Account")
-        .select("id")
-        .in("id", ownedAccountIds);
-
-      if (ownedError) {
-        console.error("Error fetching owned accounts:", ownedError);
-      } else {
-        ownedAccounts?.forEach(acc => accountIds.add(acc.id));
-      }
-    }
-
-    const current = accountIds.size;
+    const current = accountCount;
     const allowed = current < limits.maxAccounts;
     
     if (!allowed) {

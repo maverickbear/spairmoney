@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPlannedPayment, getPlannedPayments, PLANNED_HORIZON_DAYS } from "@/lib/api/planned-payments";
-import { PlannedPaymentFormData } from "@/lib/api/planned-payments";
+import { makePlannedPaymentsService } from "@/src/application/planned-payments/planned-payments.factory";
+import { PlannedPaymentFormData, plannedPaymentSchema } from "@/src/domain/planned-payments/planned-payments.validations";
+import { PLANNED_HORIZON_DAYS } from "@/src/domain/planned-payments/planned-payments.types";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
+import { ZodError } from "zod";
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,7 +62,8 @@ export async function GET(request: NextRequest) {
       filters.status = filters.status || "scheduled";
     }
     
-    const result = await getPlannedPayments(filters);
+    const service = makePlannedPaymentsService();
+    const result = await service.getPlannedPayments(filters);
     
     return NextResponse.json({
       plannedPayments: result.plannedPayments,
@@ -67,6 +71,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching planned payments:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     const errorMessage = error instanceof Error ? error.message : "Failed to fetch planned payments";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 500;
     
@@ -88,13 +100,30 @@ export async function POST(request: NextRequest) {
     const writeGuard = await guardWriteAccess(userId);
     await throwIfNotAllowed(writeGuard);
 
-    const data: PlannedPaymentFormData = await request.json();
+    const body = await request.json();
+    const data = plannedPaymentSchema.parse(body);
     
-    const plannedPayment = await createPlannedPayment(data);
+    const service = makePlannedPaymentsService();
+    const plannedPayment = await service.createPlannedPayment(data);
     
     return NextResponse.json(plannedPayment, { status: 201 });
   } catch (error) {
     console.error("Error creating planned payment:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
+        { status: 400 }
+      );
+    }
+    
     const errorMessage = error instanceof Error ? error.message : "Failed to create planned payment";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;
     

@@ -4,7 +4,7 @@
  */
 
 import { createServerClient } from "../supabase-server";
-import { PlaidConnection } from "../../../domain/plaid/plaid.types";
+import { PlaidConnection, PlaidLiability } from "../../../domain/plaid/plaid.types";
 import { logger } from "@/src/infrastructure/utils/logger";
 
 export class PlaidRepository {
@@ -69,6 +69,7 @@ export class PlaidRepository {
       accessToken: conn.accessToken,
       institutionId: conn.institutionId || null,
       institutionName: conn.institutionName || null,
+      institutionLogo: (conn as any).institutionLogo || null,
       transactionsCursor: conn.transactionsCursor || null,
       createdAt: new Date(conn.createdAt),
       updatedAt: new Date(conn.updatedAt),
@@ -184,6 +185,30 @@ export class PlaidRepository {
       institutionName: connection.institutionName || null,
       institutionLogo: connection.institutionLogo || null,
     };
+  }
+
+  /**
+   * Get all liabilities for a user (including shared accounts via AccountOwner)
+   */
+  async getUserLiabilities(userId: string, accountIds: string[]): Promise<PlaidLiability[]> {
+    const supabase = await createServerClient();
+
+    if (!accountIds || accountIds.length === 0) {
+      return [];
+    }
+
+    const { data: liabilities, error } = await supabase
+      .from('PlaidLiability')
+      .select('*')
+      .in('accountId', accountIds)
+      .order('nextPaymentDueDate', { ascending: true, nullsFirst: false });
+
+    if (error) {
+      logger.error("[PlaidRepository] Error fetching liabilities:", error);
+      return [];
+    }
+
+    return (liabilities || []) as PlaidLiability[];
   }
 }
 

@@ -1,49 +1,17 @@
 /**
  * Budget Generator
- * Generates initial budgets based on expected income
+ * Generates initial budgets based on expected income and budget rules
  */
 
 import { makeBudgetsService } from "../budgets/budgets.factory";
+import { makeBudgetRulesService } from "../budgets/budget-rules.factory";
+import { makeCategoriesService } from "../categories/categories.factory";
 import { CategoryHelper } from "./category-helper";
 import { BaseBudget } from "../../domain/budgets/budgets.types";
+import { BudgetRuleType, BudgetRuleProfile } from "../../domain/budgets/budget-rules.types";
+import { getBudgetRuleById, BUDGET_RULE_PROFILES } from "../../domain/budgets/budget-rules.constants";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
-
-// Standard budget percentages based on income
-export const BUDGET_PERCENTAGES = {
-  HOUSING: 0.30, // 30%
-  GROCERIES: 0.12, // 12%
-  TRANSPORTATION: 0.10, // 10%
-  DINING_OUT: 0.08, // 8%
-  HEALTH: 0.05, // 5%
-  PERSONAL: 0.05, // 5%
-  SAVINGS: 0.20, // 20%
-  OTHER: 0.10, // 10%
-} as const;
-
-// Category name mappings
-const CATEGORY_MAPPINGS = {
-  HOUSING: ["Rent", "Rent / Mortgage", "Utilities"],
-  GROCERIES: ["Groceries"],
-  TRANSPORTATION: ["Vehicle", "Public Transit"],
-  DINING_OUT: ["Restaurants", "Dining Out"],
-  HEALTH: ["Medical", "Healthcare"],
-  PERSONAL: ["Personal Care"],
-  SAVINGS: ["Savings", "Emergency Fund"],
-  OTHER: ["Other", "Misc"],
-} as const;
-
-// Group name mappings
-const GROUP_MAPPINGS = {
-  HOUSING: "Housing",
-  GROCERIES: "Food",
-  TRANSPORTATION: "Transportation",
-  DINING_OUT: "Food",
-  HEALTH: "Health",
-  PERSONAL: "Personal",
-  SAVINGS: "Savings",
-  OTHER: "Misc",
-} as const;
 
 export class BudgetGenerator {
   constructor(
@@ -51,65 +19,73 @@ export class BudgetGenerator {
   ) {}
 
   /**
-   * Generate initial budgets based on monthly income
+   * Generate initial budgets based on monthly income and optional budget rule
+   * If no rule is provided, defaults to 50/30/20 rule
    */
   async generateInitialBudgets(
     userId: string,
     monthlyIncome: number,
     accessToken?: string,
-    refreshToken?: string
+    refreshToken?: string,
+    ruleType?: BudgetRuleType
   ): Promise<BaseBudget[]> {
     const budgetsService = makeBudgetsService();
+    const budgetRulesService = makeBudgetRulesService();
+    const categoriesService = makeCategoriesService();
     const createdBudgets: BaseBudget[] = [];
     const currentMonth = new Date();
     const periodStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
 
-    // Generate budgets for each category
-    for (const [key, percentage] of Object.entries(BUDGET_PERCENTAGES)) {
-      const budgetAmount = monthlyIncome * percentage;
-      const categoryNames = CATEGORY_MAPPINGS[key as keyof typeof CATEGORY_MAPPINGS];
-      const groupName = GROUP_MAPPINGS[key as keyof typeof GROUP_MAPPINGS];
+    // Use provided rule or default to 50/30/20
+    const selectedRule: BudgetRuleProfile = ruleType 
+      ? (getBudgetRuleById(ruleType) || BUDGET_RULE_PROFILES["50_30_20"])
+      : BUDGET_RULE_PROFILES["50_30_20"];
 
-      // Try to find or create the first available category
-      let category: { id: string } | null = null;
-      for (const categoryName of categoryNames) {
-        const found = await this.categoryHelper.findOrCreateCategory(
-          categoryName,
-          groupName,
-          userId,
-          accessToken,
-          refreshToken
-        );
-        if (found) {
-          category = { id: found.id };
-          break;
-        }
-      }
+    logger.info(`[BudgetGenerator] Using budget rule: ${selectedRule.name} for user ${userId}`);
 
-      if (!category) {
-        logger.warn(`[BudgetGenerator] Could not find or create category for ${key}, skipping`);
-        continue;
+    // Get all groups to map to rule categories
+    const groups = await categoriesService.getGroups(accessToken, refreshToken);
+    const groupMappings = budgetRulesService.mapGroupsToRuleCategories(groups);
+
+    // Calculate budget amounts per group based on rule
+    const budgetAmounts = budgetRulesService.calculateBudgetAmounts(
+      selectedRule,
+      monthlyIncome,
+      groupMappings
+    );
+
+    // Create budgets for each group
+    for (const { groupId, amount, ruleCategory } of budgetAmounts) {
+      if (amount <= 0) {
+        continue; // Skip zero or negative amounts
       }
 
       try {
-        // Create budget for current month
-        // Note: BudgetsService.createBudget doesn't accept note parameter
-        // We'll mark budgets as pre-filled by checking if they were created during onboarding
+        // Create budget for the group
+        // Using groupId creates a grouped budget that applies to all categories in that group
         const budget = await budgetsService.createBudget({
           period: periodStart,
-          categoryId: category.id,
-          amount: budgetAmount,
+          groupId: groupId,
+          amount: amount,
         });
 
         createdBudgets.push(budget);
+        logger.debug(`[BudgetGenerator] Created budget for group ${groupId} (${ruleCategory}): $${amount}`);
       } catch (error) {
-        // Budget might already exist, skip it
-        logger.warn(`[BudgetGenerator] Could not create budget for ${key}:`, error);
+        // Budget might already exist, skip it silently
+        const isAppError = error && typeof error === 'object' && 'statusCode' in error;
+        const is409Error = isAppError && (error as any).statusCode === 409;
+        const isAlreadyExistsError = error instanceof Error && error.message.includes("already exists");
+        
+        if (is409Error || isAlreadyExistsError) {
+          logger.debug(`[BudgetGenerator] Budget already exists for group ${groupId}, skipping`);
+        } else {
+          logger.warn(`[BudgetGenerator] Could not create budget for group ${groupId}:`, error);
+        }
       }
     }
 
-    logger.info(`[BudgetGenerator] Created ${createdBudgets.length} initial budgets for user ${userId}`);
+    logger.info(`[BudgetGenerator] Created ${createdBudgets.length} initial budgets using ${selectedRule.name} rule for user ${userId}`);
     return createdBudgets;
   }
 }
-

@@ -75,8 +75,8 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Validate image file
-    const validation = await validateImageFile(file, buffer);
+    // Validate image file (10MB max for receipts)
+    const validation = await validateImageFile(file, buffer, MAX_FILE_SIZE);
     if (!validation.valid) {
       return NextResponse.json(
         { error: validation.error || "Invalid image file" },

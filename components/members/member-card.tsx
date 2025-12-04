@@ -36,7 +36,7 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/members/${member.id}`, {
+      const res = await fetch(`/api/v2/members/${member.id}`, {
         method: "DELETE",
       });
 
@@ -57,7 +57,7 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
   async function handleResend() {
     setIsResending(true);
     try {
-      const res = await fetch(`/api/members/${member.id}/resend`, {
+      const res = await fetch(`/api/v2/members/${member.id}/resend`, {
         method: "POST",
       });
 

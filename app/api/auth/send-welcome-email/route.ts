@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { sendWelcomeEmail } from "@/lib/utils/email";
 
 /**
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { userId, email, testMode } = body;
 
-    const supabase = createServiceRoleClient();
+    const authService = makeAuthService();
 
     // If userId or email is provided, send to specific user
     if (userId || email) {
@@ -65,18 +65,15 @@ export async function POST(request: NextRequest) {
       }
 
       // Normal mode: check if user exists in database
-      let query = supabase.from("User").select("id, email, name");
-
+      let user;
       if (userId) {
-        query = query.eq("id", userId);
+        user = await authService.findUserById(userId);
       } else if (email) {
-        query = query.eq("email", email);
+        user = await authService.findUserByEmail(email);
       }
 
-      const { data: user, error: userError } = await query.single();
-
-      if (userError || !user) {
-        console.error("[SEND-WELCOME-EMAIL] User not found:", userError);
+      if (!user) {
+        console.error("[SEND-WELCOME-EMAIL] User not found");
         return NextResponse.json(
           { error: "User not found" },
           { status: 404 }
@@ -112,20 +109,7 @@ export async function POST(request: NextRequest) {
       to: oneDayAgoEnd.toISOString(),
     });
 
-    const { data: users, error: usersError } = await supabase
-      .from("User")
-      .select("id, email, name, createdAt")
-      .gte("createdAt", oneDayAgo.toISOString())
-      .lte("createdAt", oneDayAgoEnd.toISOString())
-      .order("createdAt", { ascending: false });
-
-    if (usersError) {
-      console.error("[SEND-WELCOME-EMAIL] Error fetching users:", usersError);
-      return NextResponse.json(
-        { error: "Failed to fetch users" },
-        { status: 500 }
-      );
-    }
+    const users = await authService.findUsersByDateRange(oneDayAgo, oneDayAgoEnd);
 
     if (!users || users.length === 0) {
       console.log("[SEND-WELCOME-EMAIL] No users found registered 1 day ago");

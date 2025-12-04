@@ -70,20 +70,6 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
 
   const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null }> => {
     try {
-      // OPTIMIZED: Use shared billing cache to prevent duplicate API calls
-      const { getBillingCacheData, getOrCreateBillingPromise } = await import("@/lib/api/billing-cache");
-      
-      // Check cache first
-      const cached = getBillingCacheData();
-      if (cached) {
-        return {
-          subscription: cached.subscription ?? null,
-          plan: cached.plan ?? null,
-        };
-      }
-      
-      // Use shared cache promise to avoid duplicate calls
-      const result = await getOrCreateBillingPromise(async () => {
       const response = await fetch("/api/billing/subscription");
       
       if (!response.ok) {
@@ -102,7 +88,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       }
 
       const data = await response.json();
-      return {
+      const result = {
         subscription: data.subscription ?? null,
         plan: data.plan ?? null,
           limits: data.limits ?? null,
@@ -110,7 +96,6 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
           accountLimit: data.accountLimit ?? null,
           interval: data.interval ?? null,
         };
-      });
       
       return {
         subscription: result.subscription ?? null,

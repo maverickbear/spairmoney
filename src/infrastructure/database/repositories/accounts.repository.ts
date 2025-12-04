@@ -55,6 +55,13 @@ export class AccountsRepository {
   ): Promise<AccountRow[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
     
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      logger.error("[AccountsRepository] User not authenticated:", authError?.message);
+      return [];
+    }
+    
     const selectFields = options?.selectFields || [
       "id", "name", "type", "initialBalance", "isConnected", 
       "createdAt", "updatedAt", "userId", "householdId"
@@ -66,9 +73,21 @@ export class AccountsRepository {
       .order("name", { ascending: true });
 
     if (error) {
-      logger.error("[AccountsRepository] Error fetching accounts:", error);
+      logger.error("[AccountsRepository] Error fetching accounts:", {
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        userId: user.id,
+      });
       throw new Error(`Failed to fetch accounts: ${error.message}`);
     }
+
+    logger.debug("[AccountsRepository] Found accounts:", {
+      count: accounts?.length || 0,
+      userId: user.id,
+      accountIds: accounts?.map((acc: any) => acc.id) || [],
+    });
 
     return (accounts || []) as unknown as AccountRow[];
   }
@@ -117,6 +136,30 @@ export class AccountsRepository {
     }
 
     return (accounts || []) as AccountRow[];
+  }
+
+  /**
+   * Find connected accounts by Plaid item IDs
+   */
+  async findConnectedAccountsByPlaidItemIds(itemIds: string[]): Promise<Array<{ id: string; plaidItemId: string | null }>> {
+    if (itemIds.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient();
+
+    const { data: accounts, error } = await supabase
+      .from("Account")
+      .select("id, plaidItemId")
+      .in("plaidItemId", itemIds)
+      .eq("isConnected", true);
+
+    if (error) {
+      logger.error("[AccountsRepository] Error fetching connected accounts by itemIds:", error);
+      throw new Error(`Failed to fetch accounts: ${error.message}`);
+    }
+
+    return (accounts || []) as Array<{ id: string; plaidItemId: string | null }>;
   }
 
   /**
@@ -363,6 +406,33 @@ export class AccountsRepository {
       .eq("transferToId", fromAccountId);
 
     return count;
+  }
+
+  /**
+   * Get user names by IDs
+   */
+  async getUserNamesByIds(
+    userIds: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<{ id: string; name: string | null }>> {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: users, error } = await supabase
+      .from("User")
+      .select("id, name")
+      .in("id", userIds);
+
+    if (error) {
+      logger.error("[AccountsRepository] Error fetching user names:", error);
+      return [];
+    }
+
+    return (users || []) as Array<{ id: string; name: string | null }>;
   }
 }
 

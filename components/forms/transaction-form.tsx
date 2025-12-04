@@ -19,7 +19,7 @@ import {
   SelectLabel,
   SelectSeparator,
 } from "@/components/ui/select";
-import { Loader2, Info, Plus, Receipt } from "lucide-react";
+import { Loader2, Info, Plus, Receipt, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import type { Transaction } from "@/src/domain/transactions/transactions.types";
 import { LimitWarning } from "@/components/billing/limit-warning";
@@ -42,6 +42,120 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { ReceiptScanner } from "@/components/receipt-scanner/receipt-scanner";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { useSubscriptionSafe } from "@/contexts/subscription-context";
+import type { PlaidTransactionMetadata } from "@/src/domain/plaid/plaid.types";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+// Component for draggable group pills on desktop
+function GroupPillsScrollable({
+  groups,
+  selectedGroupId,
+  onGroupSelect,
+}: {
+  groups: Array<{ id: string; name: string; type?: "income" | "expense" | null }>;
+  selectedGroupId: string | null;
+  onGroupSelect: (groupId: string) => void;
+}) {
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [startX, setStartX] = React.useState(0);
+  const [scrollLeft, setScrollLeft] = React.useState(0);
+  const [isDesktop, setIsDesktop] = React.useState(false);
+
+  // Check if desktop
+  React.useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 640); // sm breakpoint
+    };
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+    return () => window.removeEventListener("resize", checkDesktop);
+  }, []);
+
+  // Handle mouse down for drag
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isDesktop || !scrollContainerRef.current) return;
+    
+    // Don't start drag if clicking on a button
+    const target = e.target as HTMLElement;
+    if (target.tagName === "BUTTON" || target.closest("button")) {
+      return;
+    }
+
+    setIsDragging(true);
+    setStartX(e.pageX - (scrollContainerRef.current?.offsetLeft || 0));
+    setScrollLeft(scrollContainerRef.current?.scrollLeft || 0);
+    e.preventDefault();
+  };
+
+  // Handle mouse move for drag
+  React.useEffect(() => {
+    if (!isDragging || !isDesktop) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!scrollContainerRef.current) return;
+      e.preventDefault();
+      const x = e.pageX - (scrollContainerRef.current.offsetLeft || 0);
+      const walk = (x - startX) * 2; // Scroll speed multiplier
+      scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, startX, scrollLeft, isDesktop]);
+
+  return (
+    <div
+      ref={scrollContainerRef}
+      className={cn(
+        "flex gap-2 overflow-x-auto pb-2 scrollbar-hide",
+        isDesktop && isDragging && "cursor-grabbing select-none",
+        isDesktop && !isDragging && "cursor-grab"
+      )}
+      onMouseDown={handleMouseDown}
+      style={{
+        WebkitOverflowScrolling: 'touch',
+        scrollSnapType: 'x mandatory',
+        ...(isDesktop && {
+          userSelect: 'none',
+        }),
+      }}
+    >
+      {groups.map((group) => (
+        <button
+          key={group.id}
+          type="button"
+          onClick={() => onGroupSelect(group.id)}
+          className={cn(
+            "px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0",
+            "scroll-snap-align-start",
+            selectedGroupId === group.id
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          )}
+          style={{
+            pointerEvents: isDragging ? 'none' : 'auto',
+          }}
+        >
+          {group.name}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Converts a Date object to YYYY-MM-DD string format
@@ -125,8 +239,10 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
   const [availableGroups, setAvailableGroups] = useState<Array<{ id: string; name: string; type?: "income" | "expense" | null }>>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [selectedFilterGroupId, setSelectedFilterGroupId] = useState<string | null>(null); // For filtering categories
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(transaction?.receiptUrl || null);
   const breakpoint = useBreakpoint();
   const isMobile = !breakpoint || breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const { limits } = useSubscriptionSafe();
@@ -196,6 +312,15 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
   }, [open, transaction, form]);
 
   useEffect(() => {
+    // Update receiptUrl when transaction changes
+    if (transaction?.receiptUrl) {
+      setReceiptUrl(transaction.receiptUrl);
+    } else if (!transaction) {
+      setReceiptUrl(null);
+    }
+  }, [transaction]);
+
+  useEffect(() => {
     if (open) {
       // If editing a transaction, no need to check accounts
       if (transaction) {
@@ -219,6 +344,12 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           type: transaction.type,
         });
         
+        // Extract merchant from plaidMetadata
+        const plaidMetadata = transaction.plaidMetadata as PlaidTransactionMetadata | null;
+        const merchantName = plaidMetadata?.merchantName || 
+                            (plaidMetadata as any)?.merchant_name || 
+                            null;
+
         const formData: any = {
           date: new Date(transaction.date),
           type: transaction.type as "expense" | "income" | "transfer",
@@ -228,6 +359,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           transferFromId: (transaction as any).transferFromId || undefined,
           categoryId: transaction.categoryId || undefined,
           subcategoryId: transaction.subcategoryId || undefined,
+          merchant: merchantName || "",
           description: transaction.description || "",
           recurring: transaction.recurring ?? false,
           recurringFrequency: (transaction as any).recurringFrequency || (transaction.recurring ? "monthly" : undefined),
@@ -523,7 +655,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         setSubcategories(subcategories.map(sc => ({ ...sc, categoryId: (sc as any).categoryId || categoryId })));
       } else {
         // Fetch if not in map
-        const res = await fetch(`/api/categories?categoryId=${categoryId}`);
+        const res = await fetch(`/api/v2/categories?categoryId=${categoryId}`);
         if (res.ok) {
           const subcats = await res.json().catch(() => []);
           setSubcategories(subcats.map((sc: any) => ({ ...sc, categoryId: sc.categoryId || categoryId })));
@@ -682,7 +814,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         }
       }
 
-      const url = transaction ? `/api/transactions/${transaction.id}` : "/api/transactions";
+      const url = transaction ? `/api/v2/transactions/${transaction.id}` : "/api/v2/transactions";
       const method = transaction ? "PATCH" : "POST";
       
       // Serialize data for API - convert Date to YYYY-MM-DD string (not ISO timestamp)
@@ -691,6 +823,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       const payload: any = {
         ...data,
         date: data.date instanceof Date ? toDateOnlyString(data.date) : data.date,
+        receiptUrl: receiptUrl || undefined,
       };
       
       // Ensure categoryId is included if selected (for non-transfer transactions)
@@ -893,32 +1026,20 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           )}
           
           <div className="space-y-4">
-            {/* Date and Type row */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-sm font-medium">
-                  Date
-                </label>
-                <DatePicker
-                  date={form.watch("date")}
-                  onDateChange={(date) => {
-                    form.setValue("date", date || new Date());
-                  }}
-                  placeholder="Select date"
-                  className="h-12"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium">
-                  Type
-                </label>
-                <Tabs
-                  value={form.watch("type")}
-                  onValueChange={(value) => {
-                    const newType = value as "expense" | "income" | "transfer";
-                    form.setValue("type", newType);
+            {/* ============================================
+                1) PRIMARY FIELDS (Mandatory - always visible)
+                ============================================ */}
+            
+            {/* Type */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                Type
+              </label>
+              <Tabs
+                value={form.watch("type")}
+                onValueChange={(value) => {
+                  const newType = value as "expense" | "income" | "transfer";
+                  form.setValue("type", newType);
                   // Clear category/subcategory for transfers
                   if (newType === "transfer") {
                     form.setValue("categoryId", undefined);
@@ -954,16 +1075,19 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                   if (newType !== "expense") {
                     form.setValue("expenseType", undefined, { shouldValidate: false });
                   }
+                  // Reset group filter when type changes
+                  setSelectedFilterGroupId(null);
+                  // Reload groups when type changes to show correct groups for the new type
+                  loadAvailableGroups();
                   }}
                   className="w-full"
                 >
-                  <TabsList className="h-12 w-full grid grid-cols-3">
-                    <TabsTrigger value="expense" className="text-sm">Expense</TabsTrigger>
-                    <TabsTrigger value="income" className="text-sm">Income</TabsTrigger>
-                    <TabsTrigger value="transfer" className="text-sm">Transfer</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
+                <TabsList className="h-12 w-full grid grid-cols-3">
+                  <TabsTrigger value="expense" className="text-sm">Expense</TabsTrigger>
+                  <TabsTrigger value="income" className="text-sm">Income</TabsTrigger>
+                  <TabsTrigger value="transfer" className="text-sm">Transfer</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
 
             {/* Amount and Account row */}
@@ -1017,6 +1141,22 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Date */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                Date
+              </label>
+              <DatePicker
+                date={form.watch("date")}
+                onDateChange={(date) => {
+                  form.setValue("date", date || new Date());
+                }}
+                placeholder="Select date"
+                className="h-12"
+                required
+              />
             </div>
 
             {/* Transfer Account Fields */}
@@ -1107,39 +1247,79 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
 
             {/* Category and Subcategory (only for non-transfers) */}
             {form.watch("type") !== "transfer" && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">
-                    Category {!selectedCategoryId && <span className="text-gray-400 text-[12px]">required</span>}
-                  </label>
-                  <Select
-                    value={selectedCategoryId && selectedCategoryId !== "__add_category__" ? selectedCategoryId : ""}
-                    onValueChange={handleCategoryChange}
-                  >
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(() => {
-                        const transactionType = form.watch("type");
-                        
-                        // Filter categories by transaction type (based on group type)
-                        const filteredCategories = allCategories.filter((category) => {
-                          // Use group first, then macro for backward compatibility
-                          const categoryGroup = category.group || category.macro || 
-                                               (Array.isArray(category.group) ? category.group[0] : null) ||
-                                               (Array.isArray(category.macro) ? category.macro[0] : null);
-                          if (!categoryGroup) return false;
+              <div className="space-y-4">
+                {/* Group Pills - Horizontal Scroll */}
+                {(() => {
+                  const transactionType = form.watch("type");
+                  
+                  // Get all available groups (not just those with categories)
+                  // Filter by transaction type
+                  const groups = availableGroups
+                    .filter((group) => {
+                      if (transactionType === "expense") {
+                        return group.type === "expense" || group.type === null;
+                      } else if (transactionType === "income") {
+                        return group.type === "income" || group.type === null;
+                      }
+                      return true;
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                  
+                  if (groups.length > 0) {
+                    return (
+                      <GroupPillsScrollable
+                        groups={groups}
+                        selectedGroupId={selectedFilterGroupId}
+                        onGroupSelect={(groupId) => {
+                          setSelectedFilterGroupId(groupId);
+                          setSelectedCategoryId("");
+                          form.setValue("categoryId", undefined);
+                          form.setValue("subcategoryId", undefined);
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">
+                      Category {!selectedCategoryId && <span className="text-gray-400 text-[12px]">required</span>}
+                    </label>
+                    <Select
+                      value={selectedCategoryId && selectedCategoryId !== "__add_category__" ? selectedCategoryId : ""}
+                      onValueChange={handleCategoryChange}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(() => {
+                          const transactionType = form.watch("type");
                           
-                          // Filter by transaction type
-                          if (transactionType === "expense") {
-                            if (categoryGroup.type !== "expense" && categoryGroup.type !== null) return false;
-                          } else if (transactionType === "income") {
-                            if (categoryGroup.type !== "income" && categoryGroup.type !== null) return false;
-                          }
-                          
-                          return true;
-                        });
+                          // Filter categories by transaction type and selected group
+                          const filteredCategories = allCategories.filter((category) => {
+                            // Use group first, then macro for backward compatibility
+                            const categoryGroup = category.group || category.macro || 
+                                                 (Array.isArray(category.group) ? category.group[0] : null) ||
+                                                 (Array.isArray(category.macro) ? category.macro[0] : null);
+                            if (!categoryGroup) return false;
+                            
+                            // Filter by transaction type
+                            if (transactionType === "expense") {
+                              if (categoryGroup.type !== "expense" && categoryGroup.type !== null) return false;
+                            } else if (transactionType === "income") {
+                              if (categoryGroup.type !== "income" && categoryGroup.type !== null) return false;
+                            }
+                            
+                            // Filter by selected group
+                            if (selectedFilterGroupId !== null && categoryGroup.id !== selectedFilterGroupId) {
+                              return false;
+                            }
+                            
+                            return true;
+                          });
 
                         if (filteredCategories.length === 0) {
                           return (
@@ -1149,51 +1329,76 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                           );
                         }
 
-                        // Group categories by Group
-                        const groupedByGroup = new Map<string, { group: any; categories: Category[] }>();
-                        filteredCategories.forEach((category) => {
-                          // Use group first, then macro for backward compatibility
-                          const categoryGroup = category.group || category.macro || 
-                                               (Array.isArray(category.group) ? category.group[0] : null) ||
-                                               (Array.isArray(category.macro) ? category.macro[0] : null);
-                          if (categoryGroup) {
-                            const groupId = categoryGroup.id;
-                            if (!groupedByGroup.has(groupId)) {
-                              groupedByGroup.set(groupId, { group: categoryGroup, categories: [] });
+                        // If a group is selected, show categories directly (no grouping)
+                        // Otherwise, group categories by Group
+                        if (selectedFilterGroupId !== null) {
+                          // Show categories directly when a group is selected
+                          const sortedCategories = filteredCategories.sort((a, b) => a.name.localeCompare(b.name));
+                          
+                          return (
+                            <>
+                              {sortedCategories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                              <SelectSeparator />
+                              <SelectItem 
+                                value="__add_category__"
+                                className="text-primary font-medium"
+                              >
+                                <Plus className="mr-2 h-4 w-4 inline" />
+                                Add Category
+                              </SelectItem>
+                            </>
+                          );
+                        } else {
+                          // Group categories by Group when no filter is selected
+                          const groupedByGroup = new Map<string, { group: any; categories: Category[] }>();
+                          filteredCategories.forEach((category) => {
+                            // Use group first, then macro for backward compatibility
+                            const categoryGroup = category.group || category.macro || 
+                                                 (Array.isArray(category.group) ? category.group[0] : null) ||
+                                                 (Array.isArray(category.macro) ? category.macro[0] : null);
+                            if (categoryGroup) {
+                              const groupId = categoryGroup.id;
+                              if (!groupedByGroup.has(groupId)) {
+                                groupedByGroup.set(groupId, { group: categoryGroup, categories: [] });
+                              }
+                              groupedByGroup.get(groupId)!.categories.push(category);
                             }
-                            groupedByGroup.get(groupId)!.categories.push(category);
-                          }
-                        });
+                          });
 
-                        // Sort groups by name
-                        const sortedGroups = Array.from(groupedByGroup.entries()).sort((a, b) => 
-                          a[1].group.name.localeCompare(b[1].group.name)
-                        );
+                          // Sort groups by name
+                          const sortedGroups = Array.from(groupedByGroup.entries()).sort((a, b) => 
+                            a[1].group.name.localeCompare(b[1].group.name)
+                          );
 
-                        return (
-                          <>
-                            {sortedGroups.map(([groupId, { group, categories }]) => (
-                              <SelectGroup key={groupId}>
-                                <SelectLabel>{group.name}</SelectLabel>
-                                {categories
-                                  .sort((a, b) => a.name.localeCompare(b.name))
-                                  .map((category) => (
-                                    <SelectItem key={category.id} value={category.id}>
-                                      {category.name}
-                                    </SelectItem>
-                                  ))}
-                              </SelectGroup>
-                            ))}
-                            <SelectSeparator />
-                            <SelectItem 
-                              value="__add_category__"
-                              className="text-primary font-medium"
-                            >
-                              <Plus className="mr-2 h-4 w-4 inline" />
-                              Add Category
-                            </SelectItem>
-                          </>
-                        );
+                          return (
+                            <>
+                              {sortedGroups.map(([groupId, { group, categories }]) => (
+                                <SelectGroup key={groupId}>
+                                  <SelectLabel>{group.name}</SelectLabel>
+                                  {categories
+                                    .sort((a, b) => a.name.localeCompare(b.name))
+                                    .map((category) => (
+                                      <SelectItem key={category.id} value={category.id}>
+                                        {category.name}
+                                      </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                              ))}
+                              <SelectSeparator />
+                              <SelectItem 
+                                value="__add_category__"
+                                className="text-primary font-medium"
+                              >
+                                <Plus className="mr-2 h-4 w-4 inline" />
+                                Add Category
+                              </SelectItem>
+                            </>
+                          );
+                        }
                       })()}
                     </SelectContent>
                   </Select>
@@ -1204,164 +1409,224 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">
-                    Subcategory <span className="text-gray-400 text-[12px]">(optional)</span>
-                  </label>
-                  <Select
-                    value={form.watch("subcategoryId") || ""}
-                    onValueChange={handleSubcategoryChange}
-                    disabled={!selectedCategoryId || (subcategoriesMap.get(selectedCategoryId) || []).length === 0}
-                  >
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder={
-                        !selectedCategoryId 
-                          ? "Select a category first" 
-                          : (subcategoriesMap.get(selectedCategoryId) || []).length === 0
-                          ? "No subcategories available"
-                          : "Select a subcategory"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(() => {
-                        const subcats = selectedCategoryId ? subcategoriesMap.get(selectedCategoryId) || [] : [];
-                        
-                        if (!selectedCategoryId) {
-                          return (
-                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                              Select a category first
-                            </div>
-                          );
-                        }
-                        
-                        if (subcats.length === 0) {
-                          return (
-                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                              No subcategories found for this category
-                            </div>
-                          );
-                        }
-                        
-                        return subcats.map((subcategory) => (
-                          <SelectItem key={subcategory.id} value={subcategory.id}>
-                            {subcategory.name}
-                          </SelectItem>
-                        ));
-                      })()}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Description</label>
-              <Input className="h-12" {...form.register("description")} />
-            </div>
-
-            {/* Expense Type (only for expense transactions) */}
-            {form.watch("type") === "expense" && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium">
-                  Expense Type <span className="text-gray-400 text-[12px]">(optional)</span>
-                </label>
-                <div className="flex gap-6">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="expenseType"
-                      value="variable"
-                      checked={form.watch("expenseType") === "variable"}
-                      onChange={() => {
-                        form.setValue("expenseType", "variable");
-                      }}
-                      className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                    />
-                    <span className="text-sm">Variable</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="expenseType"
-                      value="fixed"
-                      checked={form.watch("expenseType") === "fixed"}
-                      onChange={() => {
-                        form.setValue("expenseType", "fixed");
-                      }}
-                      className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                    />
-                    <span className="text-sm">Fixed</span>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3 w-1/3">
-              <div className="flex items-center gap-3">
-                <Switch
-                  id="recurring"
-                  checked={form.watch("recurring")}
-                  onCheckedChange={(checked) => {
-                    form.setValue("recurring", checked);
-                    if (!checked) {
-                      form.setValue("recurringFrequency", undefined);
-                    } else if (!form.watch("recurringFrequency")) {
-                      form.setValue("recurringFrequency", "monthly");
-                    }
-                  }}
-                />
-                <label
-                  htmlFor="recurring"
-                  className="text-sm font-medium cursor-pointer flex items-center"
-                >
-                  Repeat this payment
-                </label>
-              </div>
-              
-              {form.watch("recurring") && (() => {
-                const frequencyOptions = {
-                  daily: { label: "Daily", description: "Daily repetition" },
-                  weekly: { label: "Weekly", description: "Every 7 days" },
-                  biweekly: { label: "Biweekly", description: "Every 14 days" },
-                  monthly: { label: "Monthly", description: "Once per month" },
-                  semimonthly: { label: "Semimonthly", description: "Twice per month" },
-                  quarterly: { label: "Quarterly", description: "Every 3 months" },
-                  semiannual: { label: "Semiannual", description: "Every 6 months" },
-                  annual: { label: "Annual", description: "Once per year" },
-                } as const;
-
-                const selectedFrequency = form.watch("recurringFrequency") || "monthly";
-                const selectedOption = frequencyOptions[selectedFrequency as keyof typeof frequencyOptions];
-
-                return (
-                  <div className="space-y-2">
-                    <label htmlFor="recurringFrequency" className="text-sm text-muted-foreground">
-                      Frequency
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">
+                      Subcategory <span className="text-gray-400 text-[12px]">(optional)</span>
                     </label>
                     <Select
-                      value={selectedFrequency}
-                      onValueChange={(value) => {
-                        form.setValue("recurringFrequency", value as any);
-                      }}
+                      value={form.watch("subcategoryId") || ""}
+                      onValueChange={handleSubcategoryChange}
+                      disabled={!selectedCategoryId || (subcategoriesMap.get(selectedCategoryId) || []).length === 0}
                     >
-                      <SelectTrigger id="recurringFrequency">
-                        <SelectValue placeholder="Select frequency" />
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder={
+                          !selectedCategoryId 
+                            ? "Select a category first" 
+                            : (subcategoriesMap.get(selectedCategoryId) || []).length === 0
+                            ? "No subcategories available"
+                            : "Select a subcategory"
+                        } />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(frequencyOptions).map(([value, option]) => (
-                          <SelectItem key={value} value={value}>
-                            <div className="flex items-center gap-2 w-full">
-                              <span className="font-medium">{option.label}</span>
-                              <span className="text-xs text-muted-foreground">{option.description}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {(() => {
+                          // Filter subcategories by selected group if a group is selected
+                          let subcats = selectedCategoryId ? subcategoriesMap.get(selectedCategoryId) || [] : [];
+                          
+                          // If a group is selected, filter subcategories to only show those from categories in that group
+                          if (selectedFilterGroupId !== null && selectedCategoryId) {
+                            const category = allCategories.find(c => c.id === selectedCategoryId);
+                            if (category) {
+                              const categoryGroup = category.group || category.macro || 
+                                                   (Array.isArray(category.group) ? category.group[0] : null) ||
+                                                   (Array.isArray(category.macro) ? category.macro[0] : null);
+                              // Only show subcategories if the category belongs to the selected group
+                              if (categoryGroup?.id !== selectedFilterGroupId) {
+                                subcats = [];
+                              }
+                            }
+                          }
+                          
+                          if (!selectedCategoryId) {
+                            return (
+                              <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                Select a category first
+                              </div>
+                            );
+                          }
+                          
+                          if (subcats.length === 0) {
+                            return (
+                              <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                No subcategories found for this category
+                              </div>
+                            );
+                          }
+                          
+                          return subcats.map((subcategory) => (
+                            <SelectItem key={subcategory.id} value={subcategory.id}>
+                              {subcategory.name}
+                            </SelectItem>
+                          ));
+                        })()}
                       </SelectContent>
                     </Select>
                   </div>
-                );
-              })()}
+                </div>
+              </div>
+            )}
+
+            {/* ============================================
+                2) SECONDARY FIELDS (Optional - visible by default)
+                ============================================ */}
+            
+            {/* Description and Merchant row */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Description</label>
+                <Input className="h-12" {...form.register("description")} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  Merchant <span className="text-gray-400 text-[12px]">(optional)</span>
+                </label>
+                <Input className="h-12" {...form.register("merchant")} placeholder="Store name" />
+              </div>
             </div>
+
+            {/* Receipt Download Button */}
+            {receiptUrl && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Receipt</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    window.open(receiptUrl, '_blank');
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Receipt
+                </Button>
+              </div>
+            )}
+
+            {/* ============================================
+                3) ADVANCED FIELDS (Rarely used - collapsed by default)
+                ============================================ */}
+            
+            <Accordion type="single" collapsible defaultValue="">
+              <AccordionItem value="more-options">
+                <AccordionTrigger>More Options</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-4">
+                    {/* Expense Type (only for expense transactions) */}
+                    {form.watch("type") === "expense" && (
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium">
+                          Expense Type <span className="text-gray-400 text-[12px]">(optional)</span>
+                        </label>
+                        <div className="flex gap-6">
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="expenseType"
+                              value="variable"
+                              checked={form.watch("expenseType") === "variable"}
+                              onChange={() => {
+                                form.setValue("expenseType", "variable");
+                              }}
+                              className="w-4 h-4 text-primary border-border focus:ring-primary"
+                            />
+                            <span className="text-sm">Variable</span>
+                          </label>
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="expenseType"
+                              value="fixed"
+                              checked={form.watch("expenseType") === "fixed"}
+                              onChange={() => {
+                                form.setValue("expenseType", "fixed");
+                              }}
+                              className="w-4 h-4 text-primary border-border focus:ring-primary"
+                            />
+                            <span className="text-sm">Fixed</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recurring */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          id="recurring"
+                          checked={form.watch("recurring")}
+                          onCheckedChange={(checked) => {
+                            form.setValue("recurring", checked);
+                            if (!checked) {
+                              form.setValue("recurringFrequency", undefined);
+                            } else if (!form.watch("recurringFrequency")) {
+                              form.setValue("recurringFrequency", "monthly");
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor="recurring"
+                          className="text-sm font-medium cursor-pointer flex items-center"
+                        >
+                          Repeat this payment
+                        </label>
+                      </div>
+                      
+                      {form.watch("recurring") && (() => {
+                        const frequencyOptions = {
+                          daily: { label: "Daily", description: "Daily repetition" },
+                          weekly: { label: "Weekly", description: "Every 7 days" },
+                          biweekly: { label: "Biweekly", description: "Every 14 days" },
+                          monthly: { label: "Monthly", description: "Once per month" },
+                          semimonthly: { label: "Semimonthly", description: "Twice per month" },
+                          quarterly: { label: "Quarterly", description: "Every 3 months" },
+                          semiannual: { label: "Semiannual", description: "Every 6 months" },
+                          annual: { label: "Annual", description: "Once per year" },
+                        } as const;
+
+                        const selectedFrequency = form.watch("recurringFrequency") || "monthly";
+
+                        return (
+                          <div className="space-y-2">
+                            <label htmlFor="recurringFrequency" className="text-sm text-muted-foreground">
+                              Frequency
+                            </label>
+                            <Select
+                              value={selectedFrequency}
+                              onValueChange={(value) => {
+                                form.setValue("recurringFrequency", value as any);
+                              }}
+                            >
+                              <SelectTrigger id="recurringFrequency">
+                                <SelectValue placeholder="Select frequency" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(frequencyOptions).map(([value, option]) => (
+                                  <SelectItem key={value} value={value}>
+                                    <div className="flex items-center gap-2 w-full">
+                                      <span className="font-medium">{option.label}</span>
+                                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             {/* Show banner if date is future */}
             {!transaction && (() => {
@@ -1554,10 +1819,13 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           if (data.amount) {
             form.setValue("amount", data.amount);
           }
+          if (data.merchant) {
+            form.setValue("merchant", data.merchant);
+          }
           if (data.description) {
             form.setValue("description", data.description);
-          }
-          if (data.merchant && !data.description) {
+          } else if (data.merchant) {
+            // Use merchant as description if no description provided
             form.setValue("description", data.merchant);
           }
           if (data.date) {
@@ -1572,6 +1840,10 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           }
           // Set type to expense by default for receipts
           form.setValue("type", "expense");
+          // Save receipt URL if available
+          if (data.receiptUrl) {
+            setReceiptUrl(data.receiptUrl);
+          }
         }}
       />
     </>

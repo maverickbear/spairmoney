@@ -254,6 +254,47 @@ export class CategoriesRepository {
   }
 
   /**
+   * Find all subcategories for multiple categories (optimized batch query)
+   */
+  async findSubcategoriesByCategoryIds(
+    categoryIds: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<SubcategoryRow[]> {
+    if (categoryIds.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id || null;
+
+    let query = supabase
+      .from("Subcategory")
+      .select("*")
+      .in("categoryId", categoryIds)
+      .order("categoryId", { ascending: true })
+      .order("name", { ascending: true });
+
+    // If authenticated, get system defaults (userId IS NULL) OR user's own subcategories
+    if (userId) {
+      query = query.or(`userId.is.null,userId.eq.${userId}`);
+    } else {
+      query = query.is("userId", null);
+    }
+
+    const { data: subcategories, error } = await query;
+
+    if (error) {
+      logger.error("[CategoriesRepository] Error fetching subcategories by category IDs:", error);
+      throw new Error(`Failed to fetch subcategories: ${error.message}`);
+    }
+
+    return (subcategories || []) as SubcategoryRow[];
+  }
+
+  /**
    * Find subcategory by ID
    */
   async findSubcategoryById(
@@ -460,6 +501,45 @@ export class CategoriesRepository {
     }
 
     return group as GroupRow;
+  }
+
+  /**
+   * Find multiple groups by IDs
+   */
+  async findGroupsByIds(
+    ids: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<GroupRow[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id || null;
+
+    let query = supabase
+      .from("Group")
+      .select("*")
+      .in("id", ids);
+
+    // If authenticated, get system defaults (userId IS NULL) OR user's own groups
+    if (userId) {
+      query = query.or(`userId.is.null,userId.eq.${userId}`);
+    } else {
+      query = query.is("userId", null);
+    }
+
+    const { data: groups, error } = await query;
+
+    if (error) {
+      logger.error("[CategoriesRepository] Error fetching groups by IDs:", error);
+      throw new Error(`Failed to fetch groups: ${error.message}`);
+    }
+
+    return (groups || []) as GroupRow[];
   }
 
   /**

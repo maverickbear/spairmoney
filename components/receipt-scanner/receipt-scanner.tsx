@@ -21,6 +21,7 @@ interface ReceiptData {
   date?: string;
   description?: string;
   items?: Array<{ name: string; price: number }>;
+  receiptUrl?: string;
 }
 
 interface ReceiptScannerProps {
@@ -161,7 +162,7 @@ export function ReceiptScanner({
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await fetch("/api/receipts/scan", {
+      const response = await fetch("/api/v2/receipts/scan", {
         method: "POST",
         body: formData,
       });
@@ -173,7 +174,12 @@ export function ReceiptScanner({
 
       const result = await response.json();
       if (result.success && result.data) {
-        onScanComplete(result.data);
+        // Include receiptUrl if available
+        const receiptData = {
+          ...result.data,
+          receiptUrl: result.receiptUrl,
+        };
+        onScanComplete(receiptData);
         toast({
           title: "Receipt Scanned",
           description: "Transaction data extracted successfully",

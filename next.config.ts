@@ -202,17 +202,19 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               // Allow Vercel Live feedback script (only loads when deployed on Vercel)
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.plaid.com https://js.stripe.com https://vercel.live https://www.googletagmanager.com https://va.vercel-scripts.com", // Note: 'unsafe-eval' and 'unsafe-inline' may be needed for Next.js, cdn.plaid.com for Plaid Link, js.stripe.com for Stripe Pricing Table, vercel.live for Vercel Live feedback, www.googletagmanager.com for Google Analytics, va.vercel-scripts.com for Vercel Speed Insights
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.plaid.com https://js.stripe.com https://vercel.live https://www.googletagmanager.com https://va.vercel-scripts.com https://challenges.cloudflare.com", // Note: 'unsafe-eval' and 'unsafe-inline' may be needed for Next.js, cdn.plaid.com for Plaid Link, js.stripe.com for Stripe Pricing Table, vercel.live for Vercel Live feedback, www.googletagmanager.com for Google Analytics, va.vercel-scripts.com for Vercel Speed Insights, challenges.cloudflare.com for Turnstile CAPTCHA
+              "worker-src 'self' blob:", // Allow web workers (needed for canvas-confetti)
               "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind CSS
-              "img-src 'self' data: https:",
+              "img-src 'self' data: https: blob:", // blob: needed for image previews (receipt scanner, file uploads)
               "font-src 'self' data:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.sparefinance.com wss://app.sparefinance.com https://api.stripe.com https://js.stripe.com https://*.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://vercel.live https://www.googletagmanager.com https://*.google-analytics.com https://va.vercel-scripts.com",
-              "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://cdn.plaid.com https://*.plaid.com https://vercel.live",
+              "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://cdn.plaid.com https://*.plaid.com https://vercel.live https://challenges.cloudflare.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'self'",
-              "upgrade-insecure-requests",
+              // Only upgrade to HTTPS in production (avoids localhost SSL errors in development)
+              ...(process.env.NODE_ENV === 'production' ? ["upgrade-insecure-requests"] : []),
             ].join("; "),
           },
         ],

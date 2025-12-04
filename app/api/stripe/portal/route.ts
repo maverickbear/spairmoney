@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPortalSession } from "@/lib/api/stripe";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function POST(request: NextRequest) {
   try {
-    // Get current user
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -16,18 +14,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Create portal session
-    const { url, error } = await createPortalSession(authUser.id);
+    const stripeService = makeStripeService();
+    const portalResult = await stripeService.createPortalSession(userId);
 
-    if (error || !url) {
+    if (portalResult.error || !portalResult.url) {
       return NextResponse.json(
-        { error: error || "Failed to create portal session" },
+        { error: portalResult.error || "Failed to create portal session" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url: portalResult.url });
   } catch (error) {
     console.error("Error creating portal session:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to create portal session" },
       { status: 500 }

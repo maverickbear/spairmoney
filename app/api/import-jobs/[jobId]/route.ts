@@ -1,33 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/src/infrastructure/database/supabase-server';
-import { getCurrentUserId } from '@/src/application/shared/feature-guard';
+import { makeImportJobsService } from '@/src/application/import-jobs/import-jobs.factory';
+import { AppError } from '@/src/application/shared/app-error';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { jobId } = await params;
-    const supabase = await createServerClient();
-    const { data: job, error } = await supabase
-      .from('ImportJob')
-      .select('*')
-      .eq('id', jobId)
-      .eq('userId', userId)
-      .single();
-
-    if (error || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-    }
+    const service = makeImportJobsService();
+    const job = await service.getImportJob(jobId);
 
     return NextResponse.json(job);
   } catch (error: any) {
     console.error('Error fetching job status:', error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Failed to get job status' },
       { status: 500 }

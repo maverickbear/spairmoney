@@ -208,7 +208,7 @@ export function LandingFeaturesSection() {
                     
                     <a
                       href="/auth/signup"
-                      className="text-sm font-semibold text-primary hover:underline inline-flex items-center gap-1.5 w-fit flex-shrink-0"
+                      className="text-sm font-semibold text-foreground hover:underline inline-flex items-center gap-1.5 w-fit flex-shrink-0"
                     >
                       {feature.cta}
                       <ArrowRight className="w-4 h-4" />

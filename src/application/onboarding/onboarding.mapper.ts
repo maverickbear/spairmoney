@@ -17,6 +17,9 @@ export class OnboardingMapper {
 
     return {
       expectedIncome: (settings.expectedIncome as ExpectedIncomeRange) || undefined,
+      expectedIncomeAmount: typeof settings.expectedIncomeAmount === 'number' 
+        ? settings.expectedIncomeAmount 
+        : undefined,
     };
   }
 
@@ -28,6 +31,10 @@ export class OnboardingMapper {
 
     if (settings.expectedIncome !== undefined) {
       result.expectedIncome = settings.expectedIncome;
+    }
+
+    if (settings.expectedIncomeAmount !== undefined) {
+      result.expectedIncomeAmount = settings.expectedIncomeAmount;
     }
 
     return result;

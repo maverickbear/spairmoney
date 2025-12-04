@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { getCurrentUserId } from '@/src/application/shared/feature-guard';
-import { exchangePublicToken } from '@/lib/api/plaid/connect';
-import { createServerClient } from '@/src/infrastructure/database/supabase-server';
+import { AppError } from '@/src/application/shared/app-error';
 
 /**
  * Preview accounts before importing them
@@ -33,9 +33,11 @@ export async function POST(req: NextRequest) {
     // Exchange public token for access token and get accounts
     // This creates a PlaidConnection but doesn't create accounts yet
     console.log('[PLAID PREVIEW] Exchanging public token for preview...');
-    const { itemId, accessToken, accounts } = await exchangePublicToken(
+    const plaidService = makePlaidService();
+    const { itemId, accessToken, accounts } = await plaidService.exchangePublicToken(
       publicToken,
-      metadata
+      metadata,
+      userId
     );
     console.log('[PLAID PREVIEW] Exchange successful:', {
       itemId,
@@ -103,6 +105,13 @@ export async function POST(req: NextRequest) {
       stack: error.stack,
       response: error.response?.data,
     });
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     return NextResponse.json(
       { 

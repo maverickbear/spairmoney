@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { formatMoney } from "@/components/common/money";
 import { TrendingUp, TrendingDown, Wallet, BarChart3, Plus, Upload, RefreshCw } from "lucide-react";
-import { PortfolioSummary } from "@/lib/api/portfolio";
+import { PortfolioSummary } from "@/src/domain/portfolio/portfolio.types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 

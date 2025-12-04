@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPortfolioSummary } from "@/lib/api/portfolio";
+import { makePortfolioService } from "@/src/application/portfolio/portfolio.factory";
 import { guardFeatureAccessReadOnly, getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET() {
   try {
@@ -22,10 +23,19 @@ export async function GET() {
       );
     }
 
-    const summary = await getPortfolioSummary();
+    const service = makePortfolioService();
+    const summary = await service.getPortfolioSummary(userId);
     return NextResponse.json(summary);
   } catch (error) {
     console.error("Error fetching portfolio summary:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to fetch portfolio summary" },
       { status: 500 }

@@ -26,7 +26,7 @@ export function ParallaxFeature({
   return (
     <div
       className={`relative ${
-        reverse ? "bg-[#f5f5f7] dark:bg-[#1d1d1f]" : "bg-background"
+        reverse ? "bg-neutral-100 dark:bg-neutral-600" : "bg-background"
       }`}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,7 +39,7 @@ export function ParallaxFeature({
           <div className="flex-1 w-full lg:w-1/2">
             <div className="max-w-xl mx-auto lg:mx-0">
               {subtitle && (
-                <p className="text-sm sm:text-base font-medium text-primary mb-3 tracking-wide uppercase">
+                <p className="text-sm sm:text-base font-medium text-muted-foreground mb-3 tracking-wide uppercase">
                   {subtitle}
                 </p>
               )}
@@ -55,7 +55,7 @@ export function ParallaxFeature({
           {/* Visual/Demo Section - Apple Style */}
           <div className="flex-1 w-full lg:w-1/2">
             <div className="relative">
-              <div className="relative rounded-3xl overflow-hidden bg-[#4A4AF2] backdrop-blur-sm">
+              <div className="relative rounded-3xl overflow-hidden bg-primary-scale-500 backdrop-blur-sm">
                 <div className="aspect-video w-full flex items-center justify-center p-6 lg:p-8 min-h-[400px] lg:min-h-[600px]">
                   {demoComponent ? (
                     <div className="w-full h-full flex items-center justify-center scale-100 lg:scale-110">

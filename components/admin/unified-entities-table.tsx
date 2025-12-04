@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Edit, Trash2, ChevronRight, ChevronDown } from "lucide-react";
-import type { SystemGroup, SystemCategory, SystemSubcategory } from "@/lib/api/admin";
+import type { SystemGroup, SystemCategory, SystemSubcategory } from "@/src/domain/admin/admin.types";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface SelectedItem {

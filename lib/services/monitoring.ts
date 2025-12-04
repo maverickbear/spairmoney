@@ -165,7 +165,6 @@ export interface HealthCheckResult {
   status: 'healthy' | 'degraded' | 'unhealthy';
   checks: {
     database: boolean;
-    redis?: boolean;
     externalApis?: {
       plaid?: boolean;
       stripe?: boolean;
@@ -180,7 +179,6 @@ export interface HealthCheckResult {
 export async function performHealthCheck(): Promise<HealthCheckResult> {
   const checks: HealthCheckResult['checks'] = {
     database: false,
-    redis: undefined,
     externalApis: {},
   };
 
@@ -194,22 +192,9 @@ export async function performHealthCheck(): Promise<HealthCheckResult> {
     logger.error('[HealthCheck] Database check failed:', error);
   }
 
-  // Check Redis
-  try {
-    const { getRedisClient } = await import('@/lib/services/redis');
-    const client = getRedisClient();
-    if (client) {
-      await client.ping();
-      checks.redis = true;
-    }
-  } catch (error) {
-    logger.error('[HealthCheck] Redis check failed:', error);
-    checks.redis = false;
-  }
-
   // Determine overall status
   const hasCriticalFailure = !checks.database;
-  const hasDegradedService = checks.redis === false;
+  const hasDegradedService = false;
   
   const status: HealthCheckResult['status'] = hasCriticalFailure
     ? 'unhealthy'

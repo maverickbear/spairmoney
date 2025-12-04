@@ -3,10 +3,9 @@
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { formatTimestamp, formatDateOnly } from "@/src/infrastructure/utils/timestamp";
 import { createPlannedPayment, PLANNED_HORIZON_DAYS } from "@/lib/api/planned-payments";
-import { createSubcategory } from "@/lib/api/categories";
+import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import { addMonths, addYears, addDays, startOfMonth, setDate } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
-import { invalidateSubscriptionCaches } from "@/src/infrastructure/cache/cache.manager";
 
 export interface UserServiceSubscription {
   id: string;
@@ -185,7 +184,8 @@ export async function createUserSubscription(
   // If creating a new subcategory
   if (data.newSubcategoryName && data.categoryId) {
     try {
-      const newSubcategory = await createSubcategory({
+      const categoriesService = makeCategoriesService();
+      const newSubcategory = await categoriesService.createSubcategory({
         name: data.newSubcategoryName,
         categoryId: data.categoryId,
       });
@@ -252,8 +252,6 @@ export async function createUserSubscription(
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(subscription, supabase);
 
-  // Invalidate cache to ensure dashboard shows the new subscription
-  invalidateSubscriptionCaches();
 
   return enrichedSubscription;
 }
@@ -290,7 +288,8 @@ export async function updateUserSubscription(
   // If creating a new subcategory
   if (data.newSubcategoryName && data.categoryId) {
     try {
-      const newSubcategory = await createSubcategory({
+      const categoriesService = makeCategoriesService();
+      const newSubcategory = await categoriesService.createSubcategory({
         name: data.newSubcategoryName,
         categoryId: data.categoryId,
       });
@@ -360,8 +359,6 @@ export async function updateUserSubscription(
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(updated, supabase);
 
-  // Invalidate cache to ensure dashboard shows the updated subscription
-  invalidateSubscriptionCaches();
 
   return enrichedSubscription;
 }
@@ -405,8 +402,6 @@ export async function deleteUserSubscription(id: string): Promise<void> {
     );
   }
 
-  // Invalidate cache to ensure dashboard reflects the deletion
-  invalidateSubscriptionCaches();
 }
 
 /**
@@ -460,8 +455,6 @@ export async function pauseUserSubscription(id: string): Promise<UserServiceSubs
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(updated, supabase);
 
-  // Invalidate cache to ensure dashboard reflects the pause
-  invalidateSubscriptionCaches();
 
   return enrichedSubscription;
 }
@@ -521,8 +514,6 @@ export async function resumeUserSubscription(id: string): Promise<UserServiceSub
   // Enrich with related data
   const enrichedSubscription = await enrichSubscription(updated, supabase);
 
-  // Invalidate cache to ensure dashboard reflects the resume
-  invalidateSubscriptionCaches();
 
   return enrichedSubscription;
 }

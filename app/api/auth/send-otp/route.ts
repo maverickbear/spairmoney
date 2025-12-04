@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/send-otp
@@ -20,35 +21,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerClient();
+    const service = makeAuthService();
+    const result = await service.sendOtp(email);
 
-    console.log("[SEND-OTP] Attempting to resend OTP for signup type");
-
-    // Resend OTP for signup
-    const { error, data } = await supabase.auth.resend({
-      type: "signup",
-      email: email,
-    });
-
-    if (error) {
-      console.error("[SEND-OTP] Error resending OTP:", {
-        message: error.message,
-        status: error.status,
-        name: error.name,
-      });
-      
-      // Provide more helpful error messages
-      let errorMessage = "Failed to send verification code";
-      if (error.message?.includes("rate limit") || error.message?.includes("too many")) {
-        errorMessage = "Too many attempts. Please wait a few minutes before trying again.";
-      } else if (error.message?.includes("not found") || error.message?.includes("user")) {
-        errorMessage = "User not found. Please verify that the email is correct.";
-      } else {
-        errorMessage = error.message || errorMessage;
-      }
-      
+    if (!result.success) {
       return NextResponse.json(
-        { error: errorMessage },
+        { error: result.error || "Failed to send verification code" },
         { status: 400 }
       );
     }
@@ -60,6 +38,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[SEND-OTP] Unexpected error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

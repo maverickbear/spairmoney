@@ -7,18 +7,40 @@ Esta pasta contém os logos da Spare Finance em diferentes variantes.
 Os logos devem ser nomeados conforme a seguinte estrutura e adicionados nesta pasta:
 
 ### Ícones (para nav fechado e lugares pequenos)
-- `icon-purple.svg` ou `icon-purple.png` - Ícone "S" roxo em fundo branco (rounded square)
-- `icon-white.svg` ou `icon-white.png` - Ícone "s" branco em fundo roxo (rounded square)
+- `1024-icon-black.svg` - Ícone "S" preto em fundo verde (rounded square) - **Usado pelo componente**
+- `1024-icon-white.svg` - Ícone "S" branco em fundo preto (rounded square) - **Usado pelo componente**
+- `icon-purple.svg` - Ícone "S" roxo em fundo branco (legado)
+- `icon-white.svg` - Ícone "S" branco em fundo roxo (legado)
 
-### Wordmark (apenas texto)
-- `wordmark-purple.svg` ou `wordmark-purple.png` - Logo "SPARE FINANCE" em roxo/azul em fundo claro/preto
-- `wordmark-white.svg` ou `wordmark-white.png` - Logo "SPARE FINANCE" em branco em fundo escuro
+### Wordmark (legado - agora usa logo completo)
+- `wordmark-purple.svg` - Logo "SPARE FINANCE" apenas texto (legado, não usado mais)
+- `wordmark-white.svg` - Logo "SPARE FINANCE" apenas texto (legado, não usado mais)
+- **Nota**: O componente `Logo` com `variant="wordmark"` agora usa automaticamente os logos completos (full) em vez dos wordmarks antigos.
 
-### Full Logo (ícone + texto) - Opcional
-- `full-purple.svg` ou `full-purple.png` - Logo completo com ícone roxo em fundo claro
-- `full-white.svg` ou `full-white.png` - Logo completo com ícone branco em fundo escuro
+### Full Logo (ícone + texto) - SVG (Recomendado)
+- `sparefiance-logo-black.svg` - Logo completo preto para fundos claros (SVG)
+- `sparefiance-logo-white.svg` - Logo completo branco para fundos escuros (SVG)
+- `sparefiance-logo-full-white.svg` - Logo completo branco (variante alternativa, SVG)
 
-**Nota**: Se os arquivos `full-*` não existirem, o componente automaticamente usa `wordmark-*` como fallback.
+### Full Logo (ícone + texto) - PNG (Fallback)
+- `sparefiance-logo-black.png` - Logo completo preto para fundos claros (PNG)
+- `sparefiance-logo-white.png` - Logo completo branco para fundos escuros (PNG)
+- `sparefiance-logo-full-white.png` - Logo completo branco (variante alternativa, PNG)
+
+**Nota**: O componente `Logo` com `variant="full"` usa automaticamente os novos logos SVG quando disponíveis (preferência sobre PNG).
+
+### Ícones de Alta Resolução (1024px) - SVG (Recomendado)
+- `1024-icon-green.svg` - Ícone verde 1024x1024 (usado para gerar ícones PWA)
+- `1024-icon-black.svg` - Ícone preto 1024x1024 (fundo verde)
+- `1024-icon-white.svg` - Ícone branco 1024x1024 (fundo preto)
+
+### Ícones de Alta Resolução (1024px) - PNG
+- `1024-icon-green.png` - Ícone verde 1024x1024 (usado para gerar ícones PWA)
+- `1024-icon-black.png` - Ícone preto 1024x1024
+- `1024-icon-white.png` - Ícone branco 1024x1024
+- `1024-icon-black-transparent.png` - Ícone preto transparente 1024x1024
+- `1024-icon-white-transparent.png` - Ícone branco transparente 1024x1024
+- `icon-green-transparent.png` - Ícone verde transparente (tamanho menor)
 
 ## Formatos Suportados
 
@@ -47,8 +69,8 @@ import { Logo } from "@/components/common/logo";
 ## Variantes
 
 - **icon**: Apenas o ícone "S" - use para nav fechado ou espaços pequenos
-- **wordmark**: Apenas o texto "SPARE FINANCE" - use para headers maiores
-- **full**: Ícone + texto completo - use como logo principal (fallback para wordmark se não disponível)
+- **wordmark**: Logo completo (ícone + texto) - mantido para compatibilidade, usa os mesmos arquivos que "full"
+- **full**: Ícone + texto completo - use como logo principal
 
 ## Cores
 
@@ -60,11 +82,11 @@ import { Logo } from "@/components/common/logo";
 
 Todos os logos têm altura fixa de **40px**:
 
-- **Landing Header**: Wordmark 150x40 (white quando não scrolled, purple quando scrolled)
-- **Sidebar Nav**: Icon 40x40 quando colapsado, Wordmark 150x40 quando expandido
-- **Mobile Header**: Wordmark 150x40
-- **Login Page**: Wordmark 150x40 (desktop e mobile)
-- **Landing Footer**: Wordmark 150x40
+- **Landing Header**: Full logo 180x40 (white quando não scrolled, adapta ao tema quando scrolled)
+- **Landing Footer**: Full logo 180x40 (adapta ao tema)
+- **Sidebar Nav**: Icon 40x40 quando colapsado (usa 1024-icon-black.svg ou 1024-icon-white.svg), Wordmark 150x40 quando expandido
+- **Mobile Header**: Icon 32x32 (usa 1024-icon-black.svg ou 1024-icon-white.svg)
+- **Login/Signup Pages**: Wordmark 150x40 (adapta ao tema)
 
 ## Fallback
 

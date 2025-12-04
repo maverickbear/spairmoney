@@ -2,14 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { guardFeatureAccessReadOnly } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { 
-  getPortfolioSummaryInternal, 
-  getPortfolioAccountsInternal,
-  getPortfolioHistoricalDataInternal,
-  getPortfolioInternalData,
-  convertSupabaseHoldingToHolding
-} from "@/lib/api/portfolio";
+import { makePortfolioService } from "@/src/application/portfolio/portfolio.factory";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { logger } from "@/src/infrastructure/utils/logger";
 
 // In-memory cache for request deduplication
@@ -48,22 +42,10 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get session tokens
-    const supabase = await createServerClient();
-    let accessToken: string | undefined;
-    let refreshToken: string | undefined;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          accessToken = session.access_token;
-          refreshToken = session.refresh_token;
-        }
-      }
-    } catch (error: any) {
-      logger.warn("[Portfolio All] Could not get session tokens:", error?.message);
-    }
+    // Get session tokens using AuthService
+    const { makeAuthService } = await import("@/src/application/auth/auth.factory");
+    const authService = makeAuthService();
+    const { accessToken, refreshToken } = await authService.getSessionTokens();
 
     // Get days parameter from query string
     const { searchParams } = new URL(request.url);
@@ -96,25 +78,16 @@ export async function GET(request: Request) {
     // Create new request promise that returns data (not Response)
     // This allows multiple requests to reuse the same data without stream lock issues
     const requestPromise = (async () => {
-      // OPTIMIZED: Get shared portfolio data once
-      // This avoids duplicate calls to getHoldings() and getInvestmentAccounts()
-      const sharedData = await getPortfolioInternalData(accessToken, refreshToken);
+      const service = makePortfolioService();
       
-      // Create authenticated supabase client for getPortfolioAccountsInternal
-      const authenticatedSupabase = await createServerClient(accessToken, refreshToken);
-      
-      // Calculate all portfolio data using shared data
-      // This ensures we only call getHoldings() and getInvestmentAccounts() once
-      const [summary, accounts, historical] = await Promise.all([
-        getPortfolioSummaryInternal(accessToken, refreshToken, sharedData),
-        getPortfolioAccountsInternal(sharedData, authenticatedSupabase),
-        getPortfolioHistoricalDataInternal(days, accessToken, refreshToken, sharedData),
+      // Get all portfolio data in parallel
+      // Note: getPortfolioHistoricalData still uses lib/api internally for complex calculations
+      const [summary, holdings, accounts, historical] = await Promise.all([
+        service.getPortfolioSummaryInternal(accessToken, refreshToken),
+        service.getPortfolioHoldings(accessToken, refreshToken),
+        service.getPortfolioAccounts(accessToken, refreshToken),
+        service.getPortfolioHistoricalData(days, userId),
       ]);
-
-      // Convert holdings to portfolio format
-      const holdings = await Promise.all(
-        sharedData.holdings.map(convertSupabaseHoldingToHolding)
-      );
 
       // Return data object (not NextResponse) to allow reuse without stream lock
       return {

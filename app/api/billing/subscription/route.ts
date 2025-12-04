@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUserSubscriptionData, checkTransactionLimit, checkAccountLimit } from "@/lib/api/subscription";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
+import { checkTransactionLimit, checkAccountLimit } from "@/src/application/shared/feature-guard";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -20,19 +21,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
  */
 export async function GET(request: Request) {
   try {
-    const supabase = await createServerClient();
-    
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    // Use unified API - single source of truth
-    const { subscription, plan, limits } = await getCurrentUserSubscriptionData();
+    // Use SubscriptionsService - single source of truth
+    const subscriptionsService = makeSubscriptionsService();
+    const { subscription, plan, limits } = await subscriptionsService.getUserSubscriptionData(userId);
     
     // OPTIMIZATION: Fetch limits in parallel with Stripe interval check
     // This reduces total request time by doing everything in parallel
@@ -69,8 +68,8 @@ export async function GET(request: Request) {
       // Fetch transaction and account limits (only if requested)
       includeLimits
         ? Promise.all([
-            checkTransactionLimit(authUser.id),
-            checkAccountLimit(authUser.id),
+            checkTransactionLimit(userId),
+            checkAccountLimit(userId),
           ]).then(([transactionLimit, accountLimit]) => ({
             transactionLimit,
             accountLimit,

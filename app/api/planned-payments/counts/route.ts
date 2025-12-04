@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPlannedPayments, PLANNED_HORIZON_DAYS } from "@/lib/api/planned-payments";
+import { makePlannedPaymentsService } from "@/src/application/planned-payments/planned-payments.factory";
+import { PLANNED_HORIZON_DAYS } from "@/src/domain/planned-payments/planned-payments.types";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     
     // Parse date filters
@@ -19,9 +27,11 @@ export async function GET(request: NextRequest) {
       : horizonDate;
     const status = (searchParams.get("status") || "scheduled") as "scheduled" | "paid" | "skipped" | "cancelled";
     
+    const service = makePlannedPaymentsService();
+    
     // Get counts for each type in parallel (using limit=1, page=1 to get only total)
     const [expenseResult, incomeResult, transferResult] = await Promise.all([
-      getPlannedPayments({
+      service.getPlannedPayments({
         startDate,
         endDate,
         status,
@@ -29,7 +39,7 @@ export async function GET(request: NextRequest) {
         limit: 1,
         page: 1,
       }),
-      getPlannedPayments({
+      service.getPlannedPayments({
         startDate,
         endDate,
         status,
@@ -37,7 +47,7 @@ export async function GET(request: NextRequest) {
         limit: 1,
         page: 1,
       }),
-      getPlannedPayments({
+      service.getPlannedPayments({
         startDate,
         endDate,
         status,
@@ -54,6 +64,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching planned payment counts:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     const errorMessage = error instanceof Error ? error.message : "Failed to fetch planned payment counts";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 500;
     

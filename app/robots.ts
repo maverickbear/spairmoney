@@ -14,7 +14,6 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: [
           "/",
-          "/pricing",
           "/faq",
           "/terms-of-service",
           "/privacy-policy",
@@ -49,7 +48,6 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "Googlebot",
         allow: [
           "/",
-          "/pricing",
           "/faq",
           "/terms-of-service",
           "/privacy-policy",
@@ -83,7 +81,6 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "Bingbot",
         allow: [
           "/",
-          "/pricing",
           "/faq",
           "/terms-of-service",
           "/privacy-policy",

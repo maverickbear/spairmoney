@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import type { SystemGroup } from "@/lib/api/admin";
+import type { SystemGroup } from "@/src/domain/admin/admin.types";
 
 const groupSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),

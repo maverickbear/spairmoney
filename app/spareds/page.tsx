@@ -8,22 +8,22 @@ export default function SpareDSPage() {
     <div className="p-8 max-w-7xl mx-auto">
       {/* Hero Section */}
       <div className="mb-12">
-        <div className="bg-gradient-to-br from-[#1A1A8F] via-[#2A2AB8] to-[#4A4AF2] rounded-2xl p-12 text-white">
+        <div className="bg-gradient-to-br from-primary-scale-500 via-primary-scale-400 to-primary-scale-300 rounded-2xl p-12 text-foreground">
           <h1 className="text-5xl font-bold mb-4">Welcome to Spare Design System</h1>
-          <p className="text-xl mb-6 text-blue-100">
+          <p className="text-xl mb-6 text-foreground/90">
             A comprehensive design system with semantic tokens following a 4-level hierarchy. 
             Build consistent, accessible, and scalable user interfaces.
           </p>
           <div className="flex gap-4">
             <Link
               href="/spareds/styles/colour"
-              className="px-6 py-3 bg-white text-[#1A1A8F] rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+              className="px-6 py-3 bg-white text-foreground rounded-lg font-semibold hover:bg-white/90 transition-colors"
             >
               Get Started
             </Link>
             <Link
               href="/spareds/about/principles"
-              className="px-6 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white/10 transition-colors"
+              className="px-6 py-3 border-2 border-foreground text-foreground rounded-lg font-semibold hover:bg-foreground/10 transition-colors"
             >
               Design Principles
             </Link>

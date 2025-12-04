@@ -775,7 +775,7 @@ export function InvestmentTransactionForm({
                     <button
                       type="button"
                       onClick={() => setIsAddingAccount(true)}
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs text-foreground hover:underline"
                     >
                       Add new
                     </button>
@@ -880,7 +880,7 @@ export function InvestmentTransactionForm({
                     <button
                       type="button"
                       onClick={() => setShowSecurityDialog(true)}
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs text-foreground hover:underline"
                     >
                       Add new
                     </button>

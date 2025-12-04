@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Bell,
+  FileText,
 } from "lucide-react";
 
 interface NavItem {
@@ -51,8 +52,8 @@ const navCategories: NavCategory[] = [
       { href: "/accounts", label: "Bank Accounts", icon: Wallet },
       { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
       { href: "/planned-payment", label: "Planned Payments", icon: Calendar },
-      { href: "/categories", label: "Categories", icon: FolderTree },
-      { href: "/members", label: "Household", icon: Users },
+      { href: "/settings?tab=categories", label: "Categories", icon: FolderTree },
+      { href: "/settings?tab=household", label: "Household", icon: Users },
     ],
   },
   {
@@ -62,6 +63,7 @@ const navCategories: NavCategory[] = [
       { href: "/planning/goals", label: "Goals", icon: PiggyBank },
       { href: "/debts", label: "Debts", icon: CreditCard },
       { href: "/investments", label: "Investments", icon: TrendingUp },
+      { href: "/reports", label: "Reports", icon: FileText },
     ],
   },
   {
@@ -156,7 +158,7 @@ export function MoreMenuSheet({
 
           // Fetch plan info if has subscription
           if (hasSubscription) {
-            const planResponse = await fetch("/api/billing/subscription?includeStripe=false&includeLimits=false");
+            const planResponse = await fetch("/api/v2/billing/subscription?includeStripe=false&includeLimits=false");
             if (planResponse.ok) {
               const planData = await planResponse.json();
               setPlanInfo({

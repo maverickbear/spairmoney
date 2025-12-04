@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
-import { acceptInvitationWithPassword } from "@/lib/api/members";
+import { makeMembersService } from "@/src/application/members/members.factory";
+import { AppError } from "@/src/application/shared/app-error";
+import { acceptInvitationSchema } from "@/src/domain/members/members.validations";
 import { z } from "zod";
-
-const acceptInvitationSchema = z.object({
-  token: z.string().min(1, "Token is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +10,8 @@ export async function POST(request: Request) {
     const validatedData = acceptInvitationSchema.parse(body);
     const { token, password } = validatedData;
 
-    const result = await acceptInvitationWithPassword(token, password);
+    const service = makeMembersService();
+    const result = await service.acceptInvitationWithPassword(token, password);
     
     // If OTP verification is required, return that info instead of session
     if (result.requiresOtpVerification) {
@@ -67,6 +65,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Invalid request data", details: error.errors },
         { status: 400 }
+      );
+    }
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     

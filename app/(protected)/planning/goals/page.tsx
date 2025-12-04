@@ -68,35 +68,42 @@ export default function GoalsPage() {
   async function loadGoals() {
     try {
       setLoading(true);
-      // Add timestamp to bypass browser cache
-      const res = await fetch(`/api/v2/goals?t=${Date.now()}`);
+      const res = await fetch(`/api/v2/goals`);
       if (!res.ok) {
         throw new Error("Failed to fetch goals");
       }
       const data = await res.json();
-      console.log("Goals loaded:", data);
       setGoals(data || []);
-      
-      // Ensure emergency fund goal exists
-      try {
-        const response = await fetch("/api/goals/ensure-emergency-fund", {
-          method: "POST",
-        });
-        if (response.ok) {
-          // Reload goals to include the emergency fund goal if it was just created
-          const res2 = await fetch(`/api/v2/goals?t=${Date.now()}`);
-          if (res2.ok) {
-            const data2 = await res2.json();
-            setGoals(data2 || []);
-          }
-        }
-      } catch (goalError) {
-        console.error("Error ensuring emergency fund goal:", goalError);
-        // Don't fail if goal creation fails
-      }
-      
       setHasLoaded(true);
       perf.markDataLoaded();
+      
+      // OPTIMIZATION: Check emergency fund goal in background, don't block render
+      // This ensures the goal exists but doesn't slow down initial page load
+      if (data && data.length > 0) {
+        // Check if emergency fund exists
+        const hasEmergencyFund = data.some((g: Goal) => g.isSystemGoal && g.name?.toLowerCase().includes('emergency'));
+        
+        if (!hasEmergencyFund) {
+          // Create emergency fund in background
+          fetch("/api/v2/goals/emergency-fund/calculate", {
+            method: "POST",
+          }).then((response) => {
+            if (response.ok) {
+              // Silently reload goals in background
+              fetch(`/api/v2/goals`).then((res2) => {
+                if (res2.ok) {
+                  res2.json().then((data2) => {
+                    setGoals(data2 || []);
+                  });
+                }
+              });
+            }
+          }).catch((error) => {
+            // Silently fail - emergency fund creation is not critical
+            console.debug("Emergency fund creation failed (non-critical):", error);
+          });
+        }
+      }
     } catch (error) {
       console.error("Error loading goals:", error);
       setHasLoaded(true);

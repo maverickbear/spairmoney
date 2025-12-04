@@ -71,7 +71,7 @@ const color = getToken('component.button.primary.bg');`}</code>
         </p>
         <Link
           href="/spareds/colors/primary"
-          className="text-[#4A4AF2] hover:underline"
+          className="text-primary-scale-500 hover:underline"
         >
           Ver todas as cores →
         </Link>

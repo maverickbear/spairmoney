@@ -59,7 +59,7 @@ async function preloadUserData() {
         return profile;
       }).catch(() => null),
       // Preload subscription/billing data (without limits - loaded later when needed)
-      fetch("/api/billing/subscription", { cache: "no-store" }).then(async (r) => {
+      fetch("/api/v2/billing/subscription", { cache: "no-store" }).then(async (r) => {
         if (!r.ok) return null;
         const subData = await r.json();
         if (!subData) return null;
@@ -324,7 +324,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       // If there's an invitation token, accept the invitation after login
       if (invitationToken && data.user) {
         try {
-          const acceptResponse = await fetch("/api/members/invite/accept", {
+          const acceptResponse = await fetch("/api/v2/members/accept", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token: invitationToken }),
@@ -578,7 +578,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
             type="button"
             onClick={handleResend}
             disabled={resending || loading}
-            className="text-sm text-primary hover:underline font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-sm text-foreground hover:underline font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {resending ? (
               <>

@@ -5,13 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 
 const primaryColors = {
-  900: '#0D0D5A',
-  800: '#1A1A7A',
-  700: '#1A1A8F',
-  600: '#2A2AB8',
-  500: '#4A4AF2',
-  400: '#6D6DFF',
-  300: '#8B8BFF',
+  900: '#16161B',
+  800: '#16161B',
+  700: '#16161B',
+  600: '#7BC85A',
+  500: '#94DD78',
+  400: '#B0E89A',
+  300: '#C5F0B0',
 };
 
 export default function PrimaryColorsPage() {

@@ -41,10 +41,16 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Spare Finance",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+    "apple-mobile-web-app-title": "Spare Finance",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4A4AF2",
+  themeColor: "#94DD78", // Using primary-500 from colors.ts
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -60,8 +66,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
-        {/* Resource hints for external domains - improve connection speed */}
-        {/* DNS prefetch for faster connections */}
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
         <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
@@ -69,14 +73,6 @@ export default function RootLayout({
         <link rel="preconnect" href="https://api.stripe.com" />
         <link rel="preconnect" href="https://js.stripe.com" />
         <link rel="preconnect" href="https://cdn.plaid.com" />
-        {/* PWA Meta Tags */}
-        <meta name="theme-color" content="#4A4AF2" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Spare Finance" />
-        {/* Viewport is now handled by viewport export above */}
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className={`${inter.className} bg-background text-foreground`}>
         <GoogleTag />

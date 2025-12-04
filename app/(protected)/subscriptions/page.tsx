@@ -13,7 +13,7 @@ import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import type { UserServiceSubscription } from "@/src/domain/subscriptions/subscriptions.types";
-import type { DetectedSubscription } from "@/lib/api/subscription-detection";
+import type { DetectedSubscription } from "@/src/domain/subscriptions/subscriptions.types";
 import { useToast } from "@/components/toast-provider";
 import {
   Dialog,
@@ -77,7 +77,7 @@ export default function SubscriptionsPage() {
   async function loadSubscriptions() {
     try {
       setLoading(true);
-      const response = await fetch("/api/user-subscriptions");
+      const response = await fetch("/api/v2/user-subscriptions");
       if (!response.ok) {
         throw new Error("Failed to fetch subscriptions");
       }
@@ -105,7 +105,7 @@ export default function SubscriptionsPage() {
       async () => {
         setDeletingId(id);
         try {
-          const response = await fetch(`/api/user-subscriptions/${id}`, {
+          const response = await fetch(`/api/v2/user-subscriptions/${id}`, {
             method: "DELETE",
           });
           if (!response.ok) {
@@ -151,7 +151,7 @@ export default function SubscriptionsPage() {
         try {
           for (const id of idsToDelete) {
             try {
-              const response = await fetch(`/api/user-subscriptions/${id}`, {
+              const response = await fetch(`/api/v2/user-subscriptions/${id}`, {
             method: "DELETE",
           });
           if (!response.ok) {
@@ -208,7 +208,7 @@ export default function SubscriptionsPage() {
   async function handlePause(id: string) {
     setPausingId(id);
     try {
-      const response = await fetch(`/api/user-subscriptions/${id}/pause`, {
+      const response = await fetch(`/api/v2/user-subscriptions/${id}/pause`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -236,7 +236,7 @@ export default function SubscriptionsPage() {
   async function handleResume(id: string) {
     setPausingId(id);
     try {
-      const response = await fetch(`/api/user-subscriptions/${id}/resume`, {
+      const response = await fetch(`/api/v2/user-subscriptions/${id}/resume`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -359,7 +359,7 @@ export default function SubscriptionsPage() {
         if (!detected) continue;
 
         try {
-          const createResponse = await fetch("/api/user-subscriptions", {
+          const createResponse = await fetch("/api/v2/user-subscriptions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

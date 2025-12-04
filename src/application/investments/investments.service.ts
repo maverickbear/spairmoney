@@ -5,6 +5,7 @@
  */
 
 import { InvestmentsRepository } from "@/src/infrastructure/database/repositories/investments.repository";
+import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
 import { InvestmentsMapper } from "./investments.mapper";
 import { InvestmentTransactionFormData, SecurityPriceFormData, InvestmentAccountFormData } from "../../domain/investments/investments.validations";
 import { BaseHolding, BaseInvestmentTransaction, BaseSecurity, BaseSecurityPrice } from "../../domain/investments/investments.types";
@@ -14,6 +15,7 @@ import { mapClassToSector, normalizeAssetType } from "@/lib/utils/portfolio-util
 import { logger } from "@/src/infrastructure/utils/logger";
 import { HOLDINGS_CACHE_TTL } from "../../domain/investments/investments.constants";
 import { AppError } from "../shared/app-error";
+import { getCurrentUserId } from "../shared/feature-guard";
 
 // In-memory cache for holdings
 const holdingsCache = new Map<string, { data: BaseHolding[]; timestamp: number }>();
@@ -28,7 +30,10 @@ function cleanHoldingsCache() {
 }
 
 export class InvestmentsService {
-  constructor(private repository: InvestmentsRepository) {}
+  constructor(
+    private repository: InvestmentsRepository,
+    private accountsRepository: AccountsRepository
+  ) {}
 
   /**
    * Get holdings (complex calculation from positions or transactions)
@@ -40,16 +45,15 @@ export class InvestmentsService {
     refreshToken?: string,
     useCache: boolean = true
   ): Promise<BaseHolding[]> {
-    const supabase = await createServerClient(accessToken, refreshToken);
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      logger.error("[InvestmentsService] ERROR: No authenticated user!", userError);
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      // In server components, this can happen during SSR - return empty array gracefully
+      // Don't log as error since this is expected in some contexts
       return [];
     }
 
     // Check cache
-    const cacheKey = `holdings:${user.id}:${accountId || 'all'}`;
+    const cacheKey = `holdings:${userId}:${accountId || 'all'}`;
     if (useCache) {
       cleanHoldingsCache();
       const cached = holdingsCache.get(cacheKey);
@@ -66,17 +70,17 @@ export class InvestmentsService {
       const securityIds = new Set(positions.map(p => p.securityId));
       const accountIds = new Set(positions.map(p => p.accountId));
 
-      const [securitiesResult, accountsResult] = await Promise.all([
+      const [securities, accounts] = await Promise.all([
         securityIds.size > 0
-          ? supabase.from("Security").select("id, symbol, name, class, sector").in("id", Array.from(securityIds))
-          : Promise.resolve({ data: [], error: null }),
+          ? this.repository.findSecuritiesByIds(Array.from(securityIds), accessToken, refreshToken)
+          : Promise.resolve([]),
         accountIds.size > 0
-          ? supabase.from("Account").select("id, name").in("id", Array.from(accountIds))
-          : Promise.resolve({ data: [], error: null }),
+          ? this.accountsRepository.findByIds(Array.from(accountIds), accessToken, refreshToken)
+          : Promise.resolve([]),
       ]);
 
-      const securityMap = new Map((securitiesResult.data || []).map(s => [s.id, s]));
-      const accountMap = new Map((accountsResult.data || []).map(a => [a.id, a]));
+      const securityMap = new Map(securities.map(s => [s.id, s]));
+      const accountMap = new Map(accounts.map(a => [a.id, a]));
 
       const holdings = positions.map(position => {
         const security = securityMap.get(position.securityId);
@@ -91,27 +95,159 @@ export class InvestmentsService {
     }
 
     // Fallback: calculate from transactions (slower but necessary if positions unavailable)
-    // This is a simplified version - the full logic is in lib/api/investments.ts
-    // For now, we'll use the old function as a temporary bridge
-    const { getHoldings: getHoldingsLegacy } = await import("@/lib/api/investments");
-    const holdings = await getHoldingsLegacy(accountId, accessToken, refreshToken, useCache);
-    
-    return holdings.map(h => ({
-      securityId: h.securityId,
-      symbol: h.symbol,
-      name: h.name,
-      assetType: h.assetType,
-      sector: h.sector,
-      quantity: h.quantity,
-      avgPrice: h.avgPrice,
-      bookValue: h.bookValue,
-      lastPrice: h.lastPrice,
-      marketValue: h.marketValue,
-      unrealizedPnL: h.unrealizedPnL,
-      unrealizedPnLPercent: h.unrealizedPnLPercent,
-      accountId: h.accountId,
-      accountName: h.accountName,
-    }));
+    return await this.calculateHoldingsFromTransactions(accountId, accessToken, refreshToken, useCache);
+  }
+
+  /**
+   * Calculate holdings from transactions (private method)
+   * This is used as a fallback when positions are not available
+   */
+  private async calculateHoldingsFromTransactions(
+    accountId?: string,
+    accessToken?: string,
+    refreshToken?: string,
+    useCache: boolean = true
+  ): Promise<BaseHolding[]> {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      // In server components, this can happen during SSR - return empty array gracefully
+      return [];
+    }
+
+    const cacheKey = `holdings:${userId}:${accountId || 'all'}`;
+    if (useCache) {
+      cleanHoldingsCache();
+      const cached = holdingsCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < HOLDINGS_CACHE_TTL) {
+        return cached.data;
+      }
+    }
+
+    // Get transactions
+    const transactions = await this.repository.findTransactions(
+      accountId ? { accountId } : undefined,
+      accessToken,
+      refreshToken
+    );
+
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+
+    // Fetch securities and accounts for enrichment
+    const securityIds = new Set(transactions.filter(t => t.securityId).map(t => t.securityId!));
+    const accountIds = new Set(transactions.map(t => t.accountId));
+
+    const [securities, accounts] = await Promise.all([
+      securityIds.size > 0
+        ? this.repository.findSecuritiesByIds(Array.from(securityIds), accessToken, refreshToken)
+        : Promise.resolve([]),
+      accountIds.size > 0
+        ? this.accountsRepository.findByIds(Array.from(accountIds), accessToken, refreshToken)
+        : Promise.resolve([]),
+    ]);
+
+    const securityMap = new Map(securities.map(s => [s.id, s]));
+    const accountMap = new Map(accounts.map(a => [a.id, a]));
+
+    // Group by security and account
+    const holdingKeyMap = new Map<string, BaseHolding>();
+
+    for (const tx of transactions) {
+      if (!tx.securityId || (tx.type !== "buy" && tx.type !== "sell")) {
+        continue;
+      }
+
+      const security = securityMap.get(tx.securityId);
+      const account = accountMap.get(tx.accountId);
+      const holdingKey = `${tx.securityId}_${tx.accountId}`;
+
+      if (!holdingKeyMap.has(holdingKey)) {
+        const assetType = security?.class || "Stock";
+        const sector = security?.sector || mapClassToSector(assetType, security?.symbol || "");
+
+        holdingKeyMap.set(holdingKey, {
+          securityId: tx.securityId,
+          symbol: security?.symbol || "",
+          name: security?.name || security?.symbol || "",
+          assetType: normalizeAssetType(assetType),
+          sector,
+          quantity: 0,
+          avgPrice: 0,
+          bookValue: 0,
+          lastPrice: 0,
+          marketValue: 0,
+          unrealizedPnL: 0,
+          unrealizedPnLPercent: 0,
+          accountId: tx.accountId,
+          accountName: account?.name || "Unknown Account",
+        });
+      }
+
+      const holding = holdingKeyMap.get(holdingKey)!;
+
+      if (tx.type === "buy" && tx.quantity && tx.price) {
+        const newCost = tx.quantity * tx.price + (tx.fees || 0);
+        const totalCost = holding.bookValue + newCost;
+        const totalQuantity = holding.quantity + tx.quantity;
+
+        holding.avgPrice = totalQuantity > 0 ? totalCost / totalQuantity : tx.price;
+        holding.quantity = totalQuantity;
+        holding.bookValue = totalCost;
+      } else if (tx.type === "sell" && tx.quantity) {
+        holding.quantity = Math.max(0, holding.quantity - tx.quantity);
+        const soldCost = tx.quantity * holding.avgPrice;
+        holding.bookValue = Math.max(0, holding.bookValue - soldCost);
+      }
+    }
+
+    // Get latest prices
+    const allSecurityIds = Array.from(new Set(Array.from(holdingKeyMap.values()).map(h => h.securityId)));
+    if (allSecurityIds.length > 0) {
+      const supabase = await createServerClient(accessToken, refreshToken);
+      const { data: prices } = await supabase
+        .from("SecurityPrice")
+        .select("securityId, price, date")
+        .in("securityId", allSecurityIds)
+        .order("securityId", { ascending: true })
+        .order("date", { ascending: false });
+
+      const priceMap = new Map<string, number>();
+      if (prices) {
+        for (const price of prices) {
+          if (!priceMap.has(price.securityId)) {
+            priceMap.set(price.securityId, price.price);
+          }
+        }
+      }
+
+      // Apply prices to holdings
+      for (const holding of holdingKeyMap.values()) {
+        const latestPrice = priceMap.get(holding.securityId);
+        if (latestPrice && latestPrice > 0) {
+          holding.lastPrice = latestPrice;
+          holding.marketValue = holding.quantity * latestPrice;
+          holding.unrealizedPnL = holding.marketValue - holding.bookValue;
+          holding.unrealizedPnLPercent = holding.bookValue > 0 
+            ? (holding.unrealizedPnL / holding.bookValue) * 100 
+            : 0;
+        } else if (holding.avgPrice > 0) {
+          holding.lastPrice = holding.avgPrice;
+          holding.marketValue = holding.quantity * holding.avgPrice;
+          holding.unrealizedPnL = 0;
+          holding.unrealizedPnLPercent = 0;
+        }
+      }
+    }
+
+    // Filter out zero quantity holdings
+    const holdings = Array.from(holdingKeyMap.values()).filter((h) => h.quantity > 0);
+
+    if (useCache) {
+      holdingsCache.set(cacheKey, { data: holdings, timestamp: Date.now() });
+    }
+
+    return holdings;
   }
 
   /**
@@ -142,6 +278,75 @@ export class InvestmentsService {
   }
 
   /**
+   * Get total investments value (simple investments)
+   * Calculates total value from SimpleInvestmentEntry and AccountInvestmentValue
+   */
+  async getTotalInvestmentsValue(): Promise<number> {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return 0;
+    }
+
+    const supabase = await createServerClient();
+
+    // Get all investment accounts (type = "investment")
+    const { data: investmentAccounts, error: accountsError } = await supabase
+      .from("Account")
+      .select("id")
+      .eq("type", "investment");
+
+    if (accountsError || !investmentAccounts || investmentAccounts.length === 0) {
+      // Handle permission denied errors gracefully
+      if (accountsError?.code === '42501' || accountsError?.message?.includes('permission denied')) {
+        logger.warn("[InvestmentsService] Permission denied fetching investment accounts - user may not be authenticated");
+        return 0;
+      }
+      return 0;
+    }
+
+    const accountIds = investmentAccounts.map((acc) => acc.id);
+
+    // Get stored values for these accounts
+    const { data: storedValues, error: valuesError } = await supabase
+      .from("AccountInvestmentValue")
+      .select("accountId, totalValue")
+      .in("accountId", accountIds);
+
+    // Get all entries for these accounts
+    const { data: entries, error: entriesError } = await supabase
+      .from("SimpleInvestmentEntry")
+      .select("accountId, type, amount")
+      .in("accountId", accountIds);
+
+    // Calculate total value for each account
+    let totalValue = 0;
+
+    for (const account of investmentAccounts) {
+      const storedValue = storedValues?.find((v) => v.accountId === account.id);
+      
+      if (storedValue) {
+        // Use stored value if available
+        totalValue += storedValue.totalValue;
+      } else {
+        // Calculate from entries if no stored value
+        const accountEntries = entries?.filter((e) => e.accountId === account.id) || [];
+        const accountTotal = accountEntries.reduce((sum, entry) => {
+          // All entry types contribute to the total value
+          if (entry.type === "initial" || entry.type === "contribution") {
+            return sum + entry.amount;
+          } else if (entry.type === "dividend" || entry.type === "interest") {
+            return sum + entry.amount;
+          }
+          return sum;
+        }, 0);
+        totalValue += accountTotal;
+      }
+    }
+
+    return totalValue;
+  }
+
+  /**
    * Get investment transactions
    */
   async getInvestmentTransactions(filters?: {
@@ -150,24 +355,23 @@ export class InvestmentsService {
     startDate?: Date;
     endDate?: Date;
   }): Promise<BaseInvestmentTransaction[]> {
-    const supabase = await createServerClient();
     const transactions = await this.repository.findTransactions(filters);
 
     // Fetch relations
     const securityIds = new Set(transactions.filter(t => t.securityId).map(t => t.securityId!));
     const accountIds = new Set(transactions.map(t => t.accountId));
 
-    const [securitiesResult, accountsResult] = await Promise.all([
+    const [securities, accounts] = await Promise.all([
       securityIds.size > 0
-        ? supabase.from("Security").select("id, symbol, name, class, sector").in("id", Array.from(securityIds))
-        : Promise.resolve({ data: [], error: null }),
+        ? this.repository.findSecuritiesByIds(Array.from(securityIds))
+        : Promise.resolve([]),
       accountIds.size > 0
-        ? supabase.from("Account").select("id, name, type").in("id", Array.from(accountIds))
-        : Promise.resolve({ data: [], error: null }),
+        ? this.accountsRepository.findByIds(Array.from(accountIds))
+        : Promise.resolve([]),
     ]);
 
-    const securityMap = new Map((securitiesResult.data || []).map(s => [s.id, s]));
-    const accountMap = new Map((accountsResult.data || []).map(a => [a.id, a]));
+    const securityMap = new Map(securities.map(s => [s.id, s]));
+    const accountMap = new Map(accounts.map(a => [a.id, a]));
 
     return transactions.map(tx => {
       return InvestmentsMapper.transactionToDomain(tx, {
@@ -181,10 +385,8 @@ export class InvestmentsService {
    * Create investment transaction
    */
   async createInvestmentTransaction(data: InvestmentTransactionFormData): Promise<BaseInvestmentTransaction> {
-    const supabase = await createServerClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
@@ -208,10 +410,10 @@ export class InvestmentsService {
     });
 
     // Clear cache
-    this.clearHoldingsCache(user.id);
+    this.clearHoldingsCache(userId);
 
     // Fetch relations
-    const relations = await this.fetchTransactionRelations(transactionRow, supabase);
+    const relations = await this.fetchTransactionRelations(transactionRow);
 
     return InvestmentsMapper.transactionToDomain(transactionRow, relations);
   }
@@ -223,10 +425,8 @@ export class InvestmentsService {
     id: string,
     data: Partial<InvestmentTransactionFormData>
   ): Promise<BaseInvestmentTransaction> {
-    const supabase = await createServerClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
@@ -246,10 +446,10 @@ export class InvestmentsService {
     const updatedRow = await this.repository.updateTransaction(id, updateData);
 
     // Clear cache
-    this.clearHoldingsCache(user.id);
+    this.clearHoldingsCache(userId);
 
     // Fetch relations
-    const relations = await this.fetchTransactionRelations(updatedRow, supabase);
+    const relations = await this.fetchTransactionRelations(updatedRow);
 
     return InvestmentsMapper.transactionToDomain(updatedRow, relations);
   }
@@ -258,17 +458,15 @@ export class InvestmentsService {
    * Delete investment transaction
    */
   async deleteInvestmentTransaction(id: string): Promise<void> {
-    const supabase = await createServerClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
     await this.repository.deleteTransaction(id);
 
     // Clear cache
-    this.clearHoldingsCache(user.id);
+    this.clearHoldingsCache(userId);
   }
 
   /**
@@ -355,27 +553,36 @@ export class InvestmentsService {
     accessToken?: string,
     refreshToken?: string
   ): Promise<Array<{ id: string; name: string; type: string; userId: string; householdId: string | null; createdAt: Date | string; updatedAt: Date | string }>> {
-    const accounts = await this.repository.findInvestmentAccounts(accessToken, refreshToken);
-    return accounts.map(a => ({
-      ...a,
-      createdAt: new Date(a.createdAt),
-      updatedAt: new Date(a.updatedAt),
-    }));
+    try {
+      const accounts = await this.repository.findInvestmentAccounts(accessToken, refreshToken);
+      return accounts.map(a => ({
+        ...a,
+        createdAt: new Date(a.createdAt),
+        updatedAt: new Date(a.updatedAt),
+      }));
+    } catch (error: any) {
+      // Handle permission denied errors gracefully (can happen during SSR)
+      if (error?.code === '42501' || error?.message?.includes('permission denied')) {
+        logger.warn("[InvestmentsService] Permission denied fetching investment accounts - user may not be authenticated");
+        return [];
+      }
+      throw error;
+    }
   }
 
   /**
    * Create investment account
    */
-  async createInvestmentAccount(data: InvestmentAccountFormData): Promise<{ id: string; name: string; type: string; userId: string; householdId: string | null; createdAt: Date | string; updatedAt: Date | string }> {
-    const supabase = await createServerClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+  async createInvestmentAccount(data: InvestmentAccountFormData, accessToken?: string, refreshToken?: string): Promise<{ id: string; name: string; type: string; userId: string; householdId: string | null; createdAt: Date | string; updatedAt: Date | string }> {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
     const id = crypto.randomUUID();
     const now = formatTimestamp(new Date());
+
+    const supabase = await createServerClient(accessToken, refreshToken);
 
     // Create account in Account table with type "investment"
     const { data: account, error } = await supabase
@@ -384,7 +591,7 @@ export class InvestmentsService {
         id,
         name: data.name,
         type: "investment",
-        userId: user.id,
+        userId,
         createdAt: now,
         updatedAt: now,
       })
@@ -407,8 +614,7 @@ export class InvestmentsService {
    * Helper to fetch transaction relations
    */
   private async fetchTransactionRelations(
-    transaction: any,
-    supabase: any
+    transaction: any
   ): Promise<{
     account?: { id: string; name: string; type: string } | null;
     security?: { id: string; symbol: string; name: string; class: string; sector: string | null } | null;
@@ -416,21 +622,14 @@ export class InvestmentsService {
     const relations: any = {};
 
     if (transaction.accountId) {
-      const { data: account } = await supabase
-        .from("Account")
-        .select("id, name, type")
-        .eq("id", transaction.accountId)
-        .single();
-      relations.account = account || null;
+      const account = await this.accountsRepository.findById(transaction.accountId);
+      relations.account = account ? { id: account.id, name: account.name, type: account.type } : null;
     }
 
     if (transaction.securityId) {
-      const { data: security } = await supabase
-        .from("Security")
-        .select("id, symbol, name, class, sector")
-        .eq("id", transaction.securityId)
-        .single();
-      relations.security = security || null;
+      const securities = await this.repository.findSecuritiesByIds([transaction.securityId]);
+      const security = securities[0] || null;
+      relations.security = security ? { id: security.id, symbol: security.symbol, name: security.name, class: security.class, sector: security.sector } : null;
     }
 
     return relations;

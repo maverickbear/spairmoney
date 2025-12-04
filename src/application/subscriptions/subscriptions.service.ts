@@ -11,6 +11,7 @@ import { SUBSCRIPTION_CACHE_TTL, PLANS_CACHE_TTL } from "../../domain/subscripti
 import { getDefaultFeatures } from "@/lib/utils/plan-features";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { getCurrentUserId } from "../shared/feature-guard";
 
 // In-memory caches
 const plansCache = new Map<string, BasePlan>();
@@ -44,6 +45,74 @@ export class SubscriptionsService {
     plansCache.clear();
     plansCacheTimestamp = 0;
     logger.debug("[SubscriptionsService] Invalidated plans cache");
+  }
+
+  /**
+   * Invalidate subscription cache for all users with a specific plan
+   */
+  async invalidateSubscriptionsForPlan(planId: string): Promise<void> {
+    try {
+      // Get all active subscriptions with this plan
+      const supabase = await createServerClient();
+      const { data: subscriptions, error } = await supabase
+        .from("Subscription")
+        .select("userId, householdId")
+        .eq("planId", planId)
+        .in("status", ["active", "trialing"]);
+
+      if (error) {
+        logger.error("[SubscriptionsService] Error fetching subscriptions for plan:", error);
+        return;
+      }
+
+      if (!subscriptions || subscriptions.length === 0) {
+        logger.debug(`[SubscriptionsService] No active subscriptions found for plan: ${planId}`);
+        return;
+      }
+
+      // Collect all user IDs (from userId and household members)
+      const userIds = new Set<string>();
+
+      for (const sub of subscriptions) {
+        // Add direct userId if exists
+        if (sub.userId) {
+          userIds.add(sub.userId);
+        }
+
+        // If household subscription, invalidate all household members
+        if (sub.householdId) {
+          const { data: members } = await supabase
+            .from("HouseholdMemberNew")
+            .select("userId")
+            .eq("householdId", sub.householdId)
+            .eq("status", "active");
+
+          if (members) {
+            members.forEach(m => {
+              if (m.userId) {
+                userIds.add(m.userId);
+              }
+            });
+          }
+        }
+      }
+
+      // Invalidate cache for all users
+      let invalidatedCount = 0;
+      for (const userId of userIds) {
+        this.invalidateSubscriptionCache(userId);
+        invalidatedCount++;
+      }
+
+      logger.debug(`[SubscriptionsService] Invalidated subscription cache for plan: ${planId}`, {
+        planId,
+        subscriptionCount: subscriptions.length,
+        userCount: userIds.size,
+        invalidatedCount,
+      });
+    } catch (error) {
+      logger.error("[SubscriptionsService] Error invalidating subscriptions for plan:", error);
+    }
   }
 
   /**
@@ -89,6 +158,16 @@ export class SubscriptionsService {
    * Get user subscription data (with caching)
    */
   async getUserSubscriptionData(userId: string): Promise<BaseSubscriptionData> {
+    // Validate userId
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      logger.error("[SubscriptionsService] Invalid userId provided to getUserSubscriptionData:", { userId, type: typeof userId });
+      return {
+        subscription: null,
+        plan: null,
+        limits: getDefaultFeatures(),
+      };
+    }
+
     try {
       const now = Date.now();
       const invalidationTime = invalidationTimestamps.get(userId) || 0;
@@ -165,10 +244,8 @@ export class SubscriptionsService {
    */
   async getCurrentUserSubscriptionData(): Promise<BaseSubscriptionData> {
     try {
-      const supabase = await createServerClient();
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !authUser) {
+      const userId = await getCurrentUserId();
+      if (!userId) {
         return {
           subscription: null,
         plan: null,
@@ -176,7 +253,7 @@ export class SubscriptionsService {
         };
       }
 
-      return await this.getUserSubscriptionData(authUser.id);
+      return await this.getUserSubscriptionData(userId);
     } catch (error) {
       logger.error("[SubscriptionsService] Error getting current user subscription data:", error);
       return {
@@ -193,35 +270,7 @@ export class SubscriptionsService {
   async checkTransactionLimit(userId: string, month: Date = new Date()): Promise<BaseLimitCheckResult> {
     try {
       const { limits } = await this.getUserSubscriptionData(userId);
-      const supabase = await createServerClient();
-      
-      const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
-      const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59);
-
-      const monthDateStr = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}-${String(startOfMonth.getDate()).padStart(2, '0')}`;
-      
-      const { data: usage, error: usageError } = await supabase
-        .from("user_monthly_usage")
-        .select("transactions_count")
-        .eq("user_id", userId)
-        .eq("month_date", monthDateStr)
-        .maybeSingle();
-
-      let current = 0;
-      
-      const hasError = usageError && (usageError as { code?: string }).code !== 'PGRST116';
-      if (!usage || hasError) {
-        const { count } = await supabase
-          .from("Transaction")
-          .select("*", { count: "exact", head: true })
-          .eq("userId", userId)
-          .gte("date", startOfMonth.toISOString())
-          .lte("date", endOfMonth.toISOString());
-
-        current = count || 0;
-      } else {
-        current = usage.transactions_count || 0;
-      }
+      const current = await this.repository.getUserMonthlyUsage(userId, month);
 
       if (limits.maxTransactions === -1) {
         return {
@@ -256,37 +305,7 @@ export class SubscriptionsService {
   async checkAccountLimit(userId: string): Promise<BaseLimitCheckResult> {
     try {
       const { limits } = await this.getUserSubscriptionData(userId);
-      const supabase = await createServerClient();
-      
-      const [accountOwnersResult, directAccountsResult] = await Promise.all([
-        supabase
-          .from("AccountOwner")
-          .select("accountId")
-          .eq("ownerId", userId),
-        supabase
-          .from("Account")
-          .select("id")
-          .eq("userId", userId),
-      ]);
-
-      const { data: accountOwners } = accountOwnersResult;
-      const { data: directAccounts } = directAccountsResult;
-
-      const ownedAccountIds = accountOwners?.map(ao => ao.accountId) || [];
-      const accountIds = new Set<string>();
-      
-      directAccounts?.forEach(acc => accountIds.add(acc.id));
-
-      if (ownedAccountIds.length > 0) {
-        const { data: ownedAccountsData } = await supabase
-          .from("Account")
-          .select("id")
-          .in("id", ownedAccountIds);
-
-        ownedAccountsData?.forEach(acc => accountIds.add(acc.id));
-      }
-
-      const count = accountIds.size;
+      const count = await this.repository.getUserAccountCount(userId);
 
       if (limits.maxAccounts === -1) {
         return {
@@ -364,6 +383,16 @@ export class SubscriptionsService {
    * Internal: Fetch user subscription data from database
    */
   private async fetchUserSubscriptionData(userId: string): Promise<BaseSubscriptionData> {
+    // Validate userId
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      logger.error("[SubscriptionsService] Invalid userId provided to fetchUserSubscriptionData:", { userId, type: typeof userId });
+      return {
+        subscription: null,
+        plan: null,
+        limits: getDefaultFeatures(),
+      };
+    }
+
     // Try cached subscription data from User table first
     const userCache = await this.repository.getUserSubscriptionCache(userId);
     
@@ -378,10 +407,11 @@ export class SubscriptionsService {
       const isRecentCache = cacheAge >= 0 && cacheAge < CACHE_MAX_AGE;
       const isVeryOldCache = cacheAge > 60 * 60 * 1000;
       
-      // Log warning if timestamp is in the future (timezone/skew issue)
-      if (isFutureTimestamp) {
+      // Handle future timestamps (timezone/skew issue) - treat as valid cache if within reasonable range
+      // Only log if the difference is significant (more than 1 hour in the future)
+      if (isFutureTimestamp && Math.abs(cacheAge) > 60 * 60 * 1000) {
         logger.warn(
-          `[SubscriptionsService] Subscription cache timestamp is in the future for user ${userId}. ` +
+          `[SubscriptionsService] Subscription cache timestamp is significantly in the future for user ${userId}. ` +
           `This may indicate timezone differences or clock skew. ` +
           `Cache age: ${Math.round(cacheAge / 1000)}s, ` +
           `Timestamp: ${userCache.subscriptionUpdatedAt}, ` +
@@ -389,7 +419,9 @@ export class SubscriptionsService {
         );
       }
       
-      if (isValidTimestamp && (isRecentCache || isFutureTimestamp || !isVeryOldCache)) {
+      // Accept cache if: valid timestamp AND (recent OR future within 1 hour OR not very old)
+      // Future timestamps within 1 hour are likely just timezone differences and should be accepted
+      if (isValidTimestamp && (isRecentCache || (isFutureTimestamp && Math.abs(cacheAge) <= 60 * 60 * 1000) || !isVeryOldCache)) {
         const plan = await this.getPlanById(userCache.effectivePlanId);
         if (plan) {
           let fullSubscription: BaseSubscription | null = null;
@@ -429,27 +461,79 @@ export class SubscriptionsService {
     const householdId = await this.repository.getActiveHouseholdId(userId);
     let subscription: BaseSubscription | null = null;
 
+    logger.debug("[SubscriptionsService] Fetching subscription data", {
+      userId,
+      householdId: householdId || null,
+    });
+
     if (householdId) {
+      logger.debug("[SubscriptionsService] Checking subscription by householdId", { householdId, userId });
       const subscriptionRow = await this.repository.findByHouseholdId(householdId);
       if (subscriptionRow) {
         subscription = SubscriptionsMapper.subscriptionToDomain(subscriptionRow);
+        logger.debug("[SubscriptionsService] Found subscription by householdId", {
+          subscriptionId: subscription.id,
+          planId: subscription.planId,
+          status: subscription.status,
+          householdId,
+        });
       } else {
+        logger.debug("[SubscriptionsService] No subscription found by householdId, checking owner's subscription", {
+          householdId,
+          userId,
+        });
         // Try owner's subscription for inheritance
         const ownerId = await this.repository.getHouseholdOwnerId(householdId);
         if (ownerId && ownerId !== userId) {
+          logger.debug("[SubscriptionsService] Checking owner's subscription for household member", {
+            userId,
+            ownerId,
+            householdId,
+          });
           const ownerSubscriptionRow = await this.repository.findByUserId(ownerId);
           if (ownerSubscriptionRow) {
             subscription = SubscriptionsMapper.subscriptionToDomain(ownerSubscriptionRow);
+            logger.debug("[SubscriptionsService] Found owner's subscription for household member", {
+              subscriptionId: subscription.id,
+              planId: subscription.planId,
+              status: subscription.status,
+              userId,
+              ownerId,
+              householdId,
+            });
+          } else {
+            logger.debug("[SubscriptionsService] Owner has no subscription", {
+              userId,
+              ownerId,
+              householdId,
+            });
           }
+        } else {
+          logger.debug("[SubscriptionsService] User is household owner or ownerId not found", {
+            userId,
+            ownerId: ownerId || null,
+            householdId,
+          });
         }
       }
+    } else {
+      logger.debug("[SubscriptionsService] No active household found for user", { userId });
     }
 
     // Fallback to user's own subscription
     if (!subscription) {
+      logger.debug("[SubscriptionsService] Checking user's own subscription as fallback", { userId });
       const subscriptionRow = await this.repository.findByUserId(userId);
       if (subscriptionRow) {
         subscription = SubscriptionsMapper.subscriptionToDomain(subscriptionRow);
+        logger.debug("[SubscriptionsService] Found user's own subscription", {
+          subscriptionId: subscription.id,
+          planId: subscription.planId,
+          status: subscription.status,
+          userId,
+        });
+      } else {
+        logger.debug("[SubscriptionsService] No subscription found for user", { userId });
       }
     }
 
@@ -506,6 +590,78 @@ export class SubscriptionsService {
       plansCacheTimestamp = Date.now();
     } catch (error) {
       logger.error("[SubscriptionsService] Error refreshing plans cache:", error);
+    }
+  }
+
+  /**
+   * Cancel active Stripe subscription for a user
+   * Used during account deletion
+   */
+  async cancelUserSubscription(userId: string): Promise<{
+    cancelled: boolean;
+    error?: string;
+  }> {
+    try {
+      // Get active subscription for user
+      // Check both householdId-based and userId-based subscriptions
+      const { getCurrentUserId } = await import("../shared/feature-guard");
+      const currentUserId = await getCurrentUserId();
+      if (!currentUserId) {
+        return { cancelled: false, error: "User not authenticated" };
+      }
+
+      // Get user's household
+      const { MembersRepository } = await import("@/src/infrastructure/database/repositories/members.repository");
+      const membersRepository = new MembersRepository();
+      const householdId = await membersRepository.getActiveHouseholdId(userId);
+
+      // Try to get subscription by householdId first (current architecture)
+      let subscription = null;
+      if (householdId) {
+        const subscriptionRow = await this.repository.findByHouseholdId(householdId);
+        if (subscriptionRow && (subscriptionRow.status === "active" || subscriptionRow.status === "trialing")) {
+          subscription = subscriptionRow;
+        }
+      }
+
+      // Fallback to userId-based subscription (backward compatibility)
+      if (!subscription) {
+        const subscriptionRow = await this.repository.findByUserId(userId);
+        if (subscriptionRow && (subscriptionRow.status === "active" || subscriptionRow.status === "trialing")) {
+          subscription = subscriptionRow;
+        }
+      }
+
+      if (!subscription || !subscription.stripeSubscriptionId) {
+        // No active subscription to cancel
+        return { cancelled: true };
+      }
+
+      // Cancel subscription in Stripe
+      try {
+        const { getStripeClient } = await import("@/src/infrastructure/external/stripe/stripe-client");
+        const stripe = getStripeClient();
+        await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+        logger.debug("[SubscriptionsService] Cancelled Stripe subscription:", subscription.stripeSubscriptionId);
+      } catch (stripeError) {
+        logger.error("[SubscriptionsService] Error cancelling Stripe subscription:", stripeError);
+        // Don't fail deletion if Stripe cancellation fails, but log it
+        return { cancelled: false, error: "Failed to cancel subscription in Stripe" };
+      }
+
+      // Update subscription status in database
+      await this.repository.update(subscription.id, {
+        status: "cancelled",
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Invalidate cache
+      this.invalidateSubscriptionCache(userId);
+
+      return { cancelled: true };
+    } catch (error) {
+      logger.error("[SubscriptionsService] Error in cancelUserSubscription:", error);
+      return { cancelled: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }
 }

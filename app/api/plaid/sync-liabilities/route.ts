@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { createServerClient } from '@/src/infrastructure/database/supabase-server';
-// import { syncAccountLiabilities } from '@/lib/api/plaid/liabilities'; // TEMPORARILY DISABLED
 import { guardBankIntegration, getCurrentUserId } from '@/src/application/shared/feature-guard';
 import { throwIfNotAllowed } from '@/src/application/shared/feature-guard';
+import { AppError } from '@/src/application/shared/app-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,38 +31,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // TEMPORARY BYPASS: Return mock result instead of calling Plaid
-    console.log('[PLAID BYPASS] Syncing liabilities (bypassed) for item:', itemId);
-    
-    // Original implementation (commented out):
-    // const supabase = await createServerClient();
+    // Get access token for this item
+    const supabase = await createServerClient();
+    const { data: connection, error: connectionError } = await supabase
+      .from('PlaidConnection')
+      .select('accessToken')
+      .eq('itemId', itemId)
+      .single();
 
-    // // Get access token for this item
-    // const { data: connection } = await supabase
-    //   .from('PlaidConnection')
-    //   .select('accessToken')
-    //   .eq('itemId', itemId)
-    //   .single();
+    if (connectionError || !connection?.accessToken) {
+      return NextResponse.json(
+        { error: 'Plaid connection not found' },
+        { status: 404 }
+      );
+    }
 
-    // if (!connection?.accessToken) {
-    //   return NextResponse.json(
-    //     { error: 'Plaid connection not found' },
-    //     { status: 404 }
-    //   );
-    // }
-
-    // // Sync liabilities
-    // const result = await syncAccountLiabilities(itemId, connection.accessToken);
-
-    const result = {
-      synced: 0,
-      skipped: 0,
-      errors: 0,
-    };
+    // Sync liabilities using PlaidService
+    const plaidService = makePlaidService();
+    const result = await plaidService.syncAccountLiabilities(itemId, connection.accessToken);
 
     return NextResponse.json({
       success: true,
-      ...result,
+      synced: result.synced,
+      updated: result.updated,
+      errors: result.errors,
     });
   } catch (error: any) {
     console.error('Error syncing liabilities:', error);
@@ -75,6 +68,13 @@ export async function POST(req: NextRequest) {
           planError: error.planError,
         },
         { status: 403 }
+      );
+    }
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
 

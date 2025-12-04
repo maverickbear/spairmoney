@@ -88,12 +88,19 @@ export default function AccountsPage() {
     perfRef.current = perf;
   }, [perf]);
 
-  const loadAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
       // Use API route instead of client-side API
       // OPTIMIZED: Skip investment balances calculation for Accounts page (not needed, saves ~1s)
-      const response = await fetch("/api/v2/accounts?includeHoldings=false");
+      // Add cache-busting timestamp when forceRefresh is true to bypass browser cache
+      const url = forceRefresh 
+        ? `/api/v2/accounts?includeHoldings=false&_t=${Date.now()}`
+        : "/api/v2/accounts?includeHoldings=false";
+      
+      const response = await fetch(url, {
+        cache: forceRefresh ? 'no-store' : 'default',
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch accounts: ${response.statusText}`);
       }
@@ -315,7 +322,7 @@ export default function AccountsPage() {
         variant: 'success',
       });
 
-      await loadAccounts();
+      await loadAccounts(true); // Force refresh to bypass cache
     } catch (error: any) {
       console.error('Error syncing transactions:', error);
       toast({
@@ -353,7 +360,7 @@ export default function AccountsPage() {
         variant: 'success',
       });
 
-      await loadAccounts();
+      await loadAccounts(true); // Force refresh to bypass cache
     } catch (error: any) {
       console.error('Error disconnecting account:', error);
       toast({
@@ -390,7 +397,7 @@ export default function AccountsPage() {
       setAccountToReconnect(null);
 
       // Reload accounts to reflect the disconnection
-      await loadAccounts();
+      await loadAccounts(true); // Force refresh to bypass cache
 
       // Show success message and guide user to reconnect
       toast({
@@ -463,7 +470,7 @@ export default function AccountsPage() {
           {accounts.length > 0 && (
             <ConnectBankButton
               onSuccess={() => {
-                loadAccounts();
+                loadAccounts(true); // Force refresh to bypass cache
                 toast({
                   title: 'Bank account connected',
                   description: 'Your bank account has been connected successfully.',
@@ -555,16 +562,16 @@ export default function AccountsPage() {
                           Connect your bank account or create a manual account to get started tracking your finances.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-                          <ConnectBankButton
-                            onSuccess={() => {
-                              loadAccounts();
-                              toast({
-                                title: 'Bank account connected',
-                                description: 'Your bank account has been connected successfully.',
-                                variant: 'success',
-                              });
-                            }}
-                          />
+                      <ConnectBankButton
+                        onSuccess={() => {
+                          loadAccounts(true); // Force refresh to bypass cache
+                          toast({
+                            title: 'Bank account connected',
+                            description: 'Your bank account has been connected successfully.',
+                            variant: 'success',
+                          });
+                        }}
+                      />
                           {canWrite && (
                             <Button onClick={handleAddAccount} size="large" variant="outline">
                               <Plus className="mr-2 h-4 w-4" />
@@ -821,7 +828,7 @@ export default function AccountsPage() {
                     <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
                       <ConnectBankButton
                         onSuccess={() => {
-                          loadAccounts();
+                          loadAccounts(true); // Force refresh to bypass cache
                           toast({
                             title: 'Bank account connected',
                             description: 'Your bank account has been connected successfully.',
@@ -897,7 +904,7 @@ export default function AccountsPage() {
         }}
         account={selectedAccount || undefined}
         onSuccess={() => {
-          loadAccounts();
+          loadAccounts(true); // Force refresh to bypass cache
           loadAccountLimit();
         }}
         initialAccountLimit={accountLimit}
@@ -960,7 +967,7 @@ export default function AccountsPage() {
         open={isAddAccountSheetOpen}
         onOpenChange={setIsAddAccountSheetOpen}
         onSuccess={() => {
-          loadAccounts();
+          loadAccounts(true); // Force refresh to bypass cache
           loadAccountLimit();
         }}
         canWrite={canWrite}

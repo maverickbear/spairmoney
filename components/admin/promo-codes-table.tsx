@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Edit, Trash2, Power, PowerOff, Tag } from "lucide-react";
-import type { PromoCode } from "@/lib/api/admin";
+import type { PromoCode } from "@/src/domain/admin/admin.types";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface PromoCodesTableProps {

@@ -10,7 +10,7 @@
  * Otherwise, deduplicates all transactions.
  */
 
-import { deduplicateTransactions } from '../lib/api/plaid/deduplicate-transactions';
+import { makePlaidService } from '../src/application/plaid/plaid.factory';
 
 async function main() {
   const accountId = process.argv[2] || undefined;
@@ -23,7 +23,8 @@ async function main() {
   }
 
   try {
-    const result = await deduplicateTransactions(accountId);
+    const plaidService = makePlaidService();
+    const result = await plaidService.deduplicateTransactions(accountId);
 
     console.log('\n✅ Deduplication completed!');
     console.log(`   Duplicates found: ${result.duplicatesFound}`);

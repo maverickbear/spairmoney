@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
-import type { AdminUser } from "@/lib/api/admin";
+import type { AdminUser } from "@/src/domain/admin/admin.types";
 
 interface ManageSubscriptionDialogProps {
   user: AdminUser | null;

@@ -1,56 +1,33 @@
-"use client";
+import { Suspense } from "react";
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { redirect } from "next/navigation";
+import { ContactFormsPageClient } from "./contact-forms-client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ContactFormsTable, ContactForm } from "@/components/admin/contact-forms-table";
-
-export default function ContactFormsPage() {
-  const [contactForms, setContactForms] = useState<ContactForm[]>([]);
-  const [loadingContactForms, setLoadingContactForms] = useState(false);
-
-  useEffect(() => {
-    loadContactForms();
-  }, []);
-
-  async function loadContactForms() {
-    try {
-      setLoadingContactForms(true);
-      const response = await fetch("/api/v2/admin/contact-forms");
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || "Failed to load contact forms";
-        console.error("Error loading contact forms:", errorMessage);
-        setContactForms([]);
-        return;
-      }
-      const data = await response.json();
-      setContactForms(Array.isArray(data.contactForms) ? data.contactForms : []);
-    } catch (error) {
-      console.error("Error loading contact forms:", error);
-      setContactForms([]);
-    } finally {
-      setLoadingContactForms(false);
-    }
+async function ContactFormsContent() {
+  const userId = await getCurrentUserId();
+  
+  if (!userId) {
+    redirect("/auth/login");
   }
 
+  const adminService = makeAdminService();
+  
+  // Check if user is super_admin
+  if (!(await adminService.isSuperAdmin(userId))) {
+    redirect("/dashboard");
+  }
+
+  const result = await adminService.getContactForms();
+
+  return <ContactFormsPageClient contactForms={result.contactForms} />;
+}
+
+export default function ContactFormsPage() {
   return (
-    <div className="w-full p-4 lg:p-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Contact Forms</CardTitle>
-          <CardDescription>
-            View and manage contact form submissions from users
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ContactFormsTable
-            contactForms={contactForms}
-            loading={loadingContactForms}
-            onUpdate={loadContactForms}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <Suspense fallback={<div className="w-full p-4 lg:p-8">Loading...</div>}>
+      <ContactFormsContent />
+    </Suspense>
   );
 }
 

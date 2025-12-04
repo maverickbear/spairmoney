@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cancelPlannedPayment } from "@/lib/api/planned-payments";
+import { makePlannedPaymentsService } from "@/src/application/planned-payments/planned-payments.factory";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function POST(
   request: NextRequest,
@@ -18,11 +19,20 @@ export async function POST(
 
     const { id } = await params;
     
-    const plannedPayment = await cancelPlannedPayment(id);
+    const service = makePlannedPaymentsService();
+    const plannedPayment = await service.cancelPlannedPayment(id);
     
     return NextResponse.json(plannedPayment, { status: 200 });
   } catch (error) {
     console.error("Error cancelling planned payment:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     const errorMessage = error instanceof Error ? error.message : "Failed to cancel planned payment";
     const statusCode = errorMessage.includes("Unauthorized") || errorMessage.includes("not found") ? 401 : 400;
     

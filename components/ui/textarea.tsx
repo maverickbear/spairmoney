@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { componentSizes, DEFAULT_SIZE, type ComponentSize } from "@/lib/design-system/sizes";
 
 const textareaVariants = cva(
-  "flex w-full border border-input bg-background ring-offset-background placeholder:text-muted-foreground transition-colors hover:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-input",
+  "flex w-full border border-input bg-background ring-offset-background placeholder:text-muted-foreground transition-colors hover:border-ring active:border-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-input",
   {
     variants: {
       size: {

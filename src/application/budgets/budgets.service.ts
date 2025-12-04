@@ -4,20 +4,27 @@
  */
 
 import { BudgetsRepository } from "@/src/infrastructure/database/repositories/budgets.repository";
+import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
+import { TransactionsRepository } from "@/src/infrastructure/database/repositories/transactions.repository";
 import { BudgetsMapper } from "./budgets.mapper";
 import { BudgetFormData } from "../../domain/budgets/budgets.validations";
 import { BaseBudget, BudgetWithRelations } from "../../domain/budgets/budgets.types";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { formatTimestamp } from "@/lib/utils/timestamp";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { requireBudgetOwnership } from "@/lib/utils/security";
 import { logger } from "@/lib/utils/logger";
-import { invalidateBudgetCaches } from "@/src/infrastructure/cache/cache.manager";
 import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
 import { AppError } from "../shared/app-error";
+import { getCurrentUserId } from "../shared/feature-guard";
+import { makeMembersService } from "../members/members.factory";
+import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 
 export class BudgetsService {
-  constructor(private repository: BudgetsRepository) {}
+  constructor(
+    private repository: BudgetsRepository,
+    private categoriesRepository: CategoriesRepository,
+    private transactionsRepository: TransactionsRepository
+  ) {}
 
   /**
    * Get budgets for a period
@@ -27,65 +34,100 @@ export class BudgetsService {
     accessToken?: string,
     refreshToken?: string
   ): Promise<BudgetWithRelations[]> {
-    const supabase = await createServerClient(accessToken, refreshToken);
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return [];
+    }
 
-    // Ensure recurring budgets are created for this period
-    await this.ensureRecurringBudgetsForPeriod(period, supabase, accessToken, refreshToken);
+    // OPTIMIZATION: Check if there are any budgets first (fast query)
+    // Fetch budgets first to see if we need to do expensive operations
+    let rows = await this.repository.findAllByPeriod(period, accessToken, refreshToken);
 
-    // Fetch budgets
-    const rows = await this.repository.findAllByPeriod(period, accessToken, refreshToken);
+    // OPTIMIZATION: Only ensure recurring budgets if we have no budgets
+    // Skip if we already have budgets (they're already created)
+    if (rows.length === 0) {
+      // Quick check if user has any recurring budgets at all (very fast query)
+      const supabase = await createServerClient(accessToken, refreshToken);
+      const { data: hasRecurring } = await supabase
+        .from("Budget")
+        .select("id")
+        .eq("userId", userId)
+        .eq("isRecurring", true)
+        .limit(1)
+        .maybeSingle();
+
+      // Only run expensive ensureRecurringBudgetsForPeriod if user has recurring budgets
+      if (hasRecurring) {
+        await this.ensureRecurringBudgetsForPeriod(period, accessToken, refreshToken);
+        // Re-fetch after ensuring recurring budgets
+        rows = await this.repository.findAllByPeriod(period, accessToken, refreshToken);
+      }
+    }
+
+    // Early return if no budgets
+    if (rows.length === 0) {
+      return [];
+    }
 
     // Fetch related data
     const categoryIds = [...new Set(rows.map(b => b.categoryId).filter(Boolean) as string[])];
     const subcategoryIds = [...new Set(rows.map(b => b.subcategoryId).filter(Boolean) as string[])];
     const groupIds = [...new Set(rows.map(b => b.groupId).filter(Boolean) as string[])];
 
-    // Fetch categories, subcategories, and groups
-    const [categoriesResult, subcategoriesResult, groupsResult] = await Promise.all([
-      categoryIds.length > 0
-        ? supabase.from("Category").select("id, name, groupId").in("id", categoryIds)
-        : Promise.resolve({ data: null }),
+    // OPTIMIZATION: Fetch categories/subcategories/groups first (needed for mapping)
+    // Then fetch transactions in parallel with mapping operations
+    const periodStart = new Date(period.getFullYear(), period.getMonth(), 1);
+    const periodEnd = new Date(period.getFullYear(), period.getMonth() + 1, 0, 23, 59, 59);
+
+    // Fetch categories, subcategories, and groups first (needed for transaction processing)
+    const [categories, subcategories, groups] = await Promise.all([
+      categoryIds.length > 0 
+        ? this.categoriesRepository.findCategoriesByIds(categoryIds, accessToken, refreshToken)
+        : Promise.resolve([]),
       subcategoryIds.length > 0
-        ? supabase.from("Subcategory").select("id, name").in("id", subcategoryIds)
-        : Promise.resolve({ data: null }),
+        ? this.categoriesRepository.findSubcategoriesByIds(subcategoryIds, accessToken, refreshToken)
+        : Promise.resolve([]),
       groupIds.length > 0
-        ? supabase.from("Group").select("id, name").in("id", groupIds)
-        : Promise.resolve({ data: null }),
+        ? this.categoriesRepository.findGroupsByIds(groupIds, accessToken, refreshToken)
+        : Promise.resolve([]),
     ]);
 
+    // Create maps early for transaction processing
     const categoriesMap = new Map();
-    categoriesResult.data?.forEach((cat: any) => {
+    categories.forEach((cat) => {
       categoriesMap.set(cat.id, cat);
     });
 
     const subcategoriesMap = new Map();
-    subcategoriesResult.data?.forEach((sub: any) => {
+    subcategories.forEach((sub) => {
       subcategoriesMap.set(sub.id, sub);
     });
 
     const groupsMap = new Map();
-    groupsResult.data?.forEach((group: any) => {
+    groups.forEach((group) => {
       groupsMap.set(group.id, group);
     });
 
-    // Calculate actual spend for each budget
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return rows.map(row => BudgetsMapper.toDomainWithRelations(row));
-    }
-
-    // Get transactions for the period - only fetch once
-    // OPTIMIZATION: Only select necessary fields and filter by expense type at database level
-    const periodStart = new Date(period.getFullYear(), period.getMonth(), 1);
-    const periodEnd = new Date(period.getFullYear(), period.getMonth() + 1, 0, 23, 59, 59);
-
-    const { data: transactions } = await supabase
+    // OPTIMIZATION: Quick check if there are any expense transactions in the period
+    // If no transactions, skip expensive query and return budgets with zero actualSpend
+    const supabaseCheck = await createServerClient(accessToken, refreshToken);
+    const startDateStr = periodStart.toISOString().split('T')[0];
+    const endDateStr = periodEnd.toISOString().split('T')[0];
+    
+    const { count, error: countError } = await supabaseCheck
       .from("Transaction")
-      .select("categoryId, subcategoryId, amount")
-      .gte("date", periodStart.toISOString().split('T')[0])
-      .lte("date", periodEnd.toISOString().split('T')[0])
+      .select("*", { count: 'exact', head: true })
       .eq("type", "expense")
-      .not("categoryId", "is", null); // Only get transactions with categories to reduce data
+      .not("categoryId", "is", null)
+      .gte("date", startDateStr)
+      .lte("date", endDateStr);
+
+    // If no transactions or error, skip fetching full transaction data
+    let transactions: Array<{ categoryId: string; subcategoryId: string | null; amount: number }> = [];
+    if (!countError && count && count > 0) {
+      // Only fetch full transaction data if there are transactions
+      transactions = await this.fetchTransactionsForBudgets(periodStart, periodEnd, accessToken, refreshToken);
+    }
 
     // OPTIMIZATION: Pre-calculate spend maps instead of filtering for each budget
     // This reduces complexity from O(n*m) to O(n+m) where n=transactions, m=budgets
@@ -93,9 +135,10 @@ export class BudgetsService {
     const subcategorySpendMap = new Map<string, number>();
     const groupSpendMap = new Map<string, number>();
 
-    if (transactions) {
+    if (transactions && transactions.length > 0) {
       for (const tx of transactions) {
-        const amount = getTransactionAmount(tx.amount) || 0;
+        // OPTIMIZATION: Amounts are always numbers now, no need for complex decryption
+        const amount = typeof tx.amount === 'number' ? tx.amount : (getTransactionAmount(tx.amount) || 0);
         const absAmount = Math.abs(amount);
 
         // Add to category spend
@@ -158,6 +201,49 @@ export class BudgetsService {
   }
 
   /**
+   * Fetch transactions optimized for budget calculations
+   * Only selects necessary fields and filters by categoryId IS NOT NULL at DB level
+   * OPTIMIZATION: Uses minimal fields to reduce data transfer
+   */
+  private async fetchTransactionsForBudgets(
+    periodStart: Date,
+    periodEnd: Date,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<{ categoryId: string; subcategoryId: string | null; amount: number }>> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+    
+    const startDateStr = periodStart.toISOString().split('T')[0];
+    const endDateStr = periodEnd.toISOString().split('T')[0];
+
+    // OPTIMIZATION: Only select necessary fields, filter at DB level, and order by date ascending for better index usage
+    const { data: transactionRows, error } = await supabase
+      .from("Transaction")
+      .select("categoryId, subcategoryId, amount")
+      .eq("type", "expense")
+      .not("categoryId", "is", null)
+      .gte("date", startDateStr)
+      .lte("date", endDateStr)
+      .order("date", { ascending: true }); // Use index-friendly ordering
+
+    if (error) {
+      logger.warn("[BudgetsService] Error fetching transactions for budgets:", error);
+      return [];
+    }
+
+    if (!transactionRows || transactionRows.length === 0) {
+      return [];
+    }
+
+    // Map to simplified format (amounts are always numbers now)
+    return transactionRows.map(tx => ({
+      categoryId: tx.categoryId as string,
+      subcategoryId: (tx.subcategoryId as string | null) || null,
+      amount: typeof tx.amount === 'number' ? tx.amount : Number(tx.amount) || 0,
+    }));
+  }
+
+  /**
    * Get budget by ID
    */
   async getBudgetById(
@@ -171,19 +257,17 @@ export class BudgetsService {
       return null;
     }
 
-    // Fetch relations
-    const supabase = await createServerClient(accessToken, refreshToken);
-    
-    const [categoryResult, subcategoryResult, groupResult] = await Promise.all([
-      row.categoryId ? supabase.from("Category").select("id, name, groupId").eq("id", row.categoryId).single() : Promise.resolve({ data: null }),
-      row.subcategoryId ? supabase.from("Subcategory").select("id, name").eq("id", row.subcategoryId).single() : Promise.resolve({ data: null }),
-      row.groupId ? supabase.from("Group").select("id, name").eq("id", row.groupId).single() : Promise.resolve({ data: null }),
+    // Fetch relations using repository
+    const [category, subcategory, group] = await Promise.all([
+      row.categoryId ? this.categoriesRepository.findCategoryById(row.categoryId, accessToken, refreshToken) : Promise.resolve(null),
+      row.subcategoryId ? this.categoriesRepository.findSubcategoryById(row.subcategoryId, accessToken, refreshToken) : Promise.resolve(null),
+      row.groupId ? this.categoriesRepository.findGroupById(row.groupId, accessToken, refreshToken) : Promise.resolve(null),
     ]);
 
     return BudgetsMapper.toDomainWithRelations(row, {
-      category: categoryResult.data ? { ...categoryResult.data, group: null } : null,
-      subcategory: subcategoryResult.data || null,
-      group: groupResult.data ? { id: groupResult.data.id, name: groupResult.data.name } : null,
+      category: category ? { id: category.id, name: category.name, groupId: category.groupId, group: null } : null,
+      subcategory: subcategory ? { id: subcategory.id, name: subcategory.name } : null,
+      group: group ? { id: group.id, name: group.name } : null,
     });
   }
 
@@ -191,11 +275,9 @@ export class BudgetsService {
    * Create a new budget
    */
   async createBudget(data: BudgetFormData): Promise<BaseBudget> {
-    const supabase = await createServerClient();
-
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
@@ -213,7 +295,7 @@ export class BudgetsService {
       data.categoryId || null,
       data.subcategoryId || null,
       groupId,
-      user.id
+      userId
     );
 
     if (exists) {
@@ -222,7 +304,8 @@ export class BudgetsService {
 
     const id = crypto.randomUUID();
     const now = formatTimestamp(new Date());
-    const householdId = await getActiveHouseholdId(user.id);
+    const membersService = makeMembersService();
+    const householdId = await membersService.getActiveHouseholdId(userId);
 
     const budgetRow = await this.repository.create({
       id,
@@ -231,15 +314,13 @@ export class BudgetsService {
       categoryId: data.categoryId || null,
       subcategoryId: data.subcategoryId || null,
       groupId,
-      userId: user.id,
+      userId,
       note: null,
       isRecurring: false,
       createdAt: now,
       updatedAt: now,
     });
 
-    // Invalidate cache
-    invalidateBudgetCaches();
 
     return BudgetsMapper.toDomain(budgetRow);
   }
@@ -269,8 +350,6 @@ export class BudgetsService {
       updatedAt: now,
     });
 
-    // Invalidate cache
-    invalidateBudgetCaches();
 
     return BudgetsMapper.toDomain(budgetRow);
   }
@@ -284,8 +363,6 @@ export class BudgetsService {
 
     await this.repository.delete(id);
 
-    // Invalidate cache
-    invalidateBudgetCaches();
   }
 
   /**
@@ -294,18 +371,39 @@ export class BudgetsService {
    */
   private async ensureRecurringBudgetsForPeriod(
     period: Date,
-    supabase: any,
     accessToken?: string,
     refreshToken?: string
   ): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const userId = await getCurrentUserId();
+    if (!userId) return;
 
     const targetPeriod = new Date(period.getFullYear(), period.getMonth(), 1);
     const targetPeriodStr = formatTimestamp(targetPeriod);
 
+    // OPTIMIZATION: Quick check - if we already have budgets for this period, skip expensive recurring check
+    const existingBudgets = await this.repository.findAllByPeriod(period, accessToken, refreshToken);
+    if (existingBudgets.length > 0) {
+      // Already have budgets, likely no need to create recurring ones
+      return;
+    }
+
+    // OPTIMIZATION: Quick check if user has any recurring budgets at all (very fast query with limit 1)
+    const supabase = await createServerClient(accessToken, refreshToken);
+    const { data: hasRecurring, error } = await supabase
+      .from("Budget")
+      .select("id")
+      .eq("userId", userId)
+      .eq("isRecurring", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !hasRecurring) {
+      // No recurring budgets, skip expensive operations
+      return;
+    }
+
     // Get recurring budgets before this period
-    const recurringBudgets = await this.repository.findRecurringBudgetsBeforePeriod(targetPeriod, user.id, accessToken, refreshToken);
+    const recurringBudgets = await this.repository.findRecurringBudgetsBeforePeriod(targetPeriod, userId, accessToken, refreshToken);
 
     if (recurringBudgets.length === 0) {
       return;
@@ -327,16 +425,12 @@ export class BudgetsService {
 
     const uniqueRecurringBudgets = Array.from(recurringBudgetsMap.values());
 
-    // OPTIMIZATION: Fetch all existing budgets for the period in a single query
-    const { data: existingBudgets } = await supabase
-      .from("Budget")
-      .select("categoryId, subcategoryId, groupId")
-      .eq("period", targetPeriodStr)
-      .eq("userId", user.id);
+    // OPTIMIZATION: Fetch all existing budgets for the period using repository
+    const existingBudgetsRows = await this.repository.findAllByPeriod(period, accessToken, refreshToken);
 
     // Create a set of existing budget keys for O(1) lookup
     const existingKeys = new Set(
-      (existingBudgets || []).map((b: any) => 
+      existingBudgetsRows.map((b) => 
         b.groupId 
           ? `group:${b.groupId}` 
           : b.subcategoryId 
@@ -357,7 +451,7 @@ export class BudgetsService {
     
     if (budgetsToCreate.length > 0) {
       const now = formatTimestamp(new Date());
-      const householdId = await getActiveHouseholdId(user.id);
+      const householdId = await getActiveHouseholdId(userId);
 
       // Create all missing budgets in parallel
       await Promise.all(
@@ -370,7 +464,7 @@ export class BudgetsService {
             categoryId: budget.categoryId,
             subcategoryId: budget.subcategoryId,
             groupId: budget.groupId,
-            userId: user.id,
+            userId,
             note: budget.note,
             isRecurring: true,
             createdAt: now,

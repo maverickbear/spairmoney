@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeSubscriptionServicesService } from "@/src/application/subscription-services/subscription-services.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * GET /api/subscription-services/plans
@@ -17,27 +18,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerClient();
+    const service = makeSubscriptionServicesService();
+    const plans = await service.getPlansByServiceId(serviceId);
 
-    // Get only active plans for the service
-    const { data: plans, error } = await supabase
-      .from("SubscriptionServicePlan")
-      .select("*")
-      .eq("serviceId", serviceId)
-      .eq("isActive", true)
-      .order("planName", { ascending: true });
-
-    if (error) {
-      console.error("Error fetching plans:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to fetch plans" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ plans: plans || [] });
+    return NextResponse.json({ plans });
   } catch (error) {
     console.error("Error in GET /api/subscription-services/plans:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

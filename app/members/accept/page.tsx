@@ -67,7 +67,7 @@ function AcceptInvitationForm() {
     if (!token) return;
 
     try {
-      const res = await fetch(`/api/members/invite/validate?token=${encodeURIComponent(token)}`);
+      const res = await fetch(`/api/v2/members/invite/validate?token=${encodeURIComponent(token)}`);
       const data = await res.json();
 
       if (res.ok) {
@@ -102,7 +102,7 @@ function AcceptInvitationForm() {
       setStatus("processing");
       setError(null);
 
-      const res = await fetch("/api/members/invite/accept-with-password", {
+      const res = await fetch("/api/v2/members/invite/accept-with-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password: data.password }),
@@ -202,8 +202,8 @@ function AcceptInvitationForm() {
         <div className="relative z-10 space-y-8">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-[12px]">
-                <Wallet className="w-8 h-8 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px]">
+                <Wallet className="w-8 h-8 text-black" />
               </div>
               <h1 className="text-3xl font-bold">Spare Finance</h1>
             </div>
@@ -214,8 +214,8 @@ function AcceptInvitationForm() {
 
           <div className="space-y-6 pt-8">
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <TrendingUp className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <TrendingUp className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Track Your Finances</h3>
@@ -226,8 +226,8 @@ function AcceptInvitationForm() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Shield className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Shield className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Secure Data</h3>
@@ -238,8 +238,8 @@ function AcceptInvitationForm() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Zap className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Zap className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Smart Analytics</h3>
@@ -258,8 +258,8 @@ function AcceptInvitationForm() {
           {/* Mobile header */}
           <div className="lg:hidden text-center space-y-2">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-2 bg-primary/10 rounded-[12px]">
-                <Wallet className="w-6 h-6 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px]">
+                <Wallet className="w-6 h-6 text-black" />
               </div>
               <h1 className="text-2xl font-bold">Spare Finance</h1>
             </div>

@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/common/page-header";
 import { ReportFilters } from "@/components/reports/report-filters";
 import { ReportsContent } from "./reports-content";
 import { startServerPagePerformance } from "@/lib/utils/performance";
-import { getCurrentUserSubscriptionData } from "@/lib/api/subscription";
 import { Loader2 } from "lucide-react";
 import type { ReportPeriod } from "@/components/reports/report-filters";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
@@ -52,9 +51,10 @@ function getDateRange(period: ReportPeriod): { startDate: Date; endDate: Date } 
 }
 
 async function ReportsContentWrapper({ period }: { period: ReportPeriod }) {
-  // PERFORMANCE: Get subscription data once and pass to both loadReportsData and ReportsContent
-  // This avoids duplicate getCurrentUserSubscriptionData() call
-  const subscriptionData = await getCurrentUserSubscriptionData();
+  // Get subscription data using Application Service
+  const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+  const subscriptionsService = makeSubscriptionsService();
+  const subscriptionData = await subscriptionsService.getCurrentUserSubscriptionData();
   const { limits } = subscriptionData;
   
   const data = await loadReportsData(period);
@@ -99,12 +99,16 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
   ) ? periodParam as ReportPeriod : "last-12-months";
   
   // Check feature access on server side
-  const subscriptionData = await getCurrentUserSubscriptionData();
+  const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+  const { makeAdminService } = await import("@/src/application/admin/admin.factory");
+  const subscriptionsService = makeSubscriptionsService();
+  const adminService = makeAdminService();
+  
+  const subscriptionData = await subscriptionsService.getCurrentUserSubscriptionData();
   const { limits, plan } = subscriptionData;
   
-  // Use centralized feature checking service
-  const { hasFeatureAccess } = await import("@/lib/api/plan-features-service");
-  const hasAdvancedReports = hasFeatureAccess(limits, "hasAdvancedReports");
+  // Check feature access directly from limits (limits already contains the features)
+  const hasAdvancedReports = limits.hasAdvancedReports || false;
   
   // Debug: Log what we're getting from the database
   const logger = (await import("@/lib/utils/logger")).logger;
@@ -122,16 +126,10 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
   // Check if user is super_admin
   let isSuperAdmin = false;
   try {
-    const { createServerClient } = await import("@/lib/supabase-server");
-    const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: userData } = await supabase
-        .from("User")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      isSuperAdmin = userData?.role === "super_admin";
+    const { getCurrentUserId } = await import("@/src/application/shared/feature-guard");
+    const userId = await getCurrentUserId();
+    if (userId) {
+      isSuperAdmin = await adminService.isSuperAdmin(userId);
     }
   } catch (error) {
     // If error checking, assume not super_admin

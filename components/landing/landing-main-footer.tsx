@@ -31,7 +31,7 @@ export function LandingMainFooter() {
           {/* Brand */}
           <div>
             <Link href="/" className="flex items-center mb-4">
-              <Logo variant="wordmark" color="auto" height={40} />
+              <Logo variant="full" color="auto" height={40} />
             </Link>
             <p className="text-sm text-muted-foreground">
               Help your family organize finances, track expenses, and learn to save together. A place where families learn to build wealth, not just pay bills.
@@ -108,14 +108,14 @@ export function LandingMainFooter() {
           <div>
             <h3 className="font-semibold mb-4">Other</h3>
             <ul className="space-y-2">
-              <li>
+              {/* <li>
                 <Link
                   href="#testimonials"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Testimonials
                 </Link>
-              </li>
+              </li> */}
               <li>
                 <Link
                   href="/auth/signup"

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatMoney } from "./money";
+import { formatMoney, formatMoneyCompact } from "./money";
 
 interface AnimatedNumberProps {
   value: number;
-  format?: "money" | "number" | "percent";
+  format?: "money" | "money-compact" | "number" | "percent";
   duration?: number;
   className?: string;
   decimals?: number;
@@ -88,6 +88,8 @@ export function AnimatedNumber({
   const formattedValue = (() => {
     if (format === "money") {
       return formatMoney(displayValue);
+    } else if (format === "money-compact") {
+      return formatMoneyCompact(displayValue);
     } else if (format === "percent") {
       return `${displayValue.toFixed(decimals)}%`;
     } else {

@@ -40,6 +40,16 @@ export class GoalsRepository {
   ): Promise<GoalRow[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
 
+    // Verify authentication first
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      logger.warn("[GoalsRepository] User not authenticated, returning empty array");
+      return [];
+    }
+
+    logger.debug(`[GoalsRepository] Fetching goals for user: ${user.id}`);
+
     const { data: goals, error } = await supabase
       .from("Goal")
       .select("*")
@@ -47,10 +57,25 @@ export class GoalsRepository {
       .order("createdAt", { ascending: false });
 
     if (error) {
-      logger.error("[GoalsRepository] Error fetching goals:", error);
+      // Handle permission denied errors gracefully (can happen during SSR)
+      if (error.code === '42501' || error.message?.includes('permission denied')) {
+        logger.warn("[GoalsRepository] Permission denied fetching goals - RLS may be blocking. Returning empty array.", {
+          userId: user.id,
+          errorCode: error.code,
+          errorMessage: error.message,
+        });
+        return [];
+      }
+      logger.error("[GoalsRepository] Error fetching goals:", {
+        userId: user.id,
+        error,
+        errorCode: error.code,
+        errorMessage: error.message,
+      });
       throw new Error(`Failed to fetch goals: ${error.message}`);
     }
 
+    logger.debug(`[GoalsRepository] Found ${goals?.length || 0} goals for user ${user.id}`);
     return (goals || []) as GoalRow[];
   }
 

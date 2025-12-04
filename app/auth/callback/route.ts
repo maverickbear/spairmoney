@@ -219,122 +219,74 @@ export async function GET(request: NextRequest) {
         console.log("[OAUTH-CALLBACK] ✅ User profile created");
       }
 
-      // Create personal household and member record for the owner
-      if (userData) {
-        const now = new Date().toISOString();
+      // Create personal household automatically for new user
+      // This allows users to immediately create accounts, transactions, budgets, and goals
+      try {
+        const now = formatTimestamp(new Date());
         
-        // Create personal household
-        const { data: household, error: householdError } = await serviceRoleClient
+        // Check if personal household already exists
+        const { data: existingHousehold } = await serviceRoleClient
           .from("Household")
-          .insert({
-            name: name || authUser.email || "Minha Conta",
-            type: "personal",
-            createdBy: userData.id,
-            createdAt: now,
-            updatedAt: now,
-            settings: {},
-          })
-          .select()
-          .single();
+          .select("id")
+          .eq("createdBy", authUser.id)
+          .eq("type", "personal")
+          .maybeSingle();
 
-        let householdMemberError: any = null;
-
-        if (householdError || !household) {
-          console.error("[OAUTH-CALLBACK] Error creating household:", householdError);
-        } else {
-          // Create household member (owner role)
-          const { error } = await serviceRoleClient
-            .from("HouseholdMemberNew")
+        if (!existingHousehold) {
+          // Create personal household using service role (bypasses RLS)
+          const { data: household, error: householdError } = await serviceRoleClient
+            .from("Household")
             .insert({
-              householdId: household.id,
-              userId: userData.id,
-              role: "owner",
-            status: "active",
-              isDefault: true,
-              joinedAt: now,
-            createdAt: now,
-            updatedAt: now,
-          });
-          householdMemberError = error;
+              name: name || "Minha Conta",
+              type: "personal",
+              createdBy: authUser.id,
+              createdAt: now,
+              updatedAt: now,
+              settings: {},
+            })
+            .select()
+            .single();
 
-          if (householdMemberError) {
-            console.error("[OAUTH-CALLBACK] Error creating household member:", householdMemberError);
+          if (householdError || !household) {
+            console.error("[OAUTH-CALLBACK] Error creating personal household:", householdError);
           } else {
-            // Set as active household
-            const { error: activeError } = await serviceRoleClient
-              .from("UserActiveHousehold")
+            // Create HouseholdMemberNew using service role (bypasses RLS)
+            const { error: memberError } = await serviceRoleClient
+              .from("HouseholdMemberNew")
               .insert({
-                userId: userData.id,
                 householdId: household.id,
+                userId: authUser.id,
+                role: "owner",
+                status: "active",
+                isDefault: true,
+                joinedAt: now,
+                createdAt: now,
                 updatedAt: now,
               });
 
-            if (activeError) {
-              console.error("[OAUTH-CALLBACK] Error setting active household:", activeError);
+            if (memberError) {
+              console.error("[OAUTH-CALLBACK] Error creating household member:", memberError);
             } else {
-              // Create emergency fund goal for new user
-              try {
-                // Check if emergency fund goal already exists
-                const { data: existingGoals } = await serviceRoleClient
-                  .from("Goal")
-                  .select("*")
-                  .eq("householdId", household.id)
-                  .eq("name", "Emergency Funds")
-                  .eq("isSystemGoal", true)
-                  .limit(1);
+              // Set as active household using service role (bypasses RLS)
+              const { error: activeError } = await serviceRoleClient
+                .from("UserActiveHousehold")
+                .insert({
+                  userId: authUser.id,
+                  householdId: household.id,
+                  updatedAt: now,
+                });
 
-                if (!existingGoals?.length) {
-                  // Create emergency fund goal
-                  const goalId = randomUUID();
-                  const goalNow = formatTimestamp(new Date());
-                  const { error: goalError } = await serviceRoleClient
-                    .from("Goal")
-                    .insert({
-                      id: goalId,
-                      name: "Emergency Funds",
-                      targetAmount: 0.00,
-                      currentBalance: 0.00,
-                      incomePercentage: 0.00,
-                      priority: "High",
-                      description: "Emergency fund for unexpected expenses",
-                      isPaused: false,
-                      isCompleted: false,
-                      completedAt: null,
-                      expectedIncome: null,
-                      targetMonths: null,
-                      accountId: null,
-                      holdingId: null,
-                      isSystemGoal: true,
-                      userId: userData.id,
-                      householdId: household.id,
-                      createdAt: goalNow,
-                      updatedAt: goalNow,
-                    });
-
-                  if (goalError) {
-                    console.error("[OAUTH-CALLBACK] Error creating emergency fund goal:", goalError);
-                  } else {
-                    console.log("[OAUTH-CALLBACK] ✅ Emergency fund goal created");
-                  }
-                }
-              } catch (goalError) {
-                console.error("[OAUTH-CALLBACK] Error creating emergency fund goal:", goalError);
-                // Don't fail account creation if goal creation fails
+              if (activeError) {
+                console.error("[OAUTH-CALLBACK] Error setting active household:", activeError);
+              } else {
+                console.log("[OAUTH-CALLBACK] ✅ Personal household created for new user");
               }
             }
           }
         }
-
-        if (householdMemberError) {
-          // If it's a duplicate, that's OK
-          if (householdMemberError.code !== "23505" && 
-              !householdMemberError.message?.includes("duplicate") && 
-              !householdMemberError.message?.includes("unique")) {
-            console.error("[OAUTH-CALLBACK] Error creating household member:", householdMemberError);
-          }
-        } else {
-          console.log("[OAUTH-CALLBACK] ✅ Household member created");
-        }
+      } catch (householdError) {
+        console.error("[OAUTH-CALLBACK] Error creating household:", householdError);
+        // Don't fail OAuth callback if household creation fails - it can be created later
       }
     } else {
       // User already exists - update avatar if available and not set
@@ -343,6 +295,52 @@ export async function GET(request: NextRequest) {
           .from("User")
           .update({ avatarUrl: avatarUrl })
           .eq("id", authUser.id);
+      }
+      
+      // Ensure household exists (edge case: user might not have household)
+      try {
+        const { getActiveHouseholdId } = await import("@/lib/utils/household");
+        const householdId = await getActiveHouseholdId(authUser.id);
+        if (!householdId) {
+          // No household found - create one
+          const now = formatTimestamp(new Date());
+          const { data: household, error: householdError } = await serviceRoleClient
+            .from("Household")
+            .insert({
+              name: userData.name || "Minha Conta",
+              type: "personal",
+              createdBy: authUser.id,
+              createdAt: now,
+              updatedAt: now,
+              settings: {},
+            })
+            .select()
+            .single();
+
+          if (!householdError && household) {
+            await serviceRoleClient.from("HouseholdMemberNew").insert({
+              householdId: household.id,
+              userId: authUser.id,
+              role: "owner",
+              status: "active",
+              isDefault: true,
+              joinedAt: now,
+              createdAt: now,
+              updatedAt: now,
+            });
+            
+            await serviceRoleClient.from("UserActiveHousehold").insert({
+              userId: authUser.id,
+              householdId: household.id,
+              updatedAt: now,
+            });
+            
+            console.log("[OAUTH-CALLBACK] ✅ Personal household created for existing user (edge case)");
+          }
+        }
+      } catch (householdError) {
+        console.warn("[OAUTH-CALLBACK] Error checking/creating household:", householdError);
+        // Don't fail OAuth callback - household check is non-critical
       }
     }
 

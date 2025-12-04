@@ -5,11 +5,16 @@
  */
 
 import { AdminRepository } from "@/src/infrastructure/database/repositories/admin.repository";
+import { AuthRepository } from "@/src/infrastructure/database/repositories/auth.repository";
+import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
+import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
+import { SubscriptionServicesRepository } from "@/src/infrastructure/database/repositories/subscription-services.repository";
 import { AdminUser, PromoCode, SystemGroup, SystemCategory, SystemSubcategory } from "../../domain/admin/admin.types";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 import Stripe from "stripe";
 import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import { AppError } from "../shared/app-error";
+import { logger } from "@/src/infrastructure/utils/logger";
 
 // Helper function to invalidate all categories cache
 async function invalidateAllCategoriesCache(): Promise<void> {
@@ -27,7 +32,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 export class AdminService {
-  constructor(private repository: AdminRepository) {}
+  constructor(
+    private repository: AdminRepository,
+    private authRepository: AuthRepository,
+    private accountsRepository: AccountsRepository,
+    private categoriesRepository: CategoriesRepository,
+    private subscriptionServicesRepository: SubscriptionServicesRepository
+  ) {}
 
   /**
    * Check if user is super_admin
@@ -476,15 +487,191 @@ export class AdminService {
   /**
    * Get system settings
    */
-  async getSystemSettings(): Promise<{ maintenanceMode: boolean }> {
+  async getSystemSettings(): Promise<{ maintenanceMode: boolean; seoSettings?: any }> {
     return this.repository.getSystemSettings();
+  }
+
+  /**
+   * Get public system settings (no authentication required)
+   */
+  async getPublicSystemSettings(): Promise<{ maintenanceMode: boolean }> {
+    const settings = await this.repository.getSystemSettings();
+    return {
+      maintenanceMode: settings.maintenanceMode || false,
+    };
+  }
+
+  /**
+   * Get public SEO settings (no authentication required)
+   */
+  async getPublicSeoSettings(): Promise<any> {
+    const settings = await this.repository.getSystemSettings();
+    if (!settings.seoSettings) {
+      return this.getDefaultSeoSettings();
+    }
+    return settings.seoSettings;
+  }
+
+  /**
+   * Get default SEO settings
+   */
+  private getDefaultSeoSettings() {
+    return {
+      title: "Spare Finance - Powerful Tools for Easy Money Management",
+      titleTemplate: "%s | Spare Finance",
+      description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household. Start your 30-day free trial today.",
+      keywords: [
+        "personal finance",
+        "expense tracking",
+        "budget management",
+        "financial planning",
+        "money management",
+        "household finance",
+        "savings goals",
+        "investment tracking",
+        "debt management",
+        "financial dashboard",
+        "budget app",
+        "finance software",
+        "money tracker",
+        "expense manager",
+      ],
+      author: "Spare Finance",
+      publisher: "Spare Finance",
+      openGraph: {
+        title: "Spare Finance - Powerful Tools for Easy Money Management",
+        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
+        image: "/og-image.png",
+        imageWidth: 1200,
+        imageHeight: 630,
+        imageAlt: "Spare Finance - Personal Finance Management Platform",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: "Spare Finance - Powerful Tools for Easy Money Management",
+        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together.",
+        image: "/og-image.png",
+        creator: "@sparefinance",
+      },
+      organization: {
+        name: "Spare Finance",
+        logo: "/icon-512x512.png",
+        url: process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com",
+        socialLinks: {
+          twitter: "",
+          linkedin: "",
+          facebook: "",
+          instagram: "",
+        },
+      },
+      application: {
+        name: "Spare Finance",
+        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
+        category: "FinanceApplication",
+        operatingSystem: "Web",
+        price: "0",
+        priceCurrency: "USD",
+        offersUrl: "/",
+      },
+      googleTagId: "",
+    };
   }
 
   /**
    * Update system settings
    */
-  async updateSystemSettings(data: { maintenanceMode: boolean }): Promise<{ maintenanceMode: boolean }> {
+  async updateSystemSettings(data: { maintenanceMode?: boolean; seoSettings?: any }): Promise<{ maintenanceMode: boolean; seoSettings?: any }> {
     return this.repository.updateSystemSettings(data);
+  }
+
+  /**
+   * Get SEO settings
+   */
+  async getSEOSettings(): Promise<any> {
+    const settings = await this.repository.getSystemSettings();
+    return settings.seoSettings || this.getDefaultSEOSettings();
+  }
+
+  /**
+   * Update SEO settings
+   */
+  async updateSEOSettings(seoSettings: any): Promise<any> {
+    if (!seoSettings.title || !seoSettings.description) {
+      throw new AppError("Title and description are required", 400);
+    }
+
+    const currentSettings = await this.repository.getSystemSettings();
+    const updatedSettings = await this.repository.updateSystemSettings({
+      ...currentSettings,
+      seoSettings,
+    });
+
+    return updatedSettings.seoSettings || seoSettings;
+  }
+
+  /**
+   * Get default SEO settings
+   */
+  getDefaultSEOSettings() {
+    return {
+      title: "Spare Finance - Powerful Tools for Easy Money Management",
+      titleTemplate: "%s | Spare Finance",
+      description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household. Start your 30-day free trial today.",
+      keywords: [
+        "personal finance",
+        "expense tracking",
+        "budget management",
+        "financial planning",
+        "money management",
+        "household finance",
+        "savings goals",
+        "investment tracking",
+        "debt management",
+        "financial dashboard",
+        "budget app",
+        "finance software",
+        "money tracker",
+        "expense manager",
+      ],
+      author: "Spare Finance",
+      publisher: "Spare Finance",
+      openGraph: {
+        title: "Spare Finance - Powerful Tools for Easy Money Management",
+        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
+        image: "/og-image.png",
+        imageWidth: 1200,
+        imageHeight: 630,
+        imageAlt: "Spare Finance - Personal Finance Management Platform",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: "Spare Finance - Powerful Tools for Easy Money Management",
+        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together.",
+        image: "/og-image.png",
+        creator: "@sparefinance",
+      },
+      organization: {
+        name: "Spare Finance",
+        logo: "/icon-512x512.png",
+        url: process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com",
+        socialLinks: {
+          twitter: "",
+          linkedin: "",
+          facebook: "",
+          instagram: "",
+        },
+      },
+      application: {
+        name: "Spare Finance",
+        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
+        category: "FinanceApplication",
+        operatingSystem: "Web",
+        price: "0",
+        priceCurrency: "USD",
+        offersUrl: "/pricing",
+      },
+      googleTagId: "",
+    };
   }
 
   /**
@@ -508,31 +695,28 @@ export class AdminService {
   ): Promise<{ plan: any; stripeSync: { success: boolean; warnings?: string[]; error?: string } }> {
     // Validate features if provided
     if (data.features) {
-      try {
-        const { validateFeaturesForSave } = await import("@/lib/api/plan-features-service");
-        validateFeaturesForSave(data.features);
-      } catch (error) {
-        throw new AppError(`Invalid features format: ${error instanceof Error ? error.message : "Unknown error"}`, 400);
-      }
+      const { validateFeaturesForSave } = await import("../shared/plan-features-service");
+      validateFeaturesForSave(data.features);
     }
 
     // Update plan in database
     const updatedPlan = await this.repository.updatePlan(planId, data);
 
     // Invalidate plans cache
-    const { invalidatePlansCache } = await import("@/lib/api/subscription");
-    await invalidatePlansCache();
+    const { makeSubscriptionsService } = await import("../subscriptions/subscriptions.factory");
+    const subscriptionsService = makeSubscriptionsService();
+    subscriptionsService.invalidatePlansCache();
 
     // Invalidate subscription cache for all users with this plan
-    const { invalidateSubscriptionsForPlan } = await import("@/lib/api/subscription");
-    await invalidateSubscriptionsForPlan(planId);
+    await subscriptionsService.invalidateSubscriptionsForPlan(planId);
 
     // Sync to Stripe if plan has stripeProductId
     let stripeSync: { success: boolean; warnings?: string[]; error?: string } = { success: true };
     if (updatedPlan.stripeProductId) {
       try {
-        const { syncPlanToStripe } = await import("@/lib/api/stripe");
-        const syncResult = await syncPlanToStripe(planId);
+        const { makeStripeService } = await import("../stripe/stripe.factory");
+        const stripeService = makeStripeService();
+        const syncResult = await stripeService.syncPlanToStripe(planId);
         if (!syncResult.success) {
           stripeSync = {
             success: false,
@@ -868,6 +1052,498 @@ export class AdminService {
       },
       planDistribution: Object.values(planDistribution),
     };
+  }
+
+  /**
+   * Get all subscriptions with their plans
+   */
+  async getAllSubscriptions(): Promise<any[]> {
+    const data = await this.repository.getDashboardRawData();
+    
+    // Transform the data to handle plan as array or object
+    return (data.subscriptions || []).map((sub: any) => ({
+      id: sub.id,
+      userId: sub.userId,
+      planId: sub.planId,
+      status: sub.status,
+      trialStartDate: sub.trialStartDate,
+      trialEndDate: sub.trialEndDate,
+      currentPeriodStart: sub.currentPeriodStart,
+      currentPeriodEnd: sub.currentPeriodEnd,
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+      stripeSubscriptionId: sub.stripeSubscriptionId,
+      plan: Array.isArray(sub.plan) ? sub.plan[0] : sub.plan,
+    }));
+  }
+
+  /**
+   * Get all user service subscriptions
+   */
+  async getAllUserSubscriptions(): Promise<any[]> {
+    const supabase = createServiceRoleClient();
+
+    // Get all user service subscriptions
+    const { data: subscriptions, error } = await supabase
+      .from("UserServiceSubscription")
+      .select("*")
+      .order("createdAt", { ascending: false });
+
+    if (error) {
+      logger.error("[AdminService] Error fetching user subscriptions:", error);
+      throw new AppError(`Failed to fetch user subscriptions: ${error.message}`, 500);
+    }
+
+    if (!subscriptions || subscriptions.length === 0) {
+      return [];
+    }
+
+    // Collect all unique IDs for batch fetching
+    const userIds = new Set<string>();
+    const accountIds = new Set<string>();
+    const subcategoryIds = new Set<string>();
+    const serviceNames = new Set<string>();
+
+    subscriptions.forEach((sub: any) => {
+      if (sub.userId) userIds.add(sub.userId);
+      if (sub.accountId) accountIds.add(sub.accountId);
+      if (sub.subcategoryId) subcategoryIds.add(sub.subcategoryId);
+      if (sub.serviceName) serviceNames.add(sub.serviceName);
+    });
+
+    // Batch fetch all related data in parallel
+    const [users, accounts, subcategories, services] = await Promise.all([
+      userIds.size > 0
+        ? this.authRepository.findUsersByIds(Array.from(userIds))
+        : Promise.resolve([]),
+      accountIds.size > 0
+        ? this.accountsRepository.findByIds(Array.from(accountIds))
+        : Promise.resolve([]),
+      subcategoryIds.size > 0
+        ? this.categoriesRepository.findSubcategoriesByIds(Array.from(subcategoryIds))
+        : Promise.resolve([]),
+      serviceNames.size > 0
+        ? this.subscriptionServicesRepository.findServicesByNames(Array.from(serviceNames))
+        : Promise.resolve([]),
+    ]);
+
+    // Create maps for O(1) lookup
+    const usersMap = new Map(users.map((u: any) => [u.id, u]));
+    const accountsMap = new Map(accounts.map((a: any) => [a.id, a]));
+    const subcategoriesMap = new Map(subcategories.map((s: any) => [s.id, s]));
+    const servicesMap = new Map(services.map((s: any) => [s.name, s]));
+
+    // Enrich subscriptions with related data
+    return subscriptions.map((sub: any) => ({
+      ...sub,
+      amount: Number(sub.amount),
+      User: sub.userId ? (usersMap.get(sub.userId) || null) : null,
+      Account: sub.accountId ? (accountsMap.get(sub.accountId) || null) : null,
+      Subcategory: sub.subcategoryId ? (subcategoriesMap.get(sub.subcategoryId) || null) : null,
+      serviceLogo: servicesMap.get(sub.serviceName)?.logo || null,
+    }));
+  }
+
+  /**
+   * Get all subscription services (admin - includes inactive)
+   */
+  async getAllSubscriptionServices(): Promise<{
+    categories: any[];
+    services: any[];
+  }> {
+    const supabase = createServiceRoleClient();
+
+    // Get all categories
+    const { data: categories, error: categoriesError } = await supabase
+      .from("SubscriptionServiceCategory")
+      .select("*")
+      .order("displayOrder", { ascending: true });
+
+    if (categoriesError) {
+      logger.error("[AdminService] Error fetching categories:", categoriesError);
+      throw new AppError(`Failed to fetch categories: ${categoriesError.message}`, 500);
+    }
+
+    // Get all services (sorted alphabetically by name)
+    const { data: services, error: servicesError } = await supabase
+      .from("SubscriptionService")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (servicesError) {
+      logger.error("[AdminService] Error fetching services:", servicesError);
+      throw new AppError(`Failed to fetch services: ${servicesError.message}`, 500);
+    }
+
+    // Group services by category
+    const servicesByCategory = new Map<string, typeof services>();
+    (services || []).forEach((service: any) => {
+      if (!servicesByCategory.has(service.categoryId)) {
+        servicesByCategory.set(service.categoryId, []);
+      }
+      servicesByCategory.get(service.categoryId)!.push(service);
+    });
+
+    // Enrich categories with their services
+    const enrichedCategories = (categories || []).map((category: any) => ({
+      ...category,
+      services: servicesByCategory.get(category.id) || [],
+    }));
+
+    return {
+      categories: enrichedCategories,
+      services: services || [],
+    };
+  }
+
+  /**
+   * Create a subscription service category
+   */
+  async createSubscriptionServiceCategory(data: {
+    name: string;
+    displayOrder?: number;
+    isActive?: boolean;
+  }): Promise<any> {
+    const id = `cat_${data.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+    return this.repository.createSubscriptionServiceCategory({
+      id,
+      name: data.name,
+      displayOrder: data.displayOrder ?? 0,
+      isActive: data.isActive ?? true,
+    });
+  }
+
+  /**
+   * Update a subscription service category
+   */
+  async updateSubscriptionServiceCategory(id: string, data: {
+    name?: string;
+    displayOrder?: number;
+    isActive?: boolean;
+  }): Promise<any> {
+    return this.repository.updateSubscriptionServiceCategory(id, data);
+  }
+
+  /**
+   * Delete a subscription service category
+   */
+  async deleteSubscriptionServiceCategory(id: string): Promise<void> {
+    return this.repository.deleteSubscriptionServiceCategory(id);
+  }
+
+  /**
+   * Create a subscription service
+   */
+  async createSubscriptionService(data: {
+    categoryId: string;
+    name: string;
+    logo?: string | null;
+    isActive?: boolean;
+  }): Promise<any> {
+    if (!data.categoryId || !data.name) {
+      throw new AppError("Category ID and service name are required", 400);
+    }
+
+    const id = `svc_${data.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+    return this.repository.createSubscriptionService({
+      id,
+      categoryId: data.categoryId,
+      name: data.name,
+      logo: data.logo,
+      isActive: data.isActive ?? true,
+    });
+  }
+
+  /**
+   * Update a subscription service
+   */
+  async updateSubscriptionService(id: string, data: {
+    categoryId?: string;
+    name?: string;
+    logo?: string | null;
+    isActive?: boolean;
+  }): Promise<any> {
+    if (!id) {
+      throw new AppError("Service ID is required", 400);
+    }
+    return this.repository.updateSubscriptionService(id, data);
+  }
+
+  /**
+   * Delete a subscription service
+   */
+  async deleteSubscriptionService(id: string): Promise<void> {
+    if (!id) {
+      throw new AppError("Service ID is required", 400);
+    }
+    return this.repository.deleteSubscriptionService(id);
+  }
+
+  /**
+   * Get all plans for a subscription service
+   */
+  async getAllSubscriptionServicePlans(serviceId: string): Promise<any[]> {
+    if (!serviceId) {
+      throw new AppError("Service ID is required", 400);
+    }
+    return this.repository.getAllSubscriptionServicePlans(serviceId);
+  }
+
+  /**
+   * Create a subscription service plan
+   */
+  async createSubscriptionServicePlan(data: {
+    serviceId: string;
+    planName: string;
+    price: number;
+    currency: string;
+    isActive?: boolean;
+  }): Promise<any> {
+    if (!data.serviceId || !data.planName || data.price === undefined || !data.currency) {
+      throw new AppError("Service ID, plan name, price, and currency are required", 400);
+    }
+
+    if (data.currency !== "USD" && data.currency !== "CAD") {
+      throw new AppError("Currency must be USD or CAD", 400);
+    }
+
+    if (data.price < 0) {
+      throw new AppError("Price must be greater than or equal to 0", 400);
+    }
+
+    const id = `plan_${data.serviceId}_${data.planName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
+    return this.repository.createSubscriptionServicePlan({
+      id,
+      serviceId: data.serviceId,
+      planName: data.planName,
+      price: data.price,
+      currency: data.currency,
+      isActive: data.isActive ?? true,
+    });
+  }
+
+  /**
+   * Update a subscription service plan
+   */
+  async updateSubscriptionServicePlan(id: string, data: {
+    planName?: string;
+    price?: number;
+    currency?: string;
+    isActive?: boolean;
+  }): Promise<any> {
+    if (!id) {
+      throw new AppError("Plan ID is required", 400);
+    }
+
+    if (data.currency && data.currency !== "USD" && data.currency !== "CAD") {
+      throw new AppError("Currency must be USD or CAD", 400);
+    }
+
+    if (data.price !== undefined && data.price < 0) {
+      throw new AppError("Price must be greater than or equal to 0", 400);
+    }
+
+    return this.repository.updateSubscriptionServicePlan(id, data);
+  }
+
+  /**
+   * Delete a subscription service plan
+   */
+  async deleteSubscriptionServicePlan(id: string): Promise<void> {
+    if (!id) {
+      throw new AppError("Plan ID is required", 400);
+    }
+    return this.repository.deleteSubscriptionServicePlan(id);
+  }
+
+  /**
+   * Upload image to Supabase Storage
+   */
+  async uploadImage(data: {
+    file: File;
+    folder: string;
+    bucket: string;
+  }): Promise<{ url: string }> {
+    const { validateImageFile, sanitizeFilename, getFileExtension } = await import("@/lib/utils/file-validation");
+    
+    // Convert File to ArrayBuffer for validation
+    const arrayBuffer = await data.file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Validate image file
+    const validation = await validateImageFile(data.file, buffer);
+    if (!validation.valid) {
+      throw new AppError(validation.error || "Invalid file", 400);
+    }
+
+    // Sanitize filename
+    const sanitizedOriginalName = sanitizeFilename(data.file.name);
+    const fileExt = getFileExtension(sanitizedOriginalName) || getFileExtension(data.file.name) || "png";
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const fileName = data.folder ? `${data.folder}/${timestamp}-${randomSuffix}.${fileExt}` : `${timestamp}-${randomSuffix}.${fileExt}`;
+
+    return this.repository.uploadImage({
+      file: buffer,
+      fileName,
+      contentType: data.file.type,
+      bucket: data.bucket,
+    });
+  }
+
+  /**
+   * End trial immediately or cancel subscription
+   */
+  async endTrialOrCancel(subscriptionId: string, action: "end_trial" | "cancel"): Promise<{ success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string }> {
+    if (!subscriptionId || !action) {
+      throw new AppError("subscriptionId and action are required. Action must be 'end_trial' or 'cancel'", 400);
+    }
+
+    if (action !== "end_trial" && action !== "cancel") {
+      throw new AppError("Action must be 'end_trial' or 'cancel'", 400);
+    }
+
+    const result = await this.repository.endTrialOrCancel(subscriptionId, action);
+
+    // Update in Stripe
+    try {
+      if (action === "cancel") {
+        // Cancel subscription immediately in Stripe
+        await stripe.subscriptions.cancel(result.stripeSubscriptionId);
+        logger.log("[AdminService] Subscription cancelled in Stripe");
+      } else {
+        // End trial immediately by setting trial_end to now
+        const now = Math.floor(Date.now() / 1000); // Unix timestamp
+        await stripe.subscriptions.update(result.stripeSubscriptionId, {
+          trial_end: now,
+        });
+        logger.log("[AdminService] Trial ended in Stripe");
+      }
+    } catch (stripeError) {
+      logger.error("[AdminService] Error updating subscription in Stripe:", stripeError);
+      return {
+        success: result.success,
+        message: result.message,
+        subscription: result.subscription,
+        warning: `Updated in database but failed to sync with Stripe: ${stripeError instanceof Error ? stripeError.message : 'Unknown error'}`,
+        stripeSubscriptionId: result.stripeSubscriptionId,
+        userId: result.userId,
+      };
+    }
+
+    // Invalidate cache
+    if (result.userId) {
+      const { makeSubscriptionsService } = await import("../subscriptions/subscriptions.factory");
+      const subscriptionsService = makeSubscriptionsService();
+      subscriptionsService.invalidateSubscriptionCache(result.userId);
+    }
+
+    return result;
+  }
+
+  /**
+   * Update subscription trial end date
+   */
+  async updateSubscriptionTrial(subscriptionId: string, trialEndDate: Date): Promise<{ success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string }> {
+    if (!subscriptionId || !trialEndDate) {
+      throw new AppError("subscriptionId and trialEndDate are required", 400);
+    }
+
+    // Validate that trialEndDate is in the future
+    const now = new Date();
+    if (trialEndDate <= now) {
+      throw new AppError("Trial end date must be in the future", 400);
+    }
+
+    const result = await this.repository.updateSubscriptionTrial(subscriptionId, trialEndDate);
+
+    // Update in Stripe
+    try {
+      const { makeStripeService } = await import("../stripe/stripe.factory");
+      const stripeService = makeStripeService();
+      const stripeResult = await stripeService.updateSubscriptionTrial(result.userId, trialEndDate);
+
+      if (!stripeResult.success) {
+        logger.error("[AdminService] Error updating subscription in Stripe:", stripeResult.error);
+        return {
+          ...result,
+          warning: `Updated in database but failed to sync with Stripe: ${stripeResult.error}`,
+        };
+      }
+    } catch (error) {
+      logger.error("[AdminService] Error updating subscription in Stripe:", error);
+      return {
+        ...result,
+        warning: `Updated in database but failed to sync with Stripe: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
+
+    return result;
+  }
+
+  /**
+   * Cancel subscription with various options
+   */
+  async cancelSubscription(
+    subscriptionId: string,
+    cancelOption: "immediately" | "end_of_period" | "specific_date",
+    cancelAt?: Date,
+    refundOption?: string
+  ): Promise<{ success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string }> {
+    if (!subscriptionId || !cancelOption) {
+      throw new AppError("subscriptionId and cancelOption are required", 400);
+    }
+
+    if (!["immediately", "end_of_period", "specific_date"].includes(cancelOption)) {
+      throw new AppError("cancelOption must be 'immediately', 'end_of_period', or 'specific_date'", 400);
+    }
+
+    if (cancelOption === "specific_date" && !cancelAt) {
+      throw new AppError("cancelAt is required when cancelOption is 'specific_date'", 400);
+    }
+
+    const result = await this.repository.cancelSubscription(subscriptionId, cancelOption, cancelAt, refundOption);
+
+    // Update in Stripe
+    try {
+      if (cancelOption === "immediately") {
+        // Cancel immediately
+        await stripe.subscriptions.cancel(result.stripeSubscriptionId);
+        logger.log("[AdminService] Subscription cancelled immediately in Stripe");
+      } else {
+        // Update subscription with cancel settings
+        const stripeUpdate: any = {};
+        if (cancelOption === "end_of_period") {
+          stripeUpdate.cancel_at_period_end = true;
+        } else if (cancelOption === "specific_date" && cancelAt) {
+          const cancelTimestamp = Math.floor(cancelAt.getTime() / 1000);
+          stripeUpdate.cancel_at = cancelTimestamp;
+        }
+
+        await stripe.subscriptions.update(result.stripeSubscriptionId, stripeUpdate);
+        logger.log("[AdminService] Subscription updated in Stripe:", stripeUpdate);
+      }
+    } catch (stripeError) {
+      logger.error("[AdminService] Error updating subscription in Stripe:", stripeError);
+      return {
+        success: result.success,
+        message: result.message,
+        subscription: result.subscription,
+        warning: `Updated in database but failed to sync with Stripe: ${stripeError instanceof Error ? stripeError.message : 'Unknown error'}`,
+        stripeSubscriptionId: result.stripeSubscriptionId,
+        userId: result.userId,
+      };
+    }
+
+    // Invalidate cache
+    if (result.userId) {
+      const { makeSubscriptionsService } = await import("../subscriptions/subscriptions.factory");
+      const subscriptionsService = makeSubscriptionsService();
+      subscriptionsService.invalidateSubscriptionCache(result.userId);
+    }
+
+    return result;
   }
 }
 

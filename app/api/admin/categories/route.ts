@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getAllSystemCategories,
-  createSystemCategory,
-  updateSystemCategory,
-  deleteSystemCategory,
-} from "@/lib/api/admin";
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
-    const categories = await getAllSystemCategories();
+    const service = makeAdminService();
+    const categories = await service.getAllSystemCategories();
     return NextResponse.json(categories, { status: 200 });
   } catch (error) {
     console.error("Error fetching system categories:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch system categories" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }
@@ -38,10 +43,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const category = await createSystemCategory({ name: name.trim(), macroId });
+    const service = makeAdminService();
+    const category = await service.createSystemCategory({ name: name.trim(), macroId });
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     console.error("Error creating system category:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create system category" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }
@@ -88,10 +102,19 @@ export async function PUT(request: NextRequest) {
       updateData.macroId = macroId;
     }
 
-    const category = await updateSystemCategory(id, updateData);
+    const service = makeAdminService();
+    const category = await service.updateSystemCategory(id, updateData);
     return NextResponse.json(category, { status: 200 });
   } catch (error) {
     console.error("Error updating system category:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update system category" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }
@@ -111,10 +134,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await deleteSystemCategory(id);
+    const service = makeAdminService();
+    await service.deleteSystemCategory(id);
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting system category:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete system category" },
       { status: error instanceof Error && error.message.includes("Unauthorized") ? 403 : 500 }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateMember, removeMember } from "@/lib/api/members";
+import { makeMembersService } from "@/src/application/members/members.factory";
 import { memberUpdateSchema, MemberUpdateFormData } from "@/src/domain/members/members.validations";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import { ZodError } from "zod";
 
 export async function PATCH(
@@ -23,9 +24,9 @@ export async function PATCH(
     const body = await request.json();
     const data: MemberUpdateFormData = memberUpdateSchema.parse(body);
 
-    // Update the member
+    const service = makeMembersService();
     const { id } = await params;
-    const member = await updateMember(id, data);
+    const member = await service.updateMember(id, data);
 
     return NextResponse.json(member, { status: 200 });
   } catch (error) {
@@ -36,6 +37,14 @@ export async function PATCH(
       return NextResponse.json(
         { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
         { status: 400 }
+      );
+    }
+
+    // Handle AppError
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
 
@@ -65,13 +74,20 @@ export async function DELETE(
       );
     }
 
-    // Remove the member
+    const service = makeMembersService();
     const { id } = await params;
-    await removeMember(id);
+    await service.removeMember(id);
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error removing member:", error);
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
 
     const errorMessage = error instanceof Error ? error.message : "Failed to remove member";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;

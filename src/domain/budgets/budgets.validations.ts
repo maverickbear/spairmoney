@@ -10,10 +10,11 @@ export const budgetSchema = z.object({
   macroId: z.string().optional(),
 }).refine(
   (data) => {
-    return !!data.categoryId;
+    // Either categoryId or groupId must be provided
+    return !!(data.categoryId || data.groupId || data.macroId);
   },
   {
-    message: "Category must be selected",
+    message: "Either category or group must be selected",
     path: ["categoryId"],
   }
 );

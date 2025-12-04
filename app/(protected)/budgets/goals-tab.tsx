@@ -67,7 +67,7 @@ export function GoalsTab() {
     try {
       setLoading(true);
       // Add timestamp to bypass browser cache
-      const res = await fetch(`/api/goals?t=${Date.now()}`);
+      const res = await fetch(`/api/v2/goals?t=${Date.now()}`);
       if (!res.ok) {
         throw new Error("Failed to fetch goals");
       }

@@ -48,6 +48,8 @@ export function AddAccountSheet({
   const handleManualAccountSuccess = () => {
     setShowManualForm(false);
     onOpenChange(false);
+    // Dispatch custom event to notify other components (e.g., OnboardingWidget)
+    window.dispatchEvent(new CustomEvent("account-created"));
     onSuccess?.();
     toast({
       title: "Account added",
@@ -90,6 +92,8 @@ export function AddAccountSheet({
         } else {
           // Small import completed immediately
           onOpenChange(false);
+          // Dispatch custom event to notify other components (e.g., OnboardingWidget)
+          window.dispatchEvent(new CustomEvent("account-created"));
           onSuccess?.();
           toast({
             title: 'Bank account connected',

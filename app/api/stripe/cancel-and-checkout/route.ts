@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { createPortalSession } from "@/lib/api/stripe";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * DEPRECATED: This route should not be used for plan changes.
@@ -11,10 +12,8 @@ import { createPortalSession } from "@/lib/api/stripe";
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -24,7 +23,8 @@ export async function POST(request: NextRequest) {
     // CRITICAL: All plan changes and cancellations must be done through Stripe Customer Portal
     // The webhook will automatically update Supabase when changes are made in Stripe
     // Redirect to Stripe Customer Portal instead of making local changes
-    const portalResult = await createPortalSession(authUser.id);
+    const stripeService = makeStripeService();
+    const portalResult = await stripeService.createPortalSession(userId);
 
     if (portalResult.error || !portalResult.url) {
       return NextResponse.json(
@@ -40,6 +40,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[CANCEL_AND_CHECKOUT] Error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create portal session" },
       { status: 500 }

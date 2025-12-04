@@ -1,52 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { feedbackSchema } from "@/lib/validations/feedback";
+import { makeFeedbackService } from "@/src/application/feedback/feedback.factory";
+import { feedbackSchema } from "@/src/domain/feedback/feedback.validations";
+import { AppError } from "@/src/application/shared/app-error";
+import { ZodError } from "zod";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    
-    // Get current user (required for feedback)
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-    
     // Parse and validate request body
     const body = await request.json();
     const validatedData = feedbackSchema.parse(body);
 
-    // Insert feedback submission
-    const { data, error } = await supabase
-      .from("Feedback")
-      .insert({
-        userId: user.id,
-        rating: validatedData.rating,
-        feedback: validatedData.feedback || null,
-      })
-      .select()
-      .single();
+    const service = makeFeedbackService();
+    const feedback = await service.createFeedback(validatedData);
 
-    if (error) {
-      console.error("Error inserting feedback:", error);
-      return NextResponse.json(
-        { error: "Failed to submit feedback" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true, data }, { status: 201 });
+    return NextResponse.json({ success: true, data: feedback }, { status: 201 });
   } catch (error) {
     console.error("Error in feedback API:", error);
     
-    if (error instanceof Error && error.name === "ZodError") {
+    if (error instanceof ZodError) {
       return NextResponse.json(
-        { error: "Invalid form data", details: error },
+        { error: "Invalid form data", details: error.errors },
         { status: 400 }
+      );
+    }
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
 

@@ -34,3 +34,44 @@ export const updatePromoCodeSchema = z.object({
 export type CreatePromoCodeFormData = z.infer<typeof createPromoCodeSchema>;
 export type UpdatePromoCodeFormData = z.infer<typeof updatePromoCodeSchema>;
 
+export const updateSystemSettingsSchema = z.object({
+  maintenanceMode: z.boolean(),
+});
+
+export type UpdateSystemSettingsFormData = z.infer<typeof updateSystemSettingsSchema>;
+
+export const updatePlanSchema = z.object({
+  id: z.string().min(1, "Plan ID is required"),
+  name: z.string().optional(),
+  features: z.any().optional(),
+  priceMonthly: z.number().optional(),
+  priceYearly: z.number().optional(),
+});
+
+export type UpdatePlanFormData = z.infer<typeof updatePlanSchema>;
+
+export const updateContactFormSchema = z.object({
+  id: z.string().min(1, "ID is required"),
+  status: z.string().optional(),
+  adminNotes: z.string().optional(),
+});
+
+export type UpdateContactFormFormData = z.infer<typeof updateContactFormSchema>;
+
+export const blockUserSchema = z.object({
+  userId: z.string(),
+  isBlocked: z.boolean(),
+  reason: z.string().optional(),
+  pauseSubscription: z.boolean().optional(),
+});
+
+export type BlockUserFormData = z.infer<typeof blockUserSchema>;
+
+export const unblockUserSchema = z.object({
+  userId: z.string(),
+  reason: z.string(),
+  pauseSubscription: z.boolean().optional(),
+});
+
+export type UnblockUserFormData = z.infer<typeof unblockUserSchema>;
+

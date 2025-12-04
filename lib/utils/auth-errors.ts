@@ -27,6 +27,26 @@ export function isHIBPError(errorMessage: string | undefined | null): boolean {
 }
 
 /**
+ * Check if an error message indicates a CAPTCHA verification failure
+ * 
+ * @param errorMessage - The error message to check
+ * @returns true if the error is CAPTCHA-related
+ */
+export function isCaptchaError(errorMessage: string | undefined | null): boolean {
+  if (!errorMessage) return false;
+  
+  const lowerMessage = errorMessage.toLowerCase();
+  
+  return (
+    lowerMessage.includes("captcha") ||
+    lowerMessage.includes("turnstile") ||
+    lowerMessage.includes("verification failed") ||
+    lowerMessage.includes("challenge") ||
+    lowerMessage.includes("bot detection")
+  );
+}
+
+/**
  * Get a user-friendly error message for authentication errors
  * 
  * @param error - The error object or message
@@ -48,6 +68,11 @@ export function getAuthErrorMessage(
   // Check for HIBP errors first
   if (isHIBPError(errorMessage)) {
     return "This password has appeared in a data breach. Please choose a different password.";
+  }
+  
+  // Check for CAPTCHA errors
+  if (isCaptchaError(errorMessage)) {
+    return "CAPTCHA verification failed. Please complete the verification again.";
   }
   
   // Check for common authentication errors

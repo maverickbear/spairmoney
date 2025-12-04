@@ -250,6 +250,33 @@ export class InvestmentsRepository {
   }
 
   /**
+   * Find securities by IDs
+   */
+  async findSecuritiesByIds(
+    securityIds: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<SecurityRow[]> {
+    if (securityIds.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data, error } = await supabase
+      .from("Security")
+      .select("id, symbol, name, class, sector")
+      .in("id", securityIds);
+
+    if (error) {
+      logger.error("[InvestmentsRepository] Error fetching securities by IDs:", error);
+      return [];
+    }
+
+    return (data || []) as SecurityRow[];
+  }
+
+  /**
    * Create a security
    */
   async createSecurity(data: {
@@ -343,11 +370,106 @@ export class InvestmentsRepository {
       .order("name", { ascending: true });
 
     if (error) {
+      // Handle permission denied errors gracefully (can happen during SSR)
+      if (error.code === '42501' || error.message?.includes('permission denied')) {
+        logger.warn("[InvestmentsRepository] Permission denied fetching investment accounts - user may not be authenticated");
+        return [];
+      }
       logger.error("[InvestmentsRepository] Error fetching investment accounts:", error);
       return [];
     }
 
     return (data || []) as Array<{ id: string; name: string; type: string; userId: string; householdId: string | null; createdAt: string; updatedAt: string }>;
+  }
+
+  /**
+   * Get investment account data by account IDs
+   */
+  async getInvestmentAccountData(
+    accountIds: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<{ accountId: string; totalEquity: number | null; marketValue: number | null; cash: number | null }>> {
+    if (accountIds.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data, error } = await supabase
+      .from("InvestmentAccount")
+      .select("accountId, totalEquity, marketValue, cash")
+      .in("accountId", accountIds)
+      .not("accountId", "is", null);
+
+    if (error) {
+      logger.error("[InvestmentsRepository] Error fetching investment account data:", error);
+      return [];
+    }
+
+    return (data || []) as Array<{ accountId: string; totalEquity: number | null; marketValue: number | null; cash: number | null }>;
+  }
+
+  /**
+   * Get account investment values by account IDs
+   */
+  async getAccountInvestmentValues(
+    accountIds: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<{ accountId: string; totalValue: number }>> {
+    if (accountIds.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data, error } = await supabase
+      .from("AccountInvestmentValue")
+      .select("accountId, totalValue")
+      .in("accountId", accountIds);
+
+    if (error) {
+      logger.error("[InvestmentsRepository] Error fetching account investment values:", error);
+      return [];
+    }
+
+    return (data || []) as Array<{ accountId: string; totalValue: number }>;
+  }
+
+  /**
+   * Get investment account mapping (InvestmentAccount.id to Account.id)
+   */
+  async getInvestmentAccountMapping(
+    accountIds: string[],
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Map<string, string>> {
+    if (accountIds.length === 0) {
+      return new Map();
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data, error } = await supabase
+      .from("InvestmentAccount")
+      .select("id, accountId")
+      .in("accountId", accountIds)
+      .not("accountId", "is", null);
+
+    if (error) {
+      logger.error("[InvestmentsRepository] Error fetching investment account mapping:", error);
+      return new Map();
+    }
+
+    const map = new Map<string, string>();
+    data?.forEach((ia: any) => {
+      if (ia.accountId) {
+        map.set(ia.id, ia.accountId);
+      }
+    });
+
+    return map;
   }
 }
 

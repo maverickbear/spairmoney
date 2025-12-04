@@ -14,6 +14,7 @@ import { CategoryHelper } from "./category-helper";
 import { FinancialHealthData } from "../shared/financial-health";
 import { makeAccountsService } from "../accounts/accounts.factory";
 import { makeProfileService } from "../profile/profile.factory";
+import { makeSubscriptionsService } from "../subscriptions/subscriptions.factory";
 import { AppError } from "../shared/app-error";
 
 // Income range to monthly income conversion (using midpoint of range)
@@ -53,18 +54,42 @@ export class OnboardingService {
       const profileService = makeProfileService();
       const profile = await profileService.getProfile(accessToken, refreshToken);
       const hasCompleteProfile = profile !== null && profile.name !== null && profile.name.trim() !== "";
+      
+      // Check personal data (phone and dateOfBirth) - required for onboarding
+      const hasPersonalData = profile !== null && 
+        profile.phoneNumber !== null && 
+        profile.phoneNumber !== undefined && 
+        profile.phoneNumber.trim() !== "" &&
+        profile.dateOfBirth !== null && 
+        profile.dateOfBirth !== undefined && 
+        profile.dateOfBirth.trim() !== "";
 
       // Check income onboarding status
       const hasExpectedIncome = await this.checkIncomeOnboardingStatus(userId, accessToken, refreshToken);
 
-      // Calculate counts
-      const completedCount = [hasAccount, hasCompleteProfile, hasExpectedIncome].filter(Boolean).length;
+      // Check if user has selected a plan (has active subscription or trial)
+      // Note: cancelled subscriptions don't count as "hasPlan" for onboarding purposes
+      // Users with cancelled subscriptions should see pricing dialog, not onboarding
+      const subscriptionsService = makeSubscriptionsService();
+      // Invalidate cache before checking to ensure we get the latest subscription status
+      // This is critical when subscription was just created to avoid stale cache
+      subscriptionsService.invalidateSubscriptionCache(userId);
+      const subscriptionData = await subscriptionsService.getUserSubscriptionData(userId);
+      const hasPlan = subscriptionData.plan !== null && 
+                     subscriptionData.subscription !== null &&
+                     (subscriptionData.subscription.status === "active" || 
+                      subscriptionData.subscription.status === "trialing");
+
+      // Calculate counts - new onboarding: personal data, income, plan (3 steps)
+      const completedCount = [hasPersonalData, hasExpectedIncome, hasPlan].filter(Boolean).length;
       const totalCount = 3;
 
       return {
         hasAccount,
         hasCompleteProfile,
+        hasPersonalData,
         hasExpectedIncome,
+        hasPlan,
         completedCount,
         totalCount,
         totalBalance,
@@ -75,7 +100,9 @@ export class OnboardingService {
       return {
         hasAccount: false,
         hasCompleteProfile: false,
+        hasPersonalData: false,
         hasExpectedIncome: false,
+        hasPlan: false,
         completedCount: 0,
         totalCount: 3,
       };
@@ -84,6 +111,7 @@ export class OnboardingService {
 
   /**
    * Check if user has completed income onboarding
+   * Checks household settings first, then falls back to temporary income in profile
    */
   async checkIncomeOnboardingStatus(
     userId: string,
@@ -92,17 +120,25 @@ export class OnboardingService {
   ): Promise<boolean> {
     try {
       const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-      if (!householdId) {
-        return false;
+      
+      // If household exists, check household settings
+      if (householdId) {
+        const settings = await this.householdRepository.getSettings(
+          householdId,
+          accessToken,
+          refreshToken
+        );
+
+        if (settings?.expectedIncome !== undefined && settings.expectedIncome !== null) {
+          return true;
+        }
       }
 
-      const settings = await this.householdRepository.getSettings(
-        householdId,
-        accessToken,
-        refreshToken
-      );
-
-      return settings?.expectedIncome !== undefined && settings.expectedIncome !== null;
+      // Fallback to temporary income in profile
+      const profileService = makeProfileService();
+      const profile = await profileService.getProfile(accessToken, refreshToken);
+      
+      return profile?.temporaryExpectedIncome !== undefined && profile.temporaryExpectedIncome !== null;
     } catch (error) {
       logger.error("[OnboardingService] Error checking income onboarding status:", error);
       return false;
@@ -111,19 +147,39 @@ export class OnboardingService {
 
   /**
    * Save expected income to household settings
+   * If no household exists, stores temporarily in User profile until household is created
    */
   async saveExpectedIncome(
     userId: string,
     incomeRange: ExpectedIncomeRange,
     accessToken?: string,
-    refreshToken?: string
+    refreshToken?: string,
+    incomeAmount?: number | null
   ): Promise<void> {
     // Validate input
     expectedIncomeRangeSchema.parse(incomeRange);
+    
+    // Validate incomeAmount if provided
+    if (incomeAmount !== undefined && incomeAmount !== null) {
+      if (incomeAmount <= 0) {
+        throw new AppError("Expected income amount must be positive", 400);
+      }
+    }
 
     const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+    
+    // If no household exists, store temporarily in User profile
     if (!householdId) {
-      throw new AppError("Active household not found", 400);
+      logger.info(`[OnboardingService] No household found for user ${userId}, storing income temporarily in profile`);
+      
+      const profileService = makeProfileService();
+      await profileService.updateProfile({ 
+        temporaryExpectedIncome: incomeRange,
+        temporaryExpectedIncomeAmount: incomeAmount ?? null,
+      });
+      
+      logger.info(`[OnboardingService] Stored temporary expected income for user ${userId}: ${incomeRange}${incomeAmount ? ` (amount: $${incomeAmount})` : ''}`);
+      return;
     }
 
     // Get current settings
@@ -137,6 +193,7 @@ export class OnboardingService {
     const updatedSettings = OnboardingMapper.settingsToDatabase({
       ...currentSettings,
       expectedIncome: incomeRange,
+      expectedIncomeAmount: incomeAmount ?? null,
     });
 
     await this.householdRepository.updateSettings(
@@ -146,11 +203,11 @@ export class OnboardingService {
       refreshToken
     );
 
-    logger.info(`[OnboardingService] Saved expected income for user ${userId}: ${incomeRange}`);
+    logger.info(`[OnboardingService] Saved expected income for user ${userId}: ${incomeRange}${incomeAmount ? ` (amount: $${incomeAmount})` : ''}`);
   }
 
   /**
-   * Get expected income from household settings
+   * Get expected income from household settings or temporary profile storage
    */
   async getExpectedIncome(
     userId: string,
@@ -158,23 +215,75 @@ export class OnboardingService {
     refreshToken?: string
   ): Promise<ExpectedIncomeRange> {
     const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-    if (!householdId) {
-      return null;
+    
+    // If household exists, check household settings first
+    if (householdId) {
+      const settings = await this.householdRepository.getSettings(
+        householdId,
+        accessToken,
+        refreshToken
+      );
+
+      if (settings?.expectedIncome !== undefined && settings.expectedIncome !== null) {
+        return settings.expectedIncome;
+      }
     }
 
-    const settings = await this.householdRepository.getSettings(
-      householdId,
-      accessToken,
-      refreshToken
-    );
-
-    return settings?.expectedIncome ?? null;
+    // Fallback to temporary income in profile
+    const profileService = makeProfileService();
+    const profile = await profileService.getProfile(accessToken, refreshToken);
+    
+    return profile?.temporaryExpectedIncome ?? null;
   }
 
   /**
-   * Get monthly income from expected income range
+   * Get expected income with amount (range and custom amount if available)
    */
-  getMonthlyIncomeFromRange(incomeRange: ExpectedIncomeRange): number {
+  async getExpectedIncomeWithAmount(
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<{ incomeRange: ExpectedIncomeRange; incomeAmount?: number | null }> {
+    const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+    
+    // If household exists, check household settings first
+    if (householdId) {
+      const settings = await this.householdRepository.getSettings(
+        householdId,
+        accessToken,
+        refreshToken
+      );
+
+      if (settings?.expectedIncome !== undefined && settings.expectedIncome !== null) {
+        return {
+          incomeRange: settings.expectedIncome,
+          incomeAmount: settings.expectedIncomeAmount ?? null,
+        };
+      }
+    }
+
+    // Fallback to temporary income in profile
+    const profileService = makeProfileService();
+    const profile = await profileService.getProfile(accessToken, refreshToken);
+    
+    return {
+      incomeRange: profile?.temporaryExpectedIncome ?? null,
+      incomeAmount: profile?.temporaryExpectedIncomeAmount ?? null,
+    };
+  }
+
+  /**
+   * Get monthly income from expected income range or custom amount
+   * If incomeAmount is provided, uses that value directly (converted to monthly)
+   * Otherwise, uses the range midpoint
+   */
+  getMonthlyIncomeFromRange(incomeRange: ExpectedIncomeRange, incomeAmount?: number | null): number {
+    // If custom amount is provided, use it directly
+    if (incomeAmount !== undefined && incomeAmount !== null && incomeAmount > 0) {
+      return incomeAmount / 12;
+    }
+
+    // Otherwise, use range midpoint
     if (!incomeRange) {
       return 0;
     }
@@ -183,19 +292,21 @@ export class OnboardingService {
   }
 
   /**
-   * Generate initial budgets based on expected income
+   * Generate initial budgets based on expected income and optional budget rule
    */
   async generateInitialBudgets(
     userId: string,
     incomeRange: ExpectedIncomeRange,
     accessToken?: string,
-    refreshToken?: string
+    refreshToken?: string,
+    ruleType?: import("../../domain/budgets/budget-rules.types").BudgetRuleType,
+    incomeAmount?: number | null
   ): Promise<void> {
     if (!incomeRange) {
       throw new AppError("Income range is required to generate budgets", 400);
     }
 
-    const monthlyIncome = this.getMonthlyIncomeFromRange(incomeRange);
+    const monthlyIncome = this.getMonthlyIncomeFromRange(incomeRange, incomeAmount);
     if (monthlyIncome === 0) {
       throw new AppError("Invalid income range", 400);
     }
@@ -204,7 +315,8 @@ export class OnboardingService {
       userId,
       monthlyIncome,
       accessToken,
-      refreshToken
+      refreshToken,
+      ruleType
     );
 
     logger.info(`[OnboardingService] Generated initial budgets for user ${userId}`);

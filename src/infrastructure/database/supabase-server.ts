@@ -67,7 +67,9 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
           errorMessage.includes("refresh_token_not_found") ||
           errorMessage.includes("refresh token not found") ||
           errorMessage.includes("invalid refresh token") ||
-          errorMessage.includes("jwt expired");
+          errorMessage.includes("jwt expired") ||
+          errorMessage.includes("user from sub claim in jwt does not exist") ||
+          errorMessage.includes("user does not exist");
         if (!isExpectedError) {
           logger.warn("[createServerClient] getUser error after setSession:", {
             userError: userError?.message,
@@ -84,7 +86,9 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
         errorMessage.includes("refresh_token_not_found") ||
         errorMessage.includes("refresh token not found") ||
         errorMessage.includes("invalid refresh token") ||
-        errorMessage.includes("jwt expired");
+        errorMessage.includes("jwt expired") ||
+        errorMessage.includes("user from sub claim in jwt does not exist") ||
+        errorMessage.includes("user does not exist");
       if (!isExpectedError) {
         logger.warn("[createServerClient] Unexpected error:", error?.message);
       }
@@ -158,7 +162,9 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
       errorMessage.includes("refresh token not found") ||
       errorMessage.includes("invalid refresh token") ||
       errorMessage.includes("jwt expired") ||
-      errorMessage.includes("auth session missing")
+      errorMessage.includes("auth session missing") ||
+      errorMessage.includes("user from sub claim in jwt does not exist") ||
+      errorMessage.includes("user does not exist")
     );
     
     if (isExpectedError) {
@@ -191,6 +197,8 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
       errorMessage.includes("refresh token not found") ||
       errorMessage.includes("invalid refresh token") ||
       errorMessage.includes("jwt expired") ||
+      errorMessage.includes("user from sub claim in jwt does not exist") ||
+      errorMessage.includes("user does not exist") ||
       errorCode === "refresh_token_not_found";
     
     if (isExpectedError) {

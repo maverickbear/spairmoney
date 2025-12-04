@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateTransaction, deleteTransaction } from "@/lib/api/transactions";
+import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
 import { TransactionFormData } from "@/src/domain/transactions/transactions.validations";
+import { AppError } from "@/src/application/shared/app-error";
 import { ZodError } from "zod";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
 
@@ -23,7 +24,8 @@ export async function PATCH(
     
     console.log("[PATCH /api/transactions/[id]] Updating transaction:", { id, data });
     
-    const transaction = await updateTransaction(id, data);
+    const service = makeTransactionsService();
+    const transaction = await service.updateTransaction(id, data);
     
     console.log("[PATCH /api/transactions/[id]] Transaction updated successfully:", { id });
     
@@ -40,6 +42,14 @@ export async function PATCH(
       return NextResponse.json(
         { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
         { status: 400 }
+      );
+    }
+    
+    // Handle AppError
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     
@@ -70,11 +80,20 @@ export async function DELETE(
 
     const { id } = await params;
     
-    await deleteTransaction(id);
+    const service = makeTransactionsService();
+    await service.deleteTransaction(id);
     
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting transaction:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete transaction" },
       { status: 400 }

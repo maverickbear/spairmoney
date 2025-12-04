@@ -4,9 +4,8 @@ import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingMainFooter } from "@/components/landing/landing-main-footer";
 import { LandingMobileFooter } from "@/components/landing/landing-mobile-footer";
 import { StructuredData } from "@/src/presentation/components/seo/structured-data";
-import { getCurrentUser } from "@/lib/api/auth";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { startServerPagePerformance } from "@/lib/utils/performance";
-import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 
 // Lazy load heavy landing page components for better initial load performance
 const LandingHeroSection = nextDynamic(() => import("@/components/landing/landing-hero-section").then(m => ({ default: m.LandingHeroSection })), { ssr: true });
@@ -14,7 +13,7 @@ const StatisticsSection = nextDynamic(() => import("@/components/landing/statist
 const LandingFeaturesSection = nextDynamic(() => import("@/components/landing/landing-features-section").then(m => ({ default: m.LandingFeaturesSection })), { ssr: true });
 const BenefitsSection = nextDynamic(() => import("@/components/landing/benefits-section").then(m => ({ default: m.BenefitsSection })), { ssr: true });
 const HowItWorksSection = nextDynamic(() => import("@/components/landing/how-it-works-section").then(m => ({ default: m.HowItWorksSection })), { ssr: true });
-const LandingTestimonialsSection = nextDynamic(() => import("@/components/landing/landing-testimonials-section").then(m => ({ default: m.LandingTestimonialsSection })), { ssr: true });
+// const LandingTestimonialsSection = nextDynamic(() => import("@/components/landing/landing-testimonials-section").then(m => ({ default: m.LandingTestimonialsSection })), { ssr: true });
 const PricingSection = nextDynamic(() => import("@/components/landing/pricing-section").then(m => ({ default: m.PricingSection })), { ssr: true });
 
 export const dynamic = 'force-dynamic';
@@ -64,16 +63,9 @@ const defaultSEOSettings = {
 // Fetch SEO settings from database
 async function getSEOSettings() {
   try {
-    const supabase = createServiceRoleClient();
-    const { data: settings } = await supabase
-      .from("SystemSettings")
-      .select("seoSettings")
-      .eq("id", "default")
-      .single();
-    
-    if (settings?.seoSettings) {
-      return settings.seoSettings;
-    }
+    const { makeAdminService } = await import("@/src/application/admin/admin.factory");
+    const adminService = makeAdminService();
+    return await adminService.getPublicSeoSettings();
   } catch (error) {
     console.error("Error fetching SEO settings:", error);
   }
@@ -148,7 +140,8 @@ export default async function LandingPage() {
   const perf = startServerPagePerformance("Landing");
   
   // Check authentication status - redirect authenticated users to dashboard
-  const user = await getCurrentUser();
+  const authService = makeAuthService();
+  const user = await authService.getCurrentUser();
   if (user) {
     redirect("/dashboard");
   }
@@ -156,14 +149,10 @@ export default async function LandingPage() {
   // Check maintenance mode status
   let isMaintenanceMode = false;
   try {
-    const supabase = createServiceRoleClient();
-    const { data: settings } = await supabase
-      .from("SystemSettings")
-      .select("maintenanceMode")
-      .eq("id", "default")
-      .single();
-    
-    isMaintenanceMode = settings?.maintenanceMode || false;
+    const { makeAdminService } = await import("@/src/application/admin/admin.factory");
+    const adminService = makeAdminService();
+    const settings = await adminService.getPublicSystemSettings();
+    isMaintenanceMode = settings.maintenanceMode || false;
   } catch (error) {
     // If error, default to no maintenance mode
     console.error("Error checking maintenance mode:", error);
@@ -172,16 +161,9 @@ export default async function LandingPage() {
   // Fetch SEO settings from database
   let seoSettings = null;
   try {
-    const supabase = createServiceRoleClient();
-    const { data: settings } = await supabase
-      .from("SystemSettings")
-      .select("seoSettings")
-      .eq("id", "default")
-      .single();
-    
-    if (settings?.seoSettings) {
-      seoSettings = settings.seoSettings;
-    }
+    const { makeAdminService } = await import("@/src/application/admin/admin.factory");
+    const adminService = makeAdminService();
+    seoSettings = await adminService.getPublicSeoSettings();
   } catch (error) {
     // If error, use defaults (handled in StructuredData component)
     console.error("Error fetching SEO settings:", error);
@@ -200,7 +182,7 @@ export default async function LandingPage() {
           <LandingFeaturesSection />
           <BenefitsSection />
           <HowItWorksSection />
-          <LandingTestimonialsSection />
+          {/* <LandingTestimonialsSection /> */}
           {!isMaintenanceMode && <PricingSection />}
         </main>
         <LandingMainFooter />

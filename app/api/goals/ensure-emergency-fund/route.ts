@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureEmergencyFundGoal } from "@/lib/api/goals";
+import { makeGoalsService } from "@/src/application/goals/goals.factory";
+import { AppError } from "@/src/application/shared/app-error";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 
@@ -15,7 +16,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No active household found" }, { status: 400 });
     }
 
-    const goal = await ensureEmergencyFundGoal(userId, householdId);
+    const service = makeGoalsService();
+    const goal = await service.ensureEmergencyFundGoal(userId, householdId);
     
     if (!goal) {
       return NextResponse.json({ error: "Failed to create emergency fund goal" }, { status: 500 });
@@ -24,6 +26,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ goal }, { status: 200 });
   } catch (error) {
     console.error("Error ensuring emergency fund goal:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     
     const errorMessage = error instanceof Error ? error.message : "Failed to ensure emergency fund goal";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 500;

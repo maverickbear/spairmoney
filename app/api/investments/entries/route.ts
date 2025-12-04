@@ -6,14 +6,7 @@ import {
 import { z } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
-
-const createEntrySchema = z.object({
-  accountId: z.string().min(1),
-  date: z.string().or(z.date()),
-  type: z.enum(["contribution", "dividend", "interest", "initial"]),
-  amount: z.number().positive(),
-  description: z.string().optional(),
-});
+import { createSimpleInvestmentEntrySchema } from "@/src/domain/investments/investments.validations";
 
 export async function GET(request: Request) {
   try {
@@ -82,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const validated = createEntrySchema.parse(body);
+    const validated = createSimpleInvestmentEntrySchema.parse(body);
     const entry = await createSimpleInvestmentEntry({
       ...validated,
       date: validated.date instanceof Date ? validated.date : new Date(validated.date),

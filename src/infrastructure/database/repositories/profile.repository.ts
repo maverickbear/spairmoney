@@ -13,6 +13,8 @@ export interface UserRow {
   name: string | null;
   avatarUrl: string | null;
   phoneNumber: string | null;
+  dateOfBirth: string | null;
+  temporaryExpectedIncome: string | null;
   role: string | null;
   createdAt: string;
   updatedAt: string;
@@ -31,7 +33,7 @@ export class ProfileRepository {
 
     const { data: user, error } = await supabase
       .from("User")
-      .select("id, email, name, avatarUrl, phoneNumber, role, createdAt, updatedAt")
+      .select("id, email, name, avatarUrl, phoneNumber, dateOfBirth, temporaryExpectedIncome, role, createdAt, updatedAt")
       .eq("id", userId)
       .single();
 
@@ -55,6 +57,8 @@ export class ProfileRepository {
       name: string | null;
       avatarUrl: string | null;
       phoneNumber: string | null;
+      dateOfBirth: string | null;
+      temporaryExpectedIncome: string | null;
       updatedAt: string;
     }>
   ): Promise<UserRow> {
@@ -64,7 +68,7 @@ export class ProfileRepository {
       .from("User")
       .update(data)
       .eq("id", userId)
-      .select("id, email, name, avatarUrl, phoneNumber, role, createdAt, updatedAt")
+      .select("id, email, name, avatarUrl, phoneNumber, dateOfBirth, temporaryExpectedIncome, role, createdAt, updatedAt")
       .single();
 
     if (error) {

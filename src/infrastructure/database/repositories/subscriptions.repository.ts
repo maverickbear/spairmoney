@@ -75,6 +75,12 @@ export class SubscriptionsRepository {
    * Find subscription by user ID
    */
   async findByUserId(userId: string): Promise<SubscriptionRow | null> {
+    // Validate userId
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      logger.error("[SubscriptionsRepository] Invalid userId provided to findByUserId:", { userId, type: typeof userId });
+      return null;
+    }
+
     const supabase = await createServerClient();
 
     const { data: subscriptions, error } = await supabase
@@ -86,7 +92,13 @@ export class SubscriptionsRepository {
       .limit(10);
 
     if (error) {
-      logger.error("[SubscriptionsRepository] Error fetching subscription by userId:", error);
+      // Permission denied (42501) is expected when RLS policies block access
+      // This is normal during onboarding or when user doesn't have subscription yet
+      if (error.code === "42501") {
+        logger.debug("[SubscriptionsRepository] Permission denied fetching subscription by userId (expected during onboarding):", { userId });
+      } else {
+        logger.error("[SubscriptionsRepository] Error fetching subscription by userId:", error);
+      }
       return null;
     }
 
@@ -156,6 +168,12 @@ export class SubscriptionsRepository {
     effectiveSubscriptionId: string | null;
     subscriptionUpdatedAt: string | null;
   } | null> {
+    // Validate userId
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      logger.error("[SubscriptionsRepository] Invalid userId provided to getUserSubscriptionCache:", { userId, type: typeof userId });
+      return null;
+    }
+
     const supabase = await createServerClient();
 
     const { data: user, error } = await supabase
@@ -165,7 +183,13 @@ export class SubscriptionsRepository {
       .maybeSingle();
 
     if (error && error.code !== "PGRST116") {
-      logger.error("[SubscriptionsRepository] Error fetching user subscription cache:", error);
+      // Permission denied (42501) is expected when RLS policies block access
+      // This is normal during onboarding or when user doesn't have subscription yet
+      if (error.code === "42501") {
+        logger.debug("[SubscriptionsRepository] Permission denied fetching user subscription cache (expected during onboarding):", { userId });
+      } else {
+        logger.error("[SubscriptionsRepository] Error fetching user subscription cache:", error);
+      }
       return null;
     }
 
@@ -236,6 +260,100 @@ export class SubscriptionsRepository {
     }
 
     return subscription as SubscriptionRow | null;
+  }
+
+  /**
+   * Get user monthly transaction usage
+   */
+  async getUserMonthlyUsage(userId: string, month: Date): Promise<number> {
+    const supabase = await createServerClient();
+    
+    const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+    const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59);
+    const monthDateStr = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}-${String(startOfMonth.getDate()).padStart(2, '0')}`;
+    
+    // Try to get from user_monthly_usage table first
+    const { data: usage, error: usageError } = await supabase
+      .from("user_monthly_usage")
+      .select("transactions_count")
+      .eq("user_id", userId)
+      .eq("month_date", monthDateStr)
+      .maybeSingle();
+
+    const hasError = usageError && (usageError as { code?: string }).code !== 'PGRST116';
+    if (!usage || hasError) {
+      // Fallback to counting transactions directly
+      const { count } = await supabase
+        .from("Transaction")
+        .select("*", { count: "exact", head: true })
+        .eq("userId", userId)
+        .gte("date", startOfMonth.toISOString())
+        .lte("date", endOfMonth.toISOString());
+
+      return count || 0;
+    }
+
+    return usage.transactions_count || 0;
+  }
+
+  /**
+   * Get user account count (including shared accounts via AccountOwner)
+   */
+  async getUserAccountCount(userId: string): Promise<number> {
+    const supabase = await createServerClient();
+    
+    const [accountOwnersResult, directAccountsResult] = await Promise.all([
+      supabase
+        .from("AccountOwner")
+        .select("accountId")
+        .eq("ownerId", userId),
+      supabase
+        .from("Account")
+        .select("id")
+        .eq("userId", userId),
+    ]);
+
+    const { data: accountOwners } = accountOwnersResult;
+    const { data: directAccounts } = directAccountsResult;
+
+    const ownedAccountIds = accountOwners?.map(ao => ao.accountId) || [];
+    const accountIds = new Set<string>();
+    
+    directAccounts?.forEach(acc => accountIds.add(acc.id));
+
+    if (ownedAccountIds.length > 0) {
+      const { data: ownedAccountsData } = await supabase
+        .from("Account")
+        .select("id")
+        .in("id", ownedAccountIds);
+
+      ownedAccountsData?.forEach(acc => accountIds.add(acc.id));
+    }
+
+    return accountIds.size;
+  }
+
+  /**
+   * Update subscription
+   */
+  async update(
+    id: string,
+    data: Partial<{
+      status: "active" | "trialing" | "cancelled" | "past_due" | "unpaid";
+      updatedAt: string;
+    }>
+  ): Promise<void> {
+    const supabase = await createServerClient();
+
+    const { error } = await supabase
+      .from("Subscription")
+      .update(data)
+      .eq("id", id);
+
+    if (error) {
+      logger.error("[SubscriptionsRepository] Error updating subscription:", error);
+      throw new Error(`Failed to update subscription: ${error.message}`);
+    }
   }
 }
 

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { detectSubscriptionsFromTransactions } from "@/lib/api/subscription-detection";
+import { makeSubscriptionDetectionService } from "@/src/application/subscription-detection/subscription-detection.factory";
+import { AppError } from "@/src/application/shared/app-error";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 
 /**
  * GET /api/subscriptions/detect
@@ -7,7 +9,13 @@ import { detectSubscriptionsFromTransactions } from "@/lib/api/subscription-dete
  */
 export async function GET(request: NextRequest) {
   try {
-    const detectedSubscriptions = await detectSubscriptionsFromTransactions();
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeSubscriptionDetectionService();
+    const detectedSubscriptions = await service.detectSubscriptionsFromTransactions(userId);
     
     return NextResponse.json({
       success: true,
@@ -16,6 +24,19 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error detecting subscriptions:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          subscriptions: [],
+          count: 0,
+        },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       {
         success: false,

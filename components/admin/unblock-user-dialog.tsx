@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { AdminUser } from "@/lib/api/admin";
+import type { AdminUser } from "@/src/domain/admin/admin.types";
 
 interface UnblockUserDialogProps {
   user: AdminUser | null;

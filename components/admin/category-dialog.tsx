@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import type { SystemCategory } from "@/lib/api/admin";
+import type { SystemCategory } from "@/src/domain/admin/admin.types";
 
 const categorySchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),

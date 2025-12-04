@@ -7,35 +7,13 @@
 import { BasePortfolioHolding, BasePortfolioSummary, BasePortfolioAccount, BaseHistoricalDataPoint, BasePortfolioTransaction } from "../../domain/portfolio/portfolio.types";
 import { makeInvestmentsService } from "../investments/investments.factory";
 import { BaseHolding } from "../../domain/investments/investments.types";
+import { PortfolioMapper } from "./portfolio.mapper";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { formatDateStart, formatDateEnd } from "@/src/infrastructure/utils/timestamp";
 import { subDays } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
-import { cache } from "@/src/infrastructure/external/redis";
-import { unstable_cache } from "next/cache";
 
 export class PortfolioService {
-  /**
-   * Convert investment holding to portfolio holding format
-   */
-  private convertHolding(holding: BaseHolding): BasePortfolioHolding {
-    return {
-      id: holding.securityId,
-      symbol: holding.symbol,
-      name: holding.name,
-      assetType: holding.assetType as "Stock" | "ETF" | "Crypto" | "Fund",
-      sector: holding.sector,
-      quantity: holding.quantity,
-      avgPrice: holding.avgPrice,
-      currentPrice: holding.lastPrice,
-      marketValue: holding.marketValue,
-      bookValue: holding.bookValue,
-      unrealizedPnL: holding.unrealizedPnL,
-      unrealizedPnLPercent: holding.unrealizedPnLPercent,
-      accountId: holding.accountId,
-      accountName: holding.accountName,
-    };
-  }
 
   /**
    * Get portfolio holdings
@@ -46,7 +24,7 @@ export class PortfolioService {
   ): Promise<BasePortfolioHolding[]> {
     const investmentsService = makeInvestmentsService();
     const holdings = await investmentsService.getHoldings(undefined, accessToken, refreshToken);
-    return holdings.map(h => this.convertHolding(h));
+    return PortfolioMapper.investmentHoldingsToPortfolioHoldings(holdings);
   }
 
   /**
@@ -140,16 +118,9 @@ export class PortfolioService {
   }
 
   /**
-   * Get portfolio summary (with caching)
+   * Get portfolio summary
    */
   async getPortfolioSummary(userId: string): Promise<BasePortfolioSummary> {
-    // Try Redis cache first
-    const cacheKey = `portfolio:summary:${userId}`;
-    const cached = await cache.get<BasePortfolioSummary>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     // Get session tokens
     let accessToken: string | undefined;
     let refreshToken: string | undefined;
@@ -167,20 +138,7 @@ export class PortfolioService {
       logger.warn("[PortfolioService] Could not get session tokens:", error?.message);
     }
 
-    // Use Next.js cache as fallback
-    const result = await unstable_cache(
-      async () => this.getPortfolioSummaryInternal(accessToken, refreshToken),
-      [`portfolio-summary-${userId}`],
-      {
-        tags: ['investments', 'portfolio'],
-        revalidate: 30,
-      }
-    )();
-
-    // Store in Redis cache
-    await cache.set(cacheKey, result, 300);
-
-    return result;
+    return this.getPortfolioSummaryInternal(accessToken, refreshToken);
   }
 
   /**
@@ -243,13 +201,6 @@ export class PortfolioService {
     days: number = 365,
     userId: string
   ): Promise<BaseHistoricalDataPoint[]> {
-    // Try Redis cache first
-    const cacheKey = `portfolio:historical:${userId}:${days}`;
-    const cached = await cache.get<BaseHistoricalDataPoint[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     // Get session tokens
     let accessToken: string | undefined;
     let refreshToken: string | undefined;
@@ -267,15 +218,192 @@ export class PortfolioService {
       logger.warn("[PortfolioService] Could not get session tokens:", error?.message);
     }
 
-    // For now, use the legacy function as it's very complex
-    // TODO: Refactor this into the service layer
-    const { getPortfolioHistoricalDataInternal } = await import("@/lib/api/portfolio");
-    const result = await getPortfolioHistoricalDataInternal(days, accessToken, refreshToken);
+    // Use InvestmentsService to get data, then calculate historical data
+    const investmentsService = makeInvestmentsService();
+    const holdings = await investmentsService.getHoldings(undefined, accessToken, refreshToken);
+    const investmentAccounts = await investmentsService.getInvestmentAccounts(accessToken, refreshToken);
+    
+    // Get summary for current value
+    const summary = await this.getPortfolioSummaryInternal(accessToken, refreshToken);
+    return this.calculateHistoricalData(
+      days,
+      holdings,
+      investmentAccounts,
+      summary.totalValue,
+      accessToken,
+      refreshToken
+    );
+  }
 
-    // Store in Redis cache
-    await cache.set(cacheKey, result, 300);
+  /**
+   * Calculate historical data (private method)
+   * This is a complex calculation that processes transactions and prices over time
+   */
+  private async calculateHistoricalData(
+    days: number,
+    holdings: BaseHolding[],
+    investmentAccounts: any[],
+    currentValue: number,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<BaseHistoricalDataPoint[]> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+    const endDate = new Date();
+    const startDate = subDays(endDate, days);
 
-    return result;
+    // Convert holdings to portfolio format
+    const portfolioHoldings = PortfolioMapper.investmentHoldingsToPortfolioHoldings(holdings);
+    const securityIds = Array.from(new Set(portfolioHoldings.map(h => h.id)));
+
+    if (securityIds.length === 0 && (!investmentAccounts || investmentAccounts.length === 0)) {
+      return [];
+    }
+
+    // Get historical prices
+    const { data: historicalPrices } = await supabase
+      .from("SecurityPrice")
+      .select("securityId, price, date")
+      .in("securityId", securityIds)
+      .gte("date", formatDateStart(startDate))
+      .lte("date", formatDateEnd(endDate))
+      .order("date", { ascending: true });
+
+    // Group prices by date
+    const pricesByDate = new Map<string, Map<string, number>>();
+    if (historicalPrices) {
+      for (const price of historicalPrices) {
+        const dateKey = price.date instanceof Date 
+          ? price.date.toISOString().split("T")[0]
+          : price.date.split("T")[0];
+        
+        if (!pricesByDate.has(dateKey)) {
+          pricesByDate.set(dateKey, new Map());
+        }
+        pricesByDate.get(dateKey)!.set(price.securityId, price.price);
+      }
+    }
+
+    // Get investment transactions
+    const investmentsService = makeInvestmentsService();
+    const transactions = await investmentsService.getInvestmentTransactions({
+      startDate,
+      endDate,
+    });
+
+    // Group transactions by date
+    const transactionsByDate = new Map<string, any[]>();
+    for (const tx of transactions) {
+      const dateKey = tx.date instanceof Date 
+        ? tx.date.toISOString().split("T")[0]
+        : (typeof tx.date === 'string' ? tx.date.split("T")[0] : '');
+      
+      if (!transactionsByDate.has(dateKey)) {
+        transactionsByDate.set(dateKey, []);
+      }
+      transactionsByDate.get(dateKey)!.push(tx);
+    }
+
+    // Calculate portfolio value for each day
+    const data: BaseHistoricalDataPoint[] = [];
+    const today = new Date();
+    const holdingsOverTime = new Map<string, { quantity: number; avgPrice: number }>();
+
+    // Initialize with current holdings
+    for (const holding of portfolioHoldings) {
+      if (holding.quantity > 0) {
+        holdingsOverTime.set(holding.id, {
+          quantity: holding.quantity,
+          avgPrice: holding.avgPrice,
+        });
+      }
+    }
+
+    // Process each day chronologically
+    const todayKey = today.toISOString().split("T")[0];
+    for (let i = 0; i <= days; i++) {
+      const date = subDays(today, days - i);
+      const dateKey = date.toISOString().split("T")[0];
+
+      // Process transactions on this date
+      const transactionsOnDate = transactionsByDate.get(dateKey) || [];
+      for (const tx of transactionsOnDate) {
+        if (!tx.securityId || (tx.type !== "buy" && tx.type !== "sell")) continue;
+
+        const securityId = tx.securityId;
+        const quantity = tx.quantity || 0;
+        const price = tx.price || 0;
+        const fees = tx.fees || 0;
+
+        if (!holdingsOverTime.has(securityId)) {
+          holdingsOverTime.set(securityId, { quantity: 0, avgPrice: 0 });
+        }
+
+        const holding = holdingsOverTime.get(securityId)!;
+
+        if (tx.type === "buy") {
+          const cost = quantity * price + fees;
+          const newQuantity = holding.quantity + quantity;
+          const newTotalCost = holding.quantity * holding.avgPrice + cost;
+          holding.quantity = newQuantity;
+          holding.avgPrice = newQuantity > 0 ? newTotalCost / newQuantity : 0;
+        } else if (tx.type === "sell") {
+          holding.quantity = Math.max(0, holding.quantity - quantity);
+        }
+      }
+
+      // Calculate portfolio value for this date
+      let portfolioValue = 0;
+      const pricesForDate = pricesByDate.get(dateKey);
+
+      if (dateKey === todayKey) {
+        portfolioValue = currentValue;
+      } else if (pricesForDate && holdingsOverTime.size > 0) {
+        for (const [securityId, holding] of holdingsOverTime) {
+          if (holding.quantity <= 0) continue;
+          
+          const price = pricesForDate.get(securityId);
+          if (price !== undefined) {
+            portfolioValue += holding.quantity * price;
+          } else {
+            portfolioValue += holding.quantity * holding.avgPrice;
+          }
+        }
+      } else if (holdingsOverTime.size > 0) {
+        for (const [securityId, holding] of holdingsOverTime) {
+          if (holding.quantity > 0) {
+            portfolioValue += holding.quantity * holding.avgPrice;
+          }
+        }
+      }
+
+      data.push({
+        date: dateKey,
+        value: Math.max(0, portfolioValue),
+      });
+    }
+
+    // Ensure today's value is accurate
+    if (data.length > 0) {
+      const todayIndex = data.findIndex(d => d.date === todayKey);
+      if (todayIndex >= 0) {
+        data[todayIndex].value = currentValue;
+      } else {
+        data.push({
+          date: todayKey,
+          value: currentValue,
+        });
+      }
+    } else {
+      data.push({
+        date: todayKey,
+        value: currentValue,
+      });
+    }
+
+    // Sort by date
+    data.sort((a, b) => a.date.localeCompare(b.date));
+
+    return data;
   }
 
   /**
@@ -304,26 +432,5 @@ export class PortfolioService {
     }));
   }
 
-  /**
-   * Invalidate portfolio cache
-   */
-  async invalidatePortfolioCache(userId?: string): Promise<void> {
-    const targetUserId = userId;
-    if (!targetUserId) {
-      return;
-    }
-
-    const cacheKey = `portfolio:summary:${targetUserId}`;
-    await cache.delete(cacheKey);
-    
-    // Also invalidate Next.js cache
-    const { revalidateTag } = await import("next/cache");
-    revalidateTag('investments', 'max');
-    revalidateTag('portfolio', 'max');
-    
-    // Clear holdings cache
-    const investmentsService = makeInvestmentsService();
-    investmentsService.clearHoldingsCache(targetUserId);
-  }
 }
 

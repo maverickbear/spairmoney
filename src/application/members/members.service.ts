@@ -4,19 +4,90 @@
  */
 
 import { MembersRepository } from "@/src/infrastructure/database/repositories/members.repository";
+import { HouseholdRepository } from "@/src/infrastructure/database/repositories/household.repository";
 import { MembersMapper } from "./members.mapper";
 import { MemberInviteFormData, MemberUpdateFormData } from "../../domain/members/members.validations";
 import { BaseHouseholdMember, UserHouseholdInfo } from "../../domain/members/members.types";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
-import { getActiveHouseholdId } from "@/lib/utils/household";
 import { guardHouseholdMembers, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { sendInvitationEmail } from "@/lib/utils/email";
 import { AppError } from "../shared/app-error";
+import { validatePasswordAgainstHIBP } from "@/lib/utils/hibp";
+import { getAuthErrorMessage } from "@/lib/utils/auth-errors";
 
 export class MembersService {
-  constructor(private repository: MembersRepository) {}
+  constructor(
+    private repository: MembersRepository,
+    private householdRepository: HouseholdRepository
+  ) {}
+
+  /**
+   * Create a new household (personal or household)
+   */
+  async createHousehold(
+    userId: string,
+    name: string,
+    type: 'personal' | 'household'
+  ): Promise<{ id: string; name: string; type: string; createdAt: Date; updatedAt: Date; createdBy: string; settings: Record<string, unknown> }> {
+    const now = formatTimestamp(new Date());
+
+    // Create household
+    const household = await this.householdRepository.create({
+      name,
+      type,
+      createdBy: userId,
+    });
+
+    // Create HouseholdMemberNew (owner role)
+    try {
+      await this.repository.create({
+        id: crypto.randomUUID(),
+        householdId: household.id,
+        userId,
+        email: null,
+        name: null,
+        role: 'owner',
+        status: 'active',
+        invitationToken: null,
+        invitedAt: now,
+        acceptedAt: now,
+        joinedAt: now,
+        invitedBy: userId,
+        isDefault: type === 'personal', // Personal households are default
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (memberError) {
+      // Rollback: delete the household
+      await this.householdRepository.delete(household.id);
+      throw new AppError(
+        `Failed to create household member: ${memberError instanceof Error ? memberError.message : "Unknown error"}`,
+        500
+      );
+    }
+
+    // If personal household, set as active
+    if (type === 'personal') {
+      try {
+        await this.householdRepository.setActiveHousehold(userId, household.id);
+      } catch (activeError) {
+        logger.warn("Error setting active household (non-critical):", activeError);
+        // Don't throw - household is created successfully
+      }
+    }
+
+    return {
+      id: household.id,
+      name: household.name,
+      type: household.type,
+      createdAt: new Date(household.createdAt),
+      updatedAt: new Date(household.updatedAt),
+      createdBy: household.createdBy,
+      settings: household.settings || {},
+    };
+  }
 
   /**
    * Check if user has access to household members feature
@@ -29,6 +100,13 @@ export class MembersService {
       logger.error("Error checking member access:", error);
       return false;
     }
+  }
+
+  /**
+   * Get active household ID for user
+   */
+  async getActiveHouseholdId(userId: string): Promise<string | null> {
+    return this.repository.getActiveHouseholdId(userId);
   }
 
   /**
@@ -46,7 +124,7 @@ export class MembersService {
         .single();
 
       // Get the owner's active household
-      const householdId = await getActiveHouseholdId(ownerId);
+      const householdId = await this.getActiveHouseholdId(ownerId);
       
       if (!householdId) {
         logger.error("No household found for owner:", ownerId);
@@ -123,7 +201,7 @@ export class MembersService {
     await throwIfNotAllowed(guard);
 
     // Get the owner's active household
-    const householdId = await getActiveHouseholdId(ownerId);
+    const householdId = await this.getActiveHouseholdId(ownerId);
     if (!householdId) {
       throw new AppError("No household found for owner", 400);
     }
@@ -331,7 +409,6 @@ export class MembersService {
         .maybeSingle();
 
       if (!existingPersonalHousehold) {
-        const { createHousehold } = await import("@/lib/api/households");
         try {
           const { data: user } = await supabase
             .from("User")
@@ -339,7 +416,7 @@ export class MembersService {
             .eq("id", member.userId)
             .single();
 
-          await createHousehold(
+          await this.createHousehold(
             member.userId,
             user?.name || user?.email || "Minha Conta",
             'personal'
@@ -445,6 +522,18 @@ export class MembersService {
       }, {
         onConflict: "userId"
       });
+
+    // Invalidate subscription cache to ensure household subscription is found
+    // This is critical for household members who should inherit the owner's subscription
+    try {
+      const { makeSubscriptionsService } = await import("../subscriptions/subscriptions.factory");
+      const subscriptionsService = makeSubscriptionsService();
+      subscriptionsService.invalidateSubscriptionCache(userId);
+      logger.debug("[MembersService] Invalidated subscription cache for new household member", { userId, householdId: invitation.householdId });
+    } catch (cacheError) {
+      logger.warn("[MembersService] Could not invalidate subscription cache after accepting invitation:", cacheError);
+      // Don't fail the invitation acceptance if cache invalidation fails
+    }
 
     // Get household owner
     const { data: household } = await supabase
@@ -599,6 +688,440 @@ export class MembersService {
     } catch (error) {
       logger.error("[MembersService] Error getting user role:", error);
       return null;
+    }
+  }
+
+  /**
+   * Validate invitation token
+   * Returns invitation data if valid, null otherwise
+   */
+  async validateInvitationToken(token: string): Promise<{
+    id: string;
+    email: string;
+    name: string | null;
+    role: string;
+    owner_id: string;
+  } | null> {
+    const supabase = await createServerClient();
+
+    const { data: invitationData, error } = await supabase
+      .rpc("validate_invitation_token", { p_token: token });
+
+    if (error || !invitationData || invitationData.length === 0) {
+      return null;
+    }
+
+    return invitationData[0];
+  }
+
+  /**
+   * Get owner information for invitation
+   */
+  async getOwnerInfoForInvitation(ownerId: string): Promise<{
+    name: string | null;
+    email: string;
+  } | null> {
+    const supabase = await createServerClient();
+
+    const { data: ownerData, error } = await supabase
+      .rpc("get_owner_info_for_invitation", { p_owner_id: ownerId });
+
+    if (error || !ownerData || ownerData.length === 0) {
+      logger.error("[MembersService] Error fetching owner info:", error);
+      return null;
+    }
+
+    return ownerData[0];
+  }
+
+  /**
+   * Check if email has an account
+   */
+  async checkEmailHasAccount(email: string): Promise<boolean> {
+    const supabase = await createServerClient();
+
+    const { data: hasAccount, error } = await supabase
+      .rpc("check_email_has_account", { p_email: email });
+
+    if (error) {
+      logger.error("[MembersService] Error checking email:", error);
+      return false;
+    }
+
+    return hasAccount === true;
+  }
+
+  /**
+   * Accept invitation with password (for new users)
+   * Creates user account and returns invitation info
+   */
+  async acceptInvitationWithPassword(
+    token: string,
+    password: string
+  ): Promise<{
+    member: BaseHouseholdMember | null;
+    session: any;
+    requiresOtpVerification?: boolean;
+    email?: string;
+    invitationId?: string;
+    userId?: string;
+  }> {
+    // First, validate the token
+    const supabase = await createServerClient();
+    
+    const invitationData = await this.validateInvitationToken(token);
+    if (!invitationData) {
+      throw new AppError("Invalid or expired invitation token", 400);
+    }
+
+    // Get full invitation details using service role (needed for creating account)
+    const serviceRoleClient = createServiceRoleClient();
+    
+    const { data: fullInvitation, error: findError } = await serviceRoleClient
+      .from("HouseholdMemberNew")
+      .select(`
+        *,
+        Household(createdBy, id)
+      `)
+      .eq("id", invitationData.id)
+      .eq("status", "pending")
+      .single();
+
+    if (findError || !fullInvitation) {
+      throw new AppError("Invalid or expired invitation token", 400);
+    }
+
+    if (!fullInvitation.email) {
+      throw new AppError("Invitation is missing email", 400);
+    }
+
+    // Check password against HIBP
+    const passwordValidation = await validatePasswordAgainstHIBP(password);
+    if (!passwordValidation.isValid) {
+      throw new AppError(passwordValidation.error || "Invalid password", 400);
+    }
+
+    // Create user in Supabase Auth using service role client
+    const { data: authData, error: authError } = await serviceRoleClient.auth.signUp({
+      email: fullInvitation.email,
+      password: password,
+      options: {
+        emailRedirectTo: undefined, // Don't require email confirmation
+        data: {
+          name: fullInvitation.name || "",
+        },
+      },
+    });
+
+    if (authError) {
+      const errorMessage = getAuthErrorMessage(authError, "Failed to create account");
+      throw new AppError(errorMessage, 400);
+    }
+
+    if (!authData.user) {
+      throw new AppError("Failed to create account. Please try again.", 400);
+    }
+
+    const userId = authData.user.id;
+    const now = formatTimestamp(new Date());
+
+    // Send OTP email for verification
+    logger.log("[MembersService] Sending OTP email for invitation acceptance");
+    const { error: otpError } = await serviceRoleClient.auth.resend({
+      type: "signup",
+      email: fullInvitation.email,
+    });
+
+    if (otpError) {
+      logger.error("[MembersService] Error sending OTP:", otpError);
+      // Continue anyway - OTP might have been sent automatically by Supabase
+    } else {
+      logger.log("[MembersService] ✅ OTP email sent successfully");
+    }
+
+    // Create User in User table using service role (bypasses RLS during account creation)
+    const { error: createUserError } = await serviceRoleClient
+      .from("User")
+      .insert({
+        id: userId,
+        email: fullInvitation.email,
+        name: fullInvitation.name || null,
+        role: fullInvitation.role || "member",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+    if (createUserError) {
+      logger.error("[MembersService] Error creating user:", createUserError);
+      throw new AppError(`Failed to create user: ${createUserError.message}`, 400);
+    }
+
+    // Return without session - user needs to verify OTP first
+    return {
+      member: null, // Will be set after OTP verification
+      session: null, // No session until OTP is verified
+      requiresOtpVerification: true,
+      email: fullInvitation.email,
+      invitationId: fullInvitation.id,
+      userId: userId,
+    };
+  }
+
+  /**
+   * Complete invitation acceptance after OTP verification
+   */
+  async completeInvitationAfterOtp(
+    userId: string,
+    invitationId: string
+  ): Promise<{ member: BaseHouseholdMember; session: any }> {
+    const serviceRoleClient = createServiceRoleClient();
+    const now = formatTimestamp(new Date());
+
+    // Get the invitation to verify it's still pending
+    const { data: invitation, error: findError } = await serviceRoleClient
+      .from("HouseholdMemberNew")
+      .select(`
+        *,
+        Household(createdBy, id)
+      `)
+      .eq("id", invitationId)
+      .eq("status", "pending")
+      .single();
+
+    if (findError || !invitation) {
+      throw new AppError("Invitation not found or already accepted", 400);
+    }
+
+    // Verify the userId matches the invitation email
+    const { data: userData } = await serviceRoleClient
+      .from("User")
+      .select("email")
+      .eq("id", userId)
+      .single();
+
+    if (!userData || (invitation.email && userData.email.toLowerCase() !== invitation.email.toLowerCase())) {
+      throw new AppError("User email does not match invitation", 400);
+    }
+
+    // Update the invitation to active status and link the member
+    // Use service role client to bypass RLS during invitation acceptance
+    const { data: updatedMemberRow, error: updateError } = await serviceRoleClient
+      .from("HouseholdMemberNew")
+      .update({
+        userId: userId,
+        status: "active",
+        acceptedAt: now,
+        joinedAt: now, // Set joinedAt when accepting
+        email: null, // Clear email now that user is linked
+        name: null, // Clear name now that user is linked
+        invitationToken: null, // Clear token
+        updatedAt: now,
+      })
+      .eq("id", invitationId)
+      .eq("status", "pending") // Double-check it's still pending
+      .select()
+      .single();
+
+    if (updateError || !updatedMemberRow) {
+      logger.error("[MembersService] Error updating member in completeInvitationAfterOtp:", updateError);
+      throw new AppError(
+        `Failed to update member: ${updateError?.message || "No rows updated"}`,
+        500
+      );
+    }
+
+    const household = invitation.Household as any;
+    logger.log("[MembersService] completeInvitationAfterOtp - Member accepted invitation:", {
+      memberId: updatedMemberRow.userId,
+      userId,
+      householdId: updatedMemberRow.householdId,
+      status: updatedMemberRow.status,
+    });
+
+    // Set the household as active for the new member
+    try {
+      const { error: activeError } = await serviceRoleClient
+        .from("UserActiveHousehold")
+        .upsert({
+          userId: userId,
+          householdId: updatedMemberRow.householdId,
+          updatedAt: now,
+        }, {
+          onConflict: "userId"
+        });
+      
+      if (activeError) {
+        logger.warn("[MembersService] Could not set active household for new member:", activeError);
+      } else {
+        logger.log("[MembersService] Set active household for new member:", { userId, householdId: updatedMemberRow.householdId });
+      }
+    } catch (activeError) {
+      logger.warn("[MembersService] Error setting active household:", activeError);
+    }
+
+    // Update subscription cache in User table for the new member
+    try {
+      const { error: cacheUpdateError } = await serviceRoleClient.rpc(
+        "update_user_subscription_cache",
+        { p_user_id: userId }
+      );
+      
+      if (cacheUpdateError) {
+        logger.warn("[MembersService] Could not update subscription cache via RPC:", cacheUpdateError);
+        // Fallback: invalidate cache
+        try {
+          const { makeSubscriptionsService } = await import("../subscriptions/subscriptions.factory");
+          const subscriptionsService = makeSubscriptionsService();
+          subscriptionsService.invalidateSubscriptionCache(userId);
+        } catch (invalidateError) {
+          logger.warn("[MembersService] Could not invalidate subscription cache:", invalidateError);
+        }
+      } else {
+        logger.log("[MembersService] Subscription cache updated in User table for new member");
+      }
+    } catch (cacheError) {
+      logger.warn("[MembersService] Could not update subscription cache:", cacheError);
+      // Fallback: invalidate cache
+      try {
+        const { makeSubscriptionsService } = await import("../subscriptions/subscriptions.factory");
+        const subscriptionsService = makeSubscriptionsService();
+        subscriptionsService.invalidateSubscriptionCache(userId);
+      } catch (invalidateError) {
+        logger.warn("[MembersService] Could not invalidate subscription cache:", invalidateError);
+      }
+    }
+
+    // Get session for the authenticated user
+    const supabase = await createServerClient();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      logger.warn("[MembersService] Could not get session:", sessionError);
+    }
+
+    // Get user data
+    const { data: user } = await supabase
+      .from("User")
+      .select("id, email, name, avatarUrl")
+      .eq("id", userId)
+      .single();
+
+    const member = MembersMapper.toDomain(updatedMemberRow, household?.createdBy || "", user);
+
+    return {
+      member,
+      session: session || null,
+    };
+  }
+
+  /**
+   * Create household member (deprecated - use createHousehold instead)
+   * Kept for backward compatibility with old API routes
+   */
+  async createHouseholdMember(data: {
+    ownerId: string;
+    memberId?: string;
+    email: string;
+    name?: string;
+  }): Promise<{ id: string; householdId: string }> {
+    // Get or create household for owner
+    let householdId = await this.getActiveHouseholdId(data.ownerId);
+    
+    if (!householdId) {
+      // Create personal household for owner
+      const household = await this.createHousehold(data.ownerId, "Personal", "personal");
+      householdId = household.id;
+    }
+
+    // Check if member already exists
+    if (data.memberId) {
+      const existing = await this.repository.findByUserIdAndHousehold(data.memberId, householdId);
+      if (existing) {
+        return { id: existing.id, householdId };
+      }
+    }
+
+    // Create member record
+    const now = formatTimestamp(new Date());
+    const id = crypto.randomUUID();
+    const memberRow = await this.repository.create({
+      id,
+      householdId,
+      userId: data.memberId || null,
+      email: data.memberId ? null : data.email.toLowerCase(),
+      name: data.name || null,
+      role: "member",
+      status: data.memberId ? "active" : "pending",
+      invitationToken: data.memberId ? null : crypto.randomUUID(),
+      invitedAt: now,
+      acceptedAt: data.memberId ? now : null,
+      joinedAt: now,
+      invitedBy: data.ownerId,
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { id: memberRow.id, householdId };
+  }
+
+  /**
+   * Check if an email has a pending invitation
+   */
+  async checkPendingInvitation(email: string): Promise<{ hasPendingInvitation: boolean }> {
+    const pendingInvitation = await this.repository.findPendingInvitationByEmail(email);
+    return { hasPendingInvitation: !!pendingInvitation };
+  }
+
+  /**
+   * Check if user is owner of a household with other members
+   * Returns true if user owns a household (non-personal or personal with other members)
+   */
+  async checkHouseholdOwnership(userId: string): Promise<{
+    isOwner: boolean;
+    householdId: string | null;
+    memberCount: number;
+    householdName: string | null;
+  }> {
+    try {
+      // Get all households created by this user
+      const ownedHouseholds = await this.repository.findHouseholdsByOwner(userId);
+
+      if (!ownedHouseholds || ownedHouseholds.length === 0) {
+        return { isOwner: false, householdId: null, memberCount: 0, householdName: null };
+      }
+
+      // Check each household for other members
+      for (const household of ownedHouseholds) {
+        // For personal households, check if there are other members
+        if (household.type === "personal") {
+          const otherMemberCount = await this.repository.countActiveMembersExcludingUser(household.id, userId);
+
+          // If personal household has other members, user is owner of shared household
+          if (otherMemberCount > 0) {
+            return {
+              isOwner: true,
+              householdId: household.id,
+              memberCount: otherMemberCount + 1, // +1 for the owner
+              householdName: household.name,
+            };
+          }
+        } else {
+          // Non-personal household - user is definitely an owner
+          const memberCount = await this.repository.countActiveMembers(household.id);
+          return {
+            isOwner: true,
+            householdId: household.id,
+            memberCount,
+            householdName: household.name,
+          };
+        }
+      }
+
+      return { isOwner: false, householdId: null, memberCount: 0, householdName: null };
+    } catch (error) {
+      logger.error("[MembersService] Error checking household ownership:", error);
+      return { isOwner: false, householdId: null, memberCount: 0, householdName: null };
     }
   }
 }

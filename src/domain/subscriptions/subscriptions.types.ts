@@ -97,3 +97,21 @@ export interface UserServiceSubscriptionFormData {
   planId?: string | null; // ID of the selected SubscriptionServicePlan
 }
 
+// Detected Subscription types (for subscription detection from transactions)
+export interface DetectedSubscription {
+  merchantName: string;
+  merchantEntityId?: string | null;
+  logoUrl?: string | null;
+  amount: number;
+  frequency: "monthly" | "weekly" | "biweekly" | "semimonthly" | "daily";
+  billingDay?: number;
+  firstBillingDate: string;
+  accountId: string;
+  accountName: string;
+  transactionCount: number;
+  lastTransactionDate: string;
+  confidence: "high" | "medium" | "low";
+  description?: string | null;
+  transactionIds: string[]; // IDs of transactions used for detection
+}
+

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/components/common/money";
-import { Wallet, Building2 } from "lucide-react";
+import { Wallet, Building2, CreditCard, PiggyBank, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Account {
@@ -56,15 +56,28 @@ export function AccountsBreakdownModal({
   const getAccountTypeColor = (type: string) => {
     switch (type) {
       case "checking":
-        return "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400";
+        return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800";
       case "savings":
-        return "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400";
+        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800";
       case "credit":
-        return "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400";
+        return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800";
       case "investment":
-        return "bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary";
+        return "bg-primary/10 dark:bg-primary/30 text-primary dark:text-primary border-primary/20 dark:border-primary/30";
       default:
-        return "bg-grey-100 dark:bg-grey-900/20 text-grey-700 dark:text-grey-400";
+        return "bg-muted text-muted-foreground border-border";
+    }
+  };
+
+  const getAccountTypeIcon = (type: string) => {
+    switch (type) {
+      case "checking":
+        return <Wallet className="h-4 w-4" />;
+      case "savings":
+        return <PiggyBank className="h-4 w-4" />;
+      case "credit":
+        return <CreditCard className="h-4 w-4" />;
+      default:
+        return <Wallet className="h-4 w-4" />;
     }
   };
 
@@ -81,39 +94,56 @@ export function AccountsBreakdownModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
           {/* Total Balance Summary */}
-          <div className="p-6 rounded-[12px] bg-card">
+          <div className="rounded-lg border bg-gradient-to-br from-card to-card/50 p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
-                <p className={cn(
-                  "text-2xl font-semibold",
-                  totalBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                )}>
-                  {formatMoney(totalBalance)}
-                </p>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Balance</p>
+                <div className="flex items-center gap-2">
+                  {totalBalance >= 0 ? (
+                    <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  )}
+                  <p className={cn(
+                    "text-3xl font-bold tabular-nums",
+                    totalBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                  )}>
+                    {formatMoney(totalBalance)}
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground mb-1">Total Accounts</p>
-                <p className="text-2xl font-semibold">{accounts.length}</p>
+              <div className="text-right space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Accounts</p>
+                <div className="flex items-center justify-end gap-2">
+                  <Wallet className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-3xl font-bold tabular-nums">{accounts.length}</p>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Accounts by Household */}
-          {householdTotals.map(({ household, accounts, total }) => (
-            <div key={household} className="space-y-3">
-              <div className="flex items-center justify-between p-4 rounded-[12px] bg-card">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold">{household}</h3>
+          {householdTotals.map(({ household, accounts, total }, index) => (
+            <div key={household} className="space-y-4">
+              {index > 0 && <div className="border-t border-border" />}
+              
+              <div className="flex items-center justify-between rounded-lg border bg-card/50 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">{household}</h3>
+                    <p className="text-xs text-muted-foreground">{accounts.length} account{accounts.length !== 1 ? 's' : ''}</p>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-muted-foreground mb-1">Household Total</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Household Total</p>
                   <p className={cn(
-                    "text-2xl font-semibold",
+                    "text-2xl font-bold tabular-nums",
                     total >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                   )}>
                     {formatMoney(total)}
@@ -121,7 +151,7 @@ export function AccountsBreakdownModal({
                 </div>
               </div>
 
-              <div className="space-y-2 pl-4">
+              <div className="space-y-2 pl-2">
                 {accounts.map((account) => {
                   const isCreditCard = account.type === "credit" && account.creditLimit;
                   const available = isCreditCard 
@@ -131,31 +161,34 @@ export function AccountsBreakdownModal({
                   return (
                     <div
                       key={account.id}
-                      className="flex items-center justify-between p-3 rounded-[12px] border bg-muted/50"
+                      className="group flex items-center justify-between rounded-lg border bg-background p-4 transition-all hover:border-primary/50 hover:shadow-md"
                     >
-                      <div className="flex items-center gap-3 flex-1">
-                        <span className={cn(
-                          "px-2 py-1 rounded-md text-xs font-medium capitalize",
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold capitalize border",
                           getAccountTypeColor(account.type)
                         )}>
-                          {account.type}
-                        </span>
-                        <span className="font-medium text-sm">{account.name}</span>
+                          {getAccountTypeIcon(account.type)}
+                          <span>{account.type}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-foreground truncate">{account.name}</p>
+                          {isCreditCard && available !== null && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Available: {formatMoney(available)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right ml-4 flex-shrink-0">
                         <p className={cn(
-                          "text-sm font-semibold",
+                          "text-base font-bold tabular-nums",
                           account.balance >= 0 
                             ? "text-green-600 dark:text-green-400" 
                             : "text-red-600 dark:text-red-400"
                         )}>
                           {formatMoney(account.balance)}
                         </p>
-                        {isCreditCard && available !== null && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Available: {formatMoney(available)}
-                          </p>
-                        )}
                       </div>
                     </div>
                   );

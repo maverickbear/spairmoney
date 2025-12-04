@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-
-async function isSuperAdmin(): Promise<boolean> {
-  try {
-    const supabase = await createServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return false;
-    }
-
-    const { data: userData } = await supabase
-      .from("User")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    return userData?.role === "super_admin";
-  } catch (error) {
-    console.error("Error checking super_admin status:", error);
-    return false;
-  }
-}
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * GET /api/admin/subscription-services/plans
@@ -29,7 +9,16 @@ async function isSuperAdmin(): Promise<boolean> {
  */
 export async function GET(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -43,25 +32,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServiceRoleClient();
+    const plans = await service.getAllSubscriptionServicePlans(serviceId);
 
-    const { data: plans, error } = await supabase
-      .from("SubscriptionServicePlan")
-      .select("*")
-      .eq("serviceId", serviceId)
-      .order("planName", { ascending: true });
-
-    if (error) {
-      console.error("Error fetching plans:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to fetch plans" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ plans: plans || [] });
+    return NextResponse.json({ plans });
   } catch (error) {
     console.error("Error in GET /api/admin/subscription-services/plans:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -75,63 +58,41 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();
     const { serviceId, planName, price, currency, isActive } = body;
 
-    if (!serviceId || !planName || price === undefined || !currency) {
-      return NextResponse.json(
-        { error: "Service ID, plan name, price, and currency are required" },
-        { status: 400 }
-      );
-    }
-
-    if (currency !== "USD" && currency !== "CAD") {
-      return NextResponse.json(
-        { error: "Currency must be USD or CAD" },
-        { status: 400 }
-      );
-    }
-
-    if (price < 0) {
-      return NextResponse.json(
-        { error: "Price must be greater than or equal to 0" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createServiceRoleClient();
-    const id = `plan_${serviceId}_${planName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
-
-    const { data: plan, error } = await supabase
-      .from("SubscriptionServicePlan")
-      .insert({
-        id,
-        serviceId,
-        planName: planName.trim(),
-        price: parseFloat(price),
-        currency,
-        isActive: isActive ?? true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error creating plan:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to create plan" },
-        { status: 500 }
-      );
-    }
+    const plan = await service.createSubscriptionServicePlan({
+      serviceId,
+      planName,
+      price,
+      currency,
+      isActive,
+    });
 
     return NextResponse.json({ plan });
   } catch (error) {
     console.error("Error in POST /api/admin/subscription-services/plans:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -145,62 +106,40 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();
     const { id, planName, price, currency, isActive } = body;
 
-    if (!id) {
-      return NextResponse.json(
-        { error: "Plan ID is required" },
-        { status: 400 }
-      );
-    }
-
-    if (currency && currency !== "USD" && currency !== "CAD") {
-      return NextResponse.json(
-        { error: "Currency must be USD or CAD" },
-        { status: 400 }
-      );
-    }
-
-    if (price !== undefined && price < 0) {
-      return NextResponse.json(
-        { error: "Price must be greater than or equal to 0" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createServiceRoleClient();
-    const updateData: any = {
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (planName !== undefined) updateData.planName = planName.trim();
-    if (price !== undefined) updateData.price = parseFloat(price);
-    if (currency !== undefined) updateData.currency = currency;
-    if (isActive !== undefined) updateData.isActive = isActive;
-
-    const { data: plan, error } = await supabase
-      .from("SubscriptionServicePlan")
-      .update(updateData)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error updating plan:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to update plan" },
-        { status: 500 }
-      );
-    }
+    const plan = await service.updateSubscriptionServicePlan(id, {
+      planName,
+      price,
+      currency,
+      isActive,
+    });
 
     return NextResponse.json({ plan });
   } catch (error) {
     console.error("Error in PUT /api/admin/subscription-services/plans:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -214,7 +153,16 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    if (!(await isSuperAdmin())) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -228,24 +176,19 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const supabase = createServiceRoleClient();
-
-    const { error } = await supabase
-      .from("SubscriptionServicePlan")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      console.error("Error deleting plan:", error);
-      return NextResponse.json(
-        { error: error.message || "Failed to delete plan" },
-        { status: 500 }
-      );
-    }
+    await service.deleteSubscriptionServicePlan(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error in DELETE /api/admin/subscription-services/plans:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

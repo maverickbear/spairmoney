@@ -25,8 +25,8 @@ function ResetPasswordFormWrapper() {
 
           <div className="space-y-6 pt-8">
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Key className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Key className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Strong Password</h3>
@@ -37,8 +37,8 @@ function ResetPasswordFormWrapper() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Lock className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Lock className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Secure Storage</h3>
@@ -49,8 +49,8 @@ function ResetPasswordFormWrapper() {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="p-2 bg-primary/10 rounded-[12px] shrink-0">
-                <Shield className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-primary rounded-[12px] shrink-0">
+                <Shield className="w-5 h-5 text-black" />
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Protected Account</h3>

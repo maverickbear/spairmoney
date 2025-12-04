@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import nextDynamic from "next/dynamic";
-import { MonthSelector } from "@/components/dashboard/month-selector";
 import { loadDashboardData } from "./data-loader";
 import { PageHeader } from "@/components/common/page-header";
-import { getProfile } from "@/lib/api/profile";
+import { DashboardHeaderActions } from "@/components/dashboard/dashboard-header-actions";
+import { makeProfileService } from "@/src/application/profile/profile.factory";
 import { DashboardRealtime } from "@/components/dashboard/dashboard-realtime";
 import { DashboardUpdateChecker } from "@/components/dashboard/dashboard-update-checker";
+import { TrialCelebration } from "@/components/dashboard/trial-celebration";
 import { UrlCleanup } from "@/components/common/url-cleanup";
 import { startServerPagePerformance } from "@/lib/utils/performance";
 import { startOfMonth, endOfMonth, subMonths, subDays } from "date-fns";
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic';
 
 // Lazy load the new Financial Overview page
 const FinancialOverviewPage = nextDynamic(() => import("./financial-overview-page").then(m => ({ default: m.FinancialOverviewPage })), { ssr: true });
-const OnboardingWidget = nextDynamic(() => import("@/components/dashboard/onboarding-widget").then(m => ({ default: m.OnboardingWidget })), { ssr: true });
+const OnboardingDialogWrapper = nextDynamic(() => import("@/src/presentation/components/features/onboarding/onboarding-dialog-wrapper").then(m => ({ default: m.OnboardingDialogWrapper })));
 
 type DateRange = "this-month" | "last-month" | "last-60-days" | "last-90-days";
 
@@ -79,8 +80,8 @@ async function DashboardContent({
 
   return (
     <>
-      {/* Onboarding Widget - Always show if status exists or if we need to check */}
-      <OnboardingWidget initialStatus={data.onboardingStatus || undefined} />
+      {/* Multi-Step Onboarding Dialog - Opens automatically if incomplete */}
+      <OnboardingDialogWrapper initialStatus={data.onboardingStatus || undefined} />
 
       {/* Financial Overview Dashboard */}
       <FinancialOverviewPage
@@ -120,7 +121,8 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   const { startDate, endDate, selectedMonthDate } = calculateDateRange(validRange);
   
   // Get user profile to personalize the header
-  const profile = await getProfile();
+  const profileService = makeProfileService();
+  const profile = await profileService.getProfile();
   const firstName = profile?.name?.split(' ')[0] || 'there';
   
   perf.end();
@@ -129,13 +131,14 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     <div>
       <Suspense fallback={null}>
         <UrlCleanup />
+        <TrialCelebration />
       </Suspense>
       <DashboardRealtime />
       <DashboardUpdateChecker />
       <PageHeader
         title={`Welcome, ${firstName}`}
       >
-        <MonthSelector />
+        <DashboardHeaderActions />
       </PageHeader>
 
       <div className="w-full p-4 lg:p-8">

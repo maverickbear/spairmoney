@@ -16,6 +16,8 @@ export class ProfileMapper {
       email: row.email,
       avatarUrl: row.avatarUrl,
       phoneNumber: row.phoneNumber,
+      dateOfBirth: row.dateOfBirth,
+      temporaryExpectedIncome: (row.temporaryExpectedIncome as import("../../domain/onboarding/onboarding.types").ExpectedIncomeRange) || null,
     };
   }
 

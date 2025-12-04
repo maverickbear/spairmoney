@@ -7,7 +7,7 @@ import { DashboardDemo } from "./demo/dashboard-demo";
 
 export function HeroSection() {
   return (
-    <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#1A1A8F] via-[#2A2AB8] to-[#4A4AF2] pt-24 md:pt-32">
+    <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-primary-scale-500 via-primary-scale-400 to-primary-scale-300 pt-24 md:pt-32">
       {/* Background patterns */}
       <div className="absolute inset-0">
         {/* Grid pattern */}
@@ -21,18 +21,18 @@ export function HeroSection() {
       </div>
       
       {/* Decorative circles */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[#4A4AF2]/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#4A4AF2]/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary-scale-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary-scale-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-5xl mx-auto text-center space-y-10 md:space-y-12">
           {/* Headline - Apple Style */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-white leading-tight tracking-tight">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold text-foreground leading-tight tracking-tight">
             Take Control of Your<br />Finances. Automatically.
           </h1>
 
           {/* Sub-headline - Apple Style */}
-          <p className="text-lg sm:text-xl md:text-2xl text-white/90 max-w-3xl mx-auto font-light leading-relaxed">
+          <p className="text-lg sm:text-xl md:text-2xl text-foreground/90 max-w-3xl mx-auto font-light leading-relaxed">
             Connect your bank accounts, track spending, manage budgets, and reach your financial goals—all in one powerful platform. Join thousands who've transformed their financial future.
           </p>
 
@@ -40,14 +40,14 @@ export function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
             <Button
               asChild
-              className="bg-white text-[#1A1A8F] hover:bg-white/90 text-lg font-medium px-8 h-12 rounded-full transition-all"
+              className="bg-white text-foreground hover:bg-white/90 text-lg font-medium px-8 h-12 rounded-full transition-all"
             >
               <Link href="/auth/signup">Get Started</Link>
             </Button>
             <Button
               asChild
               variant="outline"
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20 text-lg font-medium px-8 h-12 rounded-full backdrop-blur-sm"
+              className="bg-white/10 border-foreground/30 text-foreground hover:bg-white/20 text-lg font-medium px-8 h-12 rounded-full backdrop-blur-sm"
             >
               <Link href="#features">
                 Learn More
@@ -61,12 +61,12 @@ export function HeroSection() {
         <div className="mt-24 md:mt-32 max-w-7xl mx-auto">
           {/* Glow effect wrapper */}
           <div className="relative">
-            {/* Strong glow effect - Purple tones */}
-            <div className="absolute inset-0 -z-10 rounded-t-3xl bg-[#4A4AF2]/40 blur-3xl scale-110"></div>
-            <div className="absolute inset-0 -z-10 rounded-t-3xl bg-[#6D6DFF]/30 blur-2xl scale-105"></div>
-            <div className="absolute inset-0 -z-10 rounded-t-3xl bg-[#8B8BFF]/20 blur-xl scale-[1.02]"></div>
+            {/* Strong glow effect - Green tones */}
+            <div className="absolute inset-0 -z-10 rounded-t-3xl bg-primary-scale-500/40 blur-3xl scale-110"></div>
+            <div className="absolute inset-0 -z-10 rounded-t-3xl bg-primary-scale-400/30 blur-2xl scale-105"></div>
+            <div className="absolute inset-0 -z-10 rounded-t-3xl bg-primary-scale-300/20 blur-xl scale-[1.02]"></div>
             
-            <div className="relative rounded-t-3xl overflow-hidden border-t border-l border-r border-white/10 backdrop-blur-sm bg-white/5 shadow-[0_0_80px_rgba(74,74,242,0.4),0_0_120px_rgba(109,109,255,0.3),0_0_200px_rgba(139,139,255,0.2)]">
+            <div className="relative rounded-t-3xl overflow-hidden border-t border-l border-r border-white/10 backdrop-blur-sm bg-white/5 shadow-[0_0_80px_hsl(var(--primary-500)/0.4),0_0_120px_hsl(var(--primary-400)/0.3),0_0_200px_hsl(var(--primary-300)/0.2)]">
               <DashboardDemo />
             </div>
           </div>

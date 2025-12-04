@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  updateUserSubscription,
-  deleteUserSubscription,
-  pauseUserSubscription,
-  resumeUserSubscription,
-} from "@/lib/api/user-subscriptions";
-import { invalidateSubscriptionCaches } from "@/src/infrastructure/cache/cache.manager";
+import { makeUserSubscriptionsService } from "@/src/application/user-subscriptions/user-subscriptions.factory";
+import { AppError } from "@/src/application/shared/app-error";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
-    const { getUserSubscriptions } = await import("@/lib/api/user-subscriptions");
-    const subscriptions = await getUserSubscriptions();
+    const service = makeUserSubscriptionsService();
+    const subscriptions = await service.getUserSubscriptions(userId);
     const subscription = subscriptions.find((s) => s.id === id);
 
     if (!subscription) {
@@ -27,6 +28,14 @@ export async function GET(
     return NextResponse.json(subscription, { status: 200 });
   } catch (error) {
     console.error("Error fetching subscription:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to fetch subscription" },
       { status: 500 }
@@ -39,14 +48,27 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
-    const subscription = await updateUserSubscription(id, body);
-    // Invalidate cache to ensure dashboard shows updated subscription
-    invalidateSubscriptionCaches();
+    const service = makeUserSubscriptionsService();
+    const subscription = await service.updateUserSubscription(userId, id, body);
+    
     return NextResponse.json(subscription, { status: 200 });
   } catch (error) {
     console.error("Error updating subscription:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update subscription" },
       { status: 500 }
@@ -59,13 +81,26 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
-    await deleteUserSubscription(id);
-    // Invalidate cache to ensure dashboard reflects deleted subscription
-    invalidateSubscriptionCaches();
+    const service = makeUserSubscriptionsService();
+    await service.deleteUserSubscription(userId, id);
+    
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting subscription:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete subscription" },
       { status: 500 }
@@ -78,19 +113,22 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { action } = body;
 
+    const service = makeUserSubscriptionsService();
+
     if (action === "pause") {
-      const subscription = await pauseUserSubscription(id);
-      // Invalidate cache to ensure dashboard reflects paused subscription
-      invalidateSubscriptionCaches();
+      const subscription = await service.pauseUserSubscription(userId, id);
       return NextResponse.json(subscription, { status: 200 });
     } else if (action === "resume") {
-      const subscription = await resumeUserSubscription(id);
-      // Invalidate cache to ensure dashboard reflects resumed subscription
-      invalidateSubscriptionCaches();
+      const subscription = await service.resumeUserSubscription(userId, id);
       return NextResponse.json(subscription, { status: 200 });
     } else {
       return NextResponse.json(
@@ -100,6 +138,14 @@ export async function POST(
     }
   } catch (error) {
     console.error("Error pausing/resuming subscription:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to pause/resume subscription" },
       { status: 500 }

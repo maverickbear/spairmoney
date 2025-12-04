@@ -29,15 +29,27 @@ export class UserSubscriptionsRepository {
   /**
    * Find all user subscriptions
    */
-  async findAll(userId: string): Promise<UserServiceSubscriptionRow[]> {
+  async findAll(userId: string, householdId?: string): Promise<UserServiceSubscriptionRow[]> {
     const supabase = await createServerClient();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("UserServiceSubscription")
       .select("*")
-      .order("createdAt", { ascending: false });
+      .eq("userId", userId);
+
+    // If householdId is provided, also filter by it (for RLS policies)
+    if (householdId) {
+      query = query.eq("householdId", householdId);
+    }
+
+    const { data, error } = await query.order("createdAt", { ascending: false });
 
     if (error) {
+      // Handle permission denied errors gracefully (can happen during SSR)
+      if (error.code === '42501' || error.message?.includes('permission denied')) {
+        logger.warn("[UserSubscriptionsRepository] Permission denied fetching subscriptions - user may not be authenticated");
+        return [];
+      }
       logger.error("[UserSubscriptionsRepository] Error fetching subscriptions:", error);
       throw new Error(`Failed to fetch subscriptions: ${error.message}`);
     }

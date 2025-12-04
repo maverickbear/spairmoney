@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
-import { handleWebhookEvent } from "@/lib/api/stripe";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
+import { AppError } from "@/src/application/shared/app-error";
 import { headers } from "next/headers";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY is not set");
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  throw new Error("STRIPE_WEBHOOK_SECRET is not set");
 }
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-10-29.clover",
-  typescript: true,
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,28 +22,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      console.error("[WEBHOOK:ROUTE] STRIPE_WEBHOOK_SECRET is not configured");
-      return NextResponse.json(
-        { error: "STRIPE_WEBHOOK_SECRET is not configured" },
-        { status: 500 }
-      );
-    }
-
-    // Verify webhook signature
-    // The constructEvent method automatically verifies:
-    // 1. The signature is valid
-    // 2. The timestamp is recent (default tolerance: 5 minutes)
-    // This prevents replay attacks
-    let event: Stripe.Event;
+    // Verify webhook signature using service
+    const stripeService = makeStripeService();
+    let event;
     try {
       console.log("[WEBHOOK:ROUTE] Verifying webhook signature...");
-      event = stripe.webhooks.constructEvent(
+      event = stripeService.verifyWebhookSignature(
         body,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET,
-        // Optional: customize timestamp tolerance (default is 300 seconds / 5 minutes)
-        // For production, 5 minutes is recommended to account for clock skew
+        process.env.STRIPE_WEBHOOK_SECRET
       );
       console.log("[WEBHOOK:ROUTE] Webhook signature verified successfully");
     } catch (err) {
@@ -61,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Handle the event
     console.log("[WEBHOOK:ROUTE] Handling webhook event:", event.type);
-    const result = await handleWebhookEvent(event);
+    const result = await stripeService.handleWebhookEvent(event);
 
     if (!result.success) {
       console.error("[WEBHOOK:ROUTE] Webhook event handling failed:", result.error);
@@ -75,6 +57,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("[WEBHOOK:ROUTE] Error processing webhook:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to process webhook" },
       { status: 500 }

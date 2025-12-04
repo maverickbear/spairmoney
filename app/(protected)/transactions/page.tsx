@@ -710,13 +710,13 @@ export default function TransactionsPage() {
       params.append("page", currentPage.toString());
       params.append("limit", limit.toString());
 
-      // Use API route to get transactions (descriptions are decrypted on server)
+      // Use API v2 route to get transactions (descriptions are decrypted on server)
       // Add cache busting timestamp to force fresh data after deletions
       const queryString = params.toString();
       // OPTIMIZED: Add _forceRefresh parameter to bypass server-side unstable_cache
       // This forces getTransactions() to bypass cache by using search parameter trick
       const refreshParam = forceRefresh ? '&_forceRefresh=true' : '';
-      const url = `/api/transactions${queryString ? `?${queryString}` : ''}${queryString ? '&' : '?'}_t=${Date.now()}${refreshParam}`;
+      const url = `/api/v2/transactions${queryString ? `?${queryString}` : ''}${queryString ? '&' : '?'}_t=${Date.now()}${refreshParam}`;
       
       const response = await fetch(url, {
         // Force fresh fetch - cache is invalidated server-side but browser may still cache
@@ -817,7 +817,7 @@ export default function TransactionsPage() {
           // Generate suggestions in the background after a delay to not block initial load
           // Use requestIdleCallback if available, otherwise setTimeout
           const generateSuggestions = () => {
-            fetch("/api/transactions/generate-suggestions", { method: "POST" })
+            fetch("/api/v2/transactions/suggestions/generate", { method: "POST" })
               .then(response => response.json())
               .then(result => {
                 if (result.processed > 0) {
@@ -1063,7 +1063,7 @@ export default function TransactionsPage() {
 
   async function loadSubcategoriesForBulk(categoryId: string): Promise<Array<{ id: string; name: string }>> {
     try {
-      const response = await fetch(`/api/categories?categoryId=${categoryId}`);
+      const response = await fetch(`/api/v2/categories?categoryId=${categoryId}`);
       if (response.ok) {
         const data = await response.json();
         return data || [];
@@ -1300,7 +1300,7 @@ export default function TransactionsPage() {
     ));
 
     try {
-      const response = await fetch(`/api/transactions/${transactionId}/apply-suggestion`, {
+      const response = await fetch(`/api/v2/transactions/${transactionId}/suggestions/apply`, {
         method: "POST",
       });
 
@@ -1422,7 +1422,7 @@ export default function TransactionsPage() {
     ));
 
     try {
-      const response = await fetch(`/api/transactions/${transactionId}/reject-suggestion`, {
+      const response = await fetch(`/api/v2/transactions/${transactionId}/suggestions/reject`, {
         method: "POST",
       });
 
@@ -1532,7 +1532,7 @@ export default function TransactionsPage() {
     ));
 
     try {
-      const response = await fetch(`/api/transactions/${transactionId}`, {
+      const response = await fetch(`/api/v2/transactions/${transactionId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -1591,7 +1591,7 @@ export default function TransactionsPage() {
     ));
 
     try {
-      const response = await fetch(`/api/transactions/${transactionId}`, {
+      const response = await fetch(`/api/v2/transactions/${transactionId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -2129,7 +2129,7 @@ export default function TransactionsPage() {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-6 w-6 rounded-[8px] bg-white border border-gray-300 text-red-600 hover:text-red-700 hover:bg-red-50 dark:bg-white dark:border-gray-300 dark:hover:bg-red-50"
+                          className="h-6 w-6 rounded-[8px] bg-white border border-border text-red-600 hover:text-red-700 hover:bg-red-50 dark:bg-white dark:hover:bg-red-50"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRejectSuggestion(tx.id);
@@ -2146,7 +2146,7 @@ export default function TransactionsPage() {
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-6 w-6 rounded-[8px] bg-white border border-gray-300 text-green-600 hover:text-green-700 hover:bg-green-50 dark:bg-white dark:border-gray-300 dark:hover:bg-green-50"
+                          className="h-6 w-6 rounded-[8px] bg-white border border-border text-green-600 hover:text-green-700 hover:bg-green-50 dark:bg-white dark:hover:bg-green-50"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleApplySuggestion(tx.id);

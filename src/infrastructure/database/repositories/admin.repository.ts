@@ -862,7 +862,7 @@ export class AdminRepository {
   /**
    * Get system settings
    */
-  async getSystemSettings(): Promise<{ maintenanceMode: boolean }> {
+  async getSystemSettings(): Promise<{ maintenanceMode: boolean; seoSettings?: any }> {
     const supabase = createServiceRoleClient();
 
     const { data: settings, error } = await supabase
@@ -884,22 +884,30 @@ export class AdminRepository {
 
     return {
       maintenanceMode: settings.maintenanceMode || false,
+      seoSettings: settings.seoSettings || undefined,
     };
   }
 
   /**
    * Update system settings
    */
-  async updateSystemSettings(data: { maintenanceMode: boolean }): Promise<{ maintenanceMode: boolean }> {
+  async updateSystemSettings(data: { maintenanceMode?: boolean; seoSettings?: any }): Promise<{ maintenanceMode: boolean; seoSettings?: any }> {
     const supabase = createServiceRoleClient();
 
     // Try to update existing settings
+    const updateData: any = {
+      updatedAt: new Date().toISOString(),
+    };
+    if (data.maintenanceMode !== undefined) {
+      updateData.maintenanceMode = data.maintenanceMode;
+    }
+    if (data.seoSettings !== undefined) {
+      updateData.seoSettings = data.seoSettings;
+    }
+
     const { data: updatedSettings, error: updateError } = await supabase
       .from("SystemSettings")
-      .update({
-        maintenanceMode: data.maintenanceMode,
-        updatedAt: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq("id", "default")
       .select()
       .single();
@@ -1256,6 +1264,588 @@ export class AdminRepository {
       subscriptions: subscriptions || [],
       plans: plans || [],
     };
+  }
+
+  /**
+   * Create a subscription service category
+   */
+  async createSubscriptionServiceCategory(data: {
+    id: string;
+    name: string;
+    displayOrder: number;
+    isActive: boolean;
+  }): Promise<any> {
+    const supabase = createServiceRoleClient();
+    const now = new Date().toISOString();
+
+    const { data: category, error } = await supabase
+      .from("SubscriptionServiceCategory")
+      .insert({
+        id: data.id,
+        name: data.name.trim(),
+        displayOrder: data.displayOrder,
+        isActive: data.isActive,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("[AdminRepository] Error creating subscription service category:", error);
+      throw new Error(`Failed to create category: ${error.message}`);
+    }
+
+    return category;
+  }
+
+  /**
+   * Update a subscription service category
+   */
+  async updateSubscriptionServiceCategory(id: string, data: {
+    name?: string;
+    displayOrder?: number;
+    isActive?: boolean;
+  }): Promise<any> {
+    const supabase = createServiceRoleClient();
+    const updateData: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.displayOrder !== undefined) updateData.displayOrder = data.displayOrder;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+    const { data: category, error } = await supabase
+      .from("SubscriptionServiceCategory")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("[AdminRepository] Error updating subscription service category:", error);
+      throw new Error(`Failed to update category: ${error.message}`);
+    }
+
+    return category;
+  }
+
+  /**
+   * Delete a subscription service category
+   */
+  async deleteSubscriptionServiceCategory(id: string): Promise<void> {
+    const supabase = createServiceRoleClient();
+
+    // Check if category has services
+    const { data: services, error: servicesError } = await supabase
+      .from("SubscriptionService")
+      .select("id")
+      .eq("categoryId", id)
+      .limit(1);
+
+    if (servicesError) {
+      logger.error("[AdminRepository] Error checking services:", servicesError);
+      throw new Error(`Failed to check category services: ${servicesError.message}`);
+    }
+
+    if (services && services.length > 0) {
+      throw new Error("Cannot delete category with existing services. Delete or move services first.");
+    }
+
+    const { error } = await supabase
+      .from("SubscriptionServiceCategory")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      logger.error("[AdminRepository] Error deleting subscription service category:", error);
+      throw new Error(`Failed to delete category: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a subscription service
+   */
+  async createSubscriptionService(data: {
+    id: string;
+    categoryId: string;
+    name: string;
+    logo?: string | null;
+    isActive: boolean;
+  }): Promise<any> {
+    const supabase = createServiceRoleClient();
+    const now = new Date().toISOString();
+
+    const { data: service, error } = await supabase
+      .from("SubscriptionService")
+      .insert({
+        id: data.id,
+        categoryId: data.categoryId,
+        name: data.name.trim(),
+        logo: data.logo || null,
+        displayOrder: 0, // Not used anymore, services are sorted alphabetically
+        isActive: data.isActive,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("[AdminRepository] Error creating subscription service:", error);
+      throw new Error(`Failed to create service: ${error.message}`);
+    }
+
+    return service;
+  }
+
+  /**
+   * Update a subscription service
+   */
+  async updateSubscriptionService(id: string, data: {
+    categoryId?: string;
+    name?: string;
+    logo?: string | null;
+    isActive?: boolean;
+  }): Promise<any> {
+    const supabase = createServiceRoleClient();
+    const updateData: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.logo !== undefined) updateData.logo = data.logo || null;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+    const { data: service, error } = await supabase
+      .from("SubscriptionService")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("[AdminRepository] Error updating subscription service:", error);
+      throw new Error(`Failed to update service: ${error.message}`);
+    }
+
+    return service;
+  }
+
+  /**
+   * Delete a subscription service
+   */
+  async deleteSubscriptionService(id: string): Promise<void> {
+    const supabase = createServiceRoleClient();
+
+    // Get service name to check if it's used in user subscriptions
+    const { data: service, error: serviceError } = await supabase
+      .from("SubscriptionService")
+      .select("name")
+      .eq("id", id)
+      .single();
+
+    if (serviceError) {
+      logger.error("[AdminRepository] Error fetching service:", serviceError);
+      throw new Error(`Failed to fetch service: ${serviceError.message}`);
+    }
+
+    if (service) {
+      // Check if service is used in any user subscriptions
+      const { data: userSubscriptions, error: checkError } = await supabase
+        .from("UserServiceSubscription")
+        .select("id")
+        .eq("serviceName", service.name)
+        .limit(1);
+
+      if (checkError) {
+        logger.error("[AdminRepository] Error checking user subscriptions:", checkError);
+        // Don't fail, just log
+      }
+
+      // Note: This is a simple check. In production, you might want to link UserServiceSubscription to SubscriptionService via a foreign key
+    }
+
+    const { error } = await supabase
+      .from("SubscriptionService")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      logger.error("[AdminRepository] Error deleting subscription service:", error);
+      throw new Error(`Failed to delete service: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all plans for a subscription service
+   */
+  async getAllSubscriptionServicePlans(serviceId: string): Promise<any[]> {
+    const supabase = createServiceRoleClient();
+
+    const { data: plans, error } = await supabase
+      .from("SubscriptionServicePlan")
+      .select("*")
+      .eq("serviceId", serviceId)
+      .order("planName", { ascending: true });
+
+    if (error) {
+      logger.error("[AdminRepository] Error fetching subscription service plans:", error);
+      throw new Error(`Failed to fetch plans: ${error.message}`);
+    }
+
+    return plans || [];
+  }
+
+  /**
+   * Create a subscription service plan
+   */
+  async createSubscriptionServicePlan(data: {
+    id: string;
+    serviceId: string;
+    planName: string;
+    price: number;
+    currency: string;
+    isActive: boolean;
+  }): Promise<any> {
+    const supabase = createServiceRoleClient();
+    const now = new Date().toISOString();
+
+    const { data: plan, error } = await supabase
+      .from("SubscriptionServicePlan")
+      .insert({
+        id: data.id,
+        serviceId: data.serviceId,
+        planName: data.planName.trim(),
+        price: parseFloat(data.price.toString()),
+        currency: data.currency,
+        isActive: data.isActive,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("[AdminRepository] Error creating subscription service plan:", error);
+      throw new Error(`Failed to create plan: ${error.message}`);
+    }
+
+    return plan;
+  }
+
+  /**
+   * Update a subscription service plan
+   */
+  async updateSubscriptionServicePlan(id: string, data: {
+    planName?: string;
+    price?: number;
+    currency?: string;
+    isActive?: boolean;
+  }): Promise<any> {
+    const supabase = createServiceRoleClient();
+    const updateData: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (data.planName !== undefined) updateData.planName = data.planName.trim();
+    if (data.price !== undefined) updateData.price = parseFloat(data.price.toString());
+    if (data.currency !== undefined) updateData.currency = data.currency;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+    const { data: plan, error } = await supabase
+      .from("SubscriptionServicePlan")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error("[AdminRepository] Error updating subscription service plan:", error);
+      throw new Error(`Failed to update plan: ${error.message}`);
+    }
+
+    return plan;
+  }
+
+  /**
+   * Delete a subscription service plan
+   */
+  async deleteSubscriptionServicePlan(id: string): Promise<void> {
+    const supabase = createServiceRoleClient();
+
+    const { error } = await supabase
+      .from("SubscriptionServicePlan")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      logger.error("[AdminRepository] Error deleting subscription service plan:", error);
+      throw new Error(`Failed to delete plan: ${error.message}`);
+    }
+  }
+
+  /**
+   * Upload image to Supabase Storage
+   */
+  async uploadImage(data: {
+    file: Buffer;
+    fileName: string;
+    contentType: string;
+    bucket: string;
+  }): Promise<{ url: string }> {
+    const { createServiceRoleClient } = await import("../supabase-server");
+    const supabase = createServiceRoleClient();
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(data.bucket)
+      .upload(data.fileName, data.file, {
+        contentType: data.contentType,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      logger.error("[AdminRepository] Error uploading image:", uploadError);
+      throw new Error(`Failed to upload image: ${uploadError.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(data.bucket)
+      .getPublicUrl(data.fileName);
+
+    if (!urlData?.publicUrl) {
+      throw new Error("Failed to get image URL");
+    }
+
+    return { url: urlData.publicUrl };
+  }
+
+  /**
+   * End trial immediately or cancel subscription
+   */
+  async endTrialOrCancel(subscriptionId: string, action: "end_trial" | "cancel"): Promise<{ success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string }> {
+    const supabase = createServiceRoleClient();
+
+    // Get subscription to verify it exists and get userId/stripeSubscriptionId
+    const { data: subscription, error: subError } = await supabase
+      .from("Subscription")
+      .select("id, userId, stripeSubscriptionId, status, trialEndDate")
+      .eq("id", subscriptionId)
+      .maybeSingle();
+
+    if (subError || !subscription) {
+      logger.error("[AdminRepository] Error fetching subscription:", subError);
+      throw new Error("Subscription not found");
+    }
+
+    if (!subscription.stripeSubscriptionId) {
+      throw new Error("Subscription does not have a Stripe subscription ID");
+    }
+
+    let updatedSubscription;
+    const now = new Date().toISOString();
+
+    if (action === "end_trial") {
+      if (subscription.status !== "trialing") {
+        throw new Error("Subscription is not in trial period");
+      }
+
+      // Update in Supabase
+      const { data: updated, error: updateError } = await supabase
+        .from("Subscription")
+        .update({
+          trialEndDate: now,
+          updatedAt: now,
+        })
+        .eq("id", subscriptionId)
+        .select()
+        .single();
+
+      if (updateError) {
+        logger.error("[AdminRepository] Error updating subscription:", updateError);
+        throw new Error(`Failed to update subscription in database: ${updateError.message}`);
+      }
+
+      updatedSubscription = updated;
+    } else if (action === "cancel") {
+      // Update in Supabase
+      const { data: updated, error: updateError } = await supabase
+        .from("Subscription")
+        .update({
+          status: "cancelled",
+          cancelAtPeriodEnd: false,
+          updatedAt: now,
+        })
+        .eq("id", subscriptionId)
+        .select()
+        .single();
+
+      if (updateError) {
+        logger.error("[AdminRepository] Error updating subscription:", updateError);
+        throw new Error(`Failed to update subscription in database: ${updateError.message}`);
+      }
+
+      updatedSubscription = updated;
+    }
+
+    return {
+      success: true,
+      message: action === "end_trial" ? "Trial ended successfully" : "Subscription cancelled successfully",
+      subscription: updatedSubscription,
+      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      userId: subscription.userId,
+    } as { success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string };
+  }
+
+  /**
+   * Update subscription trial end date
+   */
+  async updateSubscriptionTrial(subscriptionId: string, trialEndDate: Date): Promise<{ success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string }> {
+    const supabase = createServiceRoleClient();
+
+    // Get subscription to verify it exists and get userId/stripeSubscriptionId
+    const { data: subscription, error: subError } = await supabase
+      .from("Subscription")
+      .select("id, userId, stripeSubscriptionId, status, trialEndDate")
+      .eq("id", subscriptionId)
+      .maybeSingle();
+
+    if (subError || !subscription) {
+      logger.error("[AdminRepository] Error fetching subscription:", subError);
+      throw new Error("Subscription not found");
+    }
+
+    if (!subscription.stripeSubscriptionId) {
+      throw new Error("Subscription does not have a Stripe subscription ID");
+    }
+
+    // Update in Supabase
+    const { data: updatedSub, error: updateError } = await supabase
+      .from("Subscription")
+      .update({
+        trialEndDate: trialEndDate.toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .eq("id", subscriptionId)
+      .select()
+      .single();
+
+    if (updateError) {
+      logger.error("[AdminRepository] Error updating subscription:", updateError);
+      throw new Error(`Failed to update subscription in database: ${updateError.message}`);
+    }
+
+    return {
+      success: true,
+      message: "Trial end date updated successfully in both Supabase and Stripe",
+      subscription: updatedSub,
+      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      userId: subscription.userId,
+    } as { success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string };
+  }
+
+  /**
+   * Cancel subscription with various options
+   */
+  async cancelSubscription(
+    subscriptionId: string,
+    cancelOption: "immediately" | "end_of_period" | "specific_date",
+    cancelAt?: Date,
+    refundOption?: string
+  ): Promise<{ success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string }> {
+    const supabase = createServiceRoleClient();
+
+    // Get subscription
+    const { data: subscription, error: subError } = await supabase
+      .from("Subscription")
+      .select("id, userId, stripeSubscriptionId, status, currentPeriodEnd")
+      .eq("id", subscriptionId)
+      .maybeSingle();
+
+    if (subError || !subscription) {
+      logger.error("[AdminRepository] Error fetching subscription:", subError);
+      throw new Error("Subscription not found");
+    }
+
+    if (!subscription.stripeSubscriptionId) {
+      throw new Error("Subscription does not have a Stripe subscription ID");
+    }
+
+    let updatedSubscription;
+    const now = new Date().toISOString();
+
+    if (cancelOption === "immediately") {
+      // Update in Supabase
+      const { data: updated, error: updateError } = await supabase
+        .from("Subscription")
+        .update({
+          status: "cancelled",
+          cancelAtPeriodEnd: false,
+          updatedAt: now,
+        })
+        .eq("id", subscriptionId)
+        .select()
+        .single();
+
+      if (updateError) {
+        logger.error("[AdminRepository] Error updating subscription:", updateError);
+        throw new Error(`Failed to update subscription in database: ${updateError.message}`);
+      }
+
+      updatedSubscription = updated;
+    } else if (cancelOption === "end_of_period") {
+      // Update in Supabase
+      const { data: updated, error: updateError } = await supabase
+        .from("Subscription")
+        .update({
+          cancelAtPeriodEnd: true,
+          updatedAt: now,
+        })
+        .eq("id", subscriptionId)
+        .select()
+        .single();
+
+      if (updateError) {
+        logger.error("[AdminRepository] Error updating subscription:", updateError);
+        throw new Error(`Failed to update subscription in database: ${updateError.message}`);
+      }
+
+      updatedSubscription = updated;
+    } else if (cancelOption === "specific_date") {
+      if (!cancelAt) {
+        throw new Error("cancelAt is required when cancelOption is 'specific_date'");
+      }
+
+      // Update in Supabase
+      const { data: updated, error: updateError } = await supabase
+        .from("Subscription")
+        .update({
+          cancelAtPeriodEnd: false,
+          updatedAt: now,
+        })
+        .eq("id", subscriptionId)
+        .select()
+        .single();
+
+      if (updateError) {
+        logger.error("[AdminRepository] Error updating subscription:", updateError);
+        throw new Error(`Failed to update subscription in database: ${updateError.message}`);
+      }
+
+      updatedSubscription = updated;
+    }
+
+    return {
+      success: true,
+      message: "Subscription cancellation processed successfully",
+      subscription: updatedSubscription,
+      stripeSubscriptionId: subscription.stripeSubscriptionId,
+      userId: subscription.userId,
+      cancelOption,
+      cancelAt: cancelAt?.toISOString(),
+    } as { success: boolean; message: string; subscription: any; warning?: string; stripeSubscriptionId: string; userId: string };
   }
 }
 

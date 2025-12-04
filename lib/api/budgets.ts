@@ -1,6 +1,5 @@
 "use server";
 
-import { unstable_cache, revalidateTag } from "next/cache";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { formatTimestamp, formatDateStart, formatDateEnd } from "@/src/infrastructure/utils/timestamp";
 import { requireBudgetOwnership } from "@/src/infrastructure/utils/security";
@@ -386,16 +385,11 @@ export async function getBudgets(period: Date) {
     }
     
   } catch (error: any) {
-    // If we can't get tokens (e.g., inside unstable_cache), continue without them
+    // If we can't get tokens, continue without them
     console.warn("⚠️ [getBudgets] Could not get tokens:", error?.message);
   }
   
-  const cacheKey = `budgets-${period.getFullYear()}-${period.getMonth()}`;
-  return unstable_cache(
-    async () => getBudgetsInternal(period, accessToken, refreshToken),
-    [cacheKey],
-    { revalidate: 60, tags: ['budgets', 'transactions'] }
-  )();
+  return getBudgetsInternal(period, accessToken, refreshToken);
 }
 
 export async function createBudget(data: {
@@ -582,9 +576,6 @@ export async function createBudget(data: {
 
   // Note: subcategoryId is now stored directly in Budget, not in BudgetSubcategory
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateBudgetCaches } = await import('@/lib/services/cache-manager');
-  invalidateBudgetCaches();
 
   // Return the first budget (current month)
   return createdBudgets?.[0] || null;
@@ -613,9 +604,6 @@ export async function updateBudget(id: string, data: { amount: number }) {
     throw new Error(`Failed to update budget: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateBudgetCaches } = await import('@/lib/services/cache-manager');
-  invalidateBudgetCaches();
 
   return budget;
 }
@@ -633,7 +621,4 @@ export async function deleteBudget(id: string) {
     throw new Error(`Failed to delete budget: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateBudgetCaches } = await import('@/lib/services/cache-manager');
-  invalidateBudgetCaches();
 }

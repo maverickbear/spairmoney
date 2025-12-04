@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 
 const semanticColors = {
-  primary: '#4A4AF2',
+  primary: '#94DD78',
   success: '#10b981',
   error: '#ef4444',
   warning: '#f59e0b',

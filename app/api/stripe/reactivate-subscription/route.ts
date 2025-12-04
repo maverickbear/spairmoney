@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { createPortalSession } from "@/lib/api/stripe";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -16,7 +15,8 @@ export async function POST(request: NextRequest) {
 
     // Redirect to Stripe Customer Portal for subscription management
     // All reactivation actions should be done through the Portal
-    const portalResult = await createPortalSession(authUser.id);
+    const stripeService = makeStripeService();
+    const portalResult = await stripeService.createPortalSession(userId);
 
     if (portalResult.error || !portalResult.url) {
       return NextResponse.json(
@@ -32,6 +32,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[REACTIVATE_SUBSCRIPTION] Error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create portal session" },
       { status: 500 }

@@ -119,7 +119,7 @@ export function BudgetForm({
 
   async function loadCategoriesForMacro(macroId: string) {
     try {
-      const res = await fetch(`/api/categories?macroId=${macroId}`);
+      const res = await fetch(`/api/v2/categories?macroId=${macroId}`);
       if (!res.ok) {
         throw new Error("Failed to fetch categories");
       }
@@ -134,7 +134,7 @@ export function BudgetForm({
         } else {
           // Fetch subcategories if not included
           try {
-            const subRes = await fetch(`/api/categories?categoryId=${category.id}`);
+            const subRes = await fetch(`/api/v2/categories?categoryId=${category.id}`);
             if (subRes.ok) {
               const subcats = await subRes.json();
               if (subcats && subcats.length > 0) {
@@ -258,7 +258,7 @@ export function BudgetForm({
 
       if (budget) {
         // Editing: update single budget
-        const res = await fetch(`/api/budgets/${budget.id}`, {
+        const res = await fetch(`/api/v2/budgets/${budget.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

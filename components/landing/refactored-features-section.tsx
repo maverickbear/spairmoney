@@ -71,7 +71,7 @@ function CoreFeatureSplit({
                   {badge}
                 </Badge>
               )}
-              <p className="text-xs font-medium text-primary/80 mb-3 tracking-wider uppercase">
+              <p className="text-xs font-medium text-muted-foreground mb-3 tracking-wider uppercase">
                 {subtitle}
               </p>
               <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold mb-5 tracking-tight leading-[1.1]">

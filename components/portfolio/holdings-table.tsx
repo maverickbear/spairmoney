@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMoney } from "@/components/common/money";
-import { Holding } from "@/lib/api/portfolio";
+import { Holding } from "@/src/domain/portfolio/portfolio.types";
 import {
   getUniqueAssetTypes,
   getUniqueSectors,

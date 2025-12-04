@@ -1,44 +1,9 @@
-// Types and constants for PlannedPayment that can be used in client components
+// Re-export types and constants from domain layer for backward compatibility
 // This file does not import any server-only code
 
-// Constant for planned payment horizon (90 days)
-export const PLANNED_HORIZON_DAYS = 90;
-
-export interface PlannedPayment {
-  id: string;
-  date: Date | string;
-  type: "expense" | "income" | "transfer";
-  amount: number;
-  accountId: string;
-  toAccountId?: string | null;
-  categoryId?: string | null;
-  subcategoryId?: string | null;
-  description?: string | null;
-  source: "recurring" | "debt" | "manual" | "subscription";
-  status: "scheduled" | "paid" | "skipped" | "cancelled";
-  linkedTransactionId?: string | null;
-  debtId?: string | null;
-  subscriptionId?: string | null;
-  userId: string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  account?: { id: string; name: string } | null;
-  toAccount?: { id: string; name: string } | null;
-  category?: { id: string; name: string } | null;
-  subcategory?: { id: string; name: string; logo?: string | null } | null;
-}
-
-export interface PlannedPaymentFormData {
-  date: Date | string;
-  type: "expense" | "income" | "transfer";
-  amount: number;
-  accountId: string;
-  toAccountId?: string | null;
-  categoryId?: string | null;
-  subcategoryId?: string | null;
-  description?: string | null;
-  source?: "recurring" | "debt" | "manual" | "subscription";
-  debtId?: string | null;
-  subscriptionId?: string | null;
-}
+export {
+  PLANNED_HORIZON_DAYS,
+  type BasePlannedPayment as PlannedPayment,
+  type PlannedPaymentFormData,
+} from "@/src/domain/planned-payments/planned-payments.types";
 

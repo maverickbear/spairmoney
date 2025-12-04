@@ -72,130 +72,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use service role client to bypass RLS for creating User and Subscription
-    const serviceRoleClient = createServiceRoleClient();
-
-    // Create user profile in User table using service role (bypasses RLS)
-    const { data: userData, error: userError } = await serviceRoleClient
-      .from("User")
-      .insert({
-        id: authData.user.id,
+    // Create user profile and household using AuthService
+    const { makeAuthService } = await import("@/src/application/auth/auth.factory");
+    const authService = makeAuthService();
+    
+    let userData: any = null;
+    let householdId: string | null = null;
+    
+    try {
+      const setupResult = await authService.createAccountAndSetup({
+        userId: authData.user.id,
         email: authData.user.email!,
         name: name || null,
-        role: "admin", // Owners who sign up directly are admins
-      })
-      .select()
-      .single();
-
-    if (userError) {
-      console.error("[CREATE-ACCOUNT] Error creating user profile:", userError);
-      // User is created in auth but not in User table - this is OK, will be created on first login
-    }
-
-    // Create personal household and member record for the owner using service role (bypasses RLS)
-    if (userData) {
-      const now = new Date().toISOString();
+      });
       
-      // Create personal household
-      const { data: household, error: householdError } = await serviceRoleClient
-        .from("Household")
-        .insert({
-          name: name || authData.user.email || "Minha Conta",
-          type: "personal",
-          createdBy: userData.id,
-          createdAt: now,
-          updatedAt: now,
-          settings: {},
-        })
-        .select()
-        .single();
-
-      if (householdError || !household) {
-        console.error("[CREATE-ACCOUNT] Error creating household:", householdError);
-        // Don't fail - this is not critical
-      } else {
-        // Create household member (owner role)
-        const { error: householdMemberError } = await serviceRoleClient
-          .from("HouseholdMemberNew")
-          .insert({
-            householdId: household.id,
-            userId: userData.id,
-            role: "owner",
-            status: "active",
-            isDefault: true,
-            joinedAt: now,
-          createdAt: now,
-          updatedAt: now,
-        });
-
-      if (householdMemberError) {
-        console.error("[CREATE-ACCOUNT] Error creating household member:", householdMemberError);
-        // Don't fail - this is not critical
-        } else {
-          // Set as active household
-          const { error: activeError } = await serviceRoleClient
-            .from("UserActiveHousehold")
-            .insert({
-              userId: userData.id,
-              householdId: household.id,
-              updatedAt: now,
-            });
-
-          if (activeError) {
-            console.error("[CREATE-ACCOUNT] Error setting active household:", activeError);
-          } else {
-            // Create emergency fund goal for new user
-            try {
-              // Check if emergency fund goal already exists
-              const { data: existingGoals } = await serviceRoleClient
-                .from("Goal")
-                .select("*")
-                .eq("householdId", household.id)
-                .eq("name", "Emergency Funds")
-                .eq("isSystemGoal", true)
-                .limit(1);
-
-              if (!existingGoals || existingGoals.length === 0) {
-                // Create emergency fund goal
-                const goalId = randomUUID();
-                const goalNow = formatTimestamp(new Date());
-                const { error: goalError } = await serviceRoleClient
-                  .from("Goal")
-                  .insert({
-                    id: goalId,
-                    name: "Emergency Funds",
-                    targetAmount: 0.00,
-                    currentBalance: 0.00,
-                    incomePercentage: 0.00,
-                    priority: "High",
-                    description: "Emergency fund for unexpected expenses",
-                    isPaused: false,
-                    isCompleted: false,
-                    completedAt: null,
-                    expectedIncome: null,
-                    targetMonths: null,
-                    accountId: null,
-                    holdingId: null,
-                    isSystemGoal: true,
-                    userId: userData.id,
-                    householdId: household.id,
-                    createdAt: goalNow,
-                    updatedAt: goalNow,
-                  });
-
-                if (goalError) {
-                  console.error("[CREATE-ACCOUNT] Error creating emergency fund goal:", goalError);
-                } else {
-                  console.log("[CREATE-ACCOUNT] ✅ Emergency fund goal created");
-                }
-              }
-            } catch (goalError) {
-              console.error("[CREATE-ACCOUNT] Error creating emergency fund goal:", goalError);
-              // Don't fail account creation if goal creation fails
-            }
-          }
-        }
-      }
+      userData = setupResult.user;
+      householdId = setupResult.householdId || null;
+    } catch (setupError) {
+      console.error("[CREATE-ACCOUNT] Error setting up account:", setupError);
+      // User is created in auth but not in User table - this is OK, will be created on first login
     }
 
     // Wait a bit for the user record to be fully created
@@ -228,6 +123,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Use service role client for subscription operations (infrastructure layer)
+    const serviceRoleClient = createServiceRoleClient();
 
     // Find plan by price ID (using service role client)
     const { data: plan, error: planError } = await serviceRoleClient
@@ -282,8 +180,11 @@ export async function POST(request: NextRequest) {
     // Prefer pending subscription by customerId, then by email, then by stripeSubscriptionId
     const existingSub = pendingSubByCustomer || pendingSubByEmail || existingSubByStripeId;
     
-    // Get active household ID for the user (household should have been created during signup)
-    const householdId = await getActiveHouseholdId(authData.user.id);
+    // Use householdId from setup result or fetch it
+    if (!householdId) {
+      householdId = await getActiveHouseholdId(authData.user.id);
+    }
+    
     if (!householdId) {
       console.error("[CREATE-ACCOUNT] No active household found for user:", authData.user.id);
       // Don't fail - subscription can be linked later when household is available

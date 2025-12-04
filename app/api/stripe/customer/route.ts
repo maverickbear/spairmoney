@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
+import { AppError } from "@/src/application/shared/app-error";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 
 /**
@@ -8,9 +11,18 @@ import { createServerClient } from "@/src/infrastructure/database/supabase-serve
  */
 export async function GET(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Get user email from auth
     const supabase = await createServerClient();
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
+    
     if (authError || !authUser) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -18,27 +30,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get subscription with stripeCustomerId
-    const { data: subscription, error: subError } = await supabase
-      .from("Subscription")
-      .select("stripeCustomerId")
-      .eq("userId", authUser.id)
-      .not("stripeCustomerId", "is", null)
-      .order("createdAt", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (subError) {
-      console.error("[STRIPE/CUSTOMER] Error fetching subscription:", subError);
-    }
+    // Get subscription data using service
+    const subscriptionsService = makeSubscriptionsService();
+    const subscriptionData = await subscriptionsService.getUserSubscriptionData(userId);
 
     return NextResponse.json({
-      customerId: subscription?.stripeCustomerId || null,
+      customerId: subscriptionData.subscription?.stripeCustomerId || null,
       customerEmail: authUser.email || null,
       userId: authUser.id || null,
     });
   } catch (error) {
     console.error("[STRIPE/CUSTOMER] Error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to fetch customer information" },
       { status: 500 }

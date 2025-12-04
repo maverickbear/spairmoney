@@ -27,3 +27,27 @@ export const investmentAccountSchema = z.object({
 
 export type InvestmentAccountFormData = z.infer<typeof investmentAccountSchema>;
 
+export const createSimpleInvestmentEntrySchema = z.object({
+  accountId: z.string().min(1),
+  date: z.string().or(z.date()),
+  type: z.enum(["contribution", "dividend", "interest", "initial"]),
+  amount: z.number().positive(),
+  description: z.string().optional(),
+});
+
+export type CreateSimpleInvestmentEntryFormData = z.infer<typeof createSimpleInvestmentEntrySchema>;
+
+export const updateAccountInvestmentValueSchema = z.object({
+  totalValue: z.number().positive(),
+});
+
+export type UpdateAccountInvestmentValueFormData = z.infer<typeof updateAccountInvestmentValueSchema>;
+
+export const createSecuritySchema = z.object({
+  symbol: z.string().min(1, "Symbol is required"),
+  name: z.string().min(1, "Name is required"),
+  class: z.enum(["stock", "etf", "crypto", "bond", "reit"]),
+});
+
+export type CreateSecurityFormData = z.infer<typeof createSecuritySchema>;
+

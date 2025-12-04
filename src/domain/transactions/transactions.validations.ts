@@ -24,10 +24,12 @@ const transactionSchemaBase = z.object({
   transferFromId: z.string().optional(), // For transfer transactions (incoming, e.g., credit card payments)
   categoryId: z.string().optional(),
   subcategoryId: z.string().optional(),
+  merchant: z.string().optional(),
   description: z.string().optional(),
   recurring: z.boolean().default(false),
   recurringFrequency: recurringFrequencyEnum.optional(), // Only required when recurring is true
   expenseType: z.union([z.enum(["fixed", "variable"]), z.null()]).optional().transform((val) => val === null ? undefined : val), // Only for expense transactions, transform null to undefined
+  receiptUrl: z.string().url().optional().or(z.literal("").transform(() => undefined)), // Optional receipt URL
 });
 
 // Full schema with refinements for creating transactions

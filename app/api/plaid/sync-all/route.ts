@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/src/infrastructure/database/supabase-server';
-import { syncAllUserAccounts } from '@/lib/api/plaid/sync';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { guardBankIntegration, getCurrentUserId } from '@/src/application/shared/feature-guard';
 import { throwIfNotAllowed } from '@/src/application/shared/feature-guard';
+import { AppError } from '@/src/application/shared/app-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,8 +19,9 @@ export async function POST(req: NextRequest) {
     const guardResult = await guardBankIntegration(userId);
     await throwIfNotAllowed(guardResult);
 
-    // Sync all connected accounts
-    const result = await syncAllUserAccounts(userId);
+    // Sync all connected accounts using PlaidService
+    const plaidService = makePlaidService();
+    const result = await plaidService.syncAllUserAccounts(userId);
 
     return NextResponse.json({
       success: true,
@@ -47,6 +48,13 @@ export async function POST(req: NextRequest) {
           planError: error.planError,
         },
         { status: 403 }
+      );
+    }
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
 

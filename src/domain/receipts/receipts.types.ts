@@ -14,6 +14,7 @@ export interface ReceiptData {
 export interface ReceiptScanResult {
   success: boolean;
   data?: ReceiptData;
+  receiptUrl?: string;
   error?: string;
 }
 

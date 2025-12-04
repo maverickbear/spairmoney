@@ -11,7 +11,7 @@ import { makeAccountsService } from "../accounts/accounts.factory";
 import { makePortfolioService } from "../portfolio/portfolio.factory";
 import { calculateFinancialHealth } from "../shared/financial-health";
 import { guardFeatureAccessReadOnly } from "../shared/feature-guard";
-import { getUserLiabilities } from "@/lib/api/plaid/liabilities";
+import { makePlaidService } from "../plaid/plaid.factory";
 import { startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, format } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
@@ -311,7 +311,8 @@ export class ReportsService {
 
       // Add Plaid liabilities
       try {
-        const liabilities = await getUserLiabilities(userId, accessToken, refreshToken);
+        const plaidService = makePlaidService();
+        const liabilities = await plaidService.getUserLiabilities(userId, accessToken, refreshToken);
         totalLiabilities += liabilities.reduce((sum, liability) => {
           const balance = (liability as any).balance ?? (liability as any).currentBalance ?? null;
           if (balance == null) return sum;

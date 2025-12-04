@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeMembersService } from "@/src/application/members/members.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: Request) {
   try {
@@ -13,65 +14,28 @@ export async function GET(request: Request) {
       );
     }
 
-    // Use regular client - the PostgreSQL function will handle security
-    // This is more secure than using service role client
-    const supabase = await createServerClient();
-
+    const service = makeMembersService();
+    
     console.log("[INVITE-VALIDATE] Validating token:", token.substring(0, 8) + "...");
 
-    // Use secure PostgreSQL function to validate invitation token
-    // This function only returns limited data and can be called without authentication
-    const { data: invitationData, error: findError } = await supabase
-      .rpc("validate_invitation_token", { p_token: token });
+    // Use service to validate invitation token
+    const invitation = await service.validateInvitationToken(token);
 
-    if (findError) {
-      console.error("[INVITE-VALIDATE] Error validating invitation:", {
-        error: findError,
-        code: findError.code,
-        message: findError.message,
-      });
-      
-      return NextResponse.json(
-        { error: "Invalid or expired invitation token" },
-        { status: 404 }
-      );
-    }
-
-    if (!invitationData || invitationData.length === 0) {
+    if (!invitation) {
       console.warn("[INVITE-VALIDATE] No invitation found for token");
-      return NextResponse.json(
-        { error: "Invalid or expired invitation token" },
-        { status: 404 }
-      );
+      throw new AppError("Invalid or expired invitation token", 404);
     }
-
-    const invitation = invitationData[0];
 
     console.log("[INVITE-VALIDATE] Invitation found:", {
       id: invitation.id,
       email: invitation.email,
-      status: invitation.status,
     });
 
-    // Get owner information using secure function
-    const { data: ownerData, error: ownerError } = await supabase
-      .rpc("get_owner_info_for_invitation", { p_owner_id: invitation.owner_id });
-
-    if (ownerError) {
-      console.error("[INVITE-VALIDATE] Error fetching owner:", ownerError);
-    }
-
-    const owner = ownerData && ownerData.length > 0 ? ownerData[0] : null;
-
-    // Check if email already has an account using secure function
-    const { data: hasAccountData, error: userCheckError } = await supabase
-      .rpc("check_email_has_account", { p_email: invitation.email });
-
-    if (userCheckError) {
-      console.error("[INVITE-VALIDATE] Error checking existing user:", userCheckError);
-    }
-
-    const hasAccount = hasAccountData === true;
+    // Get owner information and check if email has account using service
+    const [owner, hasAccount] = await Promise.all([
+      service.getOwnerInfoForInvitation(invitation.owner_id),
+      service.checkEmailHasAccount(invitation.email),
+    ]);
 
     return NextResponse.json({
       invitation: {
@@ -88,6 +52,14 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Error validating invitation:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     const errorMessage = error instanceof Error ? error.message : "Failed to validate invitation";
     return NextResponse.json(
       { error: errorMessage },

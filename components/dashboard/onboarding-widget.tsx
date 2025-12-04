@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AccountForm } from "@/components/forms/account-form";
 import { 
   Wallet, 
@@ -14,12 +13,29 @@ import {
   ArrowRight,
   Sparkles,
   DollarSign,
-  ChevronRight
+  ChevronRight,
+  Pencil
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 // Using API routes instead of client-side APIs
 import { formatMoney } from "@/components/common/money";
 import { ProfileModal } from "@/components/profile/profile-modal";
+import { IncomeOnboardingDialog } from "@/src/presentation/components/features/onboarding/income-onboarding-dialog";
+import { ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
+
+// Income range labels mapping
+const INCOME_RANGE_LABELS: Record<NonNullable<ExpectedIncomeRange>, string> = {
+  "0-50k": "$0 - $50,000",
+  "50k-100k": "$50,000 - $100,000",
+  "100k-150k": "$100,000 - $150,000",
+  "150k-250k": "$150,000 - $250,000",
+  "250k+": "$250,000+",
+};
+
+function formatIncomeRange(incomeRange: ExpectedIncomeRange): string {
+  if (!incomeRange) return "";
+  return INCOME_RANGE_LABELS[incomeRange] || incomeRange;
+}
 
 interface OnboardingStatus {
   hasAccount: boolean;
@@ -28,6 +44,7 @@ interface OnboardingStatus {
   completedCount: number;
   totalCount: number;
   totalBalance?: number;
+  expectedIncome?: ExpectedIncomeRange;
 }
 
 interface OnboardingWidgetProps {
@@ -39,6 +56,7 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
   const [status, setStatus] = useState<OnboardingStatus | null>(initialStatus || null);
   const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isIncomeDialogOpen, setIsIncomeDialogOpen] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const [loading, setLoading] = useState(!initialStatus);
 
@@ -61,33 +79,71 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
     }
   }, [initialStatus]);
 
-  // Check status when page becomes visible again (user returns from income page)
+  // Check status when page becomes visible again (e.g., user returns from accounts page)
   useEffect(() => {
-    let mounted = true;
+    let visibilityTimeoutId: NodeJS.Timeout | null = null;
+    let focusTimeoutId: NodeJS.Timeout | null = null;
+    let accountCreatedTimeoutId: NodeJS.Timeout | null = null;
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && mounted) {
-        // Refresh status when page becomes visible (user returns from income page)
-        checkStatus();
+      // Only check if page is visible and we have a status (to avoid unnecessary checks)
+      if (document.visibilityState === "visible" && status) {
+        // Clear any pending timeout
+        if (visibilityTimeoutId) {
+          clearTimeout(visibilityTimeoutId);
+        }
+        // Debounce to avoid too many checks
+        visibilityTimeoutId = setTimeout(() => {
+          checkStatus();
+        }, 500);
       }
     };
 
-    // Also check on focus (when user switches back to tab)
+    // Also check when window gains focus (user switches back to tab)
     const handleFocus = () => {
-      if (mounted) {
-        checkStatus();
+      if (status) {
+        // Clear any pending timeout
+        if (focusTimeoutId) {
+          clearTimeout(focusTimeoutId);
+        }
+        focusTimeoutId = setTimeout(() => {
+          checkStatus();
+        }, 500);
       }
+    };
+
+    // Listen for account creation events (from other pages/components)
+    const handleAccountCreated = () => {
+      // Clear any pending timeout
+      if (accountCreatedTimeoutId) {
+        clearTimeout(accountCreatedTimeoutId);
+      }
+      // Wait a bit for the account to be fully created
+      accountCreatedTimeoutId = setTimeout(() => {
+        checkStatus();
+      }, 1000);
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
-    
+    window.addEventListener("account-created", handleAccountCreated);
+
     return () => {
-      mounted = false;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("account-created", handleAccountCreated);
+      if (visibilityTimeoutId) {
+        clearTimeout(visibilityTimeoutId);
+      }
+      if (focusTimeoutId) {
+        clearTimeout(focusTimeoutId);
+      }
+      if (accountCreatedTimeoutId) {
+        clearTimeout(accountCreatedTimeoutId);
+      }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status]);
+
 
   async function checkStatus() {
     try {
@@ -137,6 +193,7 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
       
       const hasCompleteProfile = profile !== null && profile.name !== null && profile.name.trim() !== "";
       const hasExpectedIncome = incomeData.hasExpectedIncome || false;
+      const expectedIncome = incomeData.expectedIncome || null;
 
       const completedCount = [hasAccount, hasCompleteProfile, hasExpectedIncome].filter(Boolean).length;
 
@@ -147,6 +204,7 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
         completedCount,
         totalCount: 3, // Updated to include income step
         totalBalance,
+        expectedIncome,
       };
 
       setStatus(newStatus);
@@ -186,6 +244,14 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
   async function handleProfileUpdated() {
     setIsProfileModalOpen(false);
     // Immediately check status after profile update
+    await checkStatus();
+  }
+
+  async function handleIncomeUpdated() {
+    setIsIncomeDialogOpen(false);
+    // Wait a bit for the income to be fully saved
+    await new Promise(resolve => setTimeout(resolve, 300));
+    // Immediately check status after income update
     await checkStatus();
   }
 
@@ -230,7 +296,9 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
       description: "Personalize your budgets and insights based on your expected income",
       icon: DollarSign,
       completed: status.hasExpectedIncome || false,
-      action: () => router.push("/onboarding/income"),
+      action: () => setIsIncomeDialogOpen(true),
+      showIncome: status.hasExpectedIncome && status.expectedIncome,
+      expectedIncome: status.expectedIncome,
     },
     {
       id: "account",
@@ -291,9 +359,9 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
                         <div className={cn(
                           "h-full w-full transition-colors",
                           step.completed && nextStep?.completed
-                            ? "bg-primary" 
+                            ? "bg-green-500" 
                             : step.completed
-                            ? "bg-primary/50"
+                            ? "bg-green-500/50"
                             : "bg-border"
                         )} />
                       </div>
@@ -304,53 +372,66 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
                 className={cn(
                         "relative z-10 h-full flex flex-col transition-all duration-200",
                         step.completed
-                          ? "border-primary/50 bg-primary/5"
-                          : "border-border hover:border-primary/50 hover:shadow-md",
-                        !step.completed && "cursor-pointer"
+                          ? "border-green-500/50 bg-green-500/5 hover:border-green-500/70 hover:bg-green-500/10"
+                          : "border-border hover:border-primary/50 hover:bg-accent/50",
+                        // Only make clickable if not completed OR if it's the income step (which is always editable)
+                        (step.completed && step.id !== "income") ? "" : "cursor-pointer"
                 )}
-                      onClick={!step.completed ? step.action : undefined}
+                      onClick={(step.completed && step.id !== "income") ? undefined : step.action}
+                      role={(step.completed && step.id !== "income") ? undefined : "button"}
+                      tabIndex={(step.completed && step.id !== "income") ? undefined : 0}
+                      onKeyDown={(step.completed && step.id !== "income") ? undefined : (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          step.action();
+                        }
+                      }}
                     >
-                      <CardContent className="flex-1 flex flex-col">
-                      {/* Step Number & Icon */}
+                      <CardContent className="flex-1 flex flex-col px-4 md:px-6 py-4 md:py-6">
+                      {/* Step Number, Title & Icon */}
                       <div className="flex items-center justify-between mb-4">
-                <div className={cn(
-                          "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all",
-                          step.completed
-                            ? "bg-primary border-primary text-primary-foreground"
-                            : "bg-background border-border text-muted-foreground"
-                )}>
-                          {step.completed ? (
-                            <CheckCircle2 className="h-5 w-5" />
-                  ) : (
-                            <span className="text-sm font-semibold">{step.stepNumber}</span>
-                  )}
-                </div>
-                        <div className={cn(
-                          "p-2 rounded-lg transition-colors",
-                          step.completed
-                            ? "bg-primary/10 text-primary"
-                            : "bg-muted text-muted-foreground"
-                        )}>
-                          <Icon className="h-5 w-5" />
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className={cn(
+                            "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all flex-shrink-0",
+                            step.completed
+                              ? "bg-green-500 border-green-500 text-white"
+                              : "bg-background border-border text-muted-foreground"
+                          )}>
+                            {step.completed ? (
+                              <CheckCircle2 className="h-5 w-5" />
+                            ) : (
+                              <span className="text-sm font-semibold">{step.stepNumber}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <h4 className={cn(
+                              "text-base font-semibold",
+                              step.completed ? "text-foreground" : "text-foreground"
+                            )}>
+                              {step.title}
+                            </h4>
+                          </div>
                         </div>
+                        {/* Show edit icon only for income step when completed, or for any step when not completed */}
+                        {step.completed && step.id === "income" && (
+                          <div className={cn(
+                            "p-2 rounded-lg transition-colors flex-shrink-0 bg-green-500/10 text-green-600 dark:text-green-400"
+                          )}>
+                            <Pencil className="h-5 w-5" />
+                          </div>
+                        )}
+                        {!step.completed && (
+                          <div className={cn(
+                            "p-2 rounded-lg transition-colors flex-shrink-0 bg-muted text-muted-foreground"
+                          )}>
+                            <Pencil className="h-5 w-5" />
+                          </div>
+                        )}
                       </div>
 
                       {/* Step Content */}
                       <div className="space-y-2 flex-1 flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <h4 className={cn(
-                            "text-base font-semibold",
-                            step.completed ? "text-foreground" : "text-foreground"
-                    )}>
-                            {step.title}
-                    </h4>
-                          {step.completed && (
-                            <Badge variant="secondary" className="text-xs">
-                              Done
-                            </Badge>
-                    )}
-                  </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
+                        <p className="text-sm text-muted-foreground leading-relaxed hidden md:block">
                           {step.description}
                   </p>
 
@@ -364,21 +445,16 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
                     </div>
                   )}
 
-                        {/* Action Button */}
-                        {!step.completed && (
-                          <Button
-                            variant="default"
-                            size="small"
-                            className="w-full mt-auto"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              step.action();
-                            }}
-                          >
-                            {step.id === "account" ? "Create Account" : "Get Started"}
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        )}
+                        {/* Income Display (only for income step) */}
+                        {step.showIncome && step.expectedIncome && (
+                          <div className="mt-3 pt-3 border-t border-border/50">
+                            <p className="text-xs text-muted-foreground mb-1">Annual Household Income</p>
+                            <p className="text-sm font-semibold text-foreground">
+                              {formatIncomeRange(step.expectedIncome as ExpectedIncomeRange)}
+                      </p>
+                    </div>
+                  )}
+
                       </div>
                       </CardContent>
                     </Card>
@@ -400,6 +476,12 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
         open={isProfileModalOpen}
         onOpenChange={setIsProfileModalOpen}
         onSuccess={handleProfileUpdated}
+      />
+
+      <IncomeOnboardingDialog
+        open={isIncomeDialogOpen}
+        onOpenChange={setIsIncomeDialogOpen}
+        onSuccess={handleIncomeUpdated}
       />
     </>
   );

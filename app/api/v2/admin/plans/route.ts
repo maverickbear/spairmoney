@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAdminService } from "@/src/application/admin/admin.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { updatePlanSchema } from "@/src/domain/admin/admin.validations";
 import { z } from "zod";
 import { AppError } from "@/src/application/shared/app-error";
-
-const updatePlanSchema = z.object({
-  id: z.string().min(1, "Plan ID is required"),
-  name: z.string().optional(),
-  features: z.any().optional(),
-  priceMonthly: z.number().optional(),
-  priceYearly: z.number().optional(),
-});
 
 /**
  * GET /api/v2/admin/plans

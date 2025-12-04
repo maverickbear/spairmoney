@@ -145,7 +145,7 @@ export async function createTrialCheckoutSession(
         if (!baseUrl.endsWith('/')) {
           baseUrl = `${baseUrl}/`;
         }
-        return `${baseUrl}pricing?canceled=true`;
+        return `${baseUrl}dashboard?openPricingModal=true&canceled=true`;
       })(),
       metadata: {
         planId: planId,
@@ -365,16 +365,9 @@ export async function createCheckoutSession(
           quantity: 1,
         },
       ],
-      // Pre-fill customer email and name in checkout form
-      // Note: When using 'customer', we can't use 'customer_email', but 'customer_details' will pre-fill the form
-      // This works for both new customers (just created) and existing customers
-      // customer_details will ensure the form is pre-filled with the most up-to-date information from User table
-      ...(userEmail && {
-        customer_details: {
-          email: userEmail,
-          ...(userName && { name: userName }),
-        },
-      }),
+      // Note: When using 'customer', we cannot use 'customer_details' or 'customer_email'
+      // Stripe automatically pre-fills the form with customer information
+      // The customer was already created/updated with email and name above
       success_url: (() => {
         let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
         // Ensure baseUrl ends with /
@@ -398,7 +391,7 @@ export async function createCheckoutSession(
         if (!baseUrl.endsWith('/')) {
           baseUrl = `${baseUrl}/`;
         }
-        return `${baseUrl}pricing?canceled=true`;
+        return `${baseUrl}dashboard?openPricingModal=true&canceled=true`;
       })(),
       metadata: {
         userId: userId,
@@ -417,9 +410,6 @@ export async function createCheckoutSession(
 
     console.log("[CHECKOUT] Session params before creation:", {
       customer: sessionParams.customer,
-      hasCustomerDetails: !!(sessionParams as any).customer_details,
-      customerDetailsEmail: (sessionParams as any).customer_details?.email,
-      customerDetailsName: (sessionParams as any).customer_details?.name,
       mode: sessionParams.mode,
       priceId,
     });
@@ -1331,8 +1321,15 @@ async function handleSubscriptionChange(
 
   // Invalidate subscription cache to ensure UI reflects changes immediately
   if (userId) {
+    // Invalidate old cache
     const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
     await invalidateSubscriptionCache(userId);
+    
+    // Invalidate new Application Service cache
+    const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+    const subscriptionsService = makeSubscriptionsService();
+    subscriptionsService.invalidateSubscriptionCache(userId);
+    
     console.log("[WEBHOOK:SUBSCRIPTION] Subscription cache invalidated for user:", userId);
   }
 }
@@ -1377,8 +1374,15 @@ async function handleSubscriptionDeletion(
       console.log("[WEBHOOK:DELETION] Subscription updated to cancelled successfully. User will need to sign up for a new plan.");
       
       // Invalidate subscription cache to ensure UI reflects cancellation immediately
+      // Invalidate old cache
       const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
       await invalidateSubscriptionCache(existingSub.userId);
+      
+      // Invalidate new Application Service cache
+      const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+      const subscriptionsService = makeSubscriptionsService();
+      subscriptionsService.invalidateSubscriptionCache(existingSub.userId);
+      
       console.log("[WEBHOOK:DELETION] Subscription cache invalidated for user:", existingSub.userId);
     }
   } else {
@@ -1883,14 +1887,76 @@ export async function createEmbeddedCheckoutSession(
       return { success: false, error: "Unauthorized" };
     }
 
-    // Get user's household
-    const { data: userData } = await supabase
-      .from("User")
-      .select("householdId")
-      .eq("id", userId)
-      .single();
+    // Get active household ID (household should already exist from signup)
+    const { getActiveHouseholdId } = await import("@/lib/utils/household");
+    const householdId = await getActiveHouseholdId(userId);
     
-    const householdId = userData?.householdId;
+    if (!householdId) {
+      console.error("[EMBEDDED-CHECKOUT] No household found for user:", userId);
+      return { success: false, error: "No household found. Please contact support." };
+    }
+    
+    console.log("[EMBEDDED-CHECKOUT] Using existing household:", householdId);
+    
+    // Move temporary income to household settings and generate initial data if exists
+    const { makeProfileService } = await import("@/src/application/profile/profile.factory");
+    const profileService = makeProfileService();
+    const profile = await profileService.getProfile();
+    
+    if (profile?.temporaryExpectedIncome) {
+      const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
+      const onboardingService = makeOnboardingService();
+      const incomeRange = profile.temporaryExpectedIncome;
+      const incomeAmount = profile.temporaryExpectedIncomeAmount;
+      
+      // Save income to household settings (including custom amount if provided)
+      await onboardingService.saveExpectedIncome(
+        userId,
+        incomeRange,
+        undefined,
+        undefined,
+        incomeAmount
+      );
+      
+      // Generate initial budgets
+      try {
+        const { makeBudgetRulesService } = await import("@/src/application/budgets/budget-rules.factory");
+        const budgetRulesService = makeBudgetRulesService();
+        const monthlyIncome = onboardingService.getMonthlyIncomeFromRange(incomeRange, incomeAmount);
+        const suggestion = budgetRulesService.suggestRule(monthlyIncome);
+        
+        await onboardingService.generateInitialBudgets(
+          userId,
+          incomeRange,
+          undefined,
+          undefined,
+          suggestion.rule.id,
+          incomeAmount
+        );
+        console.log("[EMBEDDED-CHECKOUT] Generated initial budgets");
+      } catch (error) {
+        console.error("[EMBEDDED-CHECKOUT] Error generating budgets:", error);
+        // Don't fail if budget generation fails
+      }
+      
+      // Create emergency fund goal
+      try {
+        const { makeGoalsService } = await import("@/src/application/goals/goals.factory");
+        const goalsService = makeGoalsService();
+        await goalsService.calculateAndUpdateEmergencyFund();
+        console.log("[EMBEDDED-CHECKOUT] Created emergency fund goal");
+      } catch (error) {
+        console.error("[EMBEDDED-CHECKOUT] Error creating emergency fund:", error);
+        // Don't fail if emergency fund creation fails
+      }
+      
+      // Clear temporary income from profile
+      await profileService.updateProfile({ 
+        temporaryExpectedIncome: null,
+        temporaryExpectedIncomeAmount: null 
+      });
+      console.log("[EMBEDDED-CHECKOUT] Moved temporary income to household settings");
+    }
 
     // Get plan
     const { data: plan, error: planError } = await supabase
@@ -2029,13 +2095,17 @@ export async function createEmbeddedCheckoutSession(
       return { success: false, error: "Failed to create subscription in database" };
     }
 
-    // Invalidate subscription cache
+    // Invalidate subscription cache (old API)
     const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
     await invalidateSubscriptionCache(userId);
 
-    // Also invalidate billing cache
-    const { invalidateBillingCache } = await import("@/lib/api/billing-cache");
-    invalidateBillingCache();
+    // Invalidate subscription cache (new Application Service)
+    // This ensures OnboardingService and other services see the new subscription immediately
+    const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+    const subscriptionsService = makeSubscriptionsService();
+    subscriptionsService.invalidateSubscriptionCache(userId);
+    console.log("[EMBEDDED-CHECKOUT] SubscriptionsService cache invalidated for user:", userId);
+
 
     console.log("[EMBEDDED-CHECKOUT] Subscription created successfully:", { 
       subscriptionId: newSubscription.id,

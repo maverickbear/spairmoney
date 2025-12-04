@@ -60,7 +60,7 @@ export default async function AccountBlockedPage() {
                 <div className="pt-2">
                   <Link
                     href="mailto:support@sparefinance.com"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:underline"
                   >
                     <Mail className="w-4 h-4" />
                     support@sparefinance.com

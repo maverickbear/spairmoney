@@ -14,5 +14,12 @@ export const expectedIncomeRangeSchema = z.enum([
   "250k+",
 ]).nullable();
 
+export const expectedIncomeAmountSchema = z.number().positive("Expected income amount must be positive").nullable().optional();
+
 export type ExpectedIncomeRangeFormData = z.infer<typeof expectedIncomeRangeSchema>;
+
+export interface ExpectedIncomeFormData {
+  incomeRange: ExpectedIncomeRange;
+  incomeAmount?: number | null; // Optional custom amount
+}
 

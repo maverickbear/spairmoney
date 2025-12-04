@@ -54,6 +54,7 @@ export function PlansTable({
     if (features.hasBankIntegration) featureList.push("Bank integration");
     if (features.hasHousehold) featureList.push("Household members");
     if (features.hasBudgets) featureList.push("Budgets");
+    if (features.hasReceiptScanner) featureList.push("Receipt scanner");
     
     return featureList;
   };

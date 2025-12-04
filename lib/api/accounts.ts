@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { AccountFormData } from "@/src/domain/accounts/accounts.validations";
 import { getCurrentTimestamp, formatTimestamp } from "@/src/infrastructure/utils/timestamp";
@@ -461,9 +460,6 @@ export async function createAccount(data: AccountFormData) {
     }
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  revalidateTag('accounts', 'max');
-  revalidateTag('dashboard', 'max');
 
   return account;
 }
@@ -572,9 +568,6 @@ export async function updateAccount(id: string, data: Partial<AccountFormData>) 
     }
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateAccountCaches } = await import('@/lib/services/cache-manager');
-  invalidateAccountCaches();
 
   return account;
 }
@@ -630,10 +623,6 @@ export async function transferAccountTransactions(
     // Don't throw - this is not critical, just log it
   }
 
-  // Invalidate cache
-  const { invalidateTransactionCaches, invalidateAccountCaches } = await import('@/lib/services/cache-manager');
-  invalidateTransactionCaches();
-  invalidateAccountCaches();
 
   return { transferred: transactions.length };
 }
@@ -686,8 +675,4 @@ export async function deleteAccount(id: string, transferToAccountId?: string) {
     throw new Error(`Failed to delete account: ${error.message || JSON.stringify(error)}`);
   }
 
-  // Invalidate cache to ensure dashboard shows updated data
-  const { invalidateAccountCaches, invalidateTransactionCaches } = await import('@/lib/services/cache-manager');
-  invalidateAccountCaches();
-  invalidateTransactionCaches();
 }

@@ -39,8 +39,8 @@ const commandGroups = [
       { id: "transactions", label: "Transactions", icon: Receipt, href: "/transactions" },
       { id: "subscriptions", label: "Subscriptions", icon: Repeat, href: "/subscriptions" },
       { id: "planned-payment", label: "Planned Payments", icon: Calendar, href: "/planned-payment" },
-      { id: "categories", label: "Categories", icon: FolderTree, href: "/categories" },
-      { id: "household", label: "Household", icon: Users, href: "/members" },
+      { id: "categories", label: "Categories", icon: FolderTree, href: "/settings?tab=categories" },
+      { id: "household", label: "Household", icon: Users, href: "/settings?tab=household" },
     ],
   },
   {
@@ -77,10 +77,10 @@ export function KBar({ open, onOpenChange }: KBarProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden p-0">
-        <Command className="rounded-[12px] border">
+        <Command className="rounded-[12px] border border-border">
           <Command.Input
             placeholder="Search commands..."
-            className="w-full px-4 py-3 text-sm border-b outline-none"
+            className="w-full px-4 py-3 text-sm border-b border-border outline-none"
           />
           <Command.List className="max-h-[300px] overflow-y-auto p-2">
             <Command.Empty>No results found.</Command.Empty>

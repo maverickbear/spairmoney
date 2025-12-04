@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-import { mapStripeStatus } from "@/lib/api/stripe";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -175,8 +175,9 @@ export async function POST(request: NextRequest) {
 
     console.log("[SYNC] Found plan:", { planId: plan.id, priceId });
 
-    // Map status using shared function
-    const status = await mapStripeStatus(activeSubscription.status);
+    // Map status using service
+    const stripeService = makeStripeService();
+    const status = stripeService.mapStripeStatus(activeSubscription.status);
     const subscriptionId = authUser.id + "-" + plan.id;
 
     // Get active household ID for the user
@@ -337,8 +338,9 @@ export async function POST(request: NextRequest) {
     console.log("[SYNC] Subscription synced successfully:", upsertedSub);
 
     // Invalidate subscription cache to ensure UI reflects changes immediately
-    const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
-    await invalidateSubscriptionCache(authUser.id);
+    const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+    const subscriptionsService = makeSubscriptionsService();
+    subscriptionsService.invalidateSubscriptionCache(authUser.id);
     console.log("[SYNC] Subscription cache invalidated for user:", authUser.id);
 
     return NextResponse.json({

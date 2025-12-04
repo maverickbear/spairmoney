@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import {
   LayoutDashboard,
@@ -28,8 +28,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { IncomeExpensesChart } from "@/components/charts/income-expenses-chart";
 import { CategoryExpensesChart } from "@/components/charts/category-expenses-chart";
 import { BudgetExecutionChart } from "@/components/charts/budget-execution-chart";
@@ -202,7 +200,7 @@ const fakeUpcomingTransactions = [
 ];
 
 export function FullDashboardDemo() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   // Demo data
@@ -373,7 +371,7 @@ export function FullDashboardDemo() {
               variant="ghost"
               size="icon"
               className={cn(
-                "absolute top-4 h-5 w-5 z-[50] bg-card border border-border shadow-sm flex items-center justify-center hidden md:flex",
+                "absolute top-4 h-5 w-5 z-[50] bg-card border border-border shadow-sm items-center justify-center hidden md:flex",
                 isCollapsed ? "left-16" : "left-64"
               )}
               style={{ transform: "translateX(-50%)", pointerEvents: "none" }}

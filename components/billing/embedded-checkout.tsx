@@ -60,9 +60,6 @@ export function EmbeddedCheckout({
           variant: "success",
         });
         onOpenChange(false);
-        // Invalidate billing cache
-        const { invalidateBillingCache } = await import("@/lib/api/billing-cache");
-        invalidateBillingCache();
         // Redirect to billing page to see the subscription
         // Use window.location to force a full page reload and clear all caches
         window.location.href = "/settings?tab=billing";

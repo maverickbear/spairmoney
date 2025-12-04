@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { completeInvitationAfterOtp } from "@/lib/api/members";
+import { makeMembersService } from "@/src/application/members/members.factory";
+import { AppError } from "@/src/application/shared/app-error";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { completeInvitationSchema } from "@/src/domain/members/members.validations";
 import { z } from "zod";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-
-const completeInvitationSchema = z.object({
-  invitationId: z.string().min(1, "Invitation ID is required"),
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,23 +12,23 @@ export async function POST(request: NextRequest) {
     const { invitationId } = validatedData;
 
     // Get current authenticated user
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    const result = await completeInvitationAfterOtp(authUser.id, invitationId);
+    const service = makeMembersService();
+    const result = await service.completeInvitationAfterOtp(userId, invitationId);
     
     // Invalidate subscription cache to ensure fresh data on next check
     // This is important because the member now has "active" status and should inherit owner's subscription
     try {
-      const { invalidateSubscriptionCache } = await import("@/lib/api/subscription");
-      await invalidateSubscriptionCache(authUser.id);
+      const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+      const subscriptionsService = makeSubscriptionsService();
+      subscriptionsService.invalidateSubscriptionCache(userId);
       console.log("[COMPLETE-INVITATION] Subscription cache invalidated for new member");
     } catch (cacheError) {
       console.warn("[COMPLETE-INVITATION] Could not invalidate subscription cache:", cacheError);
@@ -78,6 +76,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid request data", details: error.errors },
         { status: 400 }
+      );
+    }
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
     

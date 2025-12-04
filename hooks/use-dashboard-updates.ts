@@ -57,7 +57,14 @@ export function useDashboardUpdates(enabled: boolean = true) {
         }
 
         // If updates detected, refresh the router
+        // Add protection against excessive refreshes
         if (data.hasUpdates) {
+          // Check if we're already refreshing or just refreshed recently
+          if (isRefreshingRef.current) {
+            console.debug("[Dashboard Updates] Already refreshing, skipping");
+            return;
+          }
+          
           isRefreshingRef.current = true;
           // Small delay to ensure backend has finished processing
           setTimeout(() => {
@@ -65,7 +72,7 @@ export function useDashboardUpdates(enabled: boolean = true) {
             // Reset refreshing flag after a delay
             setTimeout(() => {
               isRefreshingRef.current = false;
-            }, 2000);
+            }, 5000); // Increased to 5 seconds to prevent rapid successive refreshes
           }, 100);
         }
       } catch (error) {

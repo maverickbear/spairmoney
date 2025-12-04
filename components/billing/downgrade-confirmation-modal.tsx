@@ -93,6 +93,11 @@ export function DowngradeConfirmationModal({
       lostFeatures.push("Bank account integration");
     }
 
+    // Check receipt scanner
+    if (current.features.hasReceiptScanner && !target.features.hasReceiptScanner) {
+      lostFeatures.push("Receipt scanner");
+    }
+
     return lostFeatures;
   }
 

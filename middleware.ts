@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SecurityLogger } from "@/lib/utils/security-logging";
-import { rateLimit as redisRateLimit } from "@/lib/services/redis";
 import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 import { createServerClient as createSSRServerClient } from "@supabase/ssr";
 
@@ -54,8 +53,8 @@ const rateLimitConfigs: Record<string, RateLimitConfig> = {
     windowMs: 60 * 60 * 1000, // 1 hour
     maxRequests: 10,
   },
-  // Profile avatar upload
-  "/api/profile/avatar": {
+  // Profile avatar upload (v2)
+  "/api/v2/profile/avatar": {
     windowMs: 60 * 1000, // 1 minute
     maxRequests: 5,
   },
@@ -87,7 +86,7 @@ function getClientId(request: NextRequest): string {
 }
 
 /**
- * Check if request should be rate limited using Redis (with fallback to memory)
+ * Check if request should be rate limited (in-memory)
  */
 async function checkRateLimit(
   clientId: string,
@@ -96,16 +95,7 @@ async function checkRateLimit(
 ): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
   const key = `ratelimit:${clientId}:${path}`;
   
-  // Try Redis first
-  try {
-    const result = await redisRateLimit.check(key, config.maxRequests, config.windowMs);
-    return result;
-  } catch (error) {
-    // Fallback to in-memory store if Redis fails
-    console.warn('[RateLimit] Redis unavailable, using in-memory fallback:', error);
-  }
-
-  // Fallback: In-memory rate limiting
+  // In-memory rate limiting
   const now = Date.now();
   const entry = rateLimitStore.get(key);
 
@@ -185,7 +175,6 @@ export async function middleware(request: NextRequest) {
   const isAccountDeletedPage = pathname === "/account-deleted";
   const isLandingPage = pathname === "/";
   const isPublicPage = pathname.startsWith("/auth") || 
-                       pathname === "/pricing" || 
                        pathname === "/privacy-policy" || 
                        pathname === "/terms-of-service" || 
                        pathname === "/faq" ||

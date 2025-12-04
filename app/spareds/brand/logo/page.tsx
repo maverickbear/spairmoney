@@ -19,7 +19,7 @@ export default function LogoPage() {
             <CardTitle>Primary Logo</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="w-32 h-32 rounded-lg bg-gradient-to-br from-[#4A4AF2] to-[#6D6DFF] flex items-center justify-center text-white text-4xl font-bold">
+            <div className="w-32 h-32 rounded-lg bg-gradient-to-br from-primary-scale-500 to-primary-scale-400 flex items-center justify-center text-white text-4xl font-bold">
               S
             </div>
             <p className="text-sm text-muted-foreground mt-4">

@@ -6,10 +6,7 @@ import {
 import { z } from "zod";
 import { guardFeatureAccess, getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
-
-const updateValueSchema = z.object({
-  totalValue: z.number().positive(),
-});
+import { updateAccountInvestmentValueSchema } from "@/src/domain/investments/investments.validations";
 
 export async function GET(
   request: Request,
@@ -79,7 +76,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const validated = updateValueSchema.parse(body);
+    const validated = updateAccountInvestmentValueSchema.parse(body);
     const value = await upsertAccountInvestmentValue({
       accountId: id,
       totalValue: validated.totalValue,

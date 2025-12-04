@@ -78,7 +78,7 @@ export function FixedTabsWrapper({ children, className }: FixedTabsWrapperProps)
       ref={tabsRef}
       data-fixed-tabs
       className={cn(
-        "sticky z-40 bg-card dark:bg-background border-b border-t-0 px-4 lg:px-8",
+        "sticky z-40 bg-card dark:bg-background border-b border-border border-t-0 px-4 lg:px-8",
         "hidden lg:block", // Only show on desktop
         className
       )}

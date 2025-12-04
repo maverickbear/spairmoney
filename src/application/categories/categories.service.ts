@@ -18,7 +18,6 @@ async function canUserWrite(userId: string): Promise<boolean> {
   const service = makeSubscriptionsService();
   return service.canUserWrite(userId);
 }
-import { invalidateCache } from "@/src/infrastructure/cache/cache.manager";
 import { AppError } from "../shared/app-error";
 
 // In-memory cache for categories
@@ -100,23 +99,21 @@ export class CategoriesService {
       return cached.data;
     }
 
-    // Fetch categories
+    // Fetch categories first
     const categoryRows = await this.repository.findAllCategories(accessToken, refreshToken);
+    const categoryIds = categoryRows.map(c => c.id);
 
-    // Fetch groups for relations
-    const groupRows = await this.repository.findAllGroups(accessToken, refreshToken);
+    // Fetch groups and subcategories in parallel (optimized: single query for all subcategories)
+    const [groupRows, allSubcategoriesRaw] = await Promise.all([
+      this.repository.findAllGroups(accessToken, refreshToken),
+      categoryIds.length > 0
+        ? this.repository.findSubcategoriesByCategoryIds(categoryIds, accessToken, refreshToken)
+        : Promise.resolve([]),
+    ]);
+
+    // Create maps for efficient lookup
     const groupsMap = new Map(groupRows.map(g => [g.id, g]));
-
-    // Fetch subcategories
-    const allSubcategories: any[] = [];
-    for (const category of categoryRows) {
-      const subcategories = await this.repository.findSubcategoriesByCategoryId(
-        category.id,
-        accessToken,
-        refreshToken
-      );
-      allSubcategories.push(...subcategories.map(s => ({ ...s, categoryId: category.id })));
-    }
+    const allSubcategories = allSubcategoriesRaw.map(s => ({ ...s, categoryId: s.categoryId }));
 
     // Map to domain with relations
     const categories: CategoryWithRelations[] = categoryRows.map(categoryRow => {

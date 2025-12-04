@@ -271,7 +271,7 @@ export function SubscriptionForm({
     const category = subscriptionsCategories[0];
     
     try {
-      const response = await fetch(`/api/categories/${category.id}/subcategories`, {
+      const response = await fetch(`/api/v2/categories/${category.id}/subcategories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -453,7 +453,7 @@ export function SubscriptionForm({
 
   async function loadSubcategoriesForCategory(categoryId: string) {
     try {
-      const res = await fetch(`/api/categories?categoryId=${categoryId}`);
+      const res = await fetch(`/api/v2/categories?categoryId=${categoryId}`);
       if (res.ok) {
         const subcats = await res.json();
         setSubcategories(subcats.map((sc: any) => ({ ...sc, categoryId: sc.categoryId || categoryId })));
@@ -544,7 +544,7 @@ export function SubscriptionForm({
     }
 
     try {
-      const res = await fetch(`/api/categories/${selectedCategoryId}/subcategories`, {
+      const res = await fetch(`/api/v2/categories/${selectedCategoryId}/subcategories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newSubcategoryName.trim() }),
@@ -592,7 +592,7 @@ export function SubscriptionForm({
       // Save subscription
       let savedSubscription: UserServiceSubscription;
       if (subscription) {
-        const response = await fetch(`/api/user-subscriptions/${subscription.id}`, {
+        const response = await fetch(`/api/v2/user-subscriptions/${subscription.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",

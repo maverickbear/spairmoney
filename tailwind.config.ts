@@ -38,7 +38,7 @@ const config = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
+        border: "hsla(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
@@ -82,6 +82,24 @@ const config = {
           700: "hsl(var(--grey-700))",
           800: "hsl(var(--grey-800))",
           900: "hsl(var(--grey-900))",
+        },
+        "primary-scale": {
+          900: "hsl(var(--primary-900))",
+          800: "hsl(var(--primary-800))",
+          700: "hsl(var(--primary-700))",
+          600: "hsl(var(--primary-600))",
+          500: "hsl(var(--primary-500))",
+          400: "hsl(var(--primary-400))",
+          300: "hsl(var(--primary-300))",
+        },
+        neutral: {
+          50: "hsl(var(--neutral-50))",
+          100: "hsl(var(--neutral-100))",
+          200: "hsl(var(--neutral-200))",
+          300: "hsl(var(--neutral-300))",
+          400: "hsl(var(--neutral-400))",
+          500: "hsl(var(--neutral-500))",
+          600: "hsl(var(--neutral-600))",
         },
       },
       borderRadius: {

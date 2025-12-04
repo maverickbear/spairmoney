@@ -2,18 +2,18 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
-import { LimitCheckResult } from "@/lib/api/subscription";
+import { BaseLimitCheckResult } from "@/src/domain/subscriptions/subscriptions.types";
 
 interface UsageChartProps {
   limits?: PlanFeatures;
-  transactionLimit?: LimitCheckResult;
-  accountLimit?: LimitCheckResult;
+  transactionLimit?: BaseLimitCheckResult;
+  accountLimit?: BaseLimitCheckResult;
 }
 
 export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChartProps) {
   // Default values when data is loading
-  const defaultTransactionLimit: LimitCheckResult = { allowed: true, limit: 0, current: 0 };
-  const defaultAccountLimit: LimitCheckResult = { allowed: true, limit: 0, current: 0 };
+  const defaultTransactionLimit: BaseLimitCheckResult = { allowed: true, limit: 0, current: 0 };
+  const defaultAccountLimit: BaseLimitCheckResult = { allowed: true, limit: 0, current: 0 };
   
   const txLimit = transactionLimit || defaultTransactionLimit;
   const accLimit = accountLimit || defaultAccountLimit;

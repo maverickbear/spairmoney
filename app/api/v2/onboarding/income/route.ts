@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeOnboardingService } from "@/src/application/onboarding/onboarding.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
-import { expectedIncomeRangeSchema } from "@/src/domain/onboarding/onboarding.validations";
+import { expectedIncomeRangeSchema, expectedIncomeAmountSchema } from "@/src/domain/onboarding/onboarding.validations";
+import { BudgetRuleType } from "@/src/domain/budgets/budget-rules.types";
+import { z } from "zod";
 
 /**
  * GET /api/v2/onboarding/income
@@ -15,11 +17,15 @@ export async function GET(request: NextRequest) {
     }
 
     const service = makeOnboardingService();
-    const expectedIncome = await service.getExpectedIncome(userId);
-    const hasExpectedIncome = expectedIncome !== null;
+    const { incomeRange, incomeAmount } = await service.getExpectedIncomeWithAmount(userId);
+    const hasExpectedIncome = incomeRange !== null;
 
     return NextResponse.json(
-      { hasExpectedIncome, expectedIncome },
+      { 
+        hasExpectedIncome, 
+        expectedIncome: incomeRange,
+        expectedIncomeAmount: incomeAmount ?? null,
+      },
       {
         headers: {
           "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
@@ -37,7 +43,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/v2/onboarding/income
- * Save expected income and generate initial budgets
+ * Save expected income
  */
 export async function POST(request: NextRequest) {
   try {
@@ -48,30 +54,61 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validated = expectedIncomeRangeSchema.parse(body.incomeRange);
+    const incomeAmount = body.incomeAmount !== undefined 
+      ? expectedIncomeAmountSchema.parse(body.incomeAmount) 
+      : undefined;
+    const ruleType = body.ruleType as BudgetRuleType | undefined;
 
     const service = makeOnboardingService();
+    const accessToken = request.cookies.get("sb-access-token")?.value;
+    const refreshToken = request.cookies.get("sb-refresh-token")?.value;
 
-    // Save expected income
-    await service.saveExpectedIncome(userId, validated);
+    // Save expected income (with optional custom amount)
+    await service.saveExpectedIncome(userId, validated, accessToken, refreshToken, incomeAmount);
 
-    // Generate initial budgets if income range is provided
-    if (validated) {
-      try {
-        await service.generateInitialBudgets(userId, validated);
-      } catch (error) {
-        // Log but don't fail the request if budget generation fails
-        console.error("Error generating initial budgets:", error);
+    // Generate initial budgets if ruleType is provided, otherwise auto-suggest (only if household exists)
+    try {
+      const { getActiveHouseholdId } = await import("@/lib/utils/household");
+      const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+      
+      if (householdId) {
+        let finalRuleType = ruleType;
+        
+        // If no ruleType provided, suggest one
+        if (!finalRuleType) {
+          const { makeBudgetRulesService } = await import("@/src/application/budgets/budget-rules.factory");
+          const budgetRulesService = makeBudgetRulesService();
+          const monthlyIncome = service.getMonthlyIncomeFromRange(validated, incomeAmount);
+          const suggestion = budgetRulesService.suggestRule(monthlyIncome);
+          finalRuleType = suggestion.rule.id;
+        }
+
+        // Generate budgets with the selected or suggested rule
+        await service.generateInitialBudgets(
+          userId,
+          validated,
+          accessToken,
+          refreshToken,
+          finalRuleType,
+          incomeAmount
+        );
       }
+      // If no household, budgets will be generated when household is created
+    } catch (error) {
+      // Log but don't fail the request if budget generation fails
+      console.error("Error generating initial budgets:", error);
     }
 
-    // Recalculate emergency fund goal based on new income
+    // Recalculate emergency fund goal based on new income (only if household exists)
     try {
-      const accessToken = request.cookies.get("sb-access-token")?.value;
-      const refreshToken = request.cookies.get("sb-refresh-token")?.value;
-      
-      const { makeGoalsService } = await import("@/src/application/goals/goals.factory");
-      const goalsService = makeGoalsService();
-      await goalsService.calculateAndUpdateEmergencyFund(accessToken, refreshToken);
+      const { getActiveHouseholdId } = await import("@/lib/utils/household");
+      const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+      if (householdId) {
+        const { makeGoalsService } = await import("@/src/application/goals/goals.factory");
+        const goalsService = makeGoalsService();
+        await goalsService.calculateAndUpdateEmergencyFund(accessToken, refreshToken);
+      }
+      // If no household, emergency fund will be created when household is created
     } catch (error) {
       // Log but don't fail the request if emergency fund calculation fails
       console.error("Error recalculating emergency fund:", error);

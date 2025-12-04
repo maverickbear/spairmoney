@@ -470,7 +470,7 @@ BEGIN
     -- Transaction
     SELECT 
       'Transaction' as table_name,
-      EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000 as last_update
+      (EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000)::bigint as last_update
     FROM "public"."Transaction"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
@@ -480,7 +480,7 @@ BEGIN
     -- Account
     SELECT 
       'Account' as table_name,
-      EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
+      (EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000)::bigint
     FROM "public"."Account"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
@@ -490,7 +490,7 @@ BEGIN
     -- Budget
     SELECT 
       'Budget' as table_name,
-      EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
+      (EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000)::bigint
     FROM "public"."Budget"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
@@ -500,7 +500,7 @@ BEGIN
     -- Goal
     SELECT 
       'Goal' as table_name,
-      EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
+      (EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000)::bigint
     FROM "public"."Goal"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
@@ -510,7 +510,7 @@ BEGIN
     -- Debt
     SELECT 
       'Debt' as table_name,
-      EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000
+      (EXTRACT(EPOCH FROM MAX(GREATEST("updatedAt", "createdAt"))) * 1000)::bigint
     FROM "public"."Debt"
     WHERE "userId" = p_user_id
       AND ("updatedAt" IS NOT NULL OR "createdAt" IS NOT NULL)
@@ -520,13 +520,13 @@ BEGIN
     -- SimpleInvestmentEntry (via Account)
     SELECT 
       'SimpleInvestmentEntry' as table_name,
-      EXTRACT(EPOCH FROM MAX(GREATEST(sie."updatedAt", sie."createdAt"))) * 1000
+      (EXTRACT(EPOCH FROM MAX(GREATEST(sie."updatedAt", sie."createdAt"))) * 1000)::bigint
     FROM "public"."SimpleInvestmentEntry" sie
     JOIN "public"."Account" a ON a.id = sie."accountId"
     WHERE a."userId" = p_user_id
       AND (sie."updatedAt" IS NOT NULL OR sie."createdAt" IS NOT NULL)
   )
-  SELECT * FROM updates WHERE last_update IS NOT NULL;
+  SELECT * FROM updates WHERE updates.last_update IS NOT NULL;
 END;
 $$;
 
@@ -2207,7 +2207,8 @@ CREATE TABLE IF NOT EXISTS "public"."SystemSettings" (
     "id" "text" DEFAULT ("gen_random_uuid"())::"text" NOT NULL,
     "maintenanceMode" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    "updatedAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "seoSettings" "jsonb"
 );
 
 
@@ -2219,6 +2220,10 @@ COMMENT ON TABLE "public"."SystemSettings" IS 'Stores system-wide configuration 
 
 
 COMMENT ON COLUMN "public"."SystemSettings"."maintenanceMode" IS 'When true, only super_admin users can access the platform. All other users see maintenance page.';
+
+
+
+COMMENT ON COLUMN "public"."SystemSettings"."seoSettings" IS 'Stores SEO configuration settings including metadata, Open Graph, Twitter cards, and structured data.';
 
 
 
@@ -2244,6 +2249,7 @@ CREATE TABLE IF NOT EXISTS "public"."Transaction" (
     "date" "date" NOT NULL,
     "householdId" "uuid",
     "amount" numeric(15,2) NOT NULL,
+    "receiptUrl" "text",
     CONSTRAINT "transaction_date_valid" CHECK ((("date" >= '1900-01-01'::"date") AND ("date" <= (CURRENT_DATE + '1 year'::interval))))
 );
 
@@ -2264,6 +2270,10 @@ COMMENT ON COLUMN "public"."Transaction"."date" IS 'Transaction date (date only,
 
 
 COMMENT ON COLUMN "public"."Transaction"."amount" IS 'Transaction amount as numeric value. No longer encrypted per regulatory compliance (amount is not PII).';
+
+
+
+COMMENT ON COLUMN "public"."Transaction"."receiptUrl" IS 'URL to the receipt file stored in Supabase Storage receipts bucket';
 
 
 
@@ -2299,7 +2309,9 @@ CREATE TABLE IF NOT EXISTS "public"."User" (
     "effectiveSubscriptionStatus" "text",
     "effectiveSubscriptionId" "text",
     "subscriptionUpdatedAt" timestamp(3) without time zone,
-    "isBlocked" boolean DEFAULT false NOT NULL
+    "isBlocked" boolean DEFAULT false NOT NULL,
+    "temporaryExpectedIncome" "text",
+    "temporaryExpectedIncomeAmount" numeric(12,2)
 );
 
 
@@ -2327,6 +2339,14 @@ COMMENT ON COLUMN "public"."User"."subscriptionUpdatedAt" IS 'Timestamp when sub
 
 
 COMMENT ON COLUMN "public"."User"."isBlocked" IS 'When true, user is blocked from accessing the system and cannot log in. Subscription is paused until unblocked.';
+
+
+
+COMMENT ON COLUMN "public"."User"."temporaryExpectedIncome" IS 'Temporary storage for expected income range during onboarding, before household is created. Values: "0-50k", "50k-100k", "100k-150k", "150k-250k", "250k+", or NULL.';
+
+
+
+COMMENT ON COLUMN "public"."User"."temporaryExpectedIncomeAmount" IS 'Temporary storage for exact expected income amount (in dollars) during onboarding, before household is created. Used when user provides a custom value instead of selecting a range.';
 
 
 

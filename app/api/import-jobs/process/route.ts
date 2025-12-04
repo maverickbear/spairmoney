@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, createServiceRoleClient } from '@/src/infrastructure/database/supabase-server';
 import { getCurrentUserId } from '@/src/application/shared/feature-guard';
-import { syncAccountTransactionsBatched } from '@/lib/api/plaid/sync-batched';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { formatTimestamp } from '@/src/infrastructure/utils/timestamp';
-import { createTransaction } from '@/lib/api/transactions';
+import { makeTransactionsService } from '@/src/application/transactions/transactions.factory';
 import { TransactionFormData, transactionSchema } from '@/src/domain/transactions/transactions.validations';
+import { AppError } from '@/src/application/shared/app-error';
 import { ZodError } from 'zod';
 
 const MAX_JOBS_PER_RUN = 5;
@@ -187,8 +188,9 @@ async function processPlaidSyncJob(supabase: any, job: any) {
     throw new Error('Access token not found for Plaid connection');
   }
 
-  // Process sync with batched function
-  const result = await syncAccountTransactionsBatched(
+  // Process sync with batched function using PlaidService
+  const plaidService = makePlaidService();
+  const result = await plaidService.syncAccountTransactionsBatched(
     accountId,
     plaidAccountId,
     connection.accessToken,
@@ -246,8 +248,9 @@ async function processCsvImportJob(supabase: any, job: any) {
         };
 
         const validatedData = transactionSchema.parse(data);
-        // Pass userId for server-side operations (bypasses auth check)
-        await createTransaction(validatedData, userId);
+        // Use TransactionsService for server-side operations
+        const transactionsService = makeTransactionsService();
+        await transactionsService.createTransaction(validatedData, userId);
         synced++;
       } catch (error) {
         errors++;

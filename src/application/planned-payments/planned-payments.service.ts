@@ -4,18 +4,24 @@
  */
 
 import { PlannedPaymentsRepository } from "@/src/infrastructure/database/repositories/planned-payments.repository";
+import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
+import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
 import { PlannedPaymentsMapper } from "./planned-payments.mapper";
 import { PlannedPaymentFormData } from "../../domain/planned-payments/planned-payments.validations";
 import { BasePlannedPayment } from "../../domain/planned-payments/planned-payments.types";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { formatTimestamp, formatDateOnly } from "@/src/infrastructure/utils/timestamp";
 import { encryptDescription } from "@/src/infrastructure/utils/transaction-encryption";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { AppError } from "../shared/app-error";
+import { getCurrentUserId } from "../shared/feature-guard";
 
 export class PlannedPaymentsService {
-  constructor(private repository: PlannedPaymentsRepository) {}
+  constructor(
+    private repository: PlannedPaymentsRepository,
+    private accountsRepository: AccountsRepository,
+    private categoriesRepository: CategoriesRepository
+  ) {}
 
   /**
    * Get planned payments with optional filters
@@ -36,14 +42,12 @@ export class PlannedPaymentsService {
     accessToken?: string,
     refreshToken?: string
   ): Promise<{ plannedPayments: BasePlannedPayment[]; total: number }> {
-    const supabase = await createServerClient(accessToken, refreshToken);
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return { plannedPayments: [], total: 0 };
     }
 
-    const { data, count } = await this.repository.findAll(user.id, filters, accessToken, refreshToken);
+    const { data, count } = await this.repository.findAll(userId, filters, accessToken, refreshToken);
 
     if (!data || data.length === 0) {
       return { plannedPayments: [], total: count || 0 };
@@ -61,21 +65,21 @@ export class PlannedPaymentsService {
       if (pp.subcategoryId) subcategoryIds.add(pp.subcategoryId);
     });
 
-    const [accountsResult, categoriesResult, subcategoriesResult] = await Promise.all([
+    const [accounts, categories, subcategories] = await Promise.all([
       accountIds.size > 0
-        ? supabase.from("Account").select("id, name").in("id", Array.from(accountIds))
-        : Promise.resolve({ data: [], error: null }),
+        ? this.accountsRepository.findByIds(Array.from(accountIds), accessToken, refreshToken)
+        : Promise.resolve([]),
       categoryIds.size > 0
-        ? supabase.from("Category").select("id, name").in("id", Array.from(categoryIds))
-        : Promise.resolve({ data: [], error: null }),
+        ? this.categoriesRepository.findCategoriesByIds(Array.from(categoryIds), accessToken, refreshToken)
+        : Promise.resolve([]),
       subcategoryIds.size > 0
-        ? supabase.from("Subcategory").select("id, name, logo").in("id", Array.from(subcategoryIds))
-        : Promise.resolve({ data: [], error: null }),
+        ? this.categoriesRepository.findSubcategoriesByIds(Array.from(subcategoryIds), accessToken, refreshToken)
+        : Promise.resolve([]),
     ]);
 
-    const accountMap = new Map((accountsResult.data || []).map(a => [a.id, a]));
-    const categoryMap = new Map((categoriesResult.data || []).map(c => [c.id, c]));
-    const subcategoryMap = new Map((subcategoriesResult.data || []).map(s => [s.id, s]));
+    const accountMap = new Map(accounts.map(a => [a.id, a]));
+    const categoryMap = new Map(categories.map(c => [c.id, c]));
+    const subcategoryMap = new Map(subcategories.map(s => [s.id, s]));
 
     const plannedPayments = data.map(pp => {
       return PlannedPaymentsMapper.toDomain(pp, {
@@ -100,14 +104,12 @@ export class PlannedPaymentsService {
     accessToken?: string,
     refreshToken?: string
   ): Promise<BasePlannedPayment> {
-    const supabase = await createServerClient(accessToken, refreshToken);
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
-    const householdId = await getActiveHouseholdId(user.id);
+    const householdId = await getActiveHouseholdId(userId);
     if (!householdId) {
       throw new AppError("No active household found. Please contact support.", 400);
     }
@@ -130,12 +132,12 @@ export class PlannedPaymentsService {
       linkedTransactionId: null,
       debtId: data.debtId || null,
       subscriptionId: data.subscriptionId || null,
-      userId: user.id,
+      userId,
       householdId,
     });
 
     // Fetch related data for enrichment
-    const relations = await this.fetchRelations(plannedPaymentRow, supabase);
+    const relations = await this.fetchRelations(plannedPaymentRow, accessToken, refreshToken);
 
     return PlannedPaymentsMapper.toDomain(plannedPaymentRow, relations);
   }
@@ -147,10 +149,8 @@ export class PlannedPaymentsService {
     id: string,
     data: Partial<PlannedPaymentFormData>
   ): Promise<BasePlannedPayment> {
-    const supabase = await createServerClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
@@ -211,7 +211,7 @@ export class PlannedPaymentsService {
     const updatedRow = await this.repository.update(id, updateData);
 
     // Fetch related data
-    const relations = await this.fetchRelations(updatedRow, supabase);
+    const relations = await this.fetchRelations(updatedRow);
 
     return PlannedPaymentsMapper.toDomain(updatedRow, relations);
   }
@@ -220,8 +220,6 @@ export class PlannedPaymentsService {
    * Mark planned payment as paid
    */
   async markAsPaid(id: string): Promise<BasePlannedPayment> {
-    const supabase = await createServerClient();
-
     const plannedPayment = await this.repository.findById(id);
     if (!plannedPayment) {
       throw new AppError("Planned payment not found", 404);
@@ -258,7 +256,7 @@ export class PlannedPaymentsService {
       linkedTransactionId: transaction.id,
     });
 
-    const relations = await this.fetchRelations(updatedRow, supabase);
+    const relations = await this.fetchRelations(updatedRow);
 
     return PlannedPaymentsMapper.toDomain(updatedRow, relations);
   }
@@ -276,12 +274,11 @@ export class PlannedPaymentsService {
       throw new AppError("Only scheduled payments can be skipped", 400);
     }
 
-    const supabase = await createServerClient();
     const updatedRow = await this.repository.update(id, {
       status: "skipped",
     });
 
-    const relations = await this.fetchRelations(updatedRow, supabase);
+    const relations = await this.fetchRelations(updatedRow);
 
     return PlannedPaymentsMapper.toDomain(updatedRow, relations);
   }
@@ -299,12 +296,11 @@ export class PlannedPaymentsService {
       throw new AppError("Paid payments cannot be cancelled", 400);
     }
 
-    const supabase = await createServerClient();
     const updatedRow = await this.repository.update(id, {
       status: "cancelled",
     });
 
-    const relations = await this.fetchRelations(updatedRow, supabase);
+    const relations = await this.fetchRelations(updatedRow);
 
     return PlannedPaymentsMapper.toDomain(updatedRow, relations);
   }
@@ -321,7 +317,8 @@ export class PlannedPaymentsService {
    */
   private async fetchRelations(
     row: any,
-    supabase: any
+    accessToken?: string,
+    refreshToken?: string
   ): Promise<{
     account?: { id: string; name: string } | null;
     toAccount?: { id: string; name: string } | null;
@@ -331,39 +328,23 @@ export class PlannedPaymentsService {
     const relations: any = {};
 
     if (row.accountId) {
-      const { data: account } = await supabase
-        .from("Account")
-        .select("id, name")
-        .eq("id", row.accountId)
-        .single();
-      relations.account = account || null;
+      const account = await this.accountsRepository.findById(row.accountId, accessToken, refreshToken);
+      relations.account = account ? { id: account.id, name: account.name } : null;
     }
 
     if (row.toAccountId) {
-      const { data: toAccount } = await supabase
-        .from("Account")
-        .select("id, name")
-        .eq("id", row.toAccountId)
-        .single();
-      relations.toAccount = toAccount || null;
+      const toAccount = await this.accountsRepository.findById(row.toAccountId, accessToken, refreshToken);
+      relations.toAccount = toAccount ? { id: toAccount.id, name: toAccount.name } : null;
     }
 
     if (row.categoryId) {
-      const { data: category } = await supabase
-        .from("Category")
-        .select("id, name")
-        .eq("id", row.categoryId)
-        .single();
-      relations.category = category || null;
+      const category = await this.categoriesRepository.findCategoryById(row.categoryId, accessToken, refreshToken);
+      relations.category = category ? { id: category.id, name: category.name } : null;
     }
 
     if (row.subcategoryId) {
-      const { data: subcategory } = await supabase
-        .from("Subcategory")
-        .select("id, name, logo")
-        .eq("id", row.subcategoryId)
-        .single();
-      relations.subcategory = subcategory || null;
+      const subcategory = await this.categoriesRepository.findSubcategoryById(row.subcategoryId, accessToken, refreshToken);
+      relations.subcategory = subcategory ? { id: subcategory.id, name: subcategory.name, logo: subcategory.logo } : null;
     }
 
     return relations;

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
-import { updateSubscriptionTrial } from "@/lib/api/stripe";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authUser) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -52,12 +51,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[UPDATE-TRIAL:ROUTE] Updating trial for user:", {
-      userId: authUser.id,
+      userId,
       trialEndDate: trialEnd.toISOString(),
     });
 
     // Update trial in Stripe
-    const result = await updateSubscriptionTrial(authUser.id, trialEnd);
+    const stripeService = makeStripeService();
+    const result = await stripeService.updateSubscriptionTrial(userId, trialEnd);
 
     if (!result.success) {
       return NextResponse.json(
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("[UPDATE-TRIAL:ROUTE] Trial updated successfully for user:", authUser.id);
+    console.log("[UPDATE-TRIAL:ROUTE] Trial updated successfully for user:", userId);
 
     return NextResponse.json({
       success: true,
@@ -74,6 +74,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[UPDATE-TRIAL:ROUTE] Error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update trial" },
       { status: 500 }

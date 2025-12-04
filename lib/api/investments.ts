@@ -6,6 +6,12 @@ import { formatTimestamp, formatDateStart, formatDateEnd, formatDateOnly } from 
 import { mapClassToSector, normalizeAssetType } from "@/lib/utils/portfolio-utils";
 import { logger } from "@/src/infrastructure/utils/logger";
 
+// Re-export Holding type from domain layer for backward compatibility
+export type { BaseHolding as Holding } from "@/src/domain/investments/investments.types";
+
+// Import type for internal use
+import type { BaseHolding as Holding } from "@/src/domain/investments/investments.types";
+
 // In-memory cache for holdings to avoid duplicate calculations within the same request
 // This cache is request-scoped and helps reduce duplicate calls
 const holdingsCache = new Map<string, { data: Holding[], timestamp: number }>();
@@ -19,23 +25,6 @@ function cleanHoldingsCache() {
       holdingsCache.delete(key);
     }
   }
-}
-
-export interface Holding {
-  securityId: string;
-  symbol: string;
-  name: string;
-  assetType: string;
-  sector: string;
-  quantity: number;
-  avgPrice: number;
-  bookValue: number;
-  lastPrice: number;
-  marketValue: number;
-  unrealizedPnL: number;
-  unrealizedPnLPercent: number;
-  accountId: string;
-  accountName: string;
 }
 
 export async function getHoldings(

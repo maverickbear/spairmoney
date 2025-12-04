@@ -216,6 +216,54 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   ))}
                 </tr>
                 <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">Bank Integration</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.features.hasBankIntegration ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">Budgets</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.features.hasBudgets ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">Goals Tracking</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.features.hasGoals ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">Receipt Scanner</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.features.hasReceiptScanner ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
                   <td className="px-6 py-4 text-sm text-foreground">Investments</td>
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
@@ -240,18 +288,6 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   ))}
                 </tr>
                 <tr>
-                  <td className="px-6 py-4 text-sm text-foreground">CSV Export</td>
-                  {sortedPlans.map((plan) => (
-                    <td key={plan.id} className="px-6 py-4 text-center">
-                      {plan.features.hasCsvExport ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
                   <td className="px-6 py-4 text-sm text-foreground">CSV Import</td>
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
@@ -264,46 +300,22 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   ))}
                 </tr>
                 <tr>
+                  <td className="px-6 py-4 text-sm text-foreground">CSV Export</td>
+                  {sortedPlans.map((plan) => (
+                    <td key={plan.id} className="px-6 py-4 text-center">
+                      {plan.features.hasCsvExport ? (
+                        <Check className="h-5 w-5 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
                   <td className="px-6 py-4 text-sm text-foreground">Debts Tracking</td>
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasDebts ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="px-6 py-4 text-sm text-foreground">Goals Tracking</td>
-                  {sortedPlans.map((plan) => (
-                    <td key={plan.id} className="px-6 py-4 text-center">
-                      {plan.features.hasGoals ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="px-6 py-4 text-sm text-foreground">Budgets</td>
-                  {sortedPlans.map((plan) => (
-                    <td key={plan.id} className="px-6 py-4 text-center">
-                      {plan.features.hasBudgets ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="px-6 py-4 text-sm text-foreground">Bank Integration</td>
-                  {sortedPlans.map((plan) => (
-                    <td key={plan.id} className="px-6 py-4 text-center">
-                      {plan.features.hasBankIntegration ? (
                         <Check className="h-5 w-5 text-primary mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -503,11 +515,11 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
             You'll retain access to your plan features until the end of your current billing period. 
             No refunds are provided for partial billing periods. 
             By subscribing, you agree to our{" "}
-            <a href="/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+            <a href="/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">
               Terms of Service
             </a>
             {" "}and{" "}
-            <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+            <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">
               Privacy Policy
             </a>
             .

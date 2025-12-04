@@ -206,29 +206,51 @@ spare-finance/
 ├── app/                          # Next.js App Router
 │   ├── (auth-required)/         # Routes requiring authentication
 │   ├── (protected)/             # Main dashboard and features
-│   ├── api/                     # API routes (80+)
+│   ├── api/                     # API routes
+│   │   ├── v2/                  # New API routes (Clean Architecture)
+│   │   └── ...                  # Legacy routes (being migrated)
 │   ├── auth/                    # Login/Signup pages
 │   └── page.tsx                 # Landing page
 │
-├── components/                   # React Components (150+)
+├── src/                          # Source code (Clean Architecture)
+│   ├── domain/                   # Domain Layer - Types, validations, constants
+│   │   ├── accounts/
+│   │   ├── transactions/
+│   │   ├── budgets/
+│   │   └── ...                   # One folder per feature
+│   │
+│   ├── application/              # Application Layer - Business logic
+│   │   ├── accounts/
+│   │   │   ├── accounts.service.ts
+│   │   │   ├── accounts.mapper.ts
+│   │   │   └── accounts.factory.ts
+│   │   ├── transactions/
+│   │   └── ...                   # One folder per feature
+│   │
+│   ├── infrastructure/           # Infrastructure Layer - Data access, external services
+│   │   ├── database/
+│   │   │   └── repositories/    # Database repositories
+│   │   ├── external/            # Plaid, Stripe, OpenAI
+│   │   └── utils/               # Utilities, cache, security
+│   │
+│   └── presentation/            # Presentation Layer - UI, hooks, API routes
+│       ├── components/
+│       └── hooks/
+│
+├── components/                   # React Components (legacy - being migrated)
 │   ├── ui/                      # Base UI components
 │   ├── dashboard/               # Dashboard widgets
 │   ├── forms/                   # Reusable forms
-│   ├── charts/                  # Chart components
 │   └── common/                  # Shared components
 │
-├── lib/                         # Business Logic
-│   ├── api/                     # API functions
-│   ├── services/                # Service layer (NEW!)
-│   │   ├── transaction-calculations.ts
-│   │   ├── balance-calculator.ts
-│   │   ├── cache-manager.ts
-│   │   └── error-handler.ts
-│   ├── types/                   # TypeScript types (NEW!)
-│   ├── validations/             # Zod schemas
+├── lib/                         # Legacy code (being migrated)
+│   ├── api/                     # Legacy API functions
+│   ├── services/                # Utility services (not business logic)
+│   ├── types/                   # Legacy types (migrating to src/domain/)
+│   ├── validations/             # Legacy validations (migrating to src/domain/)
 │   └── utils/                   # Utility functions
 │
-├── hooks/                       # Custom React Hooks
+├── hooks/                       # Custom React Hooks (legacy)
 ├── contexts/                    # React Contexts
 ├── supabase/                    # Database migrations
 ├── scripts/                     # Utility scripts
@@ -240,39 +262,145 @@ spare-finance/
 
 ## 🏗️ Architecture
 
+This project follows **Clean Architecture** with **Domain-Driven Design (DDD)** principles, organized into four distinct layers with clear separation of concerns.
+
+> 📖 **For detailed architecture rules and patterns, see [`.cursorrules`](.cursorrules)** - This is the source of truth for all architectural decisions.
+
+### Architecture Layers
+
+#### 1. Domain Layer (`src/domain/`)
+**Purpose**: Pure business domain - types, validations, and constants
+- ✅ Contains only TypeScript types/interfaces
+- ✅ Zod validation schemas
+- ✅ Domain constants
+- ✅ Zero dependencies (except Zod)
+- ❌ No business logic, no infrastructure, no UI
+
+**Example:**
+```typescript
+// src/domain/accounts/types.ts
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+  balance: number;
+}
+
+// src/domain/accounts/validations.ts
+import { z } from 'zod';
+export const accountSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(['checking', 'savings', 'credit']),
+});
+```
+
+#### 2. Application Layer (`src/application/`)
+**Purpose**: Business logic and orchestration
+- ✅ All business logic lives here
+- ✅ Uses repositories from Infrastructure layer
+- ✅ Validates using Domain schemas
+- ✅ Returns Domain types
+- ❌ No direct database access, no UI, no HTTP concerns
+
+**Example:**
+```typescript
+// src/application/accounts/accounts.service.ts
+import { AccountsRepository } from '@/src/infrastructure/database/repositories/accounts.repository';
+import { Account } from '@/src/domain/accounts/types';
+import { accountSchema } from '@/src/domain/accounts/validations';
+
+export class AccountsService {
+  constructor(private repository: AccountsRepository) {}
+  
+  async getAll(userId: string): Promise<Account[]> {
+    return this.repository.findAll(userId);
+  }
+  
+  async create(userId: string, data: unknown): Promise<Account> {
+    const validated = accountSchema.parse(data);
+    return this.repository.create(userId, validated);
+  }
+}
+```
+
+#### 3. Infrastructure Layer (`src/infrastructure/`)
+**Purpose**: Data access and external services
+- ✅ Database repositories (data access only)
+- ✅ External service integrations (Plaid, Stripe, OpenAI)
+- ✅ Cache, security, utilities
+- ❌ No business logic (must be in Application layer)
+
+**Example:**
+```typescript
+// src/infrastructure/database/repositories/accounts.repository.ts
+import { createServerClient } from '@/src/infrastructure/database/supabase-server';
+import { Account } from '@/src/domain/accounts/types';
+
+export class AccountsRepository {
+  async findAll(userId: string): Promise<Account[]> {
+    const supabase = await createServerClient();
+    const { data } = await supabase.from('Account').select('*').eq('userId', userId);
+    return data.map(this.mapToDomain);
+  }
+  
+  private mapToDomain(row: any): Account {
+    return { id: row.id, name: row.name, /* ... */ };
+  }
+}
+```
+
+#### 4. Presentation Layer (`src/presentation/` + `app/`)
+**Purpose**: UI components, hooks, and API routes
+- ✅ React components and hooks
+- ✅ API routes (thin HTTP layer)
+- ✅ Uses Application Services via factories
+- ❌ No business logic, no direct database access
+
+**Example:**
+```typescript
+// app/api/v2/accounts/route.ts
+import { makeAccountsService } from '@/src/application/accounts/accounts.factory';
+import { getCurrentUserId } from '@/src/application/shared/feature-guard';
+
+export async function GET(request: NextRequest) {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  const service = makeAccountsService();
+  const accounts = await service.getAll(userId);
+  
+  return NextResponse.json(accounts);
+}
+```
+
 ### Design Principles
 
 1. **Separation of Concerns**: Clear separation between UI, business logic, and data
-2. **Type Safety**: TypeScript everywhere with strict mode
-3. **Security First**: RLS policies, encryption, rate limiting
-4. **Performance**: Caching, code splitting, optimized queries
-5. **Maintainability**: Clean code, consistent patterns, documentation
+2. **Dependency Inversion**: Inner layers don't depend on outer layers
+3. **Type Safety**: TypeScript everywhere with strict mode
+4. **Security First**: RLS policies, encryption, rate limiting
+5. **Performance**: Caching, code splitting, optimized queries
+6. **Maintainability**: Clean code, consistent patterns, documentation
 
-### Key Components
+### Golden Rules
 
-#### Service Layer
-```typescript
-// Centralized business logic
-import { calculateTotalIncome } from '@/lib/services/transaction-calculations'
-import { calculateAccountBalances } from '@/lib/services/balance-calculator'
-import { withCache } from '@/lib/services/cache-manager'
-import { handleError } from '@/lib/services/error-handler'
-```
+1. **Business logic → Application Services ONLY**
+2. **Data access → Repositories ONLY**
+3. **Client components → API Routes (`/api/v2/<feature>`)**
+4. **Server components → Application Services (via factories)**
+5. **NEVER direct database access from Presentation Layer**
+6. **NEVER business logic in API routes or components**
 
-#### Type System
-```typescript
-// Shared TypeScript types
-import type { TransactionWithRelations } from '@/lib/types/transaction.types'
-import type { AccountWithBalance } from '@/lib/types/account.types'
-```
+### Migration Status
 
-#### Cache Strategy
-```typescript
-// Centralized cache management
-- Dashboard: 10 second cache
-- Transactions: Tag-based invalidation
-- Accounts: Automatic refresh on mutations
-```
+The project is currently migrating from a legacy structure to Clean Architecture:
+- ✅ New features use Clean Architecture (`src/` structure)
+- ⚠️ Legacy code still exists in `lib/api/` (being migrated)
+- ⚠️ Some routes still use old patterns (being migrated to `/api/v2/`)
+
+For new code, **always** follow the Clean Architecture pattern described above.
 
 ---
 
@@ -292,17 +420,20 @@ import type { AccountWithBalance } from '@/lib/types/account.types'
 ### Best Practices
 
 ```typescript
-// Always validate input
-import { validateOrThrow } from '@/lib/services/error-handler'
-validateOrThrow(condition, "Invalid input")
+// Always validate input using Domain schemas
+import { accountSchema } from '@/src/domain/accounts/validations'
+const validated = accountSchema.parse(data)
 
-// Check ownership before mutations
-import { requireTransactionOwnership } from '@/lib/utils/security'
-await requireTransactionOwnership(transactionId)
+// Use Application Services for business logic
+import { makeAccountsService } from '@/src/application/accounts/accounts.factory'
+const service = makeAccountsService()
+const account = await service.create(userId, validated)
 
-// Use encrypted storage for sensitive data
-import { encryptAmount } from '@/lib/utils/transaction-encryption'
-const encrypted = encryptAmount(amount)
+// Use AppError for expected errors
+import { AppError } from '@/src/application/shared/app-error'
+if (!account) {
+  throw new AppError('Account not found', 404)
+}
 ```
 
 ---
@@ -393,16 +524,19 @@ npm run test:coverage
 ### Writing Tests
 
 ```typescript
-import { calculateTotalIncome } from '@/lib/services/transaction-calculations'
+import { makeTransactionsService } from '@/src/application/transactions/transactions.factory'
 
-describe('Transaction Calculations', () => {
-  it('should calculate total income correctly', () => {
-    const transactions = [
-      { type: 'income', amount: 1000 },
-      { type: 'income', amount: 500 },
-    ]
+describe('Transactions Service', () => {
+  it('should calculate total income correctly', async () => {
+    const service = makeTransactionsService()
+    const transactions = await service.getTransactions(userId, {
+      type: 'income',
+      startDate: new Date('2024-01-01'),
+      endDate: new Date('2024-01-31'),
+    })
     
-    expect(calculateTotalIncome(transactions)).toBe(1500)
+    const total = transactions.reduce((sum, tx) => sum + tx.amount, 0)
+    expect(total).toBe(1500)
   })
 })
 ```
@@ -442,19 +576,27 @@ Ensure all environment variables are set:
 
 ### Available Documentation
 
-- 📊 **[Complete Analysis](docs/SPARE_FINANCE_ANALISE_COMPLETA.md)** - Full project analysis
-- 🏗️ **[Architecture Guide](docs/)** - Architecture decisions
+- 📊 **[Complete Project Analysis](docs/ANALISE_PROJETO_COMPLETA.md)** - Comprehensive analysis of architecture, issues, and recommendations
+- 🏗️ **[Architecture Rules](.cursorrules)** - Source of truth for all architectural patterns and rules
 - 🗄️ **[Database Schema](docs/ANALISE_BANCO.md)** - Database structure
 - 🐳 **[Docker Setup](README_DOCKER.md)** - Docker configuration
 - 🧪 **[Testing Guide](README_TESTS.md)** - Testing documentation
 
 ### API Documentation
 
-API routes are organized by feature:
-- `/api/transactions` - Transaction management
-- `/api/accounts` - Account operations
-- `/api/budgets` - Budget tracking
-- `/api/goals` - Financial goals
+API routes are organized by feature. **New routes follow the `/api/v2/` pattern** using Clean Architecture:
+
+**New API Routes (Recommended):**
+- `/api/v2/transactions` - Transaction management
+- `/api/v2/accounts` - Account operations
+- `/api/v2/budgets` - Budget tracking
+- `/api/v2/goals` - Financial goals
+- `/api/v2/categories` - Category management
+- `/api/v2/debts` - Debt tracking
+
+**Legacy Routes (Being Migrated):**
+- `/api/transactions` - ⚠️ Deprecated, use `/api/v2/transactions`
+- `/api/accounts` - ⚠️ Deprecated, use `/api/v2/accounts`
 - `/api/plaid` - Bank integration
 - `/api/stripe` - Payment processing
 
@@ -516,14 +658,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Phase 1: Stabilization ✅
 - [x] Core features implemented
-- [x] Service layer architecture
-- [x] Type system
+- [x] Clean Architecture + DDD structure
+- [x] Domain layer with types and validations
+- [x] Application layer with services
+- [x] Infrastructure layer with repositories
 - [x] Cache management
 - [x] Error handling
 
-### Phase 2: Optimization (Current)
-- [x] Database optimizations
-- [x] Performance improvements
+### Phase 2: Migration & Optimization (Current)
+- [x] Clean Architecture structure implemented
+- [x] New API routes (`/api/v2/`) following architecture
+- [ ] Complete migration from legacy `lib/api/` to `src/application/`
+- [ ] Migrate all components to use `/api/v2/` routes
+- [ ] Update all server components to use Application Services
 - [ ] Redis implementation
 - [ ] Test coverage >70%
 
@@ -537,5 +684,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ by Naor Tartarotti**
 
-*Last updated: November 16, 2024*
+*Last updated: January 2025*
 

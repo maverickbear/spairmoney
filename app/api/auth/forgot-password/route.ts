@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requestPasswordReset } from "@/lib/api/auth";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/auth/forgot-password
@@ -31,7 +32,8 @@ export async function POST(request: NextRequest) {
 
     // Request password reset
     // Note: This always returns success to prevent email enumeration
-    const result = await requestPasswordReset({ email });
+    const service = makeAuthService();
+    const result = await service.requestPasswordReset({ email });
 
     // Always return success message to prevent email enumeration
     // Even if the email doesn't exist, we don't reveal that information

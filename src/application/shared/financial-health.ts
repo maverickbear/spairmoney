@@ -1,6 +1,4 @@
 "use server";
-
-import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
@@ -8,8 +6,12 @@ import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
 import { makeAccountsService } from "@/src/application/accounts/accounts.factory";
 import { makeDebtsService } from "@/src/application/debts/debts.factory";
-import { getUserLiabilities } from "@/lib/api/plaid/liabilities";
-import { AppError } from "../shared/app-error";
+import { makePlaidService } from "@/src/application/plaid/plaid.factory";
+import { makeBudgetRulesService } from "@/src/application/budgets/budget-rules.factory";
+import { makeBudgetsService } from "@/src/application/budgets/budgets.factory";
+import { makeCategoriesService } from "@/src/application/categories/categories.factory";
+import { BudgetRuleProfile, BudgetRuleType } from "../../domain/budgets/budget-rules.types";
+import { AppError } from "./app-error";
 
 export interface FinancialHealthData {
   score: number;
@@ -44,7 +46,8 @@ async function calculateFinancialHealthInternal(
   accessToken?: string,
   refreshToken?: string,
   accounts?: any[], // OPTIMIZED: Accept accounts to avoid duplicate getAccounts() call
-  projectedIncome?: number // Optional projected income for initial score calculation
+  projectedIncome?: number, // Optional projected income for initial score calculation
+  budgetRule?: BudgetRuleProfile // Optional budget rule for validation
 ): Promise<FinancialHealthData> {
   const date = selectedDate || new Date();
   const selectedMonth = startOfMonth(date);
@@ -282,12 +285,60 @@ async function calculateFinancialHealthInternal(
   }
   
   // Identify alerts
-  const alerts = identifyAlerts({
+  let alerts = identifyAlerts({
     monthlyIncome,
     monthlyExpenses,
     netAmount,
     savingsRate,
   });
+  
+  // Validate against budget rule if provided
+  if (budgetRule && monthlyIncome > 0 && transactions.length > 0) {
+    try {
+      const budgetRulesService = makeBudgetRulesService();
+      const budgetsService = makeBudgetsService();
+      const categoriesService = makeCategoriesService();
+      
+      // Get budgets for the period
+      const budgets = await budgetsService.getBudgets(selectedMonth, accessToken, refreshToken);
+      
+      // Get groups to map to rule categories
+      const groups = await categoriesService.getGroups(accessToken, refreshToken);
+      const groupMappings = budgetRulesService.mapGroupsToRuleCategories(groups);
+      
+      // Get categories to build category-to-group map
+      const allCategories = await categoriesService.getAllCategories(accessToken, refreshToken);
+      const categoriesMap = new Map<string, { groupId?: string | null }>();
+      for (const category of allCategories) {
+        categoriesMap.set(category.id, { groupId: category.groupId });
+      }
+      
+      // Validate budgets against rule
+      const validation = budgetRulesService.validateBudgetAgainstRule(
+        budgets,
+        transactions,
+        budgetRule,
+        monthlyIncome,
+        groupMappings,
+        categoriesMap
+      );
+      
+      // Add rule-based alerts to existing alerts
+      if (validation.alerts.length > 0) {
+        const ruleAlerts = validation.alerts.map(alert => ({
+          id: alert.id,
+          title: alert.title,
+          description: alert.description,
+          severity: alert.severity,
+          action: `Target: ${alert.targetPercentage.toFixed(0)}%, Actual: ${alert.actualPercentage.toFixed(1)}%`,
+        }));
+        alerts = [...alerts, ...ruleAlerts];
+      }
+    } catch (error) {
+      // Log but don't fail if rule validation fails
+      log.warn("Error validating budget rule:", error);
+    }
+  }
   
   // Generate suggestions
   const suggestions = generateSuggestions({
@@ -397,7 +448,8 @@ async function calculateFinancialHealthInternal(
       // Get total debts
       const debtsService = makeDebtsService();
       const debts = await debtsService.getDebts(accessToken, refreshToken);
-      const liabilities = await getUserLiabilities(userId, accessToken, refreshToken);
+      const plaidService = makePlaidService();
+      const liabilities = await plaidService.getUserLiabilities(userId, accessToken, refreshToken);
 
       let totalDebts = 0;
 
@@ -622,7 +674,8 @@ export async function calculateFinancialHealth(
   accessToken?: string,
   refreshToken?: string,
   accounts?: any[], // OPTIMIZED: Accept accounts to avoid duplicate getAccounts() call
-  projectedIncome?: number // Optional projected income for initial score calculation
+  projectedIncome?: number, // Optional projected income for initial score calculation
+  budgetRule?: BudgetRuleProfile // Optional budget rule for validation
 ): Promise<FinancialHealthData> {
   const log = logger.withPrefix("calculateFinancialHealth");
   
@@ -663,22 +716,8 @@ export async function calculateFinancialHealth(
     }
   }
   
-  // Use cache with userId in key to ensure proper isolation (if available)
-  // Cache for 60 seconds to reduce load while keeping data relatively fresh
-  const date = selectedDate || new Date();
-  const cacheKey = finalUserId 
-    ? `financial-health-${finalUserId}-${date.getFullYear()}-${date.getMonth()}`
-    : `financial-health-${date.getFullYear()}-${date.getMonth()}`;
-  
   try {
-    const result = await unstable_cache(
-      async () => calculateFinancialHealthInternal(selectedDate, finalAccessToken, finalRefreshToken, accounts, projectedIncome),
-      [cacheKey],
-      { 
-        revalidate: 60, // 60 seconds
-        tags: ['financial-health', 'transactions', 'dashboard'] 
-      }
-    )();
+    const result = await calculateFinancialHealthInternal(selectedDate, finalAccessToken, finalRefreshToken, accounts, projectedIncome, budgetRule);
     
     // Validate result before returning
     if (result.score === undefined || isNaN(result.score) || !isFinite(result.score)) {

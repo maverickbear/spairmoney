@@ -28,26 +28,60 @@ export function FeatureGuard({
 }: FeatureGuardProps) {
   const { limits, checking: loading, plan } = useSubscription();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
+  const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
 
-  // Check if user is super_admin
+  // OPTIMIZATION: Check super_admin in background using fast endpoint, don't block render
+  // Start with optimistic assumption that user is not super_admin
   useEffect(() => {
+    let cancelled = false;
+    
     async function checkSuperAdmin() {
       try {
-        const response = await fetch("/api/v2/members");
+        // OPTIMIZATION: Use fast endpoint that only returns userRole, not all members
+        const response = await fetch("/api/v2/user/role");
+        if (cancelled) return;
+        
         if (!response.ok) {
           throw new Error("Failed to fetch user role");
         }
         const { userRole } = await response.json();
-        setIsSuperAdmin(userRole === "super_admin");
+        if (cancelled) return;
+        
+        const isSuperAdmin = userRole === "super_admin";
+        setIsSuperAdmin(isSuperAdmin);
+        
+        // Cache the result
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('isSuperAdmin', String(isSuperAdmin));
+        }
       } catch (error) {
+        if (cancelled) return;
         console.error("Error checking super_admin status:", error);
         setIsSuperAdmin(false);
+      } finally {
+        if (!cancelled) {
+          setCheckingSuperAdmin(false);
+        }
       }
     }
-    checkSuperAdmin();
+    
+    // Only check if we haven't cached it yet
+    const cachedSuperAdmin = sessionStorage.getItem('isSuperAdmin');
+    if (cachedSuperAdmin !== null) {
+      setIsSuperAdmin(cachedSuperAdmin === 'true');
+      setCheckingSuperAdmin(false);
+    } else {
+      checkSuperAdmin();
+    }
+    
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (loading || isSuperAdmin === null) {
+  // OPTIMIZATION: Don't block render while checking super_admin
+  // Show content optimistically, super_admin check happens in background
+  if (loading) {
     return (
       <div className="space-y-4 md:space-y-6">
         <Skeleton className="h-32 w-full" />
@@ -56,7 +90,12 @@ export function FeatureGuard({
   }
 
   // super_admin has access to all features
-  if (isSuperAdmin) {
+  // If we're still checking, assume not super_admin (will update if it is)
+  if (isSuperAdmin === true) {
+    // Cache the result
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('isSuperAdmin', 'true');
+    }
     return <>{children}</>;
   }
 

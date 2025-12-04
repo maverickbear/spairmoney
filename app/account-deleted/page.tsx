@@ -87,7 +87,7 @@ export default function AccountDeletedPage() {
           <div className="pt-4">
             <a
               href="/"
-              className="text-sm text-primary hover:underline"
+              className="text-sm text-foreground hover:underline"
             >
               Return to home page
             </a>

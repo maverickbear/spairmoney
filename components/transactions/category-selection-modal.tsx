@@ -36,7 +36,7 @@ export function CategorySelectionModal({
 
   const loadCategoriesForMacro = useCallback(async (macroId: string) => {
     try {
-      const response = await fetch(`/api/categories?macroId=${macroId}`);
+      const response = await fetch(`/api/v2/categories?macroId=${macroId}`);
       if (response.ok) {
         const data = await response.json();
         setAvailableCategories(data || []);
@@ -49,7 +49,7 @@ export function CategorySelectionModal({
 
   const loadSubcategories = useCallback(async (categoryId: string) => {
     try {
-      const response = await fetch(`/api/categories?categoryId=${categoryId}`);
+      const response = await fetch(`/api/v2/categories?categoryId=${categoryId}`);
       if (response.ok) {
         const data = await response.json();
         setSubcategories(data || []);

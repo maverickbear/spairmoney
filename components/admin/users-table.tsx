@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import type { AdminUser } from "@/lib/api/admin";
+import type { AdminUser } from "@/src/domain/admin/admin.types";
 
 interface UsersTableProps {
   users: AdminUser[];

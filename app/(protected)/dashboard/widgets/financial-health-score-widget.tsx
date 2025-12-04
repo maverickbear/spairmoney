@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/common/money";
+import { AnimatedNumber } from "@/components/common/animated-number";
 import { Lightbulb } from "lucide-react";
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
-import { formatExpectedIncomeRange } from "@/src/presentation/utils/format-expected-income";
+import { formatExpectedIncomeRange, formatMonthlyIncomeFromRange } from "@/src/presentation/utils/format-expected-income";
 
 interface FinancialHealthScoreWidgetProps {
   financialHealth: FinancialHealthData | null;
@@ -190,7 +191,7 @@ export function FinancialHealthScoreWidget({
           {/* Score Display */}
           <div className="flex-shrink-0">
             <div className={cn("text-4xl md:text-5xl lg:text-6xl font-bold tabular-nums leading-none", getScoreColor(score))}>
-              {score}
+              <AnimatedNumber value={score} format="number" decimals={0} />
             </div>
             <div className="flex items-center gap-2 mt-1 md:mt-2">
               <div className="text-sm md:text-base font-medium text-foreground">
@@ -203,9 +204,12 @@ export function FinancialHealthScoreWidget({
             )}
           </div>
           {financialHealth?.isProjected && expectedIncomeRange && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Expected income: {formatExpectedIncomeRange(expectedIncomeRange)}
-            </p>
+            <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
+              <div>Expected income: {formatExpectedIncomeRange(expectedIncomeRange)}</div>
+              <div className="font-medium">
+                {formatMonthlyIncomeFromRange(expectedIncomeRange)}/month
+              </div>
+            </div>
           )}
           {financialHealth?.isProjected && financialHealth?.message && !expectedIncomeRange && (
             <p className="text-xs text-muted-foreground mt-2">

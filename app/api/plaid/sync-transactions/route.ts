@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
 import { createServerClient } from '@/src/infrastructure/database/supabase-server';
-import { syncAccountTransactions } from '@/lib/api/plaid/sync';
 import { guardBankIntegration, getCurrentUserId } from '@/src/application/shared/feature-guard';
 import { throwIfNotAllowed } from '@/src/application/shared/feature-guard';
+import { AppError } from '@/src/application/shared/app-error';
 
 export async function POST(req: NextRequest) {
   try {
@@ -68,12 +69,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Sync transactions
-    const result = await syncAccountTransactions(
+    // Sync transactions using PlaidService
+    const plaidService = makePlaidService();
+    const result = await plaidService.syncAccountTransactions(
       accountId,
       account.plaidAccountId,
-      connection.accessToken,
-      daysBack || 30
+      connection.accessToken
     );
 
     return NextResponse.json({
@@ -102,6 +103,13 @@ export async function POST(req: NextRequest) {
           planError: error.planError,
         },
         { status: 403 }
+      );
+    }
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       );
     }
 

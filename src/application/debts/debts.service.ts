@@ -12,7 +12,6 @@ import { formatTimestamp, formatDateOnly } from "@/src/infrastructure/utils/time
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { requireDebtOwnership } from "@/src/infrastructure/utils/security";
 import { logger } from "@/src/infrastructure/utils/logger";
-import { invalidateDebtCaches } from "@/src/infrastructure/cache/cache.manager";
 import {
   calculateDebtMetrics,
   calculatePaymentsFromDate,
@@ -222,8 +221,6 @@ export class DebtsService {
       updatedAt: now,
     });
 
-    // Invalidate cache
-    invalidateDebtCaches();
 
     return DebtsMapper.toDomain(debtRow);
   }
@@ -297,8 +294,6 @@ export class DebtsService {
 
     const debtRow = await this.repository.update(id, updateData);
 
-    // Invalidate cache
-    invalidateDebtCaches();
 
     return DebtsMapper.toDomain(debtRow);
   }
@@ -312,8 +307,6 @@ export class DebtsService {
 
     await this.repository.delete(id);
 
-    // Invalidate cache
-    invalidateDebtCaches();
   }
 
   /**
@@ -346,8 +339,6 @@ export class DebtsService {
       updatedAt: formatTimestamp(new Date()),
     });
 
-    // Invalidate cache
-    invalidateDebtCaches();
 
     return DebtsMapper.toDomain(debtRow);
   }

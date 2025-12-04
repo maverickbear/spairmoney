@@ -19,7 +19,7 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
   const router = useRouter();
 
   async function handleManage() {
-    router.push("/pricing");
+    router.push("/dashboard?openPricingModal=true");
   }
 
   if (!subscription || !plan) {

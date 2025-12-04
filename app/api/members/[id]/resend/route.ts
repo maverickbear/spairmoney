@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resendInvitationEmail } from "@/lib/api/members";
+import { makeMembersService } from "@/src/application/members/members.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function POST(
   request: NextRequest,
@@ -17,13 +18,20 @@ export async function POST(
       );
     }
 
-    // Resend invitation email
+    const service = makeMembersService();
     const { id } = await params;
-    await resendInvitationEmail(id);
+    await service.resendInvitationEmail(id);
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error resending invitation:", error);
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
 
     const errorMessage = error instanceof Error ? error.message : "Failed to resend invitation";
     const statusCode = errorMessage.includes("Unauthorized") ? 401 : 400;

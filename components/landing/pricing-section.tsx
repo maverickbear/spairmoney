@@ -20,7 +20,7 @@ export function PricingSection() {
     // Lazy authentication check - only when user clicks a plan
     if (isAuthenticated === null) {
       try {
-        const response = await fetch("/api/billing/subscription");
+        const response = await fetch("/api/v2/billing/subscription");
         setIsAuthenticated(response.ok);
         
         // If authenticated, also get current plan info

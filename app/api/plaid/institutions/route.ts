@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { searchInstitutions } from '@/lib/api/plaid/connect';
+import { makePlaidService } from '@/src/application/plaid/plaid.factory';
+import { AppError } from '@/src/application/shared/app-error';
 import { CountryCode, Products } from 'plaid';
 
 /**
@@ -42,7 +43,8 @@ export async function GET(req: NextRequest) {
     const count = countParam ? Math.min(parseInt(countParam, 10), 500) : 500;
     const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
 
-    const result = await searchInstitutions(query, countryCode, products, count, offset);
+    const plaidService = makePlaidService();
+    const result = await plaidService.searchInstitutions(query, countryCode, products, count, offset);
 
     return NextResponse.json({
       success: true,
@@ -51,6 +53,17 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error fetching institutions:', error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+        },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       {
         success: false,

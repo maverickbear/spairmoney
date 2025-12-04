@@ -1,0 +1,248 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle2 } from "lucide-react";
+
+interface SubscriptionSuccessDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+export function SubscriptionSuccessDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: SubscriptionSuccessDialogProps) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<"active" | "trialing" | "cancelled" | "past_due" | null>(null);
+  const [trialEndDate, setTrialEndDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      syncSubscription();
+    }
+  }, [open]);
+
+  async function syncSubscription(retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+    
+    try {
+      setSyncing(true);
+      setLoading(true);
+      console.log("[SUCCESS-DIALOG] Syncing subscription from Stripe...", { retryCount });
+      
+      const response = await fetch("/api/stripe/sync-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        console.log("[SUCCESS-DIALOG] Subscription synced successfully:", data.subscription);
+        
+        // Invalidate client-side cache to force fresh data fetch
+        try {
+          const { invalidateClientSubscriptionCache } = await import("@/contexts/subscription-context");
+          invalidateClientSubscriptionCache();
+          console.log("[SUCCESS-DIALOG] Client cache invalidated");
+        } catch (error) {
+          console.error("[SUCCESS-DIALOG] Error invalidating cache:", error);
+        }
+        
+        // Fetch subscription status to determine copy
+        try {
+          const response = await fetch("/api/v2/user");
+          if (!response.ok) {
+            throw new Error("Failed to fetch user data");
+          }
+          const userData = await response.json();
+          if (userData.subscription) {
+            setSubscriptionStatus(userData.subscription.status);
+            setTrialEndDate(userData.subscription.trialEndDate || null);
+          }
+        } catch (error) {
+          console.error("[SUCCESS-DIALOG] Error fetching subscription status:", error);
+        }
+      } else {
+        console.error("[SUCCESS-DIALOG] Failed to sync subscription:", data.error);
+        
+        // If the error indicates we should retry and we haven't exceeded max retries
+        if (data.retry && retryCount < maxRetries) {
+          console.log(`[SUCCESS-DIALOG] Retrying sync in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return syncSubscription(retryCount + 1);
+        }
+        
+        // If it's a 404 and we haven't retried yet, try once more after a delay
+        if (response.status === 404 && retryCount === 0) {
+          console.log(`[SUCCESS-DIALOG] Subscription not found, retrying once after ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return syncSubscription(retryCount + 1);
+        }
+        
+        console.warn("[SUCCESS-DIALOG] Subscription sync failed after retries:", data.error);
+      }
+    } catch (error) {
+      console.error("[SUCCESS-DIALOG] Error syncing subscription:", error);
+      
+      // Retry on network errors if we haven't exceeded max retries
+      if (retryCount < maxRetries) {
+        console.log(`[SUCCESS-DIALOG] Network error, retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return syncSubscription(retryCount + 1);
+      }
+    } finally {
+      setSyncing(false);
+      setLoading(false);
+    }
+  }
+
+  const handleGoToDashboard = async () => {
+    // Invalidate client-side cache before navigating
+    try {
+      const { invalidateClientSubscriptionCache } = await import("@/contexts/subscription-context");
+      invalidateClientSubscriptionCache();
+      console.log("[SUCCESS-DIALOG] Cache invalidated before navigating to dashboard");
+    } catch (error) {
+      console.error("[SUCCESS-DIALOG] Error invalidating cache:", error);
+    }
+    
+    onOpenChange(false);
+    if (onSuccess) {
+      onSuccess();
+    }
+    
+    // Force a full page reload with cache-busting to ensure cache is cleared and subscription is re-checked
+    const timestamp = Date.now();
+    window.location.replace(`/dashboard?_t=${timestamp}`);
+  };
+
+  const handleGoToBilling = () => {
+    onOpenChange(false);
+    router.push("/settings?tab=billing");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="rounded-full bg-green-100 dark:bg-green-900 p-3">
+              <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400" />
+            </div>
+          </div>
+          <DialogTitle className="text-2xl mb-2">
+            {loading || syncing 
+              ? "Confirming your subscription..." 
+              : subscriptionStatus === "trialing" 
+                ? "Trial Started Successfully!" 
+                : "Subscription Successful!"}
+          </DialogTitle>
+          <DialogDescription className="text-base">
+            {loading || syncing 
+              ? "Please wait while we confirm your subscription."
+              : subscriptionStatus === "trialing" 
+                ? "Your 30-day trial has started. Start exploring all pro features!"
+                : "Thank you for subscribing. Your account has been upgraded."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {!loading && !syncing && (
+          <Card className="border-0 shadow-none">
+            <CardContent className="space-y-6 pt-0">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <h3 className="font-semibold text-sm">What&apos;s next?</h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  {subscriptionStatus === "trialing" ? (
+                    <>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <span>Your 30-day trial is active and you have access to all pro features</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <span>No credit card required during trial period</span>
+                      </li>
+                      {trialEndDate && (
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                          <span>
+                            Your trial ends on {new Date(trialEndDate).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </li>
+                      )}
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <span>You can add a payment method anytime from your billing settings</span>
+                      </li>
+                    </>
+                  ) : (
+                    <>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <span>Your subscription is now active and you have access to all pro features</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <span>You can manage your subscription anytime from your billing settings</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <span>A confirmation email has been sent to your email address</span>
+                      </li>
+                    </>
+                  )}
+                </ul>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={handleGoToDashboard}
+                  className="flex-1 w-full"
+                  size="large"
+                >
+                  Go to Dashboard
+                </Button>
+                <Button
+                  onClick={handleGoToBilling}
+                  variant="outline"
+                  className="flex-1 w-full"
+                  size="large"
+                >
+                  View Billing
+                </Button>
+              </div>
+
+              <p className="text-xs text-center text-muted-foreground">
+                If you have any questions, please contact our support team.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+

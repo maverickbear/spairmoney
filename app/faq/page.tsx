@@ -197,7 +197,7 @@ export default function FAQPage() {
                 href="/privacy-policy" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-primary hover:underline"
+                className="text-foreground hover:underline"
               >
                 Privacy Policy
               </Link>

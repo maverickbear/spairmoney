@@ -5,12 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signUpSchema, SignUpFormData } from "@/src/domain/auth/auth.validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
+import { Turnstile, TurnstileRef } from "./turnstile";
+import { isCaptchaError } from "@/lib/utils/auth-errors";
 
 /**
  * Preloads user, profile, and billing data into global caches
@@ -55,7 +57,7 @@ async function preloadUserData() {
       }).catch(() => null),
       // Preload subscription/billing data (without limits - loaded later when needed)
       // Optimized: Stripe API call is now opt-in (includeStripe=true) for faster loading
-      fetch("/api/billing/subscription", { cache: "no-store" }).then(async (r) => {
+      fetch("/api/v2/billing/subscription", { cache: "no-store" }).then(async (r) => {
         if (!r.ok) return null;
         const subData = await r.json();
         if (!subData) return null;
@@ -93,6 +95,23 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileRef>(null);
+  const [isDevelopment, setIsDevelopment] = useState(false);
+
+  // Detect development environment on client side only (avoid hydration mismatch)
+  useEffect(() => {
+    const isLocalhost = typeof window !== "undefined" && 
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    setIsDevelopment(isLocalhost);
+  }, []);
+
+  // Get Turnstile site key from environment
+  // Use Cloudflare test keys in development (localhost) to avoid domain validation issues
+  // Test key "1x00000000000000000000AA" always passes verification
+  const turnstileSiteKey = isDevelopment
+    ? "1x00000000000000000000AA" // Cloudflare test key that always passes
+    : (process.env.NEXT_PUBLIC_TURNSTILE_SITE || "");
 
   // Get planId from props or search params
   const finalPlanId = planId || searchParams.get("planId") || undefined;
@@ -114,140 +133,93 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       setLoading(true);
       setError(null);
 
-      // Call signup API route
+      // Validate CAPTCHA token if Turnstile is enabled (only in production)
+      // In development, CAPTCHA is optional
+      if (!isDevelopment && turnstileSiteKey && !captchaToken) {
+        setError("Please complete the CAPTCHA verification");
+        // Reset CAPTCHA
+        if (captchaRef.current) {
+          captchaRef.current.reset();
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Call signup API route with CAPTCHA token
+      // In development, don't send captchaToken to avoid Supabase verification errors
+      const requestBody: any = { ...data };
+      if (!isDevelopment && captchaToken) {
+        requestBody.captchaToken = captchaToken;
+      }
+      
       const response = await fetch("/api/v2/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(requestBody),
       });
       
       const result = await response.json();
       
       if (!response.ok) {
-        setError(result.error || "Failed to sign up");
+        const errorMessage = result.error || "Failed to sign up";
+        setError(errorMessage);
+        
+        // Reset CAPTCHA on any error (especially if it's a CAPTCHA error)
+        if (isCaptchaError(errorMessage) || captchaRef.current) {
+          if (captchaRef.current) {
+            captchaRef.current.reset();
+          }
+          setCaptchaToken(null);
+        }
+        setLoading(false);
         return;
       }
 
       if (result.error) {
-        setError(result.error);
+        const errorMessage = result.error;
+        setError(errorMessage);
+        
+        // Reset CAPTCHA on error (especially if it's a CAPTCHA error)
+        if (isCaptchaError(errorMessage) || captchaRef.current) {
+          if (captchaRef.current) {
+            captchaRef.current.reset();
+          }
+          setCaptchaToken(null);
+        }
+        setLoading(false);
         return;
       }
 
       if (!result.user) {
         setError("Failed to sign up");
+        // Reset CAPTCHA on error
+        if (captchaRef.current) {
+          captchaRef.current.reset();
+        }
+        setCaptchaToken(null);
         return;
       }
 
+      // Reset CAPTCHA after successful submission
+      if (captchaRef.current) {
+        captchaRef.current.reset();
+      }
+      setCaptchaToken(null);
+
       // After signup, redirect to OTP verification page
       // The user needs to verify their email before proceeding
+      // Checkout linking and plan selection are handled after OTP verification
       router.push(`/auth/verify-otp?email=${encodeURIComponent(data.email)}${finalPlanId ? `&planId=${finalPlanId}&interval=${finalInterval}` : ""}${fromCheckout ? "&from_checkout=true" : ""}`);
-      return;
-
-      // If user came from checkout, link their Stripe subscription
-      if (fromCheckout && prefillEmail) {
-        try {
-          // Wait for session to be fully established
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Link subscription by email
-          const linkResponse = await fetch("/api/stripe/link-subscription", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ email: prefillEmail }),
-          });
-
-          if (linkResponse.ok) {
-            const linkData = await linkResponse.json();
-            if (linkData.success) {
-              console.log("[SIGNUP] Subscription linked successfully");
-              // Preload user and plan data before redirecting
-              await preloadUserData();
-              // Redirect to dashboard
-              router.push("/dashboard");
-              return;
-            }
-          }
-          // If linking fails, continue with normal flow
-          console.log("[SIGNUP] Could not link subscription, continuing with normal flow");
-        } catch (error) {
-          console.error("[SIGNUP] Error linking subscription:", error);
-          // Continue with normal flow
-        }
-      }
-
-      // If planId is provided, redirect to Stripe Checkout
-      // Wait a bit to ensure session is established
-      if (finalPlanId) {
-        try {
-          // Wait for session to be fully established
-          // Retry up to 3 times with increasing delays
-          let retries = 3;
-          let delay = 500;
-          let lastError: string | null = null;
-          
-          while (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, delay));
-            
-            // Create Stripe Checkout session and redirect to Stripe
-            const response = await fetch("/api/stripe/checkout", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ 
-                planId: finalPlanId,
-                interval: finalInterval,
-                returnUrl: "/subscription/success"
-              }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.url) {
-              // Redirect to Stripe Checkout
-              window.location.href = data.url;
-              return;
-            } else {
-              lastError = data.error || "Failed to create checkout session";
-              console.error(`Failed to create checkout (${4 - retries}/3):`, lastError);
-              
-              // If unauthorized, session might not be ready yet
-              if (response.status === 401 && retries > 1) {
-                retries--;
-                delay *= 2; // Exponential backoff
-                continue;
-              }
-              
-              // For other errors or last retry, show error
-              setError(lastError || "Failed to start checkout. Please try again.");
-              return;
-            }
-          }
-          
-          // If we exhausted retries, show last error
-          setError(lastError || "Failed to start checkout. Please try again.");
-          return;
-        } catch (error) {
-          console.error("Error processing plan:", error);
-          setError("An error occurred while processing your plan. Please try again.");
-          return;
-        }
-      }
-
-      // No planId provided, redirect to dashboard
-      // Preload user and plan data while showing loading
-      // This ensures data is ready when user navigates
-      await preloadUserData();
-      
-      // Supabase session is automatically managed
-      router.push("/dashboard");
     } catch (error) {
       console.error("Error during signup:", error);
       setError("An unexpected error occurred");
+      // Reset CAPTCHA on error
+      if (captchaRef.current) {
+        captchaRef.current.reset();
+      }
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -360,10 +332,32 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
           )}
         </div>
 
+        {/* CAPTCHA Component */}
+        {turnstileSiteKey && (
+          <div className="flex justify-center">
+            <Turnstile
+              ref={captchaRef}
+              sitekey={turnstileSiteKey}
+              onSuccess={(token) => {
+                setCaptchaToken(token);
+              }}
+              onError={() => {
+                setCaptchaToken(null);
+                setError("CAPTCHA verification failed. Please try again.");
+              }}
+              onExpire={() => {
+                setCaptchaToken(null);
+                setError("CAPTCHA verification expired. Please complete it again.");
+              }}
+              theme="auto" // or "light" or "dark"
+            />
+          </div>
+        )}
+
         <Button 
           type="submit" 
           className="w-full h-11 text-base font-medium" 
-          disabled={loading}
+          disabled={loading || (!isDevelopment && !!turnstileSiteKey && !captchaToken)}
         >
           {loading ? (
             <>
@@ -380,7 +374,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
         Already have an account?{" "}
         <Link 
           href="/auth/login" 
-          className="text-primary hover:underline font-medium transition-colors"
+          className="text-foreground hover:underline font-medium transition-colors"
         >
           Sign in
         </Link>

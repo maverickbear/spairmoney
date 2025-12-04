@@ -83,74 +83,9 @@ export async function signUp(data: SignUpFormData): Promise<{ user: User | null;
     if (userData) {
       const now = formatTimestamp(new Date());
       
-      // Check if personal household already exists
-      const { data: existingHousehold } = await supabase
-        .from("Household")
-        .select("id")
-        .eq("createdBy", userData.id)
-        .eq("type", "personal")
-        .maybeSingle();
-
-      if (!existingHousehold) {
-        // Create personal household
-        const { data: household, error: householdError } = await supabase
-          .from("Household")
-          .insert({
-            name: data.name || userData.email || "Minha Conta",
-            type: "personal",
-            createdBy: userData.id,
-            createdAt: now,
-            updatedAt: now,
-            settings: {},
-          })
-          .select()
-          .single();
-
-        if (householdError || !household) {
-          console.error("Error creating personal household:", householdError);
-          // Don't fail signup if household creation fails, but log it
-        } else {
-          // Create HouseholdMemberNew (owner role, active, default)
-          const { error: memberError } = await supabase
-            .from("HouseholdMemberNew")
-            .insert({
-              householdId: household.id,
-              userId: userData.id,
-              role: "owner",
-              status: "active",
-              isDefault: true,
-              joinedAt: now,
-              createdAt: now,
-              updatedAt: now,
-            });
-
-          if (memberError) {
-            console.error("Error creating household member:", memberError);
-          } else {
-            // Set as active household
-            const { error: activeError } = await supabase
-              .from("UserActiveHousehold")
-              .insert({
-                userId: userData.id,
-                householdId: household.id,
-            updatedAt: now,
-          });
-
-            if (activeError) {
-              console.error("Error setting active household:", activeError);
-            } else {
-              // Create emergency fund goal for new user
-              try {
-                const { ensureEmergencyFundGoal } = await import("./goals");
-                await ensureEmergencyFundGoal(userData.id, household.id);
-              } catch (goalError) {
-                console.error("Error creating emergency fund goal:", goalError);
-                // Don't fail signup if goal creation fails
-              }
-            }
-          }
-        }
-      }
+      // Note: Household is NOT created automatically during signup
+      // Household will be created when user selects a subscription plan
+      // This aligns with business logic where household and subscription are created together
     }
 
     // Note: Subscription is NOT created automatically during signup
@@ -212,76 +147,9 @@ export async function signIn(data: SignInFormData): Promise<{ user: User | null;
       userData = newUser;
 
       // Create personal household for the new user
-      const now = formatTimestamp(new Date());
-      
-      // Check if personal household already exists
-      const { data: existingHousehold } = await supabase
-        .from("Household")
-        .select("id")
-        .eq("createdBy", userData.id)
-        .eq("type", "personal")
-        .maybeSingle();
-
-      if (!existingHousehold) {
-        // Create personal household
-        const { data: household, error: householdError } = await supabase
-          .from("Household")
-          .insert({
-            name: userData.name || userData.email || "Minha Conta",
-            type: "personal",
-            createdBy: userData.id,
-            createdAt: now,
-            updatedAt: now,
-            settings: {},
-          })
-          .select()
-          .single();
-
-        if (householdError || !household) {
-          console.error("Error creating personal household:", householdError);
-          // Don't fail signin if household creation fails, but log it
-        } else {
-          // Create HouseholdMemberNew (owner role, active, default)
-          const { error: memberError } = await supabase
-            .from("HouseholdMemberNew")
-            .insert({
-              householdId: household.id,
-              userId: userData.id,
-              role: "owner",
-              status: "active",
-              isDefault: true,
-              joinedAt: now,
-              createdAt: now,
-              updatedAt: now,
-            });
-
-          if (memberError) {
-            console.error("Error creating household member:", memberError);
-          } else {
-            // Set as active household
-            const { error: activeError } = await supabase
-              .from("UserActiveHousehold")
-              .insert({
-                userId: userData.id,
-                householdId: household.id,
-            updatedAt: now,
-          });
-
-            if (activeError) {
-              console.error("Error setting active household:", activeError);
-            } else {
-              // Create emergency fund goal for new user
-              try {
-                const { ensureEmergencyFundGoal } = await import("./goals");
-                await ensureEmergencyFundGoal(userData.id, household.id);
-              } catch (goalError) {
-                console.error("Error creating emergency fund goal:", goalError);
-                // Don't fail signin if goal creation fails
-              }
-            }
-          }
-        }
-      }
+      // Note: Household is NOT created automatically during signin
+      // Household will be created when user selects a subscription plan
+      // This aligns with business logic where household and subscription are created together
 
       // Note: Subscription is NOT created automatically during signin
       // User must select a plan on /select-plan page if they don't have one

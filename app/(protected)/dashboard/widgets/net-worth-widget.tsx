@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/components/common/money";
+import { AnimatedNumber } from "@/components/common/animated-number";
 import { cn } from "@/lib/utils";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { subMonths, format } from "date-fns";
@@ -110,7 +111,7 @@ export function NetWorthWidget({
               "text-2xl font-bold tabular-nums mb-1",
               netWorth >= 0 ? "text-green-500" : "text-red-500"
             )}>
-              {formatMoneyCompact(netWorth)}
+              <AnimatedNumber value={netWorth} format="money-compact" />
             </div>
             <div className="text-sm text-muted-foreground">Total net worth</div>
           </div>

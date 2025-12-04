@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-
-async function isSuperAdmin(): Promise<boolean> {
-  try {
-    const supabase = await createServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return false;
-    }
-
-    const { data: userData } = await supabase
-      .from("User")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    return userData?.role === "super_admin";
-  } catch (error) {
-    console.error("Error checking super_admin status:", error);
-    return false;
-  }
-}
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * GET /api/admin/subscription-services
@@ -29,58 +9,32 @@ async function isSuperAdmin(): Promise<boolean> {
  */
 export async function GET() {
   try {
-    // Use service role client to get all data (including inactive)
-    const supabase = createServiceRoleClient();
-
-    // Get all categories
-    const { data: categories, error: categoriesError } = await supabase
-      .from("SubscriptionServiceCategory")
-      .select("*")
-      .order("displayOrder", { ascending: true });
-
-    if (categoriesError) {
-      console.error("Error fetching categories:", categoriesError);
-      return NextResponse.json(
-        { error: "Failed to fetch categories" },
-        { status: 500 }
-      );
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get all services (sorted alphabetically by name)
-    const { data: services, error: servicesError } = await supabase
-      .from("SubscriptionService")
-      .select("*")
-      .order("name", { ascending: true });
-
-    if (servicesError) {
-      console.error("Error fetching services:", servicesError);
-      return NextResponse.json(
-        { error: "Failed to fetch services" },
-        { status: 500 }
-      );
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Group services by category
-    const servicesByCategory = new Map<string, typeof services>();
-    (services || []).forEach((service: any) => {
-      if (!servicesByCategory.has(service.categoryId)) {
-        servicesByCategory.set(service.categoryId, []);
-      }
-      servicesByCategory.get(service.categoryId)!.push(service);
-    });
+    const result = await service.getAllSubscriptionServices();
 
-    // Enrich categories with their services
-    const enrichedCategories = (categories || []).map((category: any) => ({
-      ...category,
-      services: servicesByCategory.get(category.id) || [],
-    }));
-
-    return NextResponse.json({
-      categories: enrichedCategories,
-      services: services || [],
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error in GET /api/admin/subscription-services:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

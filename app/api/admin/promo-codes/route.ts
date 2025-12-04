@@ -1,27 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getAllPromoCodes,
-  createPromoCode,
-  updatePromoCode,
-  deletePromoCode,
-  togglePromoCodeActive,
-} from "@/lib/api/admin";
+import { makeAdminService } from "@/src/application/admin/admin.factory";
+import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: NextRequest) {
   try {
-    const promoCodes = await getAllPromoCodes();
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const promoCodes = await service.getAllPromoCodes();
     return NextResponse.json({ promoCodes });
   } catch (error: any) {
     console.error("Error fetching promo codes:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || "Failed to fetch promo codes" },
-      { status: error.message?.includes("Unauthorized") ? 403 : 500 }
+      { status: 500 }
     );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       code,
@@ -41,7 +71,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const promoCode = await createPromoCode({
+    const promoCode = await service.createPromoCode({
       code,
       discountType,
       discountValue: parseFloat(discountValue),
@@ -55,15 +85,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ promoCode });
   } catch (error: any) {
     console.error("Error creating promo code:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || "Failed to create promo code" },
-      { status: error.message?.includes("Unauthorized") ? 403 : 500 }
+      { status: 500 }
     );
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       id,
@@ -96,20 +147,41 @@ export async function PUT(request: NextRequest) {
     if (isActive !== undefined) updateData.isActive = isActive;
     if (planIds !== undefined) updateData.planIds = planIds;
 
-    const promoCode = await updatePromoCode(id, updateData);
+    const promoCode = await service.updatePromoCode(id, updateData);
 
     return NextResponse.json({ promoCode });
   } catch (error: any) {
     console.error("Error updating promo code:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || "Failed to update promo code" },
-      { status: error.message?.includes("Unauthorized") ? 403 : 500 }
+      { status: 500 }
     );
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const service = makeAdminService();
+    
+    // Check if user is super_admin
+    const isSuperAdmin = await service.isSuperAdmin(userId);
+    if (!isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -120,14 +192,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await deletePromoCode(id);
+    await service.deletePromoCode(id);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting promo code:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error.message || "Failed to delete promo code" },
-      { status: error.message?.includes("Unauthorized") ? 403 : 500 }
+      { status: 500 }
     );
   }
 }

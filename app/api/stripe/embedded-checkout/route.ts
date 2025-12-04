@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+
     return NextResponse.json({ success: true, subscriptionId, userId: authUser.id });
   } catch (error) {
     console.error("Error creating embedded checkout session:", error);
