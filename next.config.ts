@@ -229,7 +229,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind CSS
               "img-src 'self' data: https: blob:", // blob: needed for image previews (receipt scanner, file uploads)
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.sparefinance.com wss://app.sparefinance.com https://api.stripe.com https://js.stripe.com https://*.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://vercel.live https://www.googletagmanager.com https://*.google-analytics.com https://va.vercel-scripts.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.sparefinance.com wss://app.sparefinance.com https://api.stripe.com https://js.stripe.com https://*.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://vercel.live https://www.googletagmanager.com https://*.google-analytics.com https://va.vercel-scripts.com https://challenges.cloudflare.com https://*.cloudflare.com",
               "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://cdn.plaid.com https://*.plaid.com https://vercel.live https://challenges.cloudflare.com",
               "object-src 'none'",
               "base-uri 'self'",

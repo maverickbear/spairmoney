@@ -9,6 +9,9 @@ import { AppError } from "@/src/application/shared/app-error";
  * This allows the frontend to poll silently without fetching all data
  * 
  * OPTIMIZED: Uses Redis cache (5s TTL) + RPC function for better performance
+ * 
+ * Note: This route uses request.url which causes prerendering warnings during build.
+ * These warnings are expected and do not affect functionality.
  */
 export async function GET(request: Request) {
   // Opt out of static generation - this route uses request.url

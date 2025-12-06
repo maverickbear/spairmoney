@@ -223,14 +223,48 @@ export class AuthService {
 
   /**
    * Sign out user
+   * If session doesn't exist, treat as success (logout already achieved)
    */
   async signOut(): Promise<{ error: string | null }> {
     try {
       const supabase = await createServerClient();
       const { error } = await supabase.auth.signOut();
-      return { error: error ? error.message : null };
+      
+      // If session doesn't exist, that's fine - logout is already achieved
+      if (error) {
+        const errorMessage = error.message?.toLowerCase() || "";
+        const errorCode = (error as any)?.code?.toLowerCase() || "";
+        
+        // Check if it's a "session not found" error
+        const isSessionNotFound = 
+          errorCode === "session_not_found" ||
+          errorMessage.includes("session not found") ||
+          errorMessage.includes("session id") && errorMessage.includes("doesn't exist") ||
+          errorMessage.includes("doesn't exist");
+        
+        if (isSessionNotFound) {
+          // Session already doesn't exist - logout is successful
+          logger.info("Session not found during signOut - logout already achieved");
+          return { error: null };
+        }
+        
+        // Other errors should be reported
+        return { error: error.message };
+      }
+      
+      return { error: null };
     } catch (error) {
       logger.error("Error in signOut:", error);
+      
+      // Check if it's a session-related error
+      const errorMessage = error instanceof Error ? error.message.toLowerCase() : "";
+      if (errorMessage.includes("session not found") || 
+          errorMessage.includes("session id") && errorMessage.includes("doesn't exist")) {
+        // Session already doesn't exist - logout is successful
+        logger.info("Session not found during signOut (catch) - logout already achieved");
+        return { error: null };
+      }
+      
       return { error: error instanceof Error ? error.message : "Failed to sign out" };
     }
   }

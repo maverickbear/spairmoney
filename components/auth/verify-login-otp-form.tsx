@@ -233,7 +233,8 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       let data: any = null;
       let verifyError: any = null;
 
-      // Try email type first
+      // Try email type first (for numeric OTP sent via email)
+      console.log("[LOGIN-OTP] Verifying OTP with email type...");
       const emailResult = await supabase.auth.verifyOtp({
         email,
         token: otpCode,
@@ -241,6 +242,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       });
 
       if (emailResult.error) {
+        console.log("[LOGIN-OTP] Email type failed, trying magiclink type...", emailResult.error.message);
         // If email type fails, try magiclink type
         const magiclinkResult = await supabase.auth.verifyOtp({
           email,
@@ -249,6 +251,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         });
 
         if (magiclinkResult.error) {
+          console.log("[LOGIN-OTP] Magiclink type failed, trying recovery type...", magiclinkResult.error.message);
           // If magiclink also fails, try recovery type (in case user requested password recovery)
           const recoveryResult = await supabase.auth.verifyOtp({
             email,
@@ -257,14 +260,18 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
           });
 
           if (recoveryResult.error) {
+            console.error("[LOGIN-OTP] All OTP types failed. Last error:", recoveryResult.error);
             verifyError = recoveryResult.error;
           } else {
+            console.log("[LOGIN-OTP] OTP verified successfully with recovery type");
             data = recoveryResult.data;
           }
         } else {
+          console.log("[LOGIN-OTP] OTP verified successfully with magiclink type");
           data = magiclinkResult.data;
         }
       } else {
+        console.log("[LOGIN-OTP] OTP verified successfully with email type");
         data = emailResult.data;
       }
 
@@ -274,6 +281,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       }
 
       if (verifyError) {
+        console.error("[LOGIN-OTP] OTP verification error:", verifyError);
         setError(verifyError.message || "Invalid verification code. Please try again.");
         // Clear OTP on error
         setOtp(["", "", "", "", "", ""]);
@@ -282,17 +290,54 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         return;
       }
 
-      if (!data || !data.user || !data.session) {
-        // Check if session might be established but not yet available
-        // Wait a bit and check again before showing error
-        await new Promise(resolve => setTimeout(resolve, 300));
-        const { data: { user: checkUser } } = await supabase.auth.getUser();
-        const { data: { session: checkSession } } = await supabase.auth.getSession();
+      // CRITICAL: Ensure session is set explicitly after verifyOtp
+      // The createBrowserClient should handle this automatically, but we need to ensure it happens
+      if (data && data.session) {
+        console.log("[LOGIN-OTP] Setting session explicitly after OTP verification");
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        
+        if (setSessionError) {
+          console.error("[LOGIN-OTP] Error setting session:", setSessionError);
+          setError("Failed to establish session. Please try again.");
+          setLoading(false);
+          return;
+        }
+        console.log("[LOGIN-OTP] Session set successfully");
+      } else if (!data || !data.user) {
+        console.error("[LOGIN-OTP] No user data returned from OTP verification");
+        setError("Verification failed. Please try again.");
+        setLoading(false);
+        return;
+      } else if (!data.session) {
+        // Session might be established but not in response - check for it
+        console.log("[LOGIN-OTP] OTP verified but no session in response, checking for existing session...");
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Try multiple times to get the session
+        let checkUser = null;
+        let checkSession = null;
+        for (let i = 0; i < 3; i++) {
+          const userResult = await supabase.auth.getUser();
+          const sessionResult = await supabase.auth.getSession();
+          checkUser = userResult.data.user;
+          checkSession = sessionResult.data.session;
         
         if (checkUser && checkSession) {
-          // Session exists, use it
-          data = { user: checkUser, session: checkSession };
-        } else {
+            console.log("[LOGIN-OTP] Found existing session after OTP verification");
+            data.session = checkSession;
+            break;
+          }
+          
+          if (i < 2) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        if (!checkUser || !checkSession) {
+          console.error("[LOGIN-OTP] No session found after OTP verification");
         setError("Verification failed. Please try again.");
           setLoading(false);
         return;
@@ -306,14 +351,27 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       }
 
       // Wait a moment to ensure session is fully established
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Refresh session to ensure cookies are set correctly
-      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.warn("Error refreshing session after OTP verification:", refreshError);
-        // Continue anyway - session might still be valid
+      // Verify session is accessible before proceeding
+      const { data: { session: verifySession }, error: sessionVerifyError } = await supabase.auth.getSession();
+      if (sessionVerifyError || !verifySession) {
+        console.error("[LOGIN-OTP] Session not accessible after setting:", sessionVerifyError);
+        // Try to set it again
+        if (data.session) {
+          const { error: retryError } = await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+          if (retryError) {
+            console.error("[LOGIN-OTP] Failed to set session on retry:", retryError);
+            setError("Failed to establish session. Please try again.");
+            setLoading(false);
+            return;
+          }
+        }
+      } else {
+        console.log("[LOGIN-OTP] Session verified and accessible");
       }
 
       // In production, sync session with server to ensure cookies are properly set
@@ -400,27 +458,63 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       let currentUser = null;
       let userError = null;
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttempts = 5; // Increased from 3 to 5 for more reliability
 
       while (attempts < maxAttempts && (!currentUser || userError)) {
+        // Try to get session first to ensure it's loaded
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        // If we have a session, try to refresh it to ensure it's valid
+        if (currentSession) {
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            console.warn(`[LOGIN-OTP] Session refresh error on attempt ${attempts + 1}:`, refreshError);
+          }
+        }
+        
+        // Now try to get user
         const result = await supabase.auth.getUser();
         currentUser = result.data.user;
         userError = result.error;
 
         if (userError || !currentUser) {
           attempts++;
+          console.log(`[LOGIN-OTP] Session verification attempt ${attempts}/${maxAttempts} failed:`, userError?.message || "No user");
+          
           if (attempts < maxAttempts) {
-            // Wait a bit longer between attempts in production
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait progressively longer between attempts
+            const waitTime = attempts * 500; // 500ms, 1000ms, 1500ms, 2000ms
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            
+            // Try syncing session again if we're on a later attempt
+            if (attempts >= 2) {
+              try {
+                await fetch("/api/auth/sync-session", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                });
+              } catch (syncError) {
+                console.warn("[LOGIN-OTP] Error re-syncing session:", syncError);
+              }
+            }
           }
         } else {
+          console.log("[LOGIN-OTP] Session verified successfully on attempt", attempts + 1);
           break;
         }
       }
       
       if (userError || !currentUser) {
-        console.error("Session verification failed after", maxAttempts, "attempts:", userError);
+        console.error("[LOGIN-OTP] Session verification failed after", maxAttempts, "attempts:", {
+          error: userError?.message,
+          code: userError?.code,
+          status: userError?.status,
+        });
         setError("Failed to establish session. Please try again.");
+        setLoading(false);
         return;
       }
 
@@ -529,6 +623,12 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         setCaptchaToken(null);
       } else {
         const errorMessage = data.error || "Failed to resend code. Please try again.";
+        console.error("[LOGIN-OTP] Resend error:", {
+          status: response.status,
+          error: errorMessage,
+          hasCaptchaToken: !!captchaToken,
+          isDevelopment,
+        });
         setError(errorMessage);
         
         // Reset CAPTCHA on any error (especially if it's a CAPTCHA error)
