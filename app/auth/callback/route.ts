@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
-import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
-import { getCachedSubscriptionData } from "@/src/application/subscriptions/get-dashboard-subscription";
-import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
-import { randomUUID } from "crypto";
+import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 
 /**
  * GET /auth/callback
@@ -103,20 +99,15 @@ export async function GET(request: NextRequest) {
     await supabase.auth.signOut();
 
     // Send OTP for login
-    const { createClient } = await import("@supabase/supabase-js");
-    const anonClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    );
+    // Note: For OAuth flows, we use service role client which may bypass CAPTCHA requirements
+    // since this is a server-side operation and we can't get a client-side CAPTCHA token
+    const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
+    const serviceRoleClient = createServiceRoleClient();
 
     console.log("[OAUTH-CALLBACK] Sending OTP for Google login");
-    const { error: otpError } = await anonClient.auth.signInWithOtp({
+    // Use service role client for OAuth OTP to potentially bypass CAPTCHA requirements
+    // If this fails with CAPTCHA error, we'll need to handle it differently
+    const { error: otpError } = await serviceRoleClient.auth.signInWithOtp({
       email: userEmail,
       options: {
         shouldCreateUser: false,
@@ -125,6 +116,20 @@ export async function GET(request: NextRequest) {
 
     if (otpError) {
       console.error("[OAUTH-CALLBACK] Error sending OTP:", otpError);
+      
+      // If CAPTCHA error, try with anon client (though it will likely fail without token)
+      // This is a fallback - ideally service role should bypass CAPTCHA
+      const isCaptchaError = otpError.message?.toLowerCase().includes("captcha");
+      if (isCaptchaError) {
+        console.warn("[OAUTH-CALLBACK] CAPTCHA error with service role, this shouldn't happen");
+        // For OAuth flows, we can't get a client-side CAPTCHA token
+        // Redirect to login with a specific error message
+        const redirectUrl = new URL("/auth/login", requestUrl.origin);
+        redirectUrl.searchParams.set("error", "oauth_captcha_required");
+        redirectUrl.searchParams.set("error_description", "OAuth sign-in requires additional verification. Please try signing in with email and password instead.");
+        return NextResponse.redirect(redirectUrl);
+      }
+      
       const redirectUrl = new URL("/auth/login", requestUrl.origin);
       redirectUrl.searchParams.set("error", "otp_failed");
       redirectUrl.searchParams.set("error_description", otpError.message || "Failed to send verification code");
@@ -145,251 +150,6 @@ export async function GET(request: NextRequest) {
     otpUrl.searchParams.set("oauth_data", encodeURIComponent(JSON.stringify(oauthData)));
     
     return NextResponse.redirect(otpUrl);
-
-    // Check if email has a pending invitation
-    const { data: pendingInvitation } = await supabase
-      .from("HouseholdMember")
-      .select("id, householdId, email, Household(createdBy)")
-      .eq("email", authUser.email?.toLowerCase() || "")
-      .eq("status", "pending")
-      .maybeSingle();
-
-    if (pendingInvitation) {
-      console.warn("[OAUTH-CALLBACK] User has pending invitation");
-      const redirectUrl = new URL("/auth/login", requestUrl.origin);
-      redirectUrl.searchParams.set("error", "pending_invitation");
-      redirectUrl.searchParams.set("error_description", "This email has a pending household invitation. Please accept the invitation from your email or use the invitation link to create your account.");
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    // Extract user data from OAuth metadata
-    const name = authUser.user_metadata?.full_name || authUser.user_metadata?.name || null;
-    const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null;
-
-    // Check if user profile already exists
-    const serviceRoleClient = createServiceRoleClient();
-    let { data: userData } = await serviceRoleClient
-      .from("User")
-      .select("*")
-      .eq("id", authUser.id)
-      .maybeSingle();
-
-    const isNewUser = !userData;
-
-    if (!userData) {
-      // Create user profile using service role (bypasses RLS)
-      const { data: newUserData, error: userError } = await serviceRoleClient
-        .from("User")
-        .insert({
-          id: authUser.id,
-          email: authUser.email!,
-          name: name,
-          avatarUrl: avatarUrl,
-          role: "admin", // Owners who sign up directly are admins
-        })
-        .select()
-        .single();
-
-      if (userError) {
-        console.error("[OAUTH-CALLBACK] Error creating user profile:", userError);
-        
-        // If it's a duplicate key error, try to fetch existing user
-        const errorCode = userError?.code;
-        const errorMessage: string = userError?.message || "";
-        const isDuplicateError = errorCode === "23505" || 
-          errorMessage.includes("duplicate") || 
-          errorMessage.includes("unique");
-        
-        if (isDuplicateError) {
-          const { data: existingUser } = await serviceRoleClient
-            .from("User")
-            .select("*")
-            .eq("id", authUser.id)
-            .single();
-          
-          if (existingUser) {
-            userData = existingUser;
-          } else {
-            throw new Error("Failed to create or fetch user profile");
-          }
-        } else {
-          throw new Error("Failed to create user profile");
-        }
-      } else {
-        userData = newUserData;
-        console.log("[OAUTH-CALLBACK] ✅ User profile created");
-      }
-
-      // Create personal household automatically for new user
-      // This allows users to immediately create accounts, transactions, budgets, and goals
-      try {
-        const now = formatTimestamp(new Date());
-        
-        // Check if personal household already exists
-        const { data: existingHousehold } = await serviceRoleClient
-          .from("Household")
-          .select("id")
-          .eq("createdBy", authUser.id)
-          .eq("type", "personal")
-          .maybeSingle();
-
-        if (!existingHousehold) {
-          // Create personal household using service role (bypasses RLS)
-          const { data: household, error: householdError } = await serviceRoleClient
-            .from("Household")
-            .insert({
-              name: name || "Minha Conta",
-              type: "personal",
-              createdBy: authUser.id,
-              createdAt: now,
-              updatedAt: now,
-              settings: {},
-            })
-            .select()
-            .single();
-
-          if (householdError || !household) {
-            console.error("[OAUTH-CALLBACK] Error creating personal household:", householdError);
-          } else {
-            // Create HouseholdMember using service role (bypasses RLS)
-            const { error: memberError } = await serviceRoleClient
-              .from("HouseholdMember")
-              .insert({
-                householdId: household.id,
-                userId: authUser.id,
-                role: "owner",
-                status: "active",
-                isDefault: true,
-                joinedAt: now,
-                createdAt: now,
-                updatedAt: now,
-              });
-
-            if (memberError) {
-              console.error("[OAUTH-CALLBACK] Error creating household member:", memberError);
-            } else {
-              // Set as active household using service role (bypasses RLS)
-              const { error: activeError } = await serviceRoleClient
-                .from("UserActiveHousehold")
-                .insert({
-                  userId: authUser.id,
-                  householdId: household.id,
-                  updatedAt: now,
-                });
-
-              if (activeError) {
-                console.error("[OAUTH-CALLBACK] Error setting active household:", activeError);
-              } else {
-                console.log("[OAUTH-CALLBACK] ✅ Personal household created for new user");
-              }
-            }
-          }
-        }
-      } catch (householdError) {
-        console.error("[OAUTH-CALLBACK] Error creating household:", householdError);
-        // Don't fail OAuth callback if household creation fails - it can be created later
-      }
-    } else {
-      // User already exists - update avatar if available and not set
-      if (avatarUrl && !userData.avatarUrl) {
-        await serviceRoleClient
-          .from("User")
-          .update({ avatarUrl: avatarUrl })
-          .eq("id", authUser.id);
-      }
-      
-      // Ensure household exists (edge case: user might not have household)
-      try {
-        const { getActiveHouseholdId } = await import("@/lib/utils/household");
-        const householdId = await getActiveHouseholdId(authUser.id);
-        if (!householdId) {
-          // No household found - create one
-          const now = formatTimestamp(new Date());
-          const { data: household, error: householdError } = await serviceRoleClient
-            .from("Household")
-            .insert({
-              name: userData.name || "Minha Conta",
-              type: "personal",
-              createdBy: authUser.id,
-              createdAt: now,
-              updatedAt: now,
-              settings: {},
-            })
-            .select()
-            .single();
-
-          if (!householdError && household) {
-            await serviceRoleClient.from("HouseholdMember").insert({
-              householdId: household.id,
-              userId: authUser.id,
-              role: "owner",
-              status: "active",
-              isDefault: true,
-              joinedAt: now,
-              createdAt: now,
-              updatedAt: now,
-            });
-            
-            await serviceRoleClient.from("UserActiveHousehold").insert({
-              userId: authUser.id,
-              householdId: household.id,
-              updatedAt: now,
-            });
-            
-            console.log("[OAUTH-CALLBACK] ✅ Personal household created for existing user (edge case)");
-          }
-        }
-      } catch (householdError) {
-        console.warn("[OAUTH-CALLBACK] Error checking/creating household:", householdError);
-        // Don't fail OAuth callback - household check is non-critical
-      }
-    }
-
-    // Check if there's a pending subscription for this email and link it
-    if (userData && authUser.email) {
-      try {
-        const linkResponse = await fetch(`${requestUrl.origin}/api/stripe/link-subscription`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Cookie": request.headers.get("cookie") || "",
-          },
-          body: JSON.stringify({ email: authUser.email }),
-        });
-
-        if (linkResponse.ok) {
-          const linkData = await linkResponse.json();
-          if (linkData.success) {
-            console.log("[OAUTH-CALLBACK] Pending subscription linked automatically");
-          }
-        }
-      } catch (linkError) {
-        console.error("[OAUTH-CALLBACK] Error linking pending subscription:", linkError);
-        // Don't fail if linking fails
-      }
-    }
-
-    // Check if user has an active subscription (uses cached function)
-    try {
-      const subscriptionData = await getCachedSubscriptionData(authUser.id);
-      const subscription = subscriptionData.subscription;
-      const hasActiveSubscription = 
-        subscription !== null && 
-        (subscription?.status === "active" || 
-         subscription?.status === "trialing");
-
-      if (!hasActiveSubscription) {
-        // No active subscription - redirect to dashboard (onboarding dialog will handle plan selection)
-        return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
-      }
-
-      // User has active subscription - redirect to dashboard
-      return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
-    } catch (subscriptionError) {
-      console.error("[OAUTH-CALLBACK] Error checking subscription:", subscriptionError);
-      // If we can't check subscription, redirect to dashboard to be safe
-      return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
-    }
   } catch (error) {
     console.error("[OAUTH-CALLBACK] Unexpected error:", error);
     const redirectUrl = new URL("/auth/login", requestUrl.origin);

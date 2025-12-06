@@ -137,7 +137,7 @@ export async function DELETE(
     
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete debt" },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

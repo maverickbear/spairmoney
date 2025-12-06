@@ -246,7 +246,8 @@ export async function middleware(request: NextRequest) {
                        pathname === "/privacy-policy" || 
                        pathname === "/terms-of-service" || 
                        pathname === "/faq" ||
-                       pathname.startsWith("/members/accept");
+                       pathname.startsWith("/members/accept") ||
+                       pathname.startsWith("/design");
   const isStaticFile = pathname.startsWith("/_next") || 
                        pathname.startsWith("/favicon") ||
                        /\.(svg|png|jpg|jpeg|gif|webp|ico)$/.test(pathname);

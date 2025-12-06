@@ -267,7 +267,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
               {...form.register("name")}
               placeholder="John Doe"
               disabled={loading}
-              size="small"
+              size="medium"
               className="pl-10"
               required
             />
@@ -292,7 +292,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
               {...form.register("email")}
               placeholder="you@example.com"
               disabled={loading}
-              size="small"
+              size="medium"
               className="pl-10"
               required
             />
@@ -316,7 +316,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
               type={showPassword ? "text" : "password"}
               {...form.register("password")}
               disabled={loading}
-              size="small"
+              size="medium"
               className="pl-10 pr-10"
               required
             />

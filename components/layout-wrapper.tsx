@@ -77,7 +77,8 @@ export const LayoutWrapper = memo(function LayoutWrapper({ children }: { childre
     const isFAQPage = pathname === "/faq";
     const isSubscriptionSuccessPage = pathname === "/subscription/success";
     const isMaintenancePage = pathname === "/maintenance";
-    const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage || isMaintenancePage;
+    const isDesignPage = pathname.startsWith("/design");
+    const isPublicPage = isAuthPage || isAcceptPage || isLandingPage || isPrivacyPolicyPage || isTermsOfServicePage || isFAQPage || isSubscriptionSuccessPage || isMaintenancePage || isDesignPage;
     const isDashboardRoute = !isPublicPage && !isApiRoute && !isWelcomePage;
     
     return {

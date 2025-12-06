@@ -39,8 +39,8 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
 
   // Calculate asset breakdown - use design system colors
   const assetBreakdown = [
-    { name: "Cash & Accounts", value: totalAssets * 0.6, color: interactive.primary }, // #94DD78
-    { name: "Investments", value: totalAssets * 0.4, color: interactive.accent }, // #B5EF90
+    { name: "Cash & Accounts", value: totalAssets * 0.6, color: interactive.primary }, // #4FCF7D
+    { name: "Investments", value: totalAssets * 0.4, color: interactive.accent }, // #86FBB0
   ];
 
   return (

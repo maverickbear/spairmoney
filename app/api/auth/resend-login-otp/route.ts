@@ -10,7 +10,7 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = body;
+    const { email, captchaToken } = body;
 
     console.log("[RESEND-LOGIN-OTP] Request received for email:", email);
 
@@ -33,11 +33,28 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("[RESEND-LOGIN-OTP] Resending OTP for login");
+    
+    // Prepare OTP options with CAPTCHA token if provided
+    const isDevelopment = process.env.NODE_ENV === "development";
+    const otpOptions: any = {
+      shouldCreateUser: false, // Don't create user if doesn't exist
+    };
+    
+    // Only include captchaToken in production (Supabase may require it there)
+    // In development, skip it to avoid "captcha verification process failed" errors
+    if (!isDevelopment && captchaToken) {
+      otpOptions.captchaToken = captchaToken;
+    } else if (!isDevelopment && !captchaToken) {
+      // In production, warn if CAPTCHA token is missing
+      console.warn("[RESEND-LOGIN-OTP] CAPTCHA token missing in production OTP attempt");
+    } else if (isDevelopment) {
+      // In development, log that we're skipping CAPTCHA
+      console.log("[RESEND-LOGIN-OTP] Skipping CAPTCHA verification in development mode");
+    }
+    
     const { error: otpError } = await anonClient.auth.signInWithOtp({
       email,
-      options: {
-        shouldCreateUser: false, // Don't create user if doesn't exist
-      },
+      options: otpOptions,
     });
 
     if (otpError) {

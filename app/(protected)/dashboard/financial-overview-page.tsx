@@ -273,6 +273,41 @@ export function FinancialOverviewPage({
     return () => clearInterval(interval);
   }, []);
 
+  // Load secondary dashboard data from window (loaded via Suspense)
+  useEffect(() => {
+    const checkSecondaryData = () => {
+      const secondaryData = (window as any).__SECONDARY_DASHBOARD_DATA__;
+      if (secondaryData) {
+        // Update state with secondary data
+        if (secondaryData.lastMonthTransactions) {
+          setLastMonthTransactions(secondaryData.lastMonthTransactions);
+        }
+        if (secondaryData.lastMonthTotalBalance !== undefined) {
+          setLastMonthTotalBalance(secondaryData.lastMonthTotalBalance);
+        }
+        if (secondaryData.chartTransactions) {
+          setChartTransactions(secondaryData.chartTransactions);
+        }
+        if (secondaryData.debts) {
+          setDebts(secondaryData.debts);
+        }
+        if (secondaryData.recurringPayments) {
+          setRecurringPayments(secondaryData.recurringPayments);
+        }
+        if (secondaryData.subscriptions) {
+          setSubscriptions(secondaryData.subscriptions);
+        }
+      }
+    };
+
+    // Check immediately
+    checkSecondaryData();
+
+    // Also check periodically in case data loads after component mounts
+    const interval = setInterval(checkSecondaryData, 500);
+    return () => clearInterval(interval);
+  }, []);
+
   // Filter accounts by selected household member
   const filteredAccounts = useMemo(() => {
     if (!selectedMemberId) {

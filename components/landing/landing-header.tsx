@@ -86,12 +86,23 @@ export function LandingHeader({ isAuthenticated: _initialAuth }: LandingHeaderPr
         <div className="relative flex items-center justify-between h-16 md:h-20">
           {/* Logo - À esquerda (mobile e desktop) */}
           <Link href="/" className="flex items-center gap-3 flex-1">
+            {/* Mobile: use logomark (icon only) */}
+            <Logo 
+              variant="icon" 
+              color="auto"
+              width={32} 
+              height={32}
+              priority
+              className="md:hidden"
+            />
+            {/* Desktop: use full logo */}
             <Logo 
               variant="full" 
               color="auto"
-              width={180} 
-              height={40}
+              width={240} 
+              height={53}
               priority
+              className="hidden md:block"
             />
           </Link>
 

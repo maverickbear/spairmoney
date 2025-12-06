@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Logo } from "@/components/common/logo";
-import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 export function LandingMainFooter() {
   const [currentYear, setCurrentYear] = useState<number | null>(null);
@@ -12,47 +11,37 @@ export function LandingMainFooter() {
     setCurrentYear(new Date().getFullYear());
   }, []);
   return (
-    <footer className="w-full bg-background border-t border-border">
+    <footer className="w-full bg-[#181818] border-t border-white/20">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-16">
         <div className="max-w-7xl mx-auto">
-          {/* CTA Section */}
-          <div className="text-center mb-16 pb-16 border-b border-border">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-              Start Organizing Your Finances Today
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Join families learning to track expenses, understand spending, and build wealth together. Stop working just to pay bills—start building your future.
-            </p>
-            <Button
-              asChild
-              size="large"
-            >
-              <Link href="/auth/signup">Start Organizing Your Finances</Link>
-            </Button>
-          </div>
-
-
           {/* Links */}
           {/* Mobile: 1 column, MD: 2 columns (avoid overlap), LG+: 4 columns */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {/* Brand */}
           <div>
             <Link href="/" className="flex items-center mb-4">
-              <Logo variant="full" color="auto" height={40} />
+              <Image
+                src="/assets/logos/logo-primary-darkbg.svg"
+                alt="Spare Finance"
+                width={200}
+                height={53}
+                className="object-contain"
+                priority
+              />
             </Link>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-white/70">
               Help your family organize finances, track expenses, and learn to save together. A place where families learn to build wealth, not just pay bills.
             </p>
           </div>
 
           {/* Main Pages */}
           <div>
-            <h3 className="font-semibold mb-4">Main Pages</h3>
+            <h3 className="font-semibold mb-4 text-white">Main Pages</h3>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="/"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   Home
                 </Link>
@@ -60,7 +49,7 @@ export function LandingMainFooter() {
               <li>
                 <Link
                   href="#features"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   Features
                 </Link>
@@ -68,7 +57,7 @@ export function LandingMainFooter() {
               <li>
                 <Link
                   href="#pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   Pricing
                 </Link>
@@ -76,7 +65,7 @@ export function LandingMainFooter() {
               <li>
                 <Link
                   href="/faq"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   FAQ
                 </Link>
@@ -86,14 +75,14 @@ export function LandingMainFooter() {
 
           {/* Legal */}
           <div>
-            <h3 className="font-semibold mb-4">Legal & Utilities</h3>
+            <h3 className="font-semibold mb-4 text-white">Legal & Utilities</h3>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="/terms-of-service"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   Terms of Service
                 </Link>
@@ -103,7 +92,7 @@ export function LandingMainFooter() {
                   href="/privacy-policy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   Privacy Policy
                 </Link>
@@ -113,12 +102,12 @@ export function LandingMainFooter() {
 
           {/* Other */}
           <div>
-            <h3 className="font-semibold mb-4">Other</h3>
+            <h3 className="font-semibold mb-4 text-white">Other</h3>
             <ul className="space-y-2">
               {/* <li>
                 <Link
                   href="#testimonials"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   Testimonials
                 </Link>
@@ -126,7 +115,7 @@ export function LandingMainFooter() {
               <li>
                 <Link
                   href="/auth/signup"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-white/70 hover:text-white transition-colors"
                 >
                   Get Started
                 </Link>
@@ -136,8 +125,8 @@ export function LandingMainFooter() {
         </div>
 
           {/* Bottom */}
-          <div className="pt-8 border-t border-border">
-            <p className="text-sm text-center text-muted-foreground">
+          <div className="pt-8 border-t border-white/20">
+            <p className="text-sm text-center text-white/60">
               © {currentYear || 2024} Copyright - Spare Finance. All rights reserved.
             </p>
           </div>

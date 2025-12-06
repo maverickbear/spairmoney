@@ -69,12 +69,10 @@ export function AccountRequiredDialog({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Account Required</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 px-6">
               <DialogDescription>
                 You need to create at least one account before creating transactions, budgets, goals, debts, or investments.
               </DialogDescription>
-            </div>
+            </DialogHeader>
             <DialogFooter>
               <Button variant="outline" size="small" onClick={() => onOpenChange(false)}>
                 Cancel

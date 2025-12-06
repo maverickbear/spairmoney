@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeProfileService } from "@/src/application/profile/profile.factory";
-import { ProfileFormData, profileSchema } from "@/src/domain/profile/profile.validations";
+import { profileUpdateSchema } from "@/src/domain/profile/profile.validations";
 import { AppError } from "@/src/application/shared/app-error";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { ZodError } from "zod";
@@ -45,8 +45,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Validate with schema
-    const validatedData = profileSchema.parse(body);
+    // Validate with partial schema for PATCH requests (all fields optional)
+    const validatedData = profileUpdateSchema.parse(body);
     
     const userId = await getCurrentUserId();
     if (!userId) {

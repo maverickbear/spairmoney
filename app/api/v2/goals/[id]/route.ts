@@ -126,7 +126,7 @@ export async function DELETE(
     
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete goal" },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

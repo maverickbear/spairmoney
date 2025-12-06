@@ -252,7 +252,8 @@ export function SubscriptionForm({
     });
 
     if (subscriptionsCategories.length === 0) {
-      console.error("No Subscriptions category found");
+      // Don't log error to console - this is expected if categories haven't loaded yet
+      // The user can still create a custom subcategory manually
       return null;
     }
 

@@ -96,10 +96,10 @@ export function BenefitsSection() {
             return (
               <div key={index} className="group">
                 <div className="p-8 rounded-2xl border border-border bg-card h-full flex flex-col">
-                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
-                    <Icon className="w-7 h-7 text-black" />
+                  <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center mb-6 group-hover:bg-primary/90 transition-colors">
+                    <Icon className="w-7 h-7 text-content-primary" />
                   </div>
-                  <p className="text-sm font-medium text-primary/80 mb-3 uppercase tracking-wide">
+                  <p className="text-sm font-medium text-primary mb-3 uppercase tracking-wide">
                     {benefit.subtitle}
                   </p>
                   <h3 className="text-2xl font-bold mb-4">

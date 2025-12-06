@@ -10,6 +10,8 @@ import { Loader2, AlertCircle, Mail, HelpCircle, CheckCircle2 } from "lucide-rea
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { setTrustedBrowser } from "@/lib/utils/trusted-browser";
+import { Turnstile, TurnstileRef } from "./turnstile";
+import { isCaptchaError } from "@/lib/utils/auth-errors";
 
 interface VerifyLoginOtpFormProps {
   email: string;
@@ -98,10 +100,27 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileRef>(null);
+  const [isDevelopment, setIsDevelopment] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [trustBrowser, setTrustBrowser] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const isVerifyingRef = useRef(false);
+
+  // Detect development environment on client side only (avoid hydration mismatch)
+  useEffect(() => {
+    const isLocalhost = typeof window !== "undefined" && 
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    setIsDevelopment(isLocalhost);
+  }, []);
+
+  // Get Turnstile site key from environment
+  // Use Cloudflare test keys in development (localhost) to avoid domain validation issues
+  // Test key "1x00000000000000000000AA" always passes verification
+  const turnstileSiteKey = isDevelopment
+    ? "1x00000000000000000000AA" // Cloudflare test key that always passes
+    : (process.env.NEXT_PUBLIC_TURNSTILE_SITE || "");
 
   // Focus first input on mount
   useEffect(() => {
@@ -460,10 +479,28 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
       return;
     }
 
+    // Validate CAPTCHA token if Turnstile is enabled (only in production)
+    // In development, CAPTCHA is optional
+    if (!isDevelopment && turnstileSiteKey && !captchaToken) {
+      setError("Please complete the CAPTCHA verification");
+      // Reset CAPTCHA
+      if (captchaRef.current) {
+        captchaRef.current.reset();
+      }
+      return;
+    }
+
     try {
       setResending(true);
       setError(null);
       setSuccessMessage(null);
+
+      // Call resend-login-otp API route with CAPTCHA token
+      // In development, don't send captchaToken to avoid Supabase verification errors
+      const requestBody: any = { email };
+      if (!isDevelopment && captchaToken) {
+        requestBody.captchaToken = captchaToken;
+      }
 
       // Use API route to resend login OTP (doesn't require password)
       const response = await fetch("/api/auth/resend-login-otp", {
@@ -471,7 +508,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -484,12 +521,33 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
         setSuccessMessage("Code resent successfully! Please check your inbox.");
         setTimeRemaining(300); // Reset timer to 5 minutes
         setTimeout(() => setSuccessMessage(null), 5000);
+        
+        // Reset CAPTCHA after successful resend
+        if (captchaRef.current) {
+          captchaRef.current.reset();
+        }
+        setCaptchaToken(null);
       } else {
-        setError(data.error || "Failed to resend code. Please try again.");
+        const errorMessage = data.error || "Failed to resend code. Please try again.";
+        setError(errorMessage);
+        
+        // Reset CAPTCHA on any error (especially if it's a CAPTCHA error)
+        if (isCaptchaError(errorMessage) || captchaRef.current) {
+          if (captchaRef.current) {
+            captchaRef.current.reset();
+          }
+          setCaptchaToken(null);
+        }
       }
     } catch (error) {
       console.error("Error resending OTP:", error);
       setError("Failed to resend code. Please try again.");
+      
+      // Reset CAPTCHA on error
+      if (captchaRef.current) {
+        captchaRef.current.reset();
+      }
+      setCaptchaToken(null);
     } finally {
       setResending(false);
     }
@@ -595,13 +653,34 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack }: VerifyLog
 
       </div>
 
+      {/* CAPTCHA Component for Resend */}
+      {turnstileSiteKey && (
+        <div className="flex justify-center">
+          <Turnstile
+            sitekey={turnstileSiteKey}
+            ref={captchaRef}
+            onSuccess={(token) => {
+              setCaptchaToken(token);
+            }}
+            onError={() => {
+              setCaptchaToken(null);
+              setError("CAPTCHA verification failed. Please try again.");
+            }}
+            onExpire={() => {
+              setCaptchaToken(null);
+              setError("CAPTCHA verification expired. Please complete it again.");
+            }}
+          />
+        </div>
+      )}
+
       <div className="text-center">
         <p className="text-sm text-muted-foreground inline">
           Didn't receive the code?{" "}
           <button
             type="button"
             onClick={handleResend}
-            disabled={resending || loading}
+            disabled={resending || loading || (!isDevelopment && !!turnstileSiteKey && !captchaToken)}
             className="text-sm text-foreground hover:underline font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {resending ? (

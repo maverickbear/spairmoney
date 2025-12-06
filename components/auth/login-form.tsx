@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signInSchema, SignInFormData } from "@/src/domain/auth/auth.validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, Info } from "lucide-react";
@@ -14,6 +14,8 @@ import { GoogleSignInButton } from "./google-signin-button";
 import { VerifyLoginOtpForm } from "./verify-login-otp-form";
 import { isTrustedBrowser } from "@/lib/utils/trusted-browser";
 import { supabase } from "@/lib/supabase";
+import { Turnstile, TurnstileRef } from "./turnstile";
+import { isCaptchaError } from "@/lib/utils/auth-errors";
 
 /**
  * Preloads user, profile, and billing data into global caches
@@ -101,6 +103,9 @@ function LoginFormContent() {
   const [invitationInfo, setInvitationInfo] = useState<{ email: string; ownerName: string } | null>(null);
   const [showOtpForm, setShowOtpForm] = useState(false);
   const [loginEmail, setLoginEmail] = useState<string>("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileRef>(null);
+  const [isDevelopment, setIsDevelopment] = useState(false);
 
   // Check for OAuth errors in URL params
   useEffect(() => {
@@ -131,6 +136,20 @@ function LoginFormContent() {
       window.history.replaceState({}, "", newUrl.toString());
     }
   }, [searchParams, router]);
+
+  // Detect development environment on client side only (avoid hydration mismatch)
+  useEffect(() => {
+    const isLocalhost = typeof window !== "undefined" && 
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    setIsDevelopment(isLocalhost);
+  }, []);
+
+  // Get Turnstile site key from environment
+  // Use Cloudflare test keys in development (localhost) to avoid domain validation issues
+  // Test key "1x00000000000000000000AA" always passes verification
+  const turnstileSiteKey = isDevelopment
+    ? "1x00000000000000000000AA" // Cloudflare test key that always passes
+    : (process.env.NEXT_PUBLIC_TURNSTILE_SITE || "");
 
   // Load invitation info if token is present
   useEffect(() => {
@@ -263,21 +282,49 @@ function LoginFormContent() {
         }
       } else {
         // Browser is not trusted - proceed with OTP flow
+        // Validate CAPTCHA token if Turnstile is enabled (only in production)
+        // In development, CAPTCHA is optional
+        if (!isDevelopment && turnstileSiteKey && !captchaToken) {
+          setError("Please complete the CAPTCHA verification");
+          // Reset CAPTCHA
+          if (captchaRef.current) {
+            captchaRef.current.reset();
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Call send-login-otp API route with CAPTCHA token
+        // In development, don't send captchaToken to avoid Supabase verification errors
+        const requestBody: any = {
+          email: data.email,
+          password: data.password,
+        };
+        if (!isDevelopment && captchaToken) {
+          requestBody.captchaToken = captchaToken;
+        }
+
         const response = await fetch("/api/auth/send-login-otp", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            email: data.email,
-            password: data.password,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-          setError(result.error || "Failed to send verification code");
+          const errorMessage = result.error || "Failed to send verification code";
+          setError(errorMessage);
+          
+          // Reset CAPTCHA on any error (especially if it's a CAPTCHA error)
+          if (isCaptchaError(errorMessage) || captchaRef.current) {
+            if (captchaRef.current) {
+              captchaRef.current.reset();
+            }
+            setCaptchaToken(null);
+          }
           setLoading(false);
           return;
         }
@@ -286,11 +333,23 @@ function LoginFormContent() {
         setLoginEmail(data.email);
         setShowOtpForm(true);
         setLoading(false);
+        
+        // Reset CAPTCHA after successful submission
+        if (captchaRef.current) {
+          captchaRef.current.reset();
+        }
+        setCaptchaToken(null);
       }
     } catch (error) {
       console.error("Error during login:", error);
       setError("An unexpected error occurred");
       setLoading(false);
+      
+      // Reset CAPTCHA on error
+      if (captchaRef.current) {
+        captchaRef.current.reset();
+      }
+      setCaptchaToken(null);
     }
   }
 
@@ -357,7 +416,7 @@ function LoginFormContent() {
               {...form.register("email")}
               placeholder="you@example.com"
               disabled={loading}
-              size="small"
+              size="medium"
               className="pl-10"
               required
             />
@@ -389,7 +448,7 @@ function LoginFormContent() {
               type={showPassword ? "text" : "password"}
               {...form.register("password")}
               disabled={loading}
-              size="small"
+              size="medium"
               className="pl-10 pr-10"
               required
             />
@@ -414,11 +473,32 @@ function LoginFormContent() {
           )}
         </div>
 
+        {/* CAPTCHA Component */}
+        {turnstileSiteKey && (
+          <div className="flex justify-center">
+            <Turnstile
+              sitekey={turnstileSiteKey}
+              ref={captchaRef}
+              onSuccess={(token) => {
+                setCaptchaToken(token);
+              }}
+              onError={() => {
+                setCaptchaToken(null);
+                setError("CAPTCHA verification failed. Please try again.");
+              }}
+              onExpire={() => {
+                setCaptchaToken(null);
+                setError("CAPTCHA verification expired. Please complete it again.");
+              }}
+            />
+          </div>
+        )}
+
         <Button 
           type="submit" 
           size="small"
           className="w-full text-base font-medium" 
-          disabled={loading}
+          disabled={loading || (!isDevelopment && !!turnstileSiteKey && !captchaToken)}
         >
           {loading ? (
             <>

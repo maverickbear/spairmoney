@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeBudgetsService } from "@/src/application/budgets/budgets.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
+import { ZodError } from "zod";
 import { revalidateTag } from 'next/cache';
 
 export async function PATCH(
@@ -26,9 +28,24 @@ export async function PATCH(
     return NextResponse.json(budget, { status: 200 });
   } catch (error) {
     console.error("Error updating budget:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update budget" },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
@@ -55,9 +72,17 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting budget:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete budget" },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

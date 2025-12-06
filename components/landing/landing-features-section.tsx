@@ -104,7 +104,7 @@ export function LandingFeaturesSection() {
 
 
   return (
-    <section id="features" className="py-20 md:py-32 bg-background">
+    <section id="features" className="py-12 md:py-20 bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header - Split Layout */}
         <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center mb-20">
@@ -139,7 +139,7 @@ export function LandingFeaturesSection() {
                 {/* Mockup Visual - Left or Right based on index (MD+) */}
                 <div className="w-full md:w-1/2 flex-shrink-0">
                   <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                    <div className="p-6 md:p-8 lg:p-10 min-h-[250px] md:min-h-[350px] lg:min-h-[400px] flex items-center justify-center">
+                    <div className="p-6 md:p-8 lg:p-10 min-h-[250px] md:min-h-[350px] lg:min-h-[400px] flex items-center justify-center bg-muted">
                       {feature.mockup}
                     </div>
                   </div>
@@ -188,7 +188,7 @@ export function LandingFeaturesSection() {
                   <div className="px-6 pb-6 flex-grow flex flex-col">
                     {/* Mockup - At top */}
                     {feature.mockup && (
-                      <div className="bg-card rounded-xl p-4 mb-6 h-[220px] flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <div className="bg-card rounded-xl p-4 mb-6 h-[220px] flex items-center justify-center overflow-hidden flex-shrink-0 bg-muted">
                         {feature.mockup}
                       </div>
                     )}

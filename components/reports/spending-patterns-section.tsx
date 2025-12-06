@@ -62,8 +62,8 @@ export function SpendingPatternsSection({ transactions }: SpendingPatternsSectio
   // Use category colors from design system, fallback to interactive colors
   const getChartColor = (index: number) => {
     const categoryColors = [
-      interactive.primary,    // #94DD78
-      interactive.accent,     // #B5EF90
+      interactive.primary,    // #4FCF7D
+      interactive.accent,     // #86FBB0
       sentiment.positive,     // #2F5711
       sentiment.warning,      // #EDC843
       interactive.contrast,   // #9FE870

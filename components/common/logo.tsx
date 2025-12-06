@@ -66,32 +66,32 @@ export function Logo({
     }
 
     if (variant === "icon") {
-      // Icon variant - use new SVG icons (1024px versions)
+      // Icon variant - use new official logomark SVGs
       return effectiveColor === "white"
-        ? "/assets/logos/1024-icon-white.svg" // White S icon on dark background
-        : "/assets/logos/1024-icon-black.svg"; // Black S icon on light background (green background)
+        ? "/assets/logos/logomark-mono-light.svg" // White icon on dark background
+        : "/assets/logos/logomark-primary.svg"; // Green icon for light backgrounds
     }
 
     if (variant === "wordmark") {
-      // Wordmark variant - now uses full logo (icon + text) instead of text only
+      // Wordmark variant - uses full logo (icon + text)
       return effectiveColor === "white"
-        ? "/assets/logos/sparefiance-logo-dark-mode.svg" // Dark mode logo (green icon with white text)
-        : "/assets/logos/sparefiance-logo-black.svg"; // Full black logo on light background
+        ? "/assets/logos/logo-primary-darkbg.svg" // Full logo with white text for dark backgrounds
+        : "/assets/logos/logo-primary-lightbg.svg"; // Full logo with black text for light backgrounds
     }
 
-    // Full variant - use new full logo SVGs (prefer SVG over PNG)
+    // Full variant - use new official full logo SVGs
     if (variant === "full") {
-      // For light backgrounds (purple/auto in light mode), use black logo
-      // For dark backgrounds (white/auto in dark mode), use dark-mode logo
+      // For light backgrounds (purple/auto in light mode), use logo with black text
+      // For dark backgrounds (white/auto in dark mode), use logo with white text
       return effectiveColor === "white"
-        ? "/assets/logos/sparefiance-logo-dark-mode.svg" // Dark mode logo (green icon with white text)
-        : "/assets/logos/sparefiance-logo-black.svg"; // Full black logo on light background
+        ? "/assets/logos/logo-primary-darkbg.svg" // Full logo with white text for dark backgrounds
+        : "/assets/logos/logo-primary-lightbg.svg"; // Full logo with black text for light backgrounds
     }
 
     // Fallback (should not reach here, but just in case)
     return effectiveColor === "white"
-      ? "/assets/logos/sparefiance-logo-dark-mode.svg"
-      : "/assets/logos/sparefiance-logo-black.svg";
+      ? "/assets/logos/logo-primary-darkbg.svg"
+      : "/assets/logos/logo-primary-lightbg.svg";
   };
 
   // Default dimensions based on variant

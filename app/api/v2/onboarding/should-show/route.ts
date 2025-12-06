@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeOnboardingDecisionService } from "@/src/application/onboarding/onboarding.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * GET /api/v2/onboarding/should-show
@@ -20,6 +21,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ shouldShow });
   } catch (error) {
     console.error("[OnboardingShouldShow] Error:", error);
+    
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal server error" },
       { status: 500 }

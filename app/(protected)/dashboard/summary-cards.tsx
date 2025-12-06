@@ -132,12 +132,24 @@ export function SummaryCards({
       return sum + amount;
     }, 0);
 
-  const incomeMomChange = lastMonthIncome > 0
-    ? ((currentIncome - lastMonthIncome) / lastMonthIncome) * 100
+  // Calculate income change percentage
+  // If last month had no income but current month has income, show 100% increase
+  // If last month had income, calculate normally
+  // If both are 0, show 0%
+  const incomeMomChange = lastMonthIncome !== 0
+    ? ((currentIncome - lastMonthIncome) / Math.abs(lastMonthIncome)) * 100
+    : currentIncome > 0
+    ? 100 // 100% increase from 0
     : 0;
 
-  const expensesMomChange = lastMonthExpenses > 0
-    ? ((currentExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
+  // Calculate expenses change percentage
+  // If last month had no expenses but current month has expenses, show 100% increase
+  // If last month had expenses, calculate normally
+  // If both are 0, show 0%
+  const expensesMomChange = lastMonthExpenses !== 0
+    ? ((currentExpenses - lastMonthExpenses) / Math.abs(lastMonthExpenses)) * 100
+    : currentExpenses > 0
+    ? 100 // 100% increase from 0
     : 0;
 
   // Calculate monthly savings (income - expenses) for current month
@@ -450,7 +462,7 @@ export function SummaryCards({
             {/* Available to Spend Section */}
             <div>
               {/* Label - Use content.secondary for labels */}
-              <div className="text-accent-foreground/80 text-xs mb-1">Available to spend</div>
+              <div className="text-accent-foreground/80 text-xs mb-1">Available to spend this month</div>
               {/* Amount - Use content.primary */}
               <div className="text-xl md:text-2xl font-bold mb-1 tabular-nums text-content-primary">
                 <AnimatedNumber value={availableToSpend} format="money" />

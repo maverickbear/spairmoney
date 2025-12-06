@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { Loader2, Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -141,7 +142,9 @@ export function OnboardingPricingTable({
             className={interval === "year" ? "shadow-sm" : ""}
           >
             Yearly
-            <span className={`ml-1 text-xs ${interval === "year" ? "text-primary-foreground" : "text-primary"}`}>Save 17%</span>
+            <Badge variant="secondary" className="ml-1 text-xs bg-secondary text-content-primary">
+              Save 17%
+            </Badge>
           </Button>
         </div>
       </div>

@@ -6,7 +6,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SimpleFooter } from "@/components/common/simple-footer";
-import { FileText, ArrowLeft, Wallet } from "lucide-react";
+import { LandingHeader } from "@/components/landing/landing-header";
+import { FileText } from "lucide-react";
 import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
 
 export const metadata = {
@@ -24,26 +25,7 @@ export default async function TermsOfServicePage() {
   const proPlanName = proPlan?.name || 'PRO';
   return (
     <div className="min-h-screen bg-background">
-      {/* Simple Header */}
-      <header className="border-b border-border bg-background sticky top-0 z-50">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Wallet className="w-6 h-6 text-primary" />
-              </div>
-              <span className="text-xl font-bold">Spare Finance</span>
-            </Link>
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Home
-            </Link>
-          </div>
-        </div>
-      </header>
+      <LandingHeader isAuthenticated={false} />
 
       {/* Content */}
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">

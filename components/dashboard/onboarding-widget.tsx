@@ -166,7 +166,7 @@ export function OnboardingWidget({ initialStatus }: OnboardingWidgetProps) {
 
       const hasAccount = accounts.length > 0;
       // Calculate total balance from accounts
-      // The balance should already include initialBalance from getAccountsClient,
+      // The balance should already include initialBalance from the API response,
       // but we'll use initialBalance as fallback if balance is missing
       const totalBalance = hasAccount 
         ? accounts.reduce((sum: number, acc: any) => {

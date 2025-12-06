@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { SimpleFooter } from "@/components/common/simple-footer";
-import { Logo } from "@/components/common/logo";
-import { HelpCircle, ArrowLeft, Search, X } from "lucide-react";
+import { LandingHeader } from "@/components/landing/landing-header";
+import { HelpCircle, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function FAQPage() {
@@ -263,35 +263,7 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Simple Header */}
-      <header className="border-b border-border bg-background sticky top-0 z-50">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12">
-          <div className="flex items-center justify-between h-14 sm:h-16 md:h-18">
-            <Link href="/" className="flex items-center">
-              <div className="w-[120px] h-[32px] sm:w-[140px] sm:h-[36px] md:w-[150px] md:h-[40px] flex items-center">
-                <Logo 
-                  variant="wordmark" 
-                  color="auto" 
-                  width={150} 
-                  height={40}
-                />
-              </div>
-            </Link>
-            <Button
-              variant="ghost"
-              size="small"
-              asChild
-              className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
-            >
-              <Link href="/">
-                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden xs:inline">Back to Home</span>
-                <span className="xs:hidden">Back</span>
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <LandingHeader isAuthenticated={false} />
 
       {/* Content */}
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 md:py-16 lg:py-20">

@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingMainFooter } from "@/components/landing/landing-main-footer";
-import { LandingMobileFooter } from "@/components/landing/landing-mobile-footer";
 import { StructuredData } from "@/src/presentation/components/seo/structured-data";
 import { makeAuthService } from "@/src/application/auth/auth.factory";
 
@@ -251,7 +250,7 @@ export default function LandingPage() {
       {/* Main page content - renders immediately */}
       <div className="min-h-screen flex flex-col">
         <LandingHeader isAuthenticated={false} />
-        <main className="flex-1 pb-20 md:pb-0">
+        <main className="flex-1">
           <LandingHeroSection />
           <StatisticsSection />
           <LandingFeaturesSection />
@@ -264,7 +263,6 @@ export default function LandingPage() {
           </Suspense>
         </main>
         <LandingMainFooter />
-        <LandingMobileFooter isAuthenticated={false} />
       </div>
     </>
   );

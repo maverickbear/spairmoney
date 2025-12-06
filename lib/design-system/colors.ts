@@ -22,7 +22,7 @@
  */
 export const content = {
     // Use to emphasise primary content in relation to other elements nearby
-    primary: "#0E0F0C",
+    primary: "#1C1C1C",
     // Use for most body text, and in supportive elements that give context to content that's close to it
     secondary: "#454745",
     // Use in form inputs for placeholders, and for the label that says a field is 'Optional'. Avoid using elsewhere
@@ -36,9 +36,9 @@ export const content = {
  */
 export const interactive = {
     // For neutral interactive elements or emphasising active items in a list
-    primary: "#94DD78",
+    primary: "#4FCF7D",
     // For sparing use as an accent colour in interactive elements, such as primary button backgrounds
-    accent: "#B5EF90",
+    accent: "#86FBB0",
     // For de-emphasised interactivity, like borders on inputs and checkboxes, and clear buttons on search inputs. Do not use on text
     secondary: "#ECEEEA",
     // For text and icons on a Bright Green Interactive Accent surface, ensuring visibility in dark mode, and also for surfaces if needed
@@ -55,6 +55,8 @@ export const background = {
     screen: "#FFFFFF",
     // Use for elevated surfaces that partially show the content behind it, like bottom sheets and sidebars
     elevated: "#FFFFFF",
+    // Use for dark background surfaces
+    dark: "#1C1C1C",
     // Use for delineating areas without using borders, like neutral alerts and avatars
     neutral: "#16330014",
     // Use for faintly darkening an area, for example on loading shimmers
@@ -66,9 +68,9 @@ export const background = {
  */
 export const border = {
     // Use in most separators, for example in the section header and tabs components
-    neutral: "#0E0F0C1F",
+    neutral: "#1C1C1C1F",
     // Use on the edges of images to differentiate them from the background, such as flags in avatars
-    overlay: "#0E0F0C1F",
+    overlay: "#1C1C1C1F",
 } as const;
 
 /**
