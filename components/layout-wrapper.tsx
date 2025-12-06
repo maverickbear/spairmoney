@@ -9,7 +9,7 @@ import { PausedSubscriptionBanner } from "@/src/presentation/components/features
 import { useFixedElementsHeight } from "@/hooks/use-fixed-elements-height";
 import { useEffect, useState, memo, useMemo, useRef } from "react";
 import { useSubscriptionContext, useSubscriptionSafe } from "@/contexts/subscription-context";
-import { usePathname } from "next/navigation";
+import { usePathnameSafe } from "@/hooks/use-pathname-safe";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +35,8 @@ function useProfilePreload() {
 }
 
 export const LayoutWrapper = memo(function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  // Use safe pathname hook to avoid accessing uncached data during prerender
+  const pathname = usePathnameSafe();
   // Use safe hook to avoid errors when SubscriptionProvider is not available (public pages, prerendering)
   // This prevents "uncached data accessed" errors during build time
   const context = useSubscriptionSafe();
@@ -51,10 +52,22 @@ export const LayoutWrapper = memo(function LayoutWrapper({ children }: { childre
   useProfilePreload();
   
   // Determine route types - memoized to avoid recalculation
+  // During SSR/prerender (pathname is null), default to safe values that won't break rendering
   const routeInfo = useMemo(() => {
-    const isApiRoute = pathname?.startsWith("/api");
-    const isAuthPage = pathname?.startsWith("/auth");
-    const isAcceptPage = pathname?.startsWith("/members/accept");
+    // If pathname is not available (during SSR/prerender), use safe defaults
+    if (!pathname) {
+      return {
+        isApiRoute: false,
+        isPublicPage: false,
+        isSelectPlanPage: false,
+        isWelcomePage: false,
+        isDashboardRoute: false,
+      };
+    }
+    
+    const isApiRoute = pathname.startsWith("/api");
+    const isAuthPage = pathname.startsWith("/auth");
+    const isAcceptPage = pathname.startsWith("/members/accept");
     const isSelectPlanPage = pathname === "/select-plan";
     const isWelcomePage = pathname === "/welcome";
     const isLandingPage = pathname === "/";
@@ -152,6 +165,12 @@ export const LayoutWrapper = memo(function LayoutWrapper({ children }: { childre
       }
     }
   }, [pathname, checking, hasSubscription, isPublicPage, isDashboardRoute, log]);
+
+  // During SSR/prerender (pathname is null), render children without layout
+  // This prevents errors during build time
+  if (!pathname) {
+    return <>{children}</>;
+  }
 
   // Render API routes and public pages without nav
   if (isApiRoute || isPublicPage) {

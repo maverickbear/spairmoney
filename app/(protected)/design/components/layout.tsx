@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathnameSafe } from "@/hooks/use-pathname-safe";
+import { useRouter } from "next/navigation";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger } from "@/components/ui/simple-tabs";
 import { PageHeader } from "@/components/common/page-header";
 
@@ -9,11 +10,13 @@ export default function ComponentsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathnameSafe();
   const router = useRouter();
 
   // Determine active tab based on current path
+  // During SSR/prerender (pathname is null), default to "buttons"
   const getActiveTab = () => {
+    if (!pathname) return "buttons";
     if (pathname.includes("/buttons")) return "buttons";
     if (pathname.includes("/inputs")) return "inputs";
     if (pathname.includes("/textareas")) return "textareas";

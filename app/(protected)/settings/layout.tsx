@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathnameSafe } from "@/hooks/use-pathname-safe";
 import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
@@ -12,7 +12,7 @@ export default function SettingsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathnameSafe();
 
   const tabs = [
     { href: "/settings/profile", label: "Profile", value: "profile" },
@@ -21,7 +21,8 @@ export default function SettingsLayout({
     { href: "/settings/household", label: "Household", value: "household" },
   ];
 
-  const isActive = (href: string) => pathname === href;
+  // During SSR/prerender (pathname is null), no tab is active
+  const isActive = (href: string) => pathname !== null && pathname === href;
 
   return (
     <div className="w-full">

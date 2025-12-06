@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathnameSafe } from "@/hooks/use-pathname-safe";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger } from "@/components/ui/simple-tabs";
 import { PageHeader } from "@/components/common/page-header";
@@ -10,11 +11,13 @@ export default function FoundationLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathnameSafe();
   const router = useRouter();
 
   // Determine active tab based on current path
+  // During SSR/prerender (pathname is null), default to "colors"
   const getActiveTab = () => {
+    if (!pathname) return "colors";
     if (pathname.includes("/colors")) return "colors";
     if (pathname.includes("/typography")) return "typography";
     if (pathname.includes("/spacing")) return "spacing";
