@@ -9,7 +9,8 @@ import { AppError } from "@/src/application/shared/app-error";
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    // Use nextUrl.searchParams for NextRequest (avoids prerendering issues)
+    const searchParams = request.nextUrl.searchParams;
     const token = searchParams.get("token");
 
     if (!token || typeof token !== "string") {

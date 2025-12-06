@@ -8,7 +8,7 @@ import { CancelledSubscriptionBanner } from "@/components/common/cancelled-subsc
 import { PausedSubscriptionBanner } from "@/src/presentation/components/features/subscriptions/paused-subscription-banner";
 import { useFixedElementsHeight } from "@/hooks/use-fixed-elements-height";
 import { useEffect, useState, memo, useMemo, useRef } from "react";
-import { useSubscriptionContext } from "@/contexts/subscription-context";
+import { useSubscriptionContext, useSubscriptionSafe } from "@/contexts/subscription-context";
 import { usePathname } from "next/navigation";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { cn } from "@/lib/utils";
@@ -36,16 +36,11 @@ function useProfilePreload() {
 
 export const LayoutWrapper = memo(function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // Try to get subscription context, but handle case where it might not be available (public pages)
-  let subscription = null;
-  let checking = false;
-  try {
-    const context = useSubscriptionContext();
-    subscription = context.subscription;
-    checking = context.checking;
-  } catch {
-    // SubscriptionProvider not available (public pages)
-  }
+  // Use safe hook to avoid errors when SubscriptionProvider is not available (public pages, prerendering)
+  // This prevents "uncached data accessed" errors during build time
+  const context = useSubscriptionSafe();
+  const subscription = context.subscription;
+  const checking = context.checking;
   const hasSubscription = !!subscription;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   

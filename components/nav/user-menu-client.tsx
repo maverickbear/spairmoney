@@ -38,6 +38,15 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
   const { subscription, plan, checking: checkingSubscription } = useSubscriptionSafe();
   
   const log = logger.withPrefix("USER-MENU");
+  
+  // Track if component is mounted to prevent hydration mismatches
+  const [mounted, setMounted] = useState(false);
+  
+  // Only set mounted to true after hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
   const loading = checkingAuth || checkingSubscription;
   const isSuperAdmin = role === "super_admin";
   const isTrialing = subscription?.status === "trialing";
@@ -103,7 +112,7 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
 
       {/* User Menu */}
       <div className="p-3">
-        {loading ? (
+        {!mounted || loading ? (
           <div
             className={`flex items-center ${
               isCollapsed ? "justify-center" : "space-x-3 px-3 py-2"

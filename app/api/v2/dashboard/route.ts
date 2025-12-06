@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get range from query params or default to "this-month"
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
     const rangeParam = searchParams.get("range") as DateRange | null;
     const validRange: DateRange = rangeParam && ["this-month", "last-month", "last-60-days", "last-90-days"].includes(rangeParam)
       ? rangeParam

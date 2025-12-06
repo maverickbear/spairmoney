@@ -4,7 +4,9 @@ import { AppError } from "@/src/application/shared/app-error";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
+    // Use request.url for Request type (not NextRequest)
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
     const token = searchParams.get("token");
 
     if (!token || typeof token !== "string") {

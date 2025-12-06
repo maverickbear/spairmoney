@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { unstable_noStore as noStore } from "next/cache";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { verifyUserExists } from "@/lib/utils/verify-user-exists";
 
@@ -22,6 +23,9 @@ export default async function AuthRequiredLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Opt out of static generation - this layout requires authentication
+  noStore();
+  
   console.log("[AUTH-REQUIRED-LAYOUT] Executing");
   const supabase = await createServerClient();
   
