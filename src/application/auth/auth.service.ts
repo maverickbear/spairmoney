@@ -352,12 +352,19 @@ export class AuthService {
 
   /**
    * Sign in with Google OAuth
+   * @param redirectTo - The callback URL after OAuth
+   * @param flow - "signin" or "signup" to determine the OAuth prompt behavior
    */
-  async signInWithGoogle(redirectTo?: string): Promise<{ url: string | null; error: string | null }> {
+  async signInWithGoogle(redirectTo?: string, flow?: "signin" | "signup"): Promise<{ url: string | null; error: string | null }> {
     try {
       const supabase = await createServerClient();
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
       const redirectUrl = redirectTo || `${appUrl}/auth/callback`;
+
+      // For signup, use "select_account consent" to force account selection and consent screen
+      // This prevents Google from showing "You're signing back in" message
+      // For signin, use "consent" to just show consent screen
+      const prompt = flow === "signup" ? "select_account consent" : "consent";
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -365,7 +372,7 @@ export class AuthService {
           redirectTo: redirectUrl,
           queryParams: {
             access_type: "offline",
-            prompt: "consent",
+            prompt: prompt,
           },
         },
       });

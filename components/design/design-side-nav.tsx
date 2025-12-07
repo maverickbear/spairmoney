@@ -14,6 +14,7 @@ import {
   List,
   Square,
   Menu,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,6 +83,11 @@ const navSections: NavSection[] = [
         href: "/design/components/selects",
         label: "Selects",
         icon: List,
+      },
+      {
+        href: "/design/components/feedback",
+        label: "Feedback",
+        icon: Bell,
       },
     ],
   },

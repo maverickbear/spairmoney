@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const service = makeAuthService();
-    const result = await service.signInWithGoogle(callbackUrl.toString());
+    const result = await service.signInWithGoogle(callbackUrl.toString(), flow);
 
     if (result.error) {
       return NextResponse.json(

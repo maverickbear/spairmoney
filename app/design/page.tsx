@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Palette, Type, Move, Image as ImageIcon, Layout, Component, MousePointer2, FileText, List, Square } from "lucide-react";
+import { Palette, Type, Move, Image as ImageIcon, Layout, Component, MousePointer2, FileText, List, Square, Bell } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 
 const designCategories = [
@@ -74,6 +74,13 @@ const designCategories = [
         description: "Select dropdowns with size variants",
         href: "/design/components/selects",
         icon: List,
+        disabled: false,
+      },
+      {
+        title: "Feedback",
+        description: "Toasts, alerts, and confirmation dialogs",
+        href: "/design/components/feedback",
+        icon: Bell,
         disabled: false,
       },
     ],
