@@ -6,7 +6,7 @@
 
 import { SubscriptionsRepository } from "@/src/infrastructure/database/repositories/subscriptions.repository";
 import { SubscriptionsMapper } from "./subscriptions.mapper";
-import { BaseSubscription, BasePlan, BaseSubscriptionData, BaseLimitCheckResult, BasePlanFeatures } from "../../domain/subscriptions/subscriptions.types";
+import { BaseSubscription, BasePlan, BaseSubscriptionData, BaseLimitCheckResult, BasePlanFeatures, PublicPlan } from "../../domain/subscriptions/subscriptions.types";
 import { getDefaultFeatures } from "@/lib/utils/plan-features";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
@@ -28,6 +28,28 @@ export class SubscriptionsService {
       return plans.map(plan => SubscriptionsMapper.planToDomain(plan));
     } catch (error) {
       logger.error("[SubscriptionsService] Error fetching plans:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Get public plans (without sensitive Stripe IDs)
+   * Used for public endpoints like landing page pricing section
+   */
+  async getPublicPlans(): Promise<PublicPlan[]> {
+    try {
+      const plans = await this.getPlans();
+      return plans.map(plan => ({
+        id: plan.id,
+        name: plan.name,
+        priceMonthly: plan.priceMonthly,
+        priceYearly: plan.priceYearly,
+        features: plan.features,
+        createdAt: plan.createdAt,
+        updatedAt: plan.updatedAt,
+      }));
+    } catch (error) {
+      logger.error("[SubscriptionsService] Error fetching public plans:", error);
       return [];
     }
   }

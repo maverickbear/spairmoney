@@ -17,7 +17,7 @@ export function LandingFooter() {
           {/* Brand */}
           <div>
             <Link href="/" className="flex items-center mb-4">
-              <Logo variant="wordmark" color="auto" height={53} />
+              <Logo variant="wordmark" color="auto" width={200} />
             </Link>
             <p className="text-base text-muted-foreground max-w-md">
               Simple, modern, and designed to put you in control of your future.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { signUpSchema } from "@/src/domain/auth/auth.validations";
 import { ZodError } from "zod";
+import { verifyTurnstileToken, getClientIp } from "@/src/infrastructure/utils/turnstile";
 
 /**
  * POST /api/v2/auth/signup
@@ -13,6 +14,16 @@ export async function POST(request: NextRequest) {
     
     // Validate input
     const validated = signUpSchema.parse(body);
+    
+    // Validate Turnstile token
+    const clientIp = getClientIp(request);
+    const turnstileValidation = await verifyTurnstileToken(validated.turnstileToken, clientIp);
+    if (!turnstileValidation.success) {
+      return NextResponse.json(
+        { error: turnstileValidation.error || "Security verification failed" },
+        { status: 400 }
+      );
+    }
     
     const service = makeAuthService();
     const result = await service.signUp(validated);

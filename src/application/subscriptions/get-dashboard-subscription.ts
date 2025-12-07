@@ -120,6 +120,9 @@ async function getCachedSubscriptionDataInternal(userId: string) {
 /**
  * Public accessor for subscription data, resolving current user when not provided.
  * Exported so all read paths share the same cached result.
+ * 
+ * CRITICAL: If called from within a "use cache" function, userId MUST be provided
+ * to avoid calling getCurrentUserId() (which uses cookies()) inside a cache scope.
  */
 export async function getCachedSubscriptionData(userId?: string) {
   const resolvedUserId = userId ?? (await getCurrentUserId());
@@ -137,8 +140,11 @@ export async function getCachedSubscriptionData(userId?: string) {
 
 /**
  * Backwards-compatible dashboard accessor
+ * 
+ * CRITICAL: If called from within a "use cache" function, userId MUST be provided
+ * to avoid calling getCurrentUserId() (which uses cookies()) inside a cache scope.
  */
-export async function getDashboardSubscription() {
-  return getCachedSubscriptionData();
+export async function getDashboardSubscription(userId?: string) {
+  return getCachedSubscriptionData(userId);
 }
 

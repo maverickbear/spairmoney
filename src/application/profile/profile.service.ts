@@ -63,7 +63,8 @@ async function getUserWithSubscriptionCached(
   // Get subscription and plan data
   // CRITICAL: Use cached getDashboardSubscription to avoid duplicate calls
   // This ensures React cache() works correctly within the same request
-  const subscriptionData = await getDashboardSubscription();
+  // Pass userId to avoid calling getCurrentUserId() (which uses cookies()) inside cache scope
+  const subscriptionData = await getDashboardSubscription(userId);
   
   // Get user role
   const membersService = makeMembersService();
@@ -230,6 +231,93 @@ export class ProfileService {
   }
 
   /**
+   * Upload avatar image from external URL (e.g., Google OAuth)
+   * Downloads the image, validates it, and uploads to Supabase Storage
+   */
+  async uploadAvatarFromUrl(userId: string, imageUrl: string): Promise<{ url: string }> {
+    try {
+      // Download image from URL
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new AppError(`Failed to download image from URL: ${response.statusText}`, 400);
+      }
+
+      // Get content type from response headers
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      if (!contentType.startsWith("image/")) {
+        throw new AppError("URL does not point to an image", 400);
+      }
+
+      // Convert response to buffer
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Validate file size (max 5MB)
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+      if (buffer.length > MAX_FILE_SIZE) {
+        throw new AppError("Image file size exceeds 5MB limit", 400);
+      }
+
+      // Create a File-like object for validation
+      const blob = new Blob([buffer], { type: contentType });
+      const file = new File([blob], "avatar.jpg", { type: contentType });
+
+      // Validate image file
+      const validation = await validateImageFile(file, buffer);
+      if (!validation.valid) {
+        throw new AppError(validation.error || "Invalid image file", 400);
+      }
+
+      const supabase = await createServerClient();
+
+      // Determine file extension from content type
+      let fileExt = "jpg";
+      if (contentType.includes("png")) {
+        fileExt = "png";
+      } else if (contentType.includes("gif")) {
+        fileExt = "gif";
+      } else if (contentType.includes("webp")) {
+        fileExt = "webp";
+      }
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      const fileName = `${userId}/${timestamp}-${randomSuffix}.${fileExt}`;
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("avatar")
+        .upload(fileName, buffer, {
+          contentType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        logger.error("[ProfileService] Error uploading avatar from URL:", uploadError);
+        throw new AppError(uploadError.message || "Failed to upload avatar", 400);
+      }
+
+      // Get public URL for the uploaded file
+      const { data: urlData } = supabase.storage
+        .from("avatar")
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new AppError("Failed to get avatar URL", 500);
+      }
+
+      return { url: urlData.publicUrl };
+    } catch (error) {
+      logger.error("[ProfileService] Error uploading avatar from URL:", error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError("Failed to upload avatar from URL", 500);
+    }
+  }
+
+  /**
    * Upload avatar image
    */
   async uploadAvatar(userId: string, file: File, requestHeaders: Headers): Promise<{ url: string }> {
@@ -314,16 +402,9 @@ export class ProfileService {
   /**
    * Delete user account
    */
-  async deleteAccount(userId: string, password: string): Promise<{ success: boolean; message: string }> {
+  async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
     try {
-      // 1. Verify password
-      const authService = makeAuthService();
-      const passwordVerification = await authService.verifyPasswordForDeletion(password);
-      if (!passwordVerification.valid) {
-        throw new AppError(passwordVerification.error || "Invalid password", 400);
-      }
-
-      // 2. Check household ownership
+      // 1. Check household ownership
       const membersService = makeMembersService();
       const householdCheck = await membersService.checkHouseholdOwnership(userId);
       if (householdCheck.isOwner && householdCheck.memberCount > 1) {

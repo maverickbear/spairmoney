@@ -100,8 +100,15 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
   const { makeAdminService } = await import("@/src/application/admin/admin.factory");
   const adminService = makeAdminService();
   
+  // CRITICAL: Get userId BEFORE calling getDashboardSubscription() to avoid
+  // calling cookies() inside a "use cache" function
+  const { getCurrentUserId } = await import("@/src/application/shared/feature-guard");
+  const userId = await getCurrentUserId();
+  
   // Fetch subscription data once (cached function ensures only 1 call per request)
-  const subscriptionData = await getDashboardSubscription();
+  // Pass userId to avoid calling getCurrentUserId() (which uses cookies()) inside cache scope
+  // Convert null to undefined to match function signature
+  const subscriptionData = await getDashboardSubscription(userId ?? undefined);
   
   // Now we can safely use Date.now() after accessing uncached data
   const perf = startServerPagePerformance("Reports");
@@ -126,8 +133,6 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
   // Check if user is super_admin
   let isSuperAdmin = false;
   try {
-    const { getCurrentUserId } = await import("@/src/application/shared/feature-guard");
-    const userId = await getCurrentUserId();
     if (userId) {
       isSuperAdmin = await adminService.isSuperAdmin(userId);
     }

@@ -48,6 +48,11 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
   const hasInitialDataRef = useRef(!!initialData);
   const lastFetchRef = useRef<number>(initialData ? Date.now() : 0);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Track rate limit cooldown period (when we should not retry)
+  const rateLimitCooldownRef = useRef<number>(0);
+  // Track current subscription and plan in refs to avoid stale closures
+  const subscriptionRef = useRef<Subscription | null>(initialData?.subscription ?? null);
+  const planRef = useRef<Plan | null>(initialData?.plan ?? null);
 
   // Update limits when plan changes
   // Use plan.features directly from database - the database is the source of truth
@@ -57,7 +62,14 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     } else {
       setLimits(getDefaultFeatures());
     }
+    // Keep ref in sync
+    planRef.current = plan;
   }, [plan]);
+
+  // Keep subscription ref in sync
+  useEffect(() => {
+    subscriptionRef.current = subscription;
+  }, [subscription]);
 
   const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null }> => {
     try {
@@ -66,13 +78,36 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       if (!response.ok) {
         if (response.status === 401) {
           log.log("User not authenticated");
-            return {
-              subscription: null,
-              plan: null,
-            };
+          return {
+            subscription: null,
+            plan: null,
+          };
         }
+        
+        // Handle rate limiting (429) with proper cooldown
+        if (response.status === 429) {
+          const retryAfter = response.headers.get("Retry-After");
+          const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : 60; // Default to 60 seconds
+          const cooldownMs = retryAfterSeconds * 1000;
+          
+          // Set cooldown period - don't retry until this time has passed
+          rateLimitCooldownRef.current = Date.now() + cooldownMs;
+          
+          log.log(`Rate limited (429). Cooldown until ${new Date(rateLimitCooldownRef.current).toISOString()}`);
+          
+          // Return current state from refs to avoid clearing subscription data
+          // This preserves the last known good state
+          return {
+            subscription: subscriptionRef.current,
+            plan: planRef.current,
+          };
+        }
+        
         throw new Error(`Failed to fetch subscription: ${response.status}`);
       }
+
+      // Success - clear any rate limit cooldown
+      rateLimitCooldownRef.current = 0;
 
       const data = await response.json();
       const result = {
@@ -86,7 +121,11 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       };
     } catch (error) {
       log.error("Error fetching subscription:", error);
-      return { subscription: null, plan: null };
+      // On network errors, return current state from refs to avoid clearing subscription data
+      return { 
+        subscription: subscriptionRef.current, 
+        plan: planRef.current 
+      };
     }
   }, [log]);
 
@@ -96,14 +135,34 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       return;
     }
 
+    // Check if we're in a rate limit cooldown period
+    const now = Date.now();
+    if (rateLimitCooldownRef.current > now) {
+      const remainingMs = rateLimitCooldownRef.current - now;
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      log.log(`Rate limit cooldown active. Skipping refetch. Retry in ${remainingSeconds}s`);
+      return;
+    }
+
     checkingRef.current = true;
     setChecking(true);
+    const cooldownBeforeFetch = rateLimitCooldownRef.current;
     lastFetchRef.current = Date.now();
 
     try {
       const { subscription: newSubscription, plan: newPlan } = await fetchSubscription();
-      setSubscription(newSubscription);
-      setPlan(newPlan);
+      
+      // Check if we got rate limited (cooldown was set during fetch)
+      const wasRateLimited = rateLimitCooldownRef.current > cooldownBeforeFetch;
+      
+      // Only update state if we got fresh data (not rate limited)
+      // This prevents clearing subscription data on 429 errors
+      if (!wasRateLimited) {
+        setSubscription(newSubscription);
+        setPlan(newPlan);
+      } else {
+        log.log("Rate limited during fetch, preserving current subscription state");
+      }
     } catch (error) {
       log.error("Error in refetch:", error);
     } finally {
@@ -132,7 +191,14 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
   // This handles cases where subscription changes outside the app (e.g., App Store cancellation)
   useEffect(() => {
     const handleFocus = () => {
-      const timeSinceLastFetch = Date.now() - lastFetchRef.current;
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchRef.current;
+      
+      // Skip if in rate limit cooldown
+      if (rateLimitCooldownRef.current > now) {
+        return;
+      }
+      
       // Only refetch if it's been at least 1 minute since last fetch
       // This prevents excessive refetches when user rapidly switches tabs
       if (timeSinceLastFetch > 60000) {
@@ -143,7 +209,14 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        const timeSinceLastFetch = Date.now() - lastFetchRef.current;
+        const now = Date.now();
+        const timeSinceLastFetch = now - lastFetchRef.current;
+        
+        // Skip if in rate limit cooldown
+        if (rateLimitCooldownRef.current > now) {
+          return;
+        }
+        
         // Only refetch if it's been at least 1 minute since last fetch
         if (timeSinceLastFetch > 60000) {
           log.log("Page became visible, checking subscription status...");
@@ -175,7 +248,14 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     // Start polling interval - first refetch will happen after 5 minutes
     // (not immediately on mount if we have initialData)
     const interval = setInterval(() => {
-      const timeSinceLastFetch = Date.now() - lastFetchRef.current;
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchRef.current;
+      
+      // Skip if in rate limit cooldown
+      if (rateLimitCooldownRef.current > now) {
+        return;
+      }
+      
       // Only poll if it's been at least 5 minutes since last fetch
       if (timeSinceLastFetch >= POLLING_INTERVAL) {
         log.log("Polling interval reached, refetching...");

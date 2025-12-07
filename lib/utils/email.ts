@@ -181,7 +181,16 @@ Once verified, emails will be sent from: noreply@sparefinance.com
 }
 
 function getLogoUrl(appUrl?: string): string {
-  return "https://app.sparefinance.com/storage/v1/object/public/images/sparefiance-logo-email.png";
+  // Get Supabase URL from environment variable
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  
+  if (!supabaseUrl) {
+    // Fallback to hardcoded URL if env var is not set
+    return "https://app.sparefinance.com/storage/v1/object/public/images/logo-primary-lightbg-email.png";
+  }
+  
+  // Construct the public URL for the logo in the images bucket
+  return `${supabaseUrl}/storage/v1/object/public/images/logo-primary-lightbg-email.png`;
 }
 
 function getInvitationEmailTemplate(data: {

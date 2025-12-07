@@ -132,7 +132,7 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
               <Button
                 variant="ghost"
                 size="small"
-                className={`w-full h-auto p-2 border border-border shadow ${
+                className={`w-full h-auto p-2 border border-border shadow hover:bg-secondary ${
                   isCollapsed ? "justify-center" : "justify-start"
                 }`}
               >

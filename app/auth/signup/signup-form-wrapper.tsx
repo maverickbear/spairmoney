@@ -79,7 +79,7 @@ export function SignUpFormWrapperContent() {
           <div className="lg:hidden text-center space-y-2">
             <div className="flex items-center justify-center mb-4">
               <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
-                <Logo variant="wordmark" color="auto" height={53} priority />
+                <Logo variant="wordmark" color="auto" width={200} priority />
               </Link>
             </div>
             <p className="text-muted-foreground text-sm">

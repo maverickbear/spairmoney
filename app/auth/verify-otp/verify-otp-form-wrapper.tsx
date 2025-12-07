@@ -21,7 +21,7 @@ export function VerifyOtpFormWrapperContent() {
         <div className="relative z-10 space-y-8 w-full">
           <div className="space-y-4 w-full">
             <div className="flex justify-start items-start w-full">
-              <Logo variant="full" color="purple" height={40} />
+              <Logo variant="full" color="purple" width={200} />
             </div>
             <p className="text-lg text-muted-foreground max-w-md">
               Verify your email to complete your account setup.
@@ -62,7 +62,7 @@ export function VerifyOtpFormWrapperContent() {
           {/* Mobile header */}
           <div className="lg:hidden space-y-4">
             <div className="flex items-center justify-center">
-              <Logo variant="full" color="purple" height={32} />
+              <Logo variant="full" color="purple" width={160} />
             </div>
             <p className="text-muted-foreground text-sm text-center">
               Verify your email to continue

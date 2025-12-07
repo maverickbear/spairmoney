@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,27 +13,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, Loader2, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/toast-provider";
+import { supabase } from "@/lib/supabase";
 
 interface DeleteAccountDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+const DELETE_CONFIRMATION_TEXT = "DELETE";
+
 export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogProps) {
-  const [password, setPassword] = useState("");
+  const [confirmationText, setConfirmationText] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const router = useRouter();
 
   async function handleDelete() {
-    if (!password) {
-      setError("Password is required");
+    if (confirmationText !== DELETE_CONFIRMATION_TEXT) {
+      setError(`Please type "${DELETE_CONFIRMATION_TEXT}" to confirm`);
       return;
     }
 
@@ -52,7 +52,6 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ password }),
       });
       
       const result = await response.json();
@@ -68,11 +67,21 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
           variant: "success",
         });
         
-        // Close dialog and redirect to home page
+        // Close dialog
         onOpenChange(false);
-        // Wait a moment for the toast to show, then redirect
+        
+        // Ensure Supabase client is signed out on client side
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          // Ignore sign out errors since account is already deleted
+          console.log("Sign out after deletion (account already deleted)");
+        }
+        
+        // Wait a moment for the toast to show, then force a complete page reload
+        // This ensures all caches and contexts are cleared
         setTimeout(() => {
-          router.push("/");
+          window.location.href = "/";
         }, 2000);
       }
     } catch (err) {
@@ -100,7 +109,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
 
   function handleClose() {
     if (!loading) {
-      setPassword("");
+      setConfirmationText("");
       setConfirmed(false);
       setError(null);
       onOpenChange(false);
@@ -135,36 +144,21 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
           </Alert>
 
           <div className="space-y-2">
-            <Label htmlFor="delete-password">Enter your password to confirm</Label>
-            <div className="relative">
-              <Input
-                id="delete-password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError(null);
-                }}
-                placeholder="Enter your password"
-                size="medium"
-                className="pr-10"
-                disabled={loading}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                tabIndex={-1}
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
+            <Label htmlFor="delete-confirmation">
+              Type <span className="font-mono font-semibold">{DELETE_CONFIRMATION_TEXT}</span> to confirm
+            </Label>
+            <Input
+              id="delete-confirmation"
+              type="text"
+              value={confirmationText}
+              onChange={(e) => {
+                setConfirmationText(e.target.value);
+                setError(null);
+              }}
+              size="medium"
+              disabled={loading}
+              className="font-mono"
+            />
           </div>
 
           <div className="flex items-start gap-2">
@@ -204,7 +198,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={loading || !password || !confirmed}
+            disabled={loading || confirmationText !== DELETE_CONFIRMATION_TEXT || !confirmed}
           >
             {loading ? (
               <>

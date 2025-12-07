@@ -442,18 +442,18 @@ export function SummaryCards({
               </Select>
             </div>
 
-            {/* Balance Amount Label - Use content.secondary for labels */}
-            <div className="text-accent-foreground/80 text-lg font-semibold mb-1">Balance Amount</div>
+            {/* Balance Amount Label - Use content.primary */}
+            <div className="text-foreground text-lg font-semibold mb-1">Balance Amount</div>
 
             {/* Balance Amount - Use content.primary */}
-            <div className="text-2xl md:text-3xl font-bold mb-2 tabular-nums text-content-primary">
+            <div className="text-2xl md:text-3xl font-bold mb-2 tabular-nums text-foreground">
               <AnimatedNumber value={totalBalance} format="money" />
             </div>
 
-            {/* Balance Change Tag - Use content.secondary for supportive text */}
+            {/* Balance Change Tag - Use content.primary */}
             {lastMonthTotalBalance !== 0 && (
               <div className={cn(
-                "inline-flex items-center text-sm font-medium mb-3 text-accent-foreground/80"
+                "inline-flex items-center text-sm font-medium mb-3 text-foreground"
               )}>
                 {balanceChange >= 0 ? "+" : ""}{formatMoney(balanceChange)} vs last month
               </div>
@@ -461,18 +461,18 @@ export function SummaryCards({
 
             {/* Available to Spend Section */}
             <div>
-              {/* Label - Use content.secondary for labels */}
-              <div className="text-accent-foreground/80 text-xs mb-1">Available to spend this month</div>
+              {/* Label - Use content.primary */}
+              <div className="text-foreground text-xs mb-1">Available to spend this month</div>
               {/* Amount - Use content.primary */}
-              <div className="text-xl md:text-2xl font-bold mb-1 tabular-nums text-content-primary">
+              <div className="text-xl md:text-2xl font-bold mb-1 tabular-nums text-foreground">
                 <AnimatedNumber value={availableToSpend} format="money" />
               </div>
-              {/* Description - Use content.secondary for supportive text */}
-              <div className="text-sm text-accent-foreground/70 mb-2">
+              {/* Description - Use content.primary */}
+              <div className="text-sm text-foreground mb-2">
                 after bills, goals & minimum debt
               </div>
               {hasConnectedAccounts && (
-                <div className="text-[10px] text-accent-foreground/60 mt-2">
+                <div className="text-[10px] text-foreground mt-2">
                   Based on connected accounts
                 </div>
               )}

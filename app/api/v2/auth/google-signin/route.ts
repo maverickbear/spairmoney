@@ -12,10 +12,20 @@ import { AppError } from "@/src/application/shared/app-error";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { redirectTo } = body;
+    const { redirectTo, flow } = body; // flow: "signin" | "signup"
+
+    // Build callback URL with flow context
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+    const callbackUrl = new URL("/auth/callback", appUrl);
+    if (flow) {
+      callbackUrl.searchParams.set("flow", flow); // Add flow parameter to callback
+    }
+    if (redirectTo) {
+      callbackUrl.searchParams.set("redirectTo", redirectTo);
+    }
 
     const service = makeAuthService();
-    const result = await service.signInWithGoogle(redirectTo);
+    const result = await service.signInWithGoogle(callbackUrl.toString());
 
     if (result.error) {
       return NextResponse.json(

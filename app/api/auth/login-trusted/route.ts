@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { AppError } from "@/src/application/shared/app-error";
+import { verifyTurnstileToken, getClientIp } from "@/src/infrastructure/utils/turnstile";
 
 /**
  * POST /api/auth/login-trusted
@@ -14,7 +15,7 @@ import { AppError } from "@/src/application/shared/app-error";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, turnstileToken } = body;
 
     console.log("[LOGIN-TRUSTED] Request received for email:", email);
 
@@ -30,6 +31,16 @@ export async function POST(request: NextRequest) {
       console.error("[LOGIN-TRUSTED] Password is missing");
       return NextResponse.json(
         { error: "Password is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate Turnstile token
+    const clientIp = getClientIp(request);
+    const turnstileValidation = await verifyTurnstileToken(turnstileToken, clientIp);
+    if (!turnstileValidation.success) {
+      return NextResponse.json(
+        { error: turnstileValidation.error || "Security verification failed" },
         { status: 400 }
       );
     }

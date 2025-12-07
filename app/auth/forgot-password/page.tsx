@@ -69,7 +69,7 @@ function ForgotPasswordFormWrapper() {
           {/* Mobile header */}
           <div className="lg:hidden text-center space-y-2">
             <div className="flex items-center justify-center mb-4">
-              <Logo variant="wordmark" color="auto" height={53} priority />
+              <Logo variant="wordmark" color="auto" width={200} priority />
             </div>
             <p className="text-muted-foreground text-sm">
               Enter your email to reset your password

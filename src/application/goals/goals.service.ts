@@ -778,6 +778,7 @@ export class GoalsService {
   /**
    * Ensure emergency fund goal exists
    * Creates it if it doesn't exist, or returns existing one
+   * After creating, attempts to calculate the target amount based on income/expenses
    */
   async ensureEmergencyFundGoal(userId: string, householdId: string): Promise<BaseGoal | null> {
     try {
@@ -831,6 +832,20 @@ export class GoalsService {
         isPaused: false,
         isSystemGoal: true,
       });
+
+      // After creating, try to calculate the target amount based on income/expenses
+      // This ensures the target is set correctly even when the goal is created via API
+      try {
+        const calculatedGoal = await this.calculateAndUpdateEmergencyFund();
+        if (calculatedGoal) {
+          logger.info("[GoalsService] Successfully calculated emergency fund target after creation");
+          return calculatedGoal;
+        }
+      } catch (calcError) {
+        // If calculation fails (e.g., insufficient data), return the goal with target 0
+        // This is acceptable - the target will be calculated later when data is available
+        logger.warn("[GoalsService] Could not calculate emergency fund target after creation (insufficient data), will calculate later:", calcError);
+      }
 
       return goal;
     } catch (error) {

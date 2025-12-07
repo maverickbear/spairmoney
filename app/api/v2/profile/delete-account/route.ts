@@ -14,18 +14,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { password } = body;
-
-    if (!password) {
-      return NextResponse.json(
-        { error: "Password is required" },
-        { status: 400 }
-      );
-    }
-
     const service = makeProfileService();
-    const result = await service.deleteAccount(userId, password);
+    const result = await service.deleteAccount(userId);
 
     return NextResponse.json(result);
   } catch (error) {

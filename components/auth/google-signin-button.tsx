@@ -37,6 +37,9 @@ export function GoogleSignInButton({ variant = "signin", className }: GoogleSign
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          flow: variant, // Pass "signin" or "signup" to distinguish the flow
+        }),
       });
 
       const result = await response.json();

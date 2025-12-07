@@ -495,6 +495,10 @@ export class AuthService {
     }
 
     // Create emergency fund goal for new user using service role (bypasses RLS)
+    // Note: Target amount is set to 0 initially and will be calculated automatically when:
+    // 1. User fetches goals (getAll tries calculateAndUpdateEmergencyFund first)
+    // 2. User calls /api/goals/ensure-emergency-fund endpoint
+    // This is acceptable since new users typically don't have income/expense data yet
     try {
       const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
       const serviceRoleClient = createServiceRoleClient();
@@ -519,7 +523,7 @@ export class AuthService {
           .insert({
             id: goalId,
             name: "Emergency Funds",
-            targetAmount: 0.00,
+            targetAmount: 0.00, // Will be calculated when user has income/expense data
             currentBalance: 0.00,
             incomePercentage: 0.00,
             priority: "High",
@@ -591,6 +595,32 @@ export class AuthService {
         };
       }
 
+      // Handle avatar upload from Google OAuth if provided
+      let finalAvatarUrl: string | null = null;
+      if (data.avatarUrl) {
+        try {
+          // Check if it's an external URL (Google OAuth)
+          const isExternalUrl = data.avatarUrl.startsWith("http://") || data.avatarUrl.startsWith("https://");
+          if (isExternalUrl) {
+            // Import ProfileService to upload avatar from URL
+            const { makeProfileService } = await import("../profile/profile.factory");
+            const profileService = makeProfileService();
+            
+            // Download and upload avatar to Supabase Storage
+            const uploadResult = await profileService.uploadAvatarFromUrl(data.userId, data.avatarUrl);
+            finalAvatarUrl = uploadResult.url;
+            logger.info(`[AuthService] Avatar uploaded from Google OAuth for user ${data.userId}`);
+          } else {
+            // Already a Supabase URL, use as is
+            finalAvatarUrl = data.avatarUrl;
+          }
+        } catch (avatarError) {
+          // Log error but don't fail profile creation
+          logger.error("[AuthService] Error uploading avatar from Google OAuth:", avatarError);
+          // Continue without avatar - user can upload later
+        }
+      }
+
       // Create user profile
       const userData = await this.repository.createUser({
         id: data.userId,
@@ -598,6 +628,26 @@ export class AuthService {
         name: data.name || null,
         role: "admin", // Owners who sign up directly are admins
       });
+
+      // Update profile with avatar URL if we have one
+      // We update after creation because createUser doesn't accept avatarUrl
+      if (finalAvatarUrl) {
+        try {
+          const { ProfileRepository } = await import("@/src/infrastructure/database/repositories/profile.repository");
+          const profileRepository = new ProfileRepository();
+          await profileRepository.update(data.userId, {
+            avatarUrl: finalAvatarUrl,
+            updatedAt: formatTimestamp(new Date()),
+          });
+          logger.info(`[AuthService] Avatar URL updated for user ${data.userId}`);
+          
+          // Update userData to include avatarUrl for return value
+          userData.avatarUrl = finalAvatarUrl;
+        } catch (avatarUpdateError) {
+          // Log error but don't fail - avatar can be updated later
+          logger.error("[AuthService] Error updating avatar URL:", avatarUpdateError);
+        }
+      }
 
       // Create personal household automatically (same as signup/signin)
       try {
@@ -709,38 +759,6 @@ export class AuthService {
         success: false,
         error: "An unexpected error occurred",
       };
-    }
-  }
-
-  /**
-   * Verify password for account deletion
-   */
-  async verifyPasswordForDeletion(password: string): Promise<{
-    valid: boolean;
-    error?: string;
-  }> {
-    try {
-      const supabase = await createServerClient();
-      
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-      if (authError || !authUser) {
-        return { valid: false, error: "Not authenticated" };
-      }
-
-      // Verify password by attempting to sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: authUser.email!,
-        password: password,
-      });
-
-      if (signInError) {
-        return { valid: false, error: "Invalid password" };
-      }
-
-      return { valid: true };
-    } catch (error) {
-      logger.error("[AuthService] Error verifying password:", error);
-      return { valid: false, error: "Failed to verify password" };
     }
   }
 

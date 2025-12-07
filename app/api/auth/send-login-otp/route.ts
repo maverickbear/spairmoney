@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyTurnstileToken, getClientIp } from "@/src/infrastructure/utils/turnstile";
 
 /**
  * POST /api/auth/send-login-otp
@@ -10,7 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, turnstileToken } = body;
 
     console.log("[SEND-LOGIN-OTP] Request received for email:", email);
 
@@ -26,6 +27,16 @@ export async function POST(request: NextRequest) {
       console.error("[SEND-LOGIN-OTP] Password is missing");
       return NextResponse.json(
         { error: "Password is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate Turnstile token
+    const clientIp = getClientIp(request);
+    const turnstileValidation = await verifyTurnstileToken(turnstileToken, clientIp);
+    if (!turnstileValidation.success) {
+      return NextResponse.json(
+        { error: turnstileValidation.error || "Security verification failed" },
         { status: 400 }
       );
     }

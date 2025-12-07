@@ -109,10 +109,12 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
   let plan: Plan | null = null;
   
   try {
+    // CRITICAL: Get userId BEFORE calling getDashboardSubscription() to avoid
+    // calling cookies() inside a "use cache" function
     // CRITICAL OPTIMIZATION: Use cached function to ensure only 1 call per request
     // This replaces multiple SubscriptionsService calls throughout the app
     // IMPORTANT: Using static import ensures React cache() works correctly
-    const subscriptionData = await getDashboardSubscription();
+    const subscriptionData = await getDashboardSubscription(userId);
     subscription = subscriptionData.subscription;
     plan = subscriptionData.plan;
     

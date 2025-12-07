@@ -27,7 +27,8 @@ export class OnboardingDecisionService {
   async shouldShowOnboardingDialog(userId: string): Promise<boolean> {
     try {
       // Get subscription data (uses cached function)
-      const subscriptionData = await getDashboardSubscription();
+      // Pass userId to avoid calling getCurrentUserId() (which uses cookies()) inside cache scope
+      const subscriptionData = await getDashboardSubscription(userId);
       
       const hasActivePlan = subscriptionData.plan !== null && 
                            subscriptionData.subscription !== null &&

@@ -104,7 +104,8 @@ export class OnboardingService {
             subscriptionData = options.subscriptionData;
           } else {
             // Use cached function (ensures only 1 SubscriptionsService call per request)
-            subscriptionData = await getDashboardSubscription();
+            // Pass userId to avoid calling getCurrentUserId() (which uses cookies()) inside cache scope
+            subscriptionData = await getDashboardSubscription(userId);
           }
           
           hasPlan = subscriptionData?.plan !== null && 

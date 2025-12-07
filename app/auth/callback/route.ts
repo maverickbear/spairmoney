@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
+  const flow = requestUrl.searchParams.get("flow") as "signin" | "signup" | null; // Get flow from URL params
 
   // Handle OAuth errors (user cancelled, etc.)
   if (error) {
@@ -111,21 +112,35 @@ export async function GET(request: NextRequest) {
       userId: authUser.id,
       email: userEmail,
       emailConfirmed: !!authUser.email_confirmed_at,
+      flow: flow || "unknown",
     });
 
-    // Check if this is a signup or signin by verifying if user exists in User table
-    const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
-    const serviceRoleClient = createServiceRoleClient();
+    // Determine if this is signup or signin
+    // Priority: 1. Flow parameter from URL, 2. Check if user exists in User table
+    let isSignup: boolean;
     
-    const { data: existingUser, error: userCheckError } = await serviceRoleClient
-      .from("User")
-      .select("id")
-      .eq("id", authUser.id)
-      .maybeSingle();
+    if (flow === "signup") {
+      isSignup = true;
+      console.log(`[OAUTH-CALLBACK] Flow explicitly set to SIGNUP`);
+    } else if (flow === "signin") {
+      isSignup = false;
+      console.log(`[OAUTH-CALLBACK] Flow explicitly set to SIGNIN`);
+    } else {
+      // Fallback: Check if user exists in User table
+      const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
+      const serviceRoleClient = createServiceRoleClient();
+      
+      const { data: existingUser, error: userCheckError } = await serviceRoleClient
+        .from("User")
+        .select("id")
+        .eq("id", authUser.id)
+        .maybeSingle();
+      
+      isSignup = !existingUser || !!userCheckError;
+      console.log(`[OAUTH-CALLBACK] Flow not specified, detected ${isSignup ? 'SIGNUP' : 'SIGNIN'} by checking User table`);
+    }
     
-    const isSignup = !existingUser || userCheckError;
-    
-    console.log(`[OAUTH-CALLBACK] Detected ${isSignup ? 'SIGNUP' : 'SIGNIN'} for user ${authUser.id}`);
+    console.log(`[OAUTH-CALLBACK] Processing ${isSignup ? 'SIGNUP' : 'SIGNIN'} for user ${authUser.id}`);
 
     // For signup, check for pending invitation (same validation as form signup)
     if (isSignup) {
@@ -149,15 +164,64 @@ export async function GET(request: NextRequest) {
       console.log(`[OAUTH-CALLBACK] No pending invitation found for ${userEmail} - proceeding with signup`);
     }
 
+    // Check if email is already confirmed by Google
+    // If confirmed and it's a signup, we can skip OTP and proceed directly to profile creation
+    // For signin, we still require OTP for security (even if email is confirmed)
+    const emailConfirmed = !!authUser.email_confirmed_at;
+    
+    if (emailConfirmed && isSignup) {
+      // Email is confirmed and this is a signup - create profile and redirect to dashboard
+      console.log("[OAUTH-CALLBACK] Email already confirmed by Google for signup, creating profile directly");
+      
+      // Create user profile and household
+      try {
+        const { makeAuthService } = await import("@/src/application/auth/auth.factory");
+        const authService = makeAuthService();
+        
+        const profileResult = await authService.createUserProfile({
+          userId: authUser.id,
+          email: userEmail,
+          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || null,
+          avatarUrl: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
+        });
+        
+        if (!profileResult.success) {
+          console.error("[OAUTH-CALLBACK] Failed to create user profile:", profileResult.message);
+          // Continue anyway - profile might already exist
+        } else {
+          console.log("[OAUTH-CALLBACK] ✅ User profile created successfully");
+        }
+      } catch (profileError) {
+        console.error("[OAUTH-CALLBACK] Error creating user profile:", profileError);
+        // Continue anyway - profile might already exist
+      }
+      
+      // Sync session with server
+      try {
+        await fetch(`${requestUrl.origin}/api/auth/sync-session`, {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch (syncError) {
+        console.warn("[OAUTH-CALLBACK] Failed to sync session:", syncError);
+      }
+      
+      // Redirect to dashboard
+      const dashboardUrl = new URL("/dashboard", requestUrl.origin);
+      return NextResponse.redirect(dashboardUrl);
+    }
+    
+    // For signin or unconfirmed signup, require OTP verification
+    
+    // For signin or unconfirmed signup, require OTP verification
     // Sign out to prevent session creation before OTP verification
     await supabase.auth.signOut();
 
-    // Send OTP - Use the same logic as the signup form
-    // For OAuth flows, the user already exists in auth.users, so we use signInWithOtp
-    // This is the same approach used in the login flow and works reliably
+    // Send OTP - Use signInWithOtp for both signup and signin
+    // This is the most reliable method for OAuth users
     console.log(`[OAUTH-CALLBACK] Sending OTP for Google ${isSignup ? 'signup' : 'login'}`);
     
-    // Use anon client for OTP sending (same as login form)
+    // Use anon client for OTP sending
     const { createClient } = await import("@supabase/supabase-js");
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -168,8 +232,8 @@ export async function GET(request: NextRequest) {
       },
     });
     
-    // Use signInWithOtp for both signup and signin (same as login form)
-    // The user already exists in auth.users from OAuth, so shouldCreateUser: false
+    // Send OTP using signInWithOtp
+    // For OAuth users, this is the most reliable way to send an email
     const { error: otpError } = await anonClient.auth.signInWithOtp({
       email: userEmail,
       options: {
@@ -184,22 +248,6 @@ export async function GET(request: NextRequest) {
         email: userEmail,
         isSignup,
       });
-      
-      // Sign out the temporary session before redirecting
-      await supabase.auth.signOut();
-      
-      // If CAPTCHA error, try with anon client (though it will likely fail without token)
-      // This is a fallback - ideally service role should bypass CAPTCHA
-      const isCaptchaError = otpError.message?.toLowerCase().includes("captcha");
-      if (isCaptchaError) {
-        console.warn("[OAUTH-CALLBACK] CAPTCHA error with service role, this shouldn't happen");
-        // For OAuth flows, we can't get a client-side CAPTCHA token
-        // Redirect to login with a specific error message
-        const redirectUrl = new URL("/auth/login", requestUrl.origin);
-        redirectUrl.searchParams.set("error", "oauth_captcha_required");
-        redirectUrl.searchParams.set("error_description", "OAuth sign-in requires additional verification. Please try signing in with email and password instead.");
-        return NextResponse.redirect(redirectUrl);
-      }
       
       // Check for rate limiting errors
       const isRateLimitError = otpError.message?.toLowerCase().includes("rate limit") || 
@@ -216,6 +264,8 @@ export async function GET(request: NextRequest) {
       redirectUrl.searchParams.set("error_description", otpError.message || "Failed to send verification code. Please try again.");
       return NextResponse.redirect(redirectUrl);
     }
+    
+    console.log(`[OAUTH-CALLBACK] ✅ OTP email sent successfully to ${userEmail}`);
 
     // Store OAuth data temporarily in URL params to recreate user profile after OTP verification
     const oauthData = {

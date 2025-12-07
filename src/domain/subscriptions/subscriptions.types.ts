@@ -32,6 +32,20 @@ export interface BasePlan {
   updatedAt: Date | string;
 }
 
+/**
+ * Public plan type - excludes sensitive Stripe IDs
+ * Used for public endpoints (landing page, pricing sections)
+ */
+export interface PublicPlan {
+  id: string;
+  name: string;
+  priceMonthly: number;
+  priceYearly: number;
+  features: BasePlanFeatures;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 export interface BasePlanFeatures {
   maxTransactions: number;
   maxAccounts: number;

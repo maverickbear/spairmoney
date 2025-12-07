@@ -12,6 +12,7 @@ export const signUpSchema = z.object({
       }
     ),
   name: z.string().min(1, "Name is required"),
+  turnstileToken: z.string().optional(),
 });
 
 export type SignUpFormData = z.infer<typeof signUpSchema>;
@@ -19,6 +20,7 @@ export type SignUpFormData = z.infer<typeof signUpSchema>;
 export const signInSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
+  turnstileToken: z.string().optional(),
 });
 
 export type SignInFormData = z.infer<typeof signInSchema>;

@@ -101,8 +101,38 @@ export function Logo({
     full: { width: 240, height: 53 },
   };
 
+  // If only width is provided, height should be auto
+  // If only height is provided, width should be auto
+  // If both are provided, use both
+  // If neither is provided, use defaults
+  const hasWidth = width !== undefined;
+  const hasHeight = height !== undefined;
+  
   const finalWidth = width ?? defaultDimensions[variant].width;
   const finalHeight = height ?? defaultDimensions[variant].height;
+
+  // Calculate aspect ratio for Next.js Image when one dimension is auto
+  // Default aspect ratios based on variant
+  const aspectRatios = {
+    icon: 1, // Square
+    wordmark: 200 / 53, // ~3.77
+    full: 240 / 53, // ~4.53
+  };
+  
+  const aspectRatio = aspectRatios[variant];
+  
+  // For Next.js Image, we need both width and height
+  // Calculate the missing dimension based on aspect ratio
+  let imageWidth = finalWidth;
+  let imageHeight = finalHeight;
+  
+  if (hasWidth && !hasHeight) {
+    // Width provided, height auto - calculate height from aspect ratio
+    imageHeight = finalWidth / aspectRatio;
+  } else if (!hasWidth && hasHeight) {
+    // Height provided, width auto - calculate width from aspect ratio
+    imageWidth = finalHeight * aspectRatio;
+  }
 
   // Determine effective color for fallback
   let effectiveColorForFallback = color;
@@ -127,7 +157,12 @@ export function Logo({
             : "bg-interactive-primary/10 text-interactive-primary",
           className
         )}
-        style={{ width: finalWidth, height: finalHeight }}
+        style={{ 
+          width: hasWidth ? finalWidth : undefined,
+          height: hasHeight ? finalHeight : undefined,
+          ...(hasWidth && !hasHeight ? { height: "auto" } : {}),
+          ...(!hasWidth && hasHeight ? { width: "auto" } : {}),
+        }}
       >
         <span className="text-xl font-bold">S</span>
       </div>
@@ -138,17 +173,27 @@ export function Logo({
     <div className={cn("relative flex-shrink-0 flex items-center gap-2", className)}>
       <div 
         className="relative"
-        style={{ width: finalWidth, height: finalHeight }}
+        style={{ 
+          width: hasWidth ? finalWidth : "auto",
+          height: hasHeight ? finalHeight : "auto",
+          ...(hasWidth && !hasHeight ? { height: "auto" } : {}),
+          ...(!hasWidth && hasHeight ? { width: "auto" } : {}),
+        }}
       >
         <Image
           src={getLogoPath()}
           alt="Spare Finance"
-          width={finalWidth}
-          height={finalHeight}
+          width={imageWidth}
+          height={imageHeight}
           priority={priority}
           loading={priority ? "eager" : "lazy"}
           className="object-contain"
-          style={{ width: "100%", height: "100%" }}
+          style={{ 
+            width: hasWidth ? "100%" : "auto",
+            height: hasHeight ? "100%" : "auto",
+            ...(hasWidth && !hasHeight ? { height: "auto" } : {}),
+            ...(!hasWidth && hasHeight ? { width: "auto" } : {}),
+          }}
           onError={() => setImgError(true)}
         />
       </div>

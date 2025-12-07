@@ -245,28 +245,14 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       // This prevents showing transient errors during multiple verification attempts
 
       // Verify OTP with Supabase
-      // For Google OAuth, use signup type if isOAuthSignup, otherwise try login types
+      // For Google OAuth (both signup and signin), signInWithOtp sends "email" type OTP
       // For regular signup, use "signup" type
       let data: any = null;
       let verifyError: any = null;
 
-      if (isGoogleOAuth && isOAuthSignup) {
-        // Google OAuth signup - use "signup" type
-        const signupResult = await supabase.auth.verifyOtp({
-          email,
-          token: otpCode,
-          type: "signup",
-        });
-
-        if (signupResult.error) {
-          verifyError = signupResult.error;
-        } else {
-          data = signupResult.data;
-        }
-      } else if (isGoogleOAuth && !isOAuthSignup) {
-        // Google OAuth signin - try multiple types
-        // Try "email" type first, then "magiclink", then "recovery" as fallbacks
-        // Don't show errors until all attempts fail
+      if (isGoogleOAuth) {
+        // Google OAuth (signup or signin) - signInWithOtp generates "email" type OTP
+        // Try "email" type first, then "magiclink" as fallback (in case magic link was sent)
         const emailResult = await supabase.auth.verifyOtp({
           email,
           token: otpCode,
@@ -277,6 +263,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           // Small delay between attempts to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 200));
           
+          // Try "magiclink" type as fallback (if signInWithOtp sent magic link instead of OTP)
           const magiclinkResult = await supabase.auth.verifyOtp({
             email,
             token: otpCode,
@@ -284,20 +271,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           });
 
           if (magiclinkResult.error) {
-            // Small delay between attempts
-            await new Promise(resolve => setTimeout(resolve, 200));
-            
-            const recoveryResult = await supabase.auth.verifyOtp({
-              email,
-              token: otpCode,
-              type: "recovery",
-            });
-
-            if (recoveryResult.error) {
-              verifyError = recoveryResult.error;
-            } else {
-              data = recoveryResult.data;
-            }
+            verifyError = magiclinkResult.error;
           } else {
             data = magiclinkResult.data;
           }
@@ -473,8 +447,9 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         }
 
         // Create or update user profile and household if OAuth data is available
-        // This ensures the profile is created consistently, even if it wasn't created during OAuth callback
-        if (oauthData && oauthData.userId === currentUser.id) {
+        // This ensures the profile is created consistently for OAuth signup
+        // For OAuth signin, the profile should already exist, but we verify it
+        if (oauthData && oauthData.userId === currentUser.id && isOAuthSignup) {
           try {
             const createResponse = await fetch("/api/auth/create-user-profile", {
               method: "POST",
@@ -491,14 +466,19 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
 
             if (!createResponse.ok) {
               const errorData = await createResponse.json().catch(() => ({}));
-              console.error("[OTP-VERIFY] Error creating user profile:", {
-                status: createResponse.status,
-                error: errorData.error || "Unknown error",
-                userId: oauthData.userId,
-              });
-              // Don't block the flow - profile might already exist or will be created later
+              // If profile already exists, that's fine - continue
+              if (createResponse.status === 400 && errorData.message?.includes("already exists")) {
+                console.log("[OTP-VERIFY] User profile already exists, continuing...");
+              } else {
+                console.error("[OTP-VERIFY] Error creating user profile:", {
+                  status: createResponse.status,
+                  error: errorData.error || "Unknown error",
+                  userId: oauthData.userId,
+                });
+                // Don't block the flow - profile might already exist or will be created later
+              }
             } else {
-              console.log("[OTP-VERIFY] User profile created/verified successfully for OAuth user");
+              console.log("[OTP-VERIFY] ✅ User profile created successfully for OAuth signup");
             }
 
             // Note: createUserProfile now automatically creates household
@@ -507,6 +487,46 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
             console.error("[OTP-VERIFY] Unexpected error creating user profile:", profileError);
             // Don't block the flow - continue with login even if profile creation fails
             // The profile might already exist or can be created later
+          }
+        } else if (isGoogleOAuth && !isOAuthSignup) {
+          // For OAuth signin, verify that profile exists
+          // If it doesn't exist, create it (edge case: user was created via OAuth but profile wasn't)
+          try {
+            const { data: userData, error: userError } = await supabase
+              .from("User")
+              .select("id")
+              .eq("id", currentUser.id)
+              .maybeSingle();
+
+            if (userError || !userData) {
+              console.warn("[OTP-VERIFY] User profile not found for OAuth signin, creating it...");
+              // Create profile for OAuth signin (edge case)
+              const createResponse = await fetch("/api/auth/create-user-profile", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  userId: currentUser.id,
+                  email: currentUser.email,
+                  name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || null,
+                  avatarUrl: currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || null,
+                }),
+              });
+
+              if (!createResponse.ok) {
+                const errorData = await createResponse.json().catch(() => ({}));
+                console.error("[OTP-VERIFY] Error creating user profile for OAuth signin:", {
+                  status: createResponse.status,
+                  error: errorData.error || "Unknown error",
+                });
+              } else {
+                console.log("[OTP-VERIFY] ✅ User profile created for OAuth signin (edge case)");
+              }
+            }
+          } catch (profileError) {
+            console.error("[OTP-VERIFY] Error checking/creating user profile for OAuth signin:", profileError);
+            // Don't block the flow
           }
         }
 
@@ -728,10 +748,10 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       setError(null);
       setSuccessMessage(null);
 
-      // Use different API route for Google OAuth login vs signup
-      // For OAuth signup, use send-otp (signup type), for OAuth login use resend-login-otp
-      const apiEndpoint = isGoogleOAuth && !isOAuthSignup 
-        ? "/api/auth/resend-login-otp" 
+      // For Google OAuth (both signup and signin), use signInWithOtp which sends "email" type OTP
+      // For regular signup, use send-otp which sends "signup" type OTP
+      const apiEndpoint = isGoogleOAuth
+        ? "/api/auth/resend-login-otp" // This uses signInWithOtp internally
         : "/api/auth/send-otp";
       const response = await fetch(apiEndpoint, {
         method: "POST",
