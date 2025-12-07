@@ -39,7 +39,6 @@ export function isCaptchaError(errorMessage: string | undefined | null): boolean
   
   return (
     lowerMessage.includes("captcha") ||
-    lowerMessage.includes("turnstile") ||
     lowerMessage.includes("verification failed") ||
     lowerMessage.includes("challenge") ||
     lowerMessage.includes("bot detection")

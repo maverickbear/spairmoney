@@ -11,8 +11,6 @@ import Link from "next/link";
 import { Mail, Lock, User, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
-import { Turnstile, TurnstileRef } from "./turnstile";
-import { isCaptchaError } from "@/lib/utils/auth-errors";
 
 /**
  * Preloads user, profile, and billing data into global caches
@@ -101,23 +99,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const captchaRef = useRef<TurnstileRef>(null);
-  const [isDevelopment, setIsDevelopment] = useState(false);
 
-  // Detect development environment on client side only (avoid hydration mismatch)
-  useEffect(() => {
-    const isLocalhost = typeof window !== "undefined" && 
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-    setIsDevelopment(isLocalhost);
-  }, []);
-
-  // Get Turnstile site key from environment
-  // Use Cloudflare test keys in development (localhost) to avoid domain validation issues
-  // Test key "1x00000000000000000000AA" always passes verification
-  const turnstileSiteKey = isDevelopment
-    ? "1x00000000000000000000AA" // Cloudflare test key that always passes
-    : (process.env.NEXT_PUBLIC_TURNSTILE_SITE || "");
 
   // Get planId from props or search params
   const finalPlanId = planId || searchParams.get("planId") || undefined;
@@ -139,24 +121,8 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       setLoading(true);
       setError(null);
 
-      // Validate CAPTCHA token if Turnstile is enabled (only in production)
-      // In development, CAPTCHA is optional
-      if (!isDevelopment && turnstileSiteKey && !captchaToken) {
-        setError("Please complete the CAPTCHA verification");
-        // Reset CAPTCHA
-        if (captchaRef.current) {
-          captchaRef.current.reset();
-        }
-        setLoading(false);
-        return;
-      }
-
-      // Call signup API route with CAPTCHA token
-      // In development, don't send captchaToken to avoid Supabase verification errors
+      // Call signup API route
       const requestBody: any = { ...data };
-      if (!isDevelopment && captchaToken) {
-        requestBody.captchaToken = captchaToken;
-      }
       
       const response = await fetch("/api/v2/auth/signup", {
         method: "POST",
@@ -171,14 +137,6 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       if (!response.ok) {
         const errorMessage = result.error || "Failed to sign up";
         setError(errorMessage);
-        
-        // Reset CAPTCHA on any error (especially if it's a CAPTCHA error)
-        if (isCaptchaError(errorMessage) || captchaRef.current) {
-          if (captchaRef.current) {
-            captchaRef.current.reset();
-          }
-          setCaptchaToken(null);
-        }
         setLoading(false);
         return;
       }
@@ -186,33 +144,15 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       if (result.error) {
         const errorMessage = result.error;
         setError(errorMessage);
-        
-        // Reset CAPTCHA on error (especially if it's a CAPTCHA error)
-        if (isCaptchaError(errorMessage) || captchaRef.current) {
-          if (captchaRef.current) {
-            captchaRef.current.reset();
-          }
-          setCaptchaToken(null);
-        }
         setLoading(false);
         return;
       }
 
       if (!result.user) {
         setError("Failed to sign up");
-        // Reset CAPTCHA on error
-        if (captchaRef.current) {
-          captchaRef.current.reset();
-        }
-        setCaptchaToken(null);
+        setLoading(false);
         return;
       }
-
-      // Reset CAPTCHA after successful submission
-      if (captchaRef.current) {
-        captchaRef.current.reset();
-      }
-      setCaptchaToken(null);
 
       // After signup, redirect to OTP verification page
       // The user needs to verify their email before proceeding
@@ -221,11 +161,6 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
     } catch (error) {
       console.error("Error during signup:", error);
       setError("An unexpected error occurred");
-      // Reset CAPTCHA on error
-      if (captchaRef.current) {
-        captchaRef.current.reset();
-      }
-      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -341,33 +276,11 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
           )}
         </div>
 
-        {/* CAPTCHA Component */}
-        {turnstileSiteKey && (
-          <div className="flex justify-center">
-            <Turnstile
-              ref={captchaRef}
-              sitekey={turnstileSiteKey}
-              onSuccess={(token) => {
-                setCaptchaToken(token);
-              }}
-              onError={() => {
-                setCaptchaToken(null);
-                setError("CAPTCHA verification failed. Please try again.");
-              }}
-              onExpire={() => {
-                setCaptchaToken(null);
-                setError("CAPTCHA verification expired. Please complete it again.");
-              }}
-              theme="auto" // or "light" or "dark"
-            />
-          </div>
-        )}
-
         <Button 
           type="submit" 
           size="small"
           className="w-full text-base font-medium" 
-          disabled={loading || (!isDevelopment && !!turnstileSiteKey && !captchaToken)}
+          disabled={loading}
         >
           {loading ? (
             <>

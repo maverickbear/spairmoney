@@ -12,7 +12,6 @@ export const signUpSchema = z.object({
       }
     ),
   name: z.string().min(1, "Name is required"),
-  captchaToken: z.string().optional(), // CAPTCHA token (optional for backward compatibility during rollout)
 });
 
 export type SignUpFormData = z.infer<typeof signUpSchema>;

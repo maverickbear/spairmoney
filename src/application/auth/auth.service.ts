@@ -19,7 +19,7 @@ export class AuthService {
   /**
    * Sign up a new user
    */
-  async signUp(data: SignUpFormData & { captchaToken?: string }): Promise<AuthResult> {
+  async signUp(data: SignUpFormData): Promise<AuthResult> {
     try {
       // Check password against HIBP
       const passwordValidation = await validatePasswordAgainstHIBP(data.password);
@@ -38,28 +38,13 @@ export class AuthService {
         };
       }
 
-      // Sign up with Supabase Auth (pass captchaToken if provided)
-      // In development, skip CAPTCHA token to avoid Supabase verification errors
-      // Cloudflare test keys generate tokens, but Supabase may not accept them
-      const isDevelopment = process.env.NODE_ENV === "development";
+      // Sign up with Supabase Auth
       const signUpOptions: any = {
         data: {
           name: data.name || "",
           full_name: data.name || "",
         },
       };
-      
-      // Only include captchaToken in production (Supabase may require it there)
-      // In development, skip it to avoid "captcha verification process failed" errors
-      if (!isDevelopment && data.captchaToken) {
-        signUpOptions.captchaToken = data.captchaToken;
-      } else if (!isDevelopment && !data.captchaToken) {
-        // In production, warn if CAPTCHA token is missing
-        logger.warn("CAPTCHA token missing in production signup attempt");
-      } else if (isDevelopment) {
-        // In development, log that we're skipping CAPTCHA
-        logger.info("Skipping CAPTCHA verification in development mode");
-      }
       
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
@@ -68,16 +53,6 @@ export class AuthService {
       });
 
       if (authError || !authData.user) {
-        // Log CAPTCHA errors for debugging
-        if (authError && (authError.message?.toLowerCase().includes("captcha") || 
-            authError.message?.toLowerCase().includes("turnstile") ||
-            authError.message?.toLowerCase().includes("verification"))) {
-          logger.warn("CAPTCHA verification error:", {
-            message: authError.message,
-            status: authError.status,
-            hasCaptchaToken: !!data.captchaToken,
-          });
-        }
         
         const errorMessage = getAuthErrorMessage(authError, "Failed to sign up");
         return { user: null, error: errorMessage };
