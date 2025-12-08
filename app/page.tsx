@@ -146,13 +146,43 @@ export async function generateMetadata() {
 /**
  * Auth Check Component - Wrapped in Suspense to prevent blocking page render
  * Redirects authenticated users to dashboard
+ * Also checks maintenance mode and redirects non-super_admin users
  */
 async function AuthCheck() {
   try {
+    // Access headers() first to "unlock" Math.random() usage in createServiceRoleClient()
+    await headers();
+    
     const authService = makeAuthService();
     const user = await authService.getCurrentUser();
     
-    // Redirect authenticated users to dashboard
+    // Check maintenance mode
+    const { makeAdminService } = await import("@/src/application/admin/admin.factory");
+    const adminService = makeAdminService();
+    const settings = await adminService.getPublicSystemSettings();
+    const isMaintenanceMode = settings.maintenanceMode || false;
+    
+    // If maintenance mode is active, check if user is super_admin
+    if (isMaintenanceMode) {
+      if (user) {
+        // Check if user is super_admin
+        const { makeMembersService } = await import("@/src/application/members/members.factory");
+        const membersService = makeMembersService();
+        const userRole = await membersService.getUserRole(user.id);
+        
+        // If not super_admin, redirect to maintenance page
+        if (userRole !== "super_admin") {
+          redirect("/maintenance");
+        }
+        // super_admin can continue - redirect to dashboard
+        redirect("/dashboard");
+      } else {
+        // Not authenticated - redirect to maintenance
+        redirect("/maintenance");
+      }
+    }
+    
+    // If not in maintenance mode, redirect authenticated users to dashboard
     if (user) {
       redirect("/dashboard");
     }

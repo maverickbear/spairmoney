@@ -310,8 +310,10 @@ export async function middleware(request: NextRequest) {
         }
       }
 
-      // If maintenance is active and user is trying to access protected routes
-      if (isMaintenanceMode && !isMaintenancePage && !isLandingPage && !isPublicPage) {
+      // If maintenance is active, check if user is super_admin
+      // Landing page, auth pages, and protected routes should all redirect to maintenance
+      // except for super_admin users
+      if (isMaintenanceMode && !isMaintenancePage) {
         // Check if user is authenticated and is super_admin
         try {
           const supabase = createMiddlewareClient(request);
@@ -347,15 +349,15 @@ export async function middleware(request: NextRequest) {
               return NextResponse.redirect(new URL("/account-blocked", request.url));
             }
 
-            // If super_admin, allow access
+            // If super_admin, allow access to all pages (landing, auth, protected routes)
             if (userData?.role === "super_admin") {
               // Continue to rate limiting check
             } else {
-              // Not super_admin - redirect to maintenance
+              // Not super_admin - redirect to maintenance (blocks landing page, auth pages, and protected routes)
               return NextResponse.redirect(new URL("/maintenance", request.url));
             }
           } else {
-            // Not authenticated - redirect to maintenance
+            // Not authenticated - redirect to maintenance (blocks landing page and auth pages)
             return NextResponse.redirect(new URL("/maintenance", request.url));
           }
         } catch (authError: any) {

@@ -1,5 +1,68 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { SignUpFormWrapperContent } from "./signup-form-wrapper";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+
+/**
+ * Maintenance Check Component - Wrapped in Suspense to prevent blocking page render
+ * Redirects non-super_admin users to maintenance page when maintenance mode is active
+ */
+async function MaintenanceCheck() {
+  try {
+    // Access headers() first to "unlock" Math.random() usage in createServiceRoleClient()
+    await headers();
+    
+    // Check maintenance mode
+    const { makeAdminService } = await import("@/src/application/admin/admin.factory");
+    const adminService = makeAdminService();
+    const settings = await adminService.getPublicSystemSettings();
+    const isMaintenanceMode = settings.maintenanceMode || false;
+    
+    // If maintenance mode is active, check if user is super_admin
+    if (isMaintenanceMode) {
+      const authService = makeAuthService();
+      const user = await authService.getCurrentUser();
+      
+      if (user) {
+        // Check if user is super_admin
+        const { makeMembersService } = await import("@/src/application/members/members.factory");
+        const membersService = makeMembersService();
+        const userRole = await membersService.getUserRole(user.id);
+        
+        // If not super_admin, redirect to maintenance page
+        if (userRole !== "super_admin") {
+          redirect("/maintenance");
+        }
+        // super_admin can continue - redirect to dashboard
+        redirect("/dashboard");
+      } else {
+        // Not authenticated - redirect to maintenance
+        redirect("/maintenance");
+      }
+    }
+  } catch (error: any) {
+    // NEXT_REDIRECT is expected - Next.js uses exceptions for redirects
+    if (error?.digest?.startsWith('NEXT_REDIRECT')) {
+      // Re-throw redirect exceptions - they should propagate
+      throw error;
+    }
+    
+    // Silently handle prerendering errors - these are expected during build
+    const errorMessage = error?.message || '';
+    if (errorMessage.includes('prerender') || 
+        errorMessage.includes('HANGING_PROMISE') ||
+        errorMessage.includes('cookies() rejects') ||
+        errorMessage.includes('Dynamic data sources')) {
+      // During prerendering, assume no maintenance mode - no redirect
+      return null;
+    }
+    // For other errors, log but continue (don't block page render)
+    console.error("Error checking maintenance mode:", error);
+  }
+  
+  return null;
+}
 
 function SignUpFormWrapper() {
   return <SignUpFormWrapperContent />;
@@ -7,7 +70,13 @@ function SignUpFormWrapper() {
 
 export default function SignUpPage() {
   return (
-    <Suspense fallback={
+    <>
+      {/* Maintenance Check - wrapped in Suspense (will redirect if maintenance mode is active) */}
+      <Suspense fallback={null}>
+        <MaintenanceCheck />
+      </Suspense>
+      
+      <Suspense fallback={
       <div className="min-h-screen grid lg:grid-cols-2">
         <div className="hidden lg:flex flex-col justify-center p-12 bg-gradient-to-br from-primary/10 via-primary/5 to-background">
           <div className="space-y-4">
@@ -32,5 +101,6 @@ export default function SignUpPage() {
     }>
       <SignUpFormWrapper />
     </Suspense>
+    </>
   );
 }
