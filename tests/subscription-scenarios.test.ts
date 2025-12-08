@@ -152,7 +152,9 @@ function canWrite(subscription: any): boolean {
 
 describe("Subscription Scenarios Tests", () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+                          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn("⚠️  Supabase environment variables not set. Skipping integration tests.");

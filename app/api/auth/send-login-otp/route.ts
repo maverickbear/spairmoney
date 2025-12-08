@@ -85,8 +85,19 @@ export async function POST(request: NextRequest) {
 
     // Send OTP for login (numeric OTP sent via email)
     // Use anon client to send OTP (service role might not work correctly for OTP)
+    // New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+                            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseAnonKey) {
+      console.error("[SEND-LOGIN-OTP] Missing Supabase API key");
+      return NextResponse.json(
+        { error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+    
     const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: false,

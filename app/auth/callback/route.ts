@@ -223,8 +223,16 @@ export async function GET(request: NextRequest) {
     
     // Use anon client for OTP sending
     const { createClient } = await import("@supabase/supabase-js");
+    // New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+                            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseAnonKey) {
+      console.error("[OAUTH-CALLBACK] Missing Supabase API key");
+      return NextResponse.redirect(new URL("/auth/login?error=server_error", request.url));
+    }
+    
     const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: false,

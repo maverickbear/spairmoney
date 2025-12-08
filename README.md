@@ -150,8 +150,15 @@
    ```env
    # Supabase
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   # New format (recommended): sb_publishable_...
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   # Legacy format (still supported): anon JWT key
+   # NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   
+   # New format (recommended): sb_secret_...
+   SUPABASE_SECRET_KEY=sb_secret_...
+   # Legacy format (still supported): service_role JWT key
+   # SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
    
    # Stripe
    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key

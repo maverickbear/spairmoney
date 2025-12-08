@@ -5,14 +5,18 @@ import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-
 import { createServerClient as createSSRServerClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
+// Publishable keys are safe to expose and have the same privileges as anon keys
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
  * Create Supabase client for middleware using request cookies
  * Configured to avoid automatic token refresh that can cause errors
  */
 function createMiddlewareClient(request: NextRequest) {
-  return createSSRServerClient(supabaseUrl, supabaseAnonKey, {
+  // supabaseAnonKey is validated at module load time (throws error if missing)
+  return createSSRServerClient(supabaseUrl, supabaseAnonKey!, {
     auth: {
       autoRefreshToken: false, // Disable auto-refresh to avoid errors with invalid tokens
       persistSession: false, // Don't persist session in middleware
@@ -237,8 +241,8 @@ export async function middleware(request: NextRequest) {
   // - API routes (handled separately)
   // - Static files
   // - The maintenance page itself
-  // - The landing page (/) - users can still view it
-  // - Public pages (auth, pricing, etc.)
+  // Note: Landing page (/) and auth pages are blocked during maintenance
+  // Only super_admin users can access these pages during maintenance
   const isMaintenancePage = pathname === "/maintenance";
   const isAccountDeletedPage = pathname === "/account-deleted";
   const isLandingPage = pathname === "/";

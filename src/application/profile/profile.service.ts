@@ -462,10 +462,12 @@ export class ProfileService {
       const { createClient } = await import("@supabase/supabase-js");
       
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+      // New format (sb_secret_...) is preferred, fallback to old format (service_role JWT) for backward compatibility
+      const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || 
+                                 process.env.SUPABASE_SERVICE_ROLE_KEY;
 
       if (!supabaseServiceKey) {
-        throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
+        throw new Error("SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY for legacy) is not set");
       }
 
       if (!supabaseUrl) {

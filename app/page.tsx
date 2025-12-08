@@ -145,41 +145,25 @@ export async function generateMetadata() {
 
 /**
  * Auth Check Component - Wrapped in Suspense to prevent blocking page render
- * Redirects authenticated users to dashboard
- * Also checks maintenance mode and redirects non-super_admin users
+ * Redirects authenticated users to dashboard (only when not in maintenance mode)
+ * Maintenance mode check is handled by LandingPageContent
  */
 async function AuthCheck() {
   try {
-    // Access headers() first to "unlock" Math.random() usage in createServiceRoleClient()
-    await headers();
-    
     const authService = makeAuthService();
     const user = await authService.getCurrentUser();
     
-    // Check maintenance mode
+    // Check maintenance mode first
+    await headers(); // Access headers() first to "unlock" Math.random() usage
     const { makeAdminService } = await import("@/src/application/admin/admin.factory");
     const adminService = makeAdminService();
     const settings = await adminService.getPublicSystemSettings();
     const isMaintenanceMode = settings.maintenanceMode || false;
     
-    // If maintenance mode is active, check if user is super_admin
+    // If in maintenance mode, let LandingPageContent handle the redirect
+    // (it will check if user is super_admin)
     if (isMaintenanceMode) {
-      if (user) {
-        // Check if user is super_admin
-        const { makeMembersService } = await import("@/src/application/members/members.factory");
-        const membersService = makeMembersService();
-        const userRole = await membersService.getUserRole(user.id);
-        
-        // If not super_admin, redirect to maintenance page
-        if (userRole !== "super_admin") {
-          redirect("/maintenance");
-        }
-        // super_admin can continue - redirect to dashboard
-        redirect("/dashboard");
-      } else {
-        // Not authenticated - redirect to maintenance
-        redirect("/maintenance");
-      }
+      return null;
     }
     
     // If not in maintenance mode, redirect authenticated users to dashboard
@@ -258,9 +242,67 @@ async function SEOSettingsFetch() {
 }
 
 /**
+ * Landing Page Content Wrapper
+ * Only renders content if not in maintenance mode or if user is super_admin
+ */
+async function LandingPageContent() {
+  // Access headers() first to "unlock" Math.random() usage in createServiceRoleClient()
+  await headers();
+  
+  // Check maintenance mode
+  const { makeAdminService } = await import("@/src/application/admin/admin.factory");
+  const adminService = makeAdminService();
+  const settings = await adminService.getPublicSystemSettings();
+  const isMaintenanceMode = settings.maintenanceMode || false;
+  
+  // If maintenance mode is active, check if user is super_admin
+  if (isMaintenanceMode) {
+    const authService = makeAuthService();
+    const user = await authService.getCurrentUser();
+    
+    if (user) {
+      // Check if user is super_admin
+      const { makeMembersService } = await import("@/src/application/members/members.factory");
+      const membersService = makeMembersService();
+      const userRole = await membersService.getUserRole(user.id);
+      
+      // If not super_admin, redirect to maintenance page
+      if (userRole !== "super_admin") {
+        redirect("/maintenance");
+      }
+      // super_admin can see landing page - continue
+    } else {
+      // Not authenticated - redirect to maintenance
+      redirect("/maintenance");
+    }
+  }
+  
+  // Render landing page content
+  return (
+    <div className="min-h-screen flex flex-col">
+      <LandingHeader isAuthenticated={false} />
+      <main className="flex-1">
+        <LandingHeroSection />
+        <StatisticsSection />
+        <LandingFeaturesSection />
+        <BenefitsSection />
+        {/* <LandingTestimonialsSection /> */}
+        
+        {/* Pricing Section - wrapped in Suspense to check maintenance mode */}
+        <Suspense fallback={<PricingSection />}>
+          <PricingSectionWrapper />
+        </Suspense>
+      </main>
+      <LandingMainFooter />
+    </div>
+  );
+}
+
+/**
  * Landing Page
  * 
  * This page serves as the public landing page accessible to unauthenticated users only.
+ * During maintenance mode, only super_admin users can access it.
  * Authenticated users are automatically redirected to /dashboard.
  * 
  * Uses Suspense boundaries to prevent blocking page render while checking auth/maintenance.
@@ -275,28 +317,24 @@ export default function LandingPage() {
         <SEOSettingsWrapper />
       </Suspense>
       
-      {/* Auth Check - wrapped in Suspense (will redirect if authenticated) */}
+      {/* Auth Check - wrapped in Suspense (will redirect if authenticated and not in maintenance) */}
       <Suspense fallback={null}>
         <AuthCheck />
       </Suspense>
       
-      {/* Main page content - renders immediately */}
-      <div className="min-h-screen flex flex-col">
-        <LandingHeader isAuthenticated={false} />
-        <main className="flex-1">
-          <LandingHeroSection />
-          <StatisticsSection />
-          <LandingFeaturesSection />
-          <BenefitsSection />
-          {/* <LandingTestimonialsSection /> */}
-          
-          {/* Pricing Section - wrapped in Suspense to check maintenance mode */}
-          <Suspense fallback={<PricingSection />}>
-            <PricingSectionWrapper />
-          </Suspense>
-        </main>
-        <LandingMainFooter />
-      </div>
+      {/* Main page content - wrapped in Suspense to check maintenance mode */}
+      <Suspense fallback={
+        <div className="min-h-screen flex flex-col">
+          <LandingHeader isAuthenticated={false} />
+          <main className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            </div>
+          </main>
+        </div>
+      }>
+        <LandingPageContent />
+      </Suspense>
     </>
   );
 }

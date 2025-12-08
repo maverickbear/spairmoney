@@ -67,12 +67,14 @@ export function validateSupabaseConfig(): {
   error?: string;
 } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+               process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
   if (!url || !key) {
     return {
       isValid: false,
-      error: 'Missing Supabase environment variables. Please check your .env.local file.',
+      error: 'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY for legacy).',
     };
   }
   

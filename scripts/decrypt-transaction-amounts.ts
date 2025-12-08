@@ -20,13 +20,15 @@ import { logger } from '../lib/utils/logger';
 config({ path: resolve(process.cwd(), '.env.local') });
 
 // Get environment variables
+// New format (sb_secret_...) is preferred, fallback to old format (service_role JWT) for backward compatibility
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || 
+                            process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing required environment variables:');
   console.error('   NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? '✓' : '✗');
-  console.error('   SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? '✓' : '✗');
+  console.error('   SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY):', supabaseServiceKey ? '✓' : '✗');
   console.error('\nPlease ensure these variables are set in .env.local');
   process.exit(1);
 }

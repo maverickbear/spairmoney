@@ -4,11 +4,47 @@ import { cookies } from "next/headers";
 import { logger } from "@/lib/utils/logger";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
+// Publishable keys are safe to expose and have the same privileges as anon keys
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// New format (sb_secret_...) is preferred, fallback to old format (service_role JWT) for backward compatibility
+// Secret keys have elevated privileges and bypass RLS, same as service_role
+const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY || 
+                               process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables");
+  throw new Error("Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY for legacy)");
+}
+
+/**
+ * Helper function to detect if a key is a new format publishable key
+ */
+function isPublishableKey(key: string): boolean {
+  return key.startsWith("sb_publishable_");
+}
+
+/**
+ * Helper function to detect if a key is a new format secret key
+ */
+function isSecretKey(key: string): boolean {
+  return key.startsWith("sb_secret_");
+}
+
+/**
+ * Helper function to detect if a key is an old format anon key (JWT)
+ */
+function isAnonKey(key: string): boolean {
+  // Old anon keys are JWTs (long strings, typically start with eyJ)
+  return key.startsWith("eyJ") && key.length > 100;
+}
+
+/**
+ * Helper function to detect if a key is an old format service_role key (JWT)
+ */
+function isServiceRoleKey(key: string): boolean {
+  // Old service_role keys are JWTs (long strings, typically start with eyJ)
+  return key.startsWith("eyJ") && key.length > 100;
 }
 
 // Validate Supabase URL format
@@ -32,7 +68,8 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
   // If tokens are provided, use them directly (for cached functions)
   // This avoids accessing cookies() inside cached functions
   if (accessToken && refreshToken) {
-    const client = createClient(supabaseUrl, supabaseAnonKey, {
+    // supabaseAnonKey is validated at module load time, so it's safe to assert here
+    const client = createClient(supabaseUrl, supabaseAnonKey!, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -158,7 +195,8 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
     if (isCacheError) {
       // Return unauthenticated client when cookies can't be accessed
       // This is expected when called from cached functions
-      return createClient(supabaseUrl, supabaseAnonKey, {
+      // supabaseAnonKey is validated at module load time
+      return createClient(supabaseUrl, supabaseAnonKey!, {
         auth: {
           persistSession: false,
           autoRefreshToken: false,
@@ -173,7 +211,8 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
   // Disable auto-refresh to prevent errors when tokens are invalid
   let client;
   try {
-    client = createSSRServerClient(supabaseUrl, supabaseAnonKey, {
+    // supabaseAnonKey is validated at module load time
+    client = createSSRServerClient(supabaseUrl, supabaseAnonKey!, {
       auth: {
         autoRefreshToken: false, // Disable auto-refresh to avoid errors with invalid tokens
         persistSession: false, // Session is managed via cookies
@@ -280,7 +319,8 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
     }
     
     // Return an unauthenticated client
-    client = createSSRServerClient(supabaseUrl, supabaseAnonKey, {
+    // supabaseAnonKey is validated at module load time
+    client = createSSRServerClient(supabaseUrl, supabaseAnonKey!, {
       cookies: {
         getAll() {
           return [];
@@ -299,6 +339,7 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
 // Use this for webhooks and admin operations that need to bypass RLS
 // WARNING: This client bypasses Row Level Security - use with caution!
 // Note: This function should not be called during prerendering as it uses Math.random() internally
+// Supports both old format (SUPABASE_SERVICE_ROLE_KEY - JWT) and new format (SUPABASE_SECRET_KEY - sb_secret_...)
 export function createServiceRoleClient() {
   // Check if we're in a prerendering context
   // During prerendering, createClient() will fail because it uses Math.random()
@@ -315,13 +356,28 @@ export function createServiceRoleClient() {
   }
   
   if (!supabaseServiceRoleKey) {
-    console.warn("⚠️  SUPABASE_SERVICE_ROLE_KEY not set. Falling back to anon key (may cause RLS issues).");
-    return createClient(supabaseUrl, supabaseAnonKey, {
+      const keyType = supabaseAnonKey ? 
+      (isPublishableKey(supabaseAnonKey) ? "publishable" : "anon") : 
+      "unknown";
+    console.warn(
+      `⚠️  SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY for legacy) not set. ` +
+      `Falling back to ${keyType} key (may cause RLS issues).`
+    );
+    // supabaseAnonKey is validated at module load time
+    return createClient(supabaseUrl, supabaseAnonKey!, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
     });
+  }
+
+  // Validate key format (optional - for better error messages)
+  const keyType = isSecretKey(supabaseServiceRoleKey) ? "secret" : 
+                  isServiceRoleKey(supabaseServiceRoleKey) ? "service_role" : 
+                  "unknown";
+  if (keyType === "unknown") {
+    logger.warn("[createServiceRoleClient] Key format not recognized. Expected sb_secret_... or service_role JWT.");
   }
 
   // TypeScript now knows supabaseServiceRoleKey is not undefined after the check above

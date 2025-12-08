@@ -815,9 +815,16 @@ export class AuthService {
   async sendOtp(email: string): Promise<{ success: boolean; error?: string }> {
     try {
       // Use anon client to send OTP (service role might not work correctly for OTP)
+      // New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
       const { createClient } = await import("@supabase/supabase-js");
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 
+                              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!supabaseAnonKey) {
+        throw new Error("Missing Supabase API key configuration");
+      }
+      
       const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
           persistSession: false,
