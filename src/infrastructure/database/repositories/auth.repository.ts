@@ -31,6 +31,7 @@ export class AuthRepository implements IAuthRepository {
       .from("users")
       .select("*")
       .eq("id", userId)
+      .is("deleted_at", null) // Exclude deleted users
       .single();
 
     if (error) {
@@ -107,10 +108,28 @@ export class AuthRepository implements IAuthRepository {
         
         // Check if error is due to unique constraint violation (duplicate email)
         if (errorCode === '23505') {
-          logger.error("[AuthRepository] Error creating user (duplicate email):", error);
-          const uniqueError = new Error("An account with this email already exists");
-          (uniqueError as any).code = '23505';
-          throw uniqueError;
+          // Check if there's a deleted user with this email (shouldn't happen after anonymization, but check anyway)
+          const { data: existingUser } = await serviceRoleClient
+            .from("users")
+            .select("id, email, deleted_at")
+            .eq("email", data.email)
+            .maybeSingle();
+          
+          // If user exists but is deleted (email was anonymized), allow creation
+          // This shouldn't happen since email is anonymized, but handle it gracefully
+          if (existingUser && existingUser.deleted_at) {
+            logger.info("[AuthRepository] Found deleted user with same email (should be anonymized), allowing new account creation", {
+              existingUserId: existingUser.id,
+              newUserId: data.id,
+            });
+            // Continue with insert - the constraint should not fail if email was properly anonymized
+            // But if it does, we'll handle it below
+          } else {
+            logger.error("[AuthRepository] Error creating user (duplicate email):", error);
+            const uniqueError = new Error("An account with this email already exists");
+            (uniqueError as any).code = '23505';
+            throw uniqueError;
+          }
         }
         
         // If it's a foreign key constraint error, retry if we haven't exhausted attempts

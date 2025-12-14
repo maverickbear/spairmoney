@@ -63,7 +63,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
       if (result.success) {
         toast({
           title: "Account deleted",
-          description: "Your account has been permanently deleted. You will be redirected to the home page.",
+          description: "Your account has been deactivated and your personal information has been anonymized. You will be redirected to the home page.",
           variant: "success",
         });
         
@@ -125,7 +125,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             <DialogTitle>Delete Account</DialogTitle>
           </div>
           <DialogDescription>
-            This action cannot be undone. Your account will be permanently deleted immediately.
+            This action cannot be undone. Your account will be permanently deactivated and your personal information will be anonymized immediately.
           </DialogDescription>
         </DialogHeader>
 
@@ -135,11 +135,12 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             <AlertTitle>Warning: This will permanently delete your account</AlertTitle>
             <AlertDescription>
               <ul className="list-disc list-inside space-y-1 mt-2">
-              <li>All your data (transactions, accounts, budgets, goals) will be permanently deleted</li>
-              <li>Your active subscription will be cancelled immediately</li>
-              <li>This action cannot be undone - there is no recovery period</li>
-              <li>You will not be able to access your account after deletion</li>
-            </ul>
+                <li><strong>Personal information will be removed:</strong> Your name, email, phone number, date of birth, and profile photo will be anonymized</li>
+                <li><strong>Account access will be revoked:</strong> All bank connections (Plaid) will be disconnected and your active subscription will be cancelled immediately</li>
+                <li><strong>Data retention:</strong> Some records required by law (such as transaction history and subscription records) will be kept for legal and fiscal compliance, but will no longer be linked to your identity</li>
+                <li><strong>Email reuse:</strong> Your email address can be used immediately to create a new account, but your previous data will remain anonymized and cannot be recovered</li>
+                <li><strong>This action cannot be undone</strong> - there is no recovery period</li>
+              </ul>
             </AlertDescription>
           </Alert>
 
@@ -175,7 +176,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
               htmlFor="confirm-deletion"
               className="text-sm leading-relaxed cursor-pointer"
             >
-              I understand that this action cannot be undone and all my data will be permanently deleted.
+              I understand that this action cannot be undone. My personal information will be anonymized, my account will be deactivated, and I will not be able to access my account after deletion. Some records required by law may be retained but will no longer be linked to my identity.
             </label>
           </div>
 

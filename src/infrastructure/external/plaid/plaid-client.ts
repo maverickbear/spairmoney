@@ -468,3 +468,29 @@ export async function getWebhookVerificationKey(keyId: string): Promise<string> 
     throw error;
   }
 }
+
+/**
+ * Remove an item from Plaid
+ * This permanently removes the item from Plaid's system
+ */
+export async function removeItem(accessToken: string): Promise<void> {
+  const client = getPlaidClient();
+
+  try {
+    await retryWithBackoff(async () => {
+      return await client.itemRemove({
+        access_token: accessToken,
+      });
+    });
+
+    logger.info('[PlaidClient] Successfully removed item from Plaid');
+  } catch (error: any) {
+    // NEVER log access tokens
+    logger.error('[PlaidClient] Error removing item from Plaid', {
+      error: error?.message || 'Unknown error',
+      errorType: error?.response?.data?.error_type,
+      errorCode: error?.response?.data?.error_code,
+    });
+    throw error;
+  }
+}

@@ -33,7 +33,7 @@ export function FeatureGuard({
   header,
   headerTitle,
 }: FeatureGuardProps) {
-  const { limits, checking: loading, plan } = useSubscription();
+  const { limits, checking: loading, plan, subscription } = useSubscription();
   const { role, checking: checkingAuth } = useAuthSafe(); // Use Context instead of fetch
   
   // Derive isSuperAdmin from Context role
@@ -55,18 +55,16 @@ export function FeatureGuard({
     return <>{children}</>;
   }
 
-  // Check feature access directly from the database (via limits)
-  // The database is the source of truth - if a feature is disabled in Supabase, it should be disabled here
-  // Safety check: convert string "true" to boolean (defensive programming)
-  const featureValue = limits[feature];
-  const hasAccess = featureValue === true || String(featureValue) === "true";
+  // SIMPLIFIED: With only one plan, all features are always enabled
+  // Just check if user has an active subscription (status: active or trialing)
+  const hasActiveSubscription = subscription?.status === "active" || subscription?.status === "trialing";
 
-  if (!hasAccess) {
+  if (!hasActiveSubscription) {
     if (fallback) {
       return <>{fallback}</>;
     }
 
-    // Feature not available - show blocked screen
+    // Subscription not active - show blocked screen
     const displayName = featureName || getFeatureName(feature);
     return (
       <>

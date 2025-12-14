@@ -15,6 +15,7 @@ import { getDashboardSubscription } from "../subscriptions/get-dashboard-subscri
 import { makeMembersService } from "../members/members.factory";
 import { makeAuthService } from "../auth/auth.factory";
 import { makeSubscriptionsService } from "../subscriptions/subscriptions.factory";
+import { makePlaidService } from "../plaid/plaid.factory";
 import { AppError } from "../shared/app-error";
 import { getCurrentUserId } from "../shared/feature-guard";
 import { validateImageFile, sanitizeFilename, getFileExtension } from "@/lib/utils/file-validation";
@@ -414,11 +415,41 @@ export class ProfileService {
         );
       }
 
-      // 3. Cancel active subscription (don't fail if this fails, but log it)
+      // 2. Disconnect all Plaid items (don't fail if this fails, but log it)
+      try {
+        const plaidService = makePlaidService();
+        const plaidResult = await plaidService.disconnectAllUserItems(userId);
+        if (plaidResult.failed > 0) {
+          logger.warn("[ProfileService] Warning: Some Plaid items failed to disconnect:", {
+            userId,
+            disconnected: plaidResult.disconnected,
+            failed: plaidResult.failed,
+            errors: plaidResult.errors,
+          });
+        } else if (plaidResult.disconnected > 0) {
+          logger.info("[ProfileService] Disconnected all Plaid items for user", {
+            userId,
+            disconnected: plaidResult.disconnected,
+          });
+        }
+      } catch (plaidError) {
+        logger.error("[ProfileService] Warning: Failed to disconnect Plaid items:", {
+          userId,
+          error: plaidError instanceof Error ? plaidError.message : "Unknown error",
+        });
+        // Continue with account deletion even if Plaid disconnection fails
+      }
+
+      // 3. Cancel active subscription in Stripe (don't fail if this fails, but log it)
       const subscriptionsService = makeSubscriptionsService();
       const subscriptionResult = await subscriptionsService.cancelUserSubscription(userId);
-      if (!subscriptionResult.cancelled && subscriptionResult.error) {
-        logger.error("[ProfileService] Warning: Failed to cancel subscription:", subscriptionResult.error);
+      if (subscriptionResult.cancelled) {
+        logger.info("[ProfileService] Successfully cancelled Stripe subscription for user", { userId });
+      } else {
+        logger.error("[ProfileService] Warning: Failed to cancel Stripe subscription:", {
+          userId,
+          error: subscriptionResult.error,
+        });
       }
 
       // 4. Delete account immediately
@@ -438,7 +469,7 @@ export class ProfileService {
 
       return {
         success: true,
-        message: "Account deleted successfully. All your data has been permanently removed.",
+        message: "Account deleted successfully. Your personal information has been anonymized and your account has been deactivated. Some records required by law may be retained for compliance purposes.",
       };
     } catch (error) {
       logger.error("[ProfileService] Error deleting account:", error);
@@ -450,8 +481,9 @@ export class ProfileService {
   }
 
   /**
-   * Delete account immediately
-   * Uses service role to bypass RLS and delete all user data
+   * Delete account immediately using soft delete + PII anonymization
+   * Uses service role to bypass RLS and anonymize user data
+   * Maintains fiscal/legal records while removing personal information
    */
   private async deleteAccountImmediately(userId: string): Promise<{
     success: boolean;
@@ -459,168 +491,98 @@ export class ProfileService {
   }> {
     try {
       const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
-      const { createClient } = await import("@supabase/supabase-js");
-      
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      // New format (sb_secret_...) is preferred, fallback to old format (service_role JWT) for backward compatibility
-      const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || 
-                                 process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const { makeProfileAnonymizationService } = await import("./profile.factory");
 
-      if (!supabaseServiceKey) {
-        throw new Error("SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY for legacy) is not set");
-      }
+      logger.debug("[ProfileService] Attempting to soft delete and anonymize user:", userId);
 
-      if (!supabaseUrl) {
-        throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
-      }
-
-      logger.debug("[ProfileService] Attempting to delete user:", userId);
-
-      // Use service role to clean up data before deletion
+      // Use service role to access data
       const serviceSupabase = createServiceRoleClient();
       
-      // Call SQL function to delete user data (goals, subscriptions, etc.)
-      // This handles RESTRICT constraints properly
+      // Step 1: Anonymize user PII using SQL function
+      // This anonymizes name, email, phone, date_of_birth, avatar_url
+      // and sets deleted_at timestamp
+      const anonymizationService = makeProfileAnonymizationService();
       try {
-        const { error: functionError } = await serviceSupabase.rpc("delete_user_data", {
-          p_user_id: userId,
-        });
-        
-        if (functionError) {
-          logger.warn("[ProfileService] Warning: Could not delete user data via function:", functionError);
-          // Try manual deletion as fallback
-          const { error: deleteSubsError } = await serviceSupabase
-            .from("app_subscriptions")
-            .delete()
-            .eq("user_id", userId);
-          
-          if (deleteSubsError) {
-            logger.warn("[ProfileService] Warning: Could not delete subscriptions manually:", deleteSubsError);
-          } else {
-            logger.debug("[ProfileService] Deleted user subscriptions manually");
-          }
-        } else {
-          logger.debug("[ProfileService] User data cleaned up via SQL function");
-        }
-      } catch (funcErr) {
-        logger.warn("[ProfileService] Warning: Exception calling delete_user_data function:", funcErr);
-        // Continue with manual deletion
-        const { error: deleteSubsError } = await serviceSupabase
-          .from("subscriptions")
-          .delete()
-          .eq("user_id", userId);
-        
-        if (!deleteSubsError) {
-          logger.debug("[ProfileService] Deleted user subscriptions manually (fallback)");
-        }
-      }
-
-      // Use Admin API to delete user from auth.users
-      // This will cascade delete from User table due to FK constraint
-      const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      });
-
-      // Try to delete user from auth.users with retry logic
-      let deleteError = null;
-      let data = null;
-      const maxRetries = 2;
-      
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        if (attempt > 0) {
-          // Wait a bit before retrying (exponential backoff)
-          const delay = attempt * 1000; // 1s, 2s
-          logger.debug(`[ProfileService] Retry attempt ${attempt} after ${delay}ms delay...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-        
-        const result = await adminClient.auth.admin.deleteUser(userId);
-        deleteError = result.error;
-        data = result.data;
-        
-        if (!deleteError) {
-          break; // Success!
-        }
-        
-        // If it's not a database error, don't retry
-        const errorCode = (deleteError as any).code;
-        if (errorCode !== "unexpected_failure" && deleteError.status !== 500) {
-          break;
-        }
-      }
-
-      if (deleteError) {
-        logger.error("[ProfileService] Error deleting user after retries:", {
-          error: deleteError,
-          message: deleteError.message,
-          status: deleteError.status,
-          code: (deleteError as any).code,
+        await anonymizationService.anonymizeUserPII(userId);
+        logger.info("[ProfileService] Successfully anonymized user PII", { userId });
+      } catch (anonError) {
+        logger.error("[ProfileService] Error anonymizing user PII:", {
           userId,
+          error: anonError instanceof Error ? anonError.message : "Unknown error",
         });
-
-        const errorCode = (deleteError as any).code;
-        const errorStatus = deleteError.status;
-        
-        // If it's a database error, this is likely a Supabase Auth internal issue
-        // As a workaround, we'll block the user and clean up all accessible data
-        if (errorCode === "unexpected_failure" || errorStatus === 500) {
-          logger.debug("[ProfileService] Supabase Auth deletion failed with unexpected_failure.");
-          logger.debug("[ProfileService] Attempting workaround: blocking user and cleaning up data...");
-          
-          try {
-            // Step 1: Block the user to prevent access
-            const { error: blockError } = await serviceSupabase
-              .from("users")
-              .update({ isBlocked: true })
-              .eq("id", userId);
-            
-            if (blockError) {
-              logger.error("[ProfileService] Could not block user:", blockError);
-              return { 
-                success: false, 
-                error: "Unable to complete account deletion. Please contact support for assistance." 
-              };
-            }
-            
-            logger.debug("[ProfileService] User marked as blocked - access is now disabled");
-            
-            // Clear user verification cache since user was blocked (workaround for deletion)
-            const { clearUserVerificationCache } = await import("@/lib/utils/verify-user-exists");
-            await clearUserVerificationCache(userId);
-            
-            // Return success since account is effectively deleted (blocked + data cleaned)
-            return { 
-              success: true,
-            };
-          } catch (workaroundError) {
-            logger.error("[ProfileService] Error in workaround:", workaroundError);
-            return { 
-              success: false, 
-              error: "Unable to complete account deletion due to a database constraint. Your subscriptions have been cancelled. Please contact support to complete the account deletion process." 
-            };
-          }
-        }
-        
-        // Provide user-friendly error message for other errors
-        let errorMessage = "Failed to delete account";
-        
-        if (deleteError.message) {
-          errorMessage = deleteError.message;
-        } else if (errorCode) {
-          errorMessage = `Error: ${errorCode}`;
-        }
-
-        return { success: false, error: errorMessage };
+        // Continue with deletion even if anonymization fails partially
       }
 
-      // Clear user verification cache since user was deleted
+      // Step 2: Revoke all sessions
+      try {
+        await anonymizationService.revokeAllSessions(userId);
+      } catch (sessionError) {
+        logger.warn("[ProfileService] Warning: Could not revoke all sessions:", {
+          userId,
+          error: sessionError instanceof Error ? sessionError.message : "Unknown error",
+        });
+        // Continue - session revocation is not critical
+      }
+
+      // Step 3: Revoke all external tokens (Plaid, etc.)
+      try {
+        await anonymizationService.revokeAllTokens(userId);
+      } catch (tokenError) {
+        logger.warn("[ProfileService] Warning: Could not revoke all tokens:", {
+          userId,
+          error: tokenError instanceof Error ? tokenError.message : "Unknown error",
+        });
+        // Continue - token revocation is handled by PlaidService
+      }
+
+      // Step 4: Verify that anonymization was successful
+      // Check if deleted_at was set
+      const { data: userCheck, error: checkError } = await serviceSupabase
+        .from("users")
+        .select("deleted_at, email")
+        .eq("id", userId)
+        .single();
+
+      if (checkError) {
+        logger.error("[ProfileService] Error verifying user deletion:", {
+          userId,
+          error: checkError.message,
+        });
+        return {
+          success: false,
+          error: "Failed to verify account deletion",
+        };
+      }
+
+      if (!userCheck || !userCheck.deleted_at) {
+        logger.error("[ProfileService] User anonymization did not set deleted_at:", {
+          userId,
+          userCheck,
+        });
+        return {
+          success: false,
+          error: "Failed to complete account deletion",
+        };
+      }
+
+      // Verify email was anonymized
+      if (userCheck.email && !userCheck.email.startsWith("deleted+")) {
+        logger.warn("[ProfileService] Warning: User email may not have been anonymized:", {
+          userId,
+          email: userCheck.email,
+        });
+        // Continue - email anonymization may have failed but account is still deleted
+      }
+
+      // Clear user verification cache
       const { clearUserVerificationCache } = await import("@/lib/utils/verify-user-exists");
       await clearUserVerificationCache(userId);
 
-      logger.debug("[ProfileService] Successfully deleted user:", userId, "Data:", data);
+      logger.info("[ProfileService] Successfully soft deleted and anonymized user", {
+        userId,
+        deletedAt: userCheck.deleted_at,
+      });
+
       return { success: true };
     } catch (error) {
       logger.error("[ProfileService] Exception in deleteAccountImmediately:", {

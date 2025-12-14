@@ -42,8 +42,10 @@ export function MoneyFlowMetricsWidget({
 
   const formatPercentChange = (percent?: number) => {
     if (percent === undefined || percent === null) return null;
-    const sign = percent >= 0 ? "+" : "";
-    return `${sign}${percent.toFixed(0)}%`;
+    // Limit to 0-100% range while preserving sign
+    const clampedPercent = Math.min(Math.abs(percent), 100);
+    const sign = percent >= 0 ? "+" : "-";
+    return `${sign}${clampedPercent.toFixed(0)}%`;
   };
 
   return (
@@ -107,7 +109,7 @@ export function MoneyFlowMetricsWidget({
                     : "bg-sentiment-positive/10 text-sentiment-positive border-sentiment-positive/20"
                 )}>
                   <span>▲</span>
-                  <span>{Math.abs(expensesChangePercent)}% {expensesChangePercent >= 0 ? "higher" : "lower"} than usual</span>
+                  <span>{Math.min(Math.abs(expensesChangePercent), 100).toFixed(0)}% {expensesChangePercent >= 0 ? "higher" : "lower"} than usual</span>
                 </span>
               )}
             </div>

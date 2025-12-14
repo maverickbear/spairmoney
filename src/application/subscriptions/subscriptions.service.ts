@@ -705,14 +705,25 @@ export class SubscriptionsService {
         return { cancelled: true };
       }
 
-      // Cancel subscription in Stripe
+      // Cancel subscription in Stripe immediately
       try {
         const { getStripeClient } = await import("@/src/infrastructure/external/stripe/stripe-client");
         const stripe = getStripeClient();
+        logger.info("[SubscriptionsService] Cancelling Stripe subscription immediately", {
+          userId,
+          stripeSubscriptionId: subscription.stripe_subscription_id,
+        });
         await stripe.subscriptions.cancel(subscription.stripe_subscription_id);
-        logger.debug("[SubscriptionsService] Cancelled Stripe subscription:", subscription.stripe_subscription_id);
+        logger.info("[SubscriptionsService] Successfully cancelled Stripe subscription", {
+          userId,
+          stripeSubscriptionId: subscription.stripe_subscription_id,
+        });
       } catch (stripeError) {
-        logger.error("[SubscriptionsService] Error cancelling Stripe subscription:", stripeError);
+        logger.error("[SubscriptionsService] Error cancelling Stripe subscription:", {
+          userId,
+          stripeSubscriptionId: subscription.stripe_subscription_id,
+          error: stripeError instanceof Error ? stripeError.message : "Unknown error",
+        });
         // Don't fail deletion if Stripe cancellation fails, but log it
         return { cancelled: false, error: "Failed to cancel subscription in Stripe" };
       }

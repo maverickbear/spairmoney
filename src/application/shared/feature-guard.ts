@@ -67,10 +67,7 @@ export async function checkAccountLimit(userId: string): Promise<BaseLimitCheckR
   };
 }
 
-async function checkFeatureAccess(userId: string, feature: keyof PlanFeatures): Promise<boolean> {
-  const { limits } = await getUserSubscriptionData(userId);
-  return limits[feature] === true;
-}
+// Removed checkFeatureAccess - no longer needed with single plan where all features are always enabled
 
 async function canUserWrite(userId: string): Promise<boolean> {
   const { subscription } = await getUserSubscriptionData(userId);
@@ -99,46 +96,22 @@ export interface GuardResult {
 
 /**
  * Guard feature access - validates if user has access to a specific feature
- * Requires write access (active/trialing subscription)
+ * SIMPLIFIED: With only one plan, all features are always enabled
+ * Just checks write access (active/trialing subscription)
  */
 export async function guardFeatureAccess(
   userId: string,
   feature: keyof PlanFeatures
 ): Promise<GuardResult> {
-  try {
-    // First check if user can write at all
-    const writeGuard = await guardWriteAccess(userId);
-    if (!writeGuard.allowed) {
-      return writeGuard;
-    }
-    
-    const hasAccess = await checkFeatureAccess(userId, feature);
-    
-    if (!hasAccess) {
-      return {
-        allowed: false,
-        error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
-          feature,
-        }),
-      };
-    }
-    
-    return { allowed: true };
-  } catch (error) {
-    logger.error("[FeatureGuard] Error in guardFeatureAccess:", error);
-    return {
-      allowed: false,
-      error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
-        feature,
-      }),
-    };
-  }
+  // Simplified: With only one plan, all features are always enabled
+  // Just verify write access
+  return await guardWriteAccess(userId);
 }
 
 /**
  * Guard feature access for read-only operations
- * Allows cancelled subscriptions to read data (but not write)
- * Use this for GET endpoints that only read data
+ * SIMPLIFIED: With only one plan, all features are always enabled
+ * Just checks if user has a subscription (even if cancelled)
  */
 export async function guardFeatureAccessReadOnly(
   userId: string,
@@ -158,26 +131,13 @@ export async function guardFeatureAccessReadOnly(
       };
     }
     
-    // Check feature access (doesn't require write access)
-    const hasAccess = await checkFeatureAccess(userId, feature);
-    
-    if (!hasAccess) {
-      return {
-        allowed: false,
-        error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
-          feature,
-        }),
-      };
-    }
-    
+    // Simplified: With only one plan, all features are always enabled
     return { allowed: true };
   } catch (error) {
     logger.error("[FeatureGuard] Error in guardFeatureAccessReadOnly:", error);
     return {
       allowed: false,
-      error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
-        feature,
-      }),
+      error: createPlanError(PlanErrorCode.SUBSCRIPTION_INACTIVE),
     };
   }
 }
@@ -376,6 +336,8 @@ export async function guardAccountLimit(userId: string): Promise<GuardResult> {
 
 /**
  * Guard household members - validates if user can add household members
+ * SIMPLIFIED: With only one plan, household feature is always enabled
+ * Just checks write access and super_admin role
  */
 export async function guardHouseholdMembers(userId: string): Promise<GuardResult> {
   try {
@@ -385,14 +347,16 @@ export async function guardHouseholdMembers(userId: string): Promise<GuardResult
       .from("users")
       .select("role")
       .eq("id", userId)
+      .is("deleted_at", null) // Exclude deleted users
       .single();
 
     if (user?.role === "super_admin") {
       return { allowed: true };
     }
 
-    // Use guardFeatureAccess to check hasHousehold feature (Pro-only)
-    return await guardFeatureAccess(userId, "hasHousehold");
+    // Simplified: With only one plan, household feature is always enabled
+    // Just verify write access
+    return await guardWriteAccess(userId);
   } catch (error) {
     console.error("Error in guardHouseholdMembers:", error);
     return {
@@ -404,30 +368,13 @@ export async function guardHouseholdMembers(userId: string): Promise<GuardResult
 
 /**
  * Guard bank integration - validates if user has access to bank integration feature
+ * SIMPLIFIED: With only one plan, bank integration is always enabled
+ * Just checks write access
  */
 export async function guardBankIntegration(userId: string): Promise<GuardResult> {
-  try {
-    const hasAccess = await checkFeatureAccess(userId, 'hasBankIntegration');
-    
-    if (!hasAccess) {
-      return {
-        allowed: false,
-        error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
-          feature: 'hasBankIntegration',
-        }),
-      };
-    }
-    
-    return { allowed: true };
-  } catch (error) {
-    console.error("Error in guardBankIntegration:", error);
-    return {
-      allowed: false,
-      error: createPlanError(PlanErrorCode.FEATURE_NOT_AVAILABLE, {
-        feature: 'hasBankIntegration',
-      }),
-    };
-  }
+  // Simplified: With only one plan, bank integration is always enabled
+  // Just verify write access
+  return await guardWriteAccess(userId);
 }
 
 /**

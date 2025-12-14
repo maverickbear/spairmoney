@@ -24,6 +24,7 @@ export interface Database {
           is_blocked: boolean;
           temporary_expected_income: string | null;
           temporary_expected_income_amount: number | null;
+          deleted_at: string | null;
         };
         Insert: Omit<Database['public']['Tables']['users']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['users']['Insert']>;
@@ -58,6 +59,7 @@ export interface Database {
           invitation_token: string | null;
           invited_at: string | null;
           accepted_at: string | null;
+          deleted_at: string | null;
         };
         Insert: Omit<Database['public']['Tables']['household_members']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['household_members']['Insert']>;

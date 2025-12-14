@@ -35,6 +35,7 @@ export class ProfileRepository {
       .from("users")
       .select("id, email, name, avatar_url, phone_number, date_of_birth, temporary_expected_income, role, created_at, updated_at")
       .eq("id", userId)
+      .is("deleted_at", null) // Exclude deleted users
       .single();
 
     if (error) {

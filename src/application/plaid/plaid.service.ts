@@ -16,6 +16,7 @@ import {
   exchangePublicToken,
   getAccounts,
   syncTransactions,
+  removeItem,
 } from '@/src/infrastructure/external/plaid/plaid-client';
 import {
   LinkTokenRequest,
@@ -321,6 +322,22 @@ export class PlaidService {
         throw new AppError('Unauthorized', 403);
       }
 
+      // Get access token to remove item from Plaid
+      const accessToken = await this.plaidItemsRepository.getAccessToken(itemId);
+      if (accessToken) {
+        try {
+          // Remove item from Plaid's system
+          await removeItem(accessToken);
+          logger.info('[PlaidService] Removed item from Plaid', { itemId });
+        } catch (plaidError) {
+          // Log but don't fail - item will still be deleted from our database
+          logger.warn('[PlaidService] Failed to remove item from Plaid (continuing with local deletion)', {
+            itemId,
+            error: plaidError instanceof Error ? plaidError.message : 'Unknown error',
+          });
+        }
+      }
+
       // Delete the item (cascade will handle account_integrations)
       await this.plaidItemsRepository.delete(itemId);
 
@@ -344,6 +361,107 @@ export class PlaidService {
         error: errorMessage,
       });
       throw new AppError('Failed to disconnect item', 500);
+    }
+  }
+
+  /**
+   * Disconnect all Plaid items for a user
+   * Used during account deletion to clean up all Plaid connections
+   */
+  async disconnectAllUserItems(userId: string): Promise<{
+    disconnected: number;
+    failed: number;
+    errors: Array<{ itemId: string; error: string }>;
+  }> {
+    const result = {
+      disconnected: 0,
+      failed: 0,
+      errors: [] as Array<{ itemId: string; error: string }>,
+    };
+
+    try {
+      // Find all Plaid items for the user
+      const items = await this.plaidItemsRepository.findByUserId(userId);
+
+      if (items.length === 0) {
+        logger.debug('[PlaidService] No Plaid items found for user', { userId });
+        return result;
+      }
+
+      logger.info('[PlaidService] Disconnecting all Plaid items for user', {
+        userId,
+        itemCount: items.length,
+      });
+
+      // Process each item
+      for (const item of items) {
+        try {
+          // Get access token to remove item from Plaid
+          const accessToken = await this.plaidItemsRepository.getAccessToken(item.item_id);
+          if (accessToken) {
+            try {
+              // Remove item from Plaid's system
+              await removeItem(accessToken);
+              logger.debug('[PlaidService] Removed item from Plaid', {
+                itemId: item.item_id,
+                userId,
+              });
+            } catch (plaidError) {
+              // Log but continue - item will still be deleted from our database
+              logger.warn('[PlaidService] Failed to remove item from Plaid (continuing with local deletion)', {
+                itemId: item.item_id,
+                userId,
+                error: plaidError instanceof Error ? plaidError.message : 'Unknown error',
+              });
+            }
+          }
+
+          // Delete the item from database (cascade will handle account_integrations)
+          await this.plaidItemsRepository.delete(item.item_id);
+
+          // Update account_integrations to mark accounts as disconnected
+          const supabase = await createServerClient();
+          await supabase
+            .from('account_integrations')
+            .update({
+              is_connected: false,
+              sync_enabled: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('plaid_item_id', item.item_id);
+
+          result.disconnected++;
+        } catch (error: unknown) {
+          result.failed++;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          result.errors.push({
+            itemId: item.item_id,
+            error: errorMessage,
+          });
+          logger.error('[PlaidService] Error disconnecting item during bulk disconnect', {
+            itemId: item.item_id,
+            userId,
+            error: errorMessage,
+          });
+          // Continue with next item even if this one fails
+        }
+      }
+
+      logger.info('[PlaidService] Completed disconnecting all Plaid items for user', {
+        userId,
+        disconnected: result.disconnected,
+        failed: result.failed,
+      });
+
+      return result;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('[PlaidService] Error in disconnectAllUserItems', {
+        userId,
+        error: errorMessage,
+      });
+      // Don't throw - return result with errors so caller can decide
+      return result;
     }
   }
 

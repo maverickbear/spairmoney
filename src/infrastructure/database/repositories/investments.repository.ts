@@ -279,7 +279,13 @@ export class InvestmentsRepository {
     const { data, error } = await query;
 
     if (error) {
-      logger.error("[InvestmentsRepository] Error fetching positions:", error);
+      logger.error("[InvestmentsRepository] Error fetching positions:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        error: error,
+      });
       return [];
     }
 

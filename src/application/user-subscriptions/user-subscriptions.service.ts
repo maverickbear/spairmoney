@@ -245,7 +245,9 @@ export class UserSubscriptionsService {
     const maxPayments = 100;
 
     while (currentDate <= horizonDate && paymentCount < maxPayments) {
-      if (currentDate >= today) {
+      // Only create planned payments for future dates (not today or past)
+      // This prevents creating planned payments that would be immediately processed
+      if (currentDate > today) {
         plannedPayments.push({
           date: new Date(currentDate),
           type: "expense" as const,

@@ -19,7 +19,21 @@ export const logger = {
   error: (...args: unknown[]) => {
     // Erros sempre são logados, mas apenas em desenvolvimento mostram stack trace completo
     if (isDevelopment) {
-      console.error(...args);
+      // Serialize Supabase errors properly
+      const serializedArgs = args.map(arg => {
+        // Check if it's a Supabase error object (has code, message, details, hint properties)
+        if (arg && typeof arg === 'object' && 'code' in arg && 'message' in arg) {
+          return {
+            code: (arg as any).code,
+            message: (arg as any).message,
+            details: (arg as any).details,
+            hint: (arg as any).hint,
+            error: arg,
+          };
+        }
+        return arg;
+      });
+      console.error(...serializedArgs);
     } else {
       // Em produção, apenas logar erros críticos sem detalhes sensíveis
       const message = args[0] instanceof Error ? args[0].message : String(args[0]);

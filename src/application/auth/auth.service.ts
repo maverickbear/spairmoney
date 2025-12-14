@@ -105,11 +105,48 @@ export class AuthService {
           logger.error("Error creating user profile:", error);
           
           // Check if it's a duplicate email error
+          // Note: After account deletion, email is anonymized, so this shouldn't happen
+          // But if it does, check if there's a deleted user and allow signup
           if (errorCode === '23505' || errorMessage.includes("duplicate") || errorMessage.includes("unique")) {
-            return {
-              user: null,
-              error: "An account with this email already exists. Please sign in instead."
-            };
+            // Check if there's a deleted user with this email
+            const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
+            const serviceSupabase = createServiceRoleClient();
+            const { data: existingUser } = await serviceSupabase
+              .from("users")
+              .select("id, email, deleted_at")
+              .eq("email", data.email)
+              .maybeSingle();
+            
+            // If user exists but is deleted, email should have been anonymized
+            // This is unexpected, but allow signup anyway (email will be different after anonymization)
+            if (existingUser && existingUser.deleted_at) {
+              logger.warn("[AuthService] Found deleted user with same email (should be anonymized), allowing signup", {
+                existingUserId: existingUser.id,
+                email: data.email,
+              });
+              // Retry user creation - email should be available now
+              // The error might have been a race condition
+              try {
+                userData = await this.repository.createUser({
+                  id: authData.user.id,
+                  email: authData.user.email!,
+                  name: data.name || null,
+                  role: "admin",
+                });
+                logger.info(`[AuthService] User profile created on retry for ${authData.user.id}`);
+              } catch (retryError) {
+                // If retry also fails, return error
+                return {
+                  user: null,
+                  error: "An account with this email already exists. Please sign in instead."
+                };
+              }
+            } else {
+              return {
+                user: null,
+                error: "An account with this email already exists. Please sign in instead."
+              };
+            }
           }
           
           return {

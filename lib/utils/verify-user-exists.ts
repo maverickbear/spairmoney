@@ -86,16 +86,20 @@ export async function verifyUserExists(user?: User | null): Promise<{ exists: bo
       return cached;
     }
 
-    // Verify user exists in User table
+    // Verify user exists in User table and is not deleted
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("id")
+      .select("id, deleted_at")
       .eq("id", authUser.id)
+      .is("deleted_at", null) // Exclude deleted users
       .single();
 
-    // If user doesn't exist in User table, log out
-    if (userError || !userData) {
-      console.warn(`[verifyUserExists] User ${authUser.id} authenticated but not found in User table. Logging out.`);
+    // If user doesn't exist in User table or is deleted, log out
+    if (userError || !userData || userData.deleted_at) {
+      const reason = userData?.deleted_at 
+        ? `User ${authUser.id} account has been deleted. Logging out.`
+        : `User ${authUser.id} authenticated but not found in User table. Logging out.`;
+      console.warn(`[verifyUserExists] ${reason}`);
       
       // Cache negative result
       setCachedVerification(authUser.id, false);
