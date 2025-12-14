@@ -106,7 +106,7 @@ export class UserSubscriptionsRepository {
   }): Promise<UserServiceSubscriptionRow> {
     const supabase = await createServerClient();
 
-    const insertData: any = {
+    const insertData: Record<string, unknown> = {
       id: data.id,
       user_id: data.userId,
       household_id: data.householdId,

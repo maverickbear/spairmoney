@@ -297,6 +297,20 @@ async function loadDashboardDataInternal(
     transactionsService.getTransactions({ startDate: selectedMonth, endDate: selectedMonthEnd }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching selected month transactions:", error);
       return { transactions: [], total: 0 };
+    }).then((result) => {
+      // Debug: Log transactions being fetched
+      const transactions = Array.isArray(result) ? result : (result?.transactions || []);
+      logger.debug("[DEBUG DataLoader] Fetched transactions:", {
+        count: transactions.length,
+        expenseCount: transactions.filter(t => t.type === "expense").length,
+        expenseTransactions: transactions.filter(t => t.type === "expense").map(t => ({
+          id: t.id,
+          amount: t.amount,
+          date: t.date,
+          description: t.description?.substring(0, 30),
+        })),
+      });
+      return result;
     }),
     getAccountsWithTokens(accessToken, refreshToken).catch((error) => {
       logger.error("[Dashboard] Error fetching accounts:", error);
@@ -316,6 +330,13 @@ async function loadDashboardDataInternal(
   const selectedMonthTransactions = Array.isArray(selectedMonthTransactionsResult) 
     ? selectedMonthTransactionsResult 
     : (selectedMonthTransactionsResult?.transactions || []);
+  
+  // Debug: Log final transactions array
+  logger.debug("[DEBUG DataLoader] Final selectedMonthTransactions:", {
+    count: selectedMonthTransactions.length,
+    expenseCount: selectedMonthTransactions.filter(t => t.type === "expense").length,
+    allTypes: selectedMonthTransactions.map(t => ({ type: t.type, amount: t.amount })),
+  });
   
   const totalBalance = accounts.reduce(
     (sum: number, acc: AccountWithBalance) => {

@@ -88,6 +88,16 @@ export function SummaryCards({
   const pastTransactions = selectedMonthTransactions;
   const pastLastMonthTransactions = lastMonthTransactions;
 
+  // Debug: Log transactions to identify the source of $1.00
+  // Use console.error to ensure it's visible
+  console.error("🔍 [DEBUG SummaryCards] Total transactions received:", pastTransactions.length);
+  console.error("🔍 [DEBUG SummaryCards] All transactions:", pastTransactions.map(t => ({
+    id: t?.id,
+    type: t?.type,
+    amount: t?.amount,
+    date: t?.date,
+  })));
+
   const currentIncome = pastTransactions
     .filter((t) => t && t.type === "income")
     .reduce((sum, t) => {
@@ -99,16 +109,28 @@ export function SummaryCards({
       return sum + amount;
     }, 0);
 
-  const currentExpenses = pastTransactions
-    .filter((t) => t && t.type === "expense")
-    .reduce((sum, t) => {
-      let amount = 0;
-      if (t.amount != null) {
-        const parsed = typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount);
-        amount = isNaN(parsed) ? 0 : parsed;
-      }
-      return sum + amount;
-    }, 0);
+  const expenseTransactions = pastTransactions.filter((t) => {
+    // Exclude transfers (transactions with type 'transfer' or with transferFromId/transferToId)
+    const isTransfer = t.type === 'transfer' || !!(t as any).transferFromId || !!(t as any).transferToId;
+    return t && t.type === "expense" && !isTransfer;
+  });
+
+  // Calculate expenses - ensure we always return 0 if no transactions
+  const currentExpenses = expenseTransactions.length === 0 
+    ? 0 
+    : expenseTransactions.reduce((sum, t) => {
+        let amount = 0;
+        if (t.amount != null) {
+          const parsed = typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount);
+          amount = isNaN(parsed) ? 0 : parsed;
+          // Ensure expenses are always positive (use absolute value)
+          amount = Math.abs(amount);
+        }
+        return sum + amount;
+      }, 0);
+  
+  // Ensure currentExpenses is never NaN or Infinity
+  const finalCurrentExpenses = isNaN(currentExpenses) || !isFinite(currentExpenses) ? 0 : currentExpenses;
 
   const lastMonthIncome = pastLastMonthTransactions
     .filter((t) => t && t.type === "income")
@@ -122,12 +144,18 @@ export function SummaryCards({
     }, 0);
 
   const lastMonthExpenses = pastLastMonthTransactions
-    .filter((t) => t && t.type === "expense")
+    .filter((t) => {
+      // Exclude transfers (transactions with type 'transfer' or with transferFromId/transferToId)
+      const isTransfer = t.type === 'transfer' || !!(t as any).transferFromId || !!(t as any).transferToId;
+      return t && t.type === "expense" && !isTransfer;
+    })
     .reduce((sum, t) => {
       let amount = 0;
       if (t.amount != null) {
         const parsed = typeof t.amount === 'string' ? parseFloat(t.amount) : Number(t.amount);
         amount = isNaN(parsed) ? 0 : parsed;
+        // Ensure expenses are always positive (use absolute value)
+        amount = Math.abs(amount);
       }
       return sum + amount;
     }, 0);
@@ -147,13 +175,13 @@ export function SummaryCards({
   // If last month had expenses, calculate normally
   // If both are 0, show 0%
   const expensesMomChange = lastMonthExpenses !== 0
-    ? ((currentExpenses - lastMonthExpenses) / Math.abs(lastMonthExpenses)) * 100
-    : currentExpenses > 0
+    ? ((finalCurrentExpenses - lastMonthExpenses) / Math.abs(lastMonthExpenses)) * 100
+    : finalCurrentExpenses > 0
     ? 100 // 100% increase from 0
     : 0;
 
   // Calculate monthly savings (income - expenses) for current month
-  const monthlySavings = currentIncome - currentExpenses;
+  const monthlySavings = currentIncome - finalCurrentExpenses;
   
   // Calculate monthly savings for last month
   const lastMonthSavings = lastMonthIncome - lastMonthExpenses;
@@ -556,7 +584,7 @@ export function SummaryCards({
                   
                   {/* Amount */}
                   <div className="text-xl md:text-2xl font-bold mb-2 tabular-nums">
-                    <AnimatedNumber value={currentExpenses} format="money" />
+                    <AnimatedNumber value={finalCurrentExpenses} format="money" />
                   </div>
 
                   {/* Percentage Change Tag */}

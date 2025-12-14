@@ -12,14 +12,8 @@ import { AppError } from "@/src/application/shared/app-error";
 // Note: Using unstable_noStore() instead of export const dynamic due to cacheComponents compatibility
 
 export async function GET(request: NextRequest) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7e34e216-572f-43d2-b462-14dddc4ad11d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/subscription-services/plans/route.ts:11',message:'GET handler entry',data:{hasNoStore:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   noStore();
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7e34e216-572f-43d2-b462-14dddc4ad11d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/subscription-services/plans/route.ts:14',message:'Before accessing request.url',data:{requestType:'NextRequest'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     const { searchParams } = new URL(request.url);
     const serviceId = searchParams.get("serviceId");
 
@@ -34,9 +28,9 @@ export async function GET(request: NextRequest) {
     const plans = await service.getPlansByServiceId(serviceId);
 
     return NextResponse.json({ plans });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle prerendering errors gracefully - these are expected during build analysis
-    const errorMessage = error?.message || '';
+    const errorMessage = error instanceof Error ? error.message : String(error);
     if (errorMessage.includes('prerender') || 
         errorMessage.includes('bail out') ||
         errorMessage.includes('NEXT_PRERENDER_INTERRUPTED')) {

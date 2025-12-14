@@ -818,13 +818,15 @@ export class AuthService {
         message: "User profile created successfully",
         user: userData,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[AuthService] Error creating user profile:", error);
 
       // If it's a duplicate key error, try to fetch the existing user
-      if (error.code === "23505" || 
-          error.message?.includes("duplicate") || 
-          error.message?.includes("unique")) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorCode = (error as { code?: string })?.code;
+      if (errorCode === "23505" || 
+          errorMessage.includes("duplicate") || 
+          errorMessage.includes("unique")) {
         const existingUser = await this.repository.findById(data.userId);
         
         if (existingUser) {
@@ -836,7 +838,7 @@ export class AuthService {
         }
       }
 
-      throw new Error(`Failed to create user profile: ${error.message}`);
+      throw new Error(`Failed to create user profile: ${errorMessage}`);
     }
   }
 

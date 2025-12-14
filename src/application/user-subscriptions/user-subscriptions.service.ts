@@ -64,9 +64,11 @@ export class UserSubscriptionsService {
       }
 
       return enriched;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle permission denied errors gracefully (can happen during SSR)
-      if (error?.code === '42501' || error?.message?.includes('permission denied')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorCode = (error as { code?: string })?.code;
+      if (errorCode === '42501' || errorMessage.includes('permission denied')) {
         logger.warn("[UserSubscriptionsService] Permission denied fetching subscriptions - user may not be authenticated");
         return [];
       }

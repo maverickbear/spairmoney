@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import type { BaseHistoricalDataPoint as HistoricalDataPoint, BasePortfolioSummary as PortfolioSummary } from "@/src/domain/portfolio/portfolio.types";
+import type { 
+  BaseHistoricalDataPoint as HistoricalDataPoint, 
+  BasePortfolioSummary as PortfolioSummary,
+  BasePortfolioHolding,
+  BasePortfolioAccount
+} from "@/src/domain/portfolio/portfolio.types";
 import { useAuthSafe } from "@/contexts/auth-context";
 
 interface PortfolioData {
   summary: PortfolioSummary | null;
-  holdings: any[];
-  accounts: any[];
+  holdings: BasePortfolioHolding[];
+  accounts: BasePortfolioAccount[];
   historical: HistoricalDataPoint[];
 }
 

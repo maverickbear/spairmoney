@@ -34,7 +34,8 @@ export async function handleUserCreated(event: DomainEvent): Promise<void> {
 
     if (error) {
       logger.error("[UserCreatedHandler] Error calling create_personal_household_atomic:", error);
-      throw new Error(`Failed to create personal household: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create personal household: ${errorMessage}`);
     }
 
     if (!data) {

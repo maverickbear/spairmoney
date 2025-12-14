@@ -11,7 +11,7 @@ import { TransactionWithRelations, TransactionSummary } from '@/src/domain/trans
  * @param amount - The amount value (can be string, number, null, or undefined)
  * @returns The parsed number, or 0 if invalid
  */
-export function parseAmount(amount: any): number {
+export function parseAmount(amount: unknown): number {
   if (amount == null || amount === '') {
     return 0;
   }
@@ -40,12 +40,17 @@ export function parseAmount(amount: any): number {
  * @param transaction - Transaction to validate
  * @returns true if transaction is valid
  */
-export function isValidTransaction(transaction: any): boolean {
-  if (!transaction || !transaction.type) {
+export function isValidTransaction(transaction: unknown): boolean {
+  if (!transaction || typeof transaction !== 'object') {
+    return false;
+  }
+  
+  const tx = transaction as Record<string, unknown>;
+  if (!tx.type) {
     return false;
   }
 
-  const amount = parseAmount(transaction.amount);
+  const amount = parseAmount(tx.amount);
   return amount > 0 && isFinite(amount);
 }
 

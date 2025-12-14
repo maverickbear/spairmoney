@@ -826,7 +826,7 @@ export class AdminService {
     const stripeSubMap = new Map<string, Stripe.Subscription>();
     stripeSubscriptions.forEach((result) => {
       if (result.status === "fulfilled") {
-        const value = result.value as { dbSubscriptionId: string; stripeSub: Stripe.Subscription } | { dbSubscriptionId: string; error: any };
+        const value = result.value as { dbSubscriptionId: string; stripeSub: Stripe.Subscription } | { dbSubscriptionId: string; error: unknown };
         if (!("error" in value)) {
           stripeSubMap.set(value.dbSubscriptionId, value.stripeSub);
         }
@@ -1029,7 +1029,8 @@ export class AdminService {
 
     if (error) {
       logger.error("[AdminService] Error fetching user subscriptions:", error);
-      throw new AppError(`Failed to fetch user subscriptions: ${error.message}`, 500);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new AppError(`Failed to fetch user subscriptions: ${errorMessage}`, 500);
     }
 
     if (!subscriptions || subscriptions.length === 0) {

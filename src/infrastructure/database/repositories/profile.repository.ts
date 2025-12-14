@@ -65,7 +65,7 @@ export class ProfileRepository {
   ): Promise<UserRow> {
     const supabase = await createServerClient();
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.avatarUrl !== undefined) updateData.avatar_url = data.avatarUrl;
     if (data.phoneNumber !== undefined) updateData.phone_number = data.phoneNumber;

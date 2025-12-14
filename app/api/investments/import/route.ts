@@ -5,8 +5,13 @@ import { AppError } from "@/src/application/shared/app-error";
 import { InvestmentTransactionInput } from "@/lib/csv/investment-import";
 import { normalizeAssetType } from "@/lib/utils/portfolio-utils";
 
+interface InvestmentTransactionInputWithMetadata extends InvestmentTransactionInput {
+  rowIndex?: number;
+  fileName?: string;
+}
+
 interface ImportRequest {
-  transactions: InvestmentTransactionInput[];
+  transactions: InvestmentTransactionInputWithMetadata[];
 }
 
 export async function POST(request: NextRequest) {
@@ -112,8 +117,8 @@ export async function POST(request: NextRequest) {
             errorCount++;
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
             errors.push({
-              rowIndex: (tx as any).rowIndex || 0,
-              fileName: (tx as any).fileName,
+              rowIndex: tx.rowIndex || 0,
+              fileName: tx.fileName,
               error: errorMessage,
             });
             console.error("Error importing transaction:", error);

@@ -542,7 +542,8 @@ export class InvestmentsService {
 
     if (error) {
       logger.error("[InvestmentsService] Error creating investment account:", error);
-      throw new AppError(`Failed to create investment account: ${error.message}`, 500);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new AppError(`Failed to create investment account: ${errorMessage}`, 500);
     }
 
     return {
@@ -1010,8 +1011,9 @@ export class InvestmentsService {
 
     if (error) {
       logger.error("Error creating simple investment entry:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       throw new AppError(
-        `Failed to create investment entry: ${error.message || JSON.stringify(error)}`,
+        `Failed to create investment entry: ${errorMessage || JSON.stringify(error)}`,
         500
       );
     }
@@ -1082,8 +1084,9 @@ export class InvestmentsService {
 
       if (error) {
         logger.error("Error updating account investment value:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         throw new AppError(
-          `Failed to update investment value: ${error.message || JSON.stringify(error)}`,
+          `Failed to update investment value: ${errorMessage || JSON.stringify(error)}`,
           500
         );
       }
@@ -1105,8 +1108,9 @@ export class InvestmentsService {
 
       if (error) {
         logger.error("Error creating account investment value:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         throw new AppError(
-          `Failed to create investment value: ${error.message || JSON.stringify(error)}`,
+          `Failed to create investment value: ${errorMessage || JSON.stringify(error)}`,
           500
         );
       }
