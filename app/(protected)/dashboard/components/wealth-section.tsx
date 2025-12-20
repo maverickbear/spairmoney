@@ -1,15 +1,22 @@
 "use client";
 
+import { Suspense } from "react";
 import { useMemo } from "react";
 import { formatMoney } from "@/components/common/money";
-import { SimplifiedCard } from "./simplified-card";
+import { WidgetExpandableCard } from "@/components/dashboard/widget-expandable-card";
 import type { AccountWithBalance } from "@/src/domain/accounts/accounts.types";
+import type { DebtWithCalculations } from "@/src/domain/debts/debts.types";
+import { NetWorthDetailWidget } from "./widgets/net-worth-detail-widget";
+import { InvestmentsDetailWidget } from "./widgets/investments-detail-widget";
 
 interface WealthSectionProps {
   netWorth: number;
   totalAssets: number;
   totalDebts: number;
   accounts: AccountWithBalance[];
+  debts: DebtWithCalculations[];
+  liabilities: AccountWithBalance[];
+  chartTransactions?: Array<{ month: string; income: number; expenses: number }>;
 }
 
 export function WealthSection({
@@ -17,6 +24,9 @@ export function WealthSection({
   totalAssets,
   totalDebts,
   accounts,
+  debts,
+  liabilities,
+  chartTransactions = [],
 }: WealthSectionProps) {
   // Calculate investments (sum of investment accounts)
   const investments = useMemo(() => {
@@ -38,18 +48,40 @@ export function WealthSection({
       </div>
 
       <div className="grid gap-3.5 grid-cols-1 md:grid-cols-2">
-        <SimplifiedCard
+        <WidgetExpandableCard
           label="Net worth"
           value={formatMoney(netWorth)}
           subtitle="Assets minus debts."
           pill={{ text: "Total" }}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <NetWorthDetailWidget
+                netWorth={netWorth}
+                totalAssets={totalAssets}
+                totalDebts={totalDebts}
+                accounts={accounts}
+                debts={debts}
+                liabilities={liabilities}
+                chartTransactions={chartTransactions}
+              />
+            </Suspense>
+          }
+          title="Net Worth Details"
+          description="Detailed breakdown of your net worth"
         />
 
-        <SimplifiedCard
+        <WidgetExpandableCard
           label="Investments"
           value={formatMoney(investments)}
           subtitle="Click to view portfolio details."
           pill={{ text: "Total" }}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <InvestmentsDetailWidget accounts={accounts} />
+            </Suspense>
+          }
+          title="Investment Portfolio"
+          description="Detailed view of your investments"
         />
       </div>
     </section>

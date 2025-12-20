@@ -1,15 +1,23 @@
 "use client";
 
+import { Suspense } from "react";
 import { formatMoney } from "@/components/common/money";
-import { FlowNode } from "./flow-node";
+import { WidgetExpandableCard } from "@/components/dashboard/widget-expandable-card";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import type { TransactionWithRelations } from "@/src/domain/transactions/transactions.types";
+import { IncomeDetailWidget } from "./widgets/income-detail-widget";
+import { ExpensesDetailWidget } from "./widgets/expenses-detail-widget";
+import { NetCashFlowWidget } from "./widgets/net-cash-flow-widget";
 
 interface CashFlowSectionProps {
   income: number;
   expenses: number;
   netCashFlow: number;
   selectedMonthDate: Date;
+  selectedMonthTransactions: TransactionWithRelations[];
+  lastMonthTransactions?: TransactionWithRelations[];
+  chartTransactions?: Array<{ month: string; income: number; expenses: number }>;
   incomeSubtitle?: string;
   expensesSubtitle?: string;
   netSubtitle?: string;
@@ -20,6 +28,9 @@ export function CashFlowSection({
   expenses,
   netCashFlow,
   selectedMonthDate,
+  selectedMonthTransactions,
+  lastMonthTransactions = [],
+  chartTransactions = [],
   incomeSubtitle = "Includes paychecks and transfers in.",
   expensesSubtitle = "Spending + bills paid so far.",
   netSubtitle,
@@ -44,29 +55,53 @@ export function CashFlowSection({
       </div>
 
       <div className="grid gap-2.5 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-center">
-        <FlowNode
+        <WidgetExpandableCard
           label="Income"
           value={formatMoney(income)}
           subtitle={incomeSubtitle}
           pill={{ text: "MTD" }}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <IncomeDetailWidget
+                selectedMonthTransactions={selectedMonthTransactions}
+                lastMonthTransactions={lastMonthTransactions}
+                selectedMonthDate={selectedMonthDate}
+              />
+            </Suspense>
+          }
+          title="Income Details"
+          description="Detailed breakdown of your income for this month"
+          variant="flow"
         />
 
         <div className="hidden md:grid text-muted-foreground text-xs justify-center select-none font-mono">
           →
         </div>
 
-        <FlowNode
+        <WidgetExpandableCard
           label="Expenses"
           value={formatMoney(expenses)}
           subtitle={expensesSubtitle}
           pill={{ text: "MTD" }}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <ExpensesDetailWidget
+                selectedMonthTransactions={selectedMonthTransactions}
+                lastMonthTransactions={lastMonthTransactions}
+                selectedMonthDate={selectedMonthDate}
+              />
+            </Suspense>
+          }
+          title="Expenses Details"
+          description="Detailed breakdown of your expenses for this month"
+          variant="flow"
         />
 
         <div className="hidden md:grid text-muted-foreground text-xs justify-center select-none font-mono">
           →
         </div>
 
-        <FlowNode
+        <WidgetExpandableCard
           label="Net cash flow"
           value={
             <span
@@ -83,6 +118,20 @@ export function CashFlowSection({
             text: isPositive ? "Positive" : "Negative",
             variant: isPositive ? "positive" : "negative",
           }}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <NetCashFlowWidget
+                chartTransactions={chartTransactions}
+                currentIncome={income}
+                currentExpenses={expenses}
+                currentNetCashFlow={netCashFlow}
+                selectedMonthDate={selectedMonthDate}
+              />
+            </Suspense>
+          }
+          title="Net Cash Flow Analysis"
+          description="Trends and insights about your cash flow"
+          variant="flow"
         />
       </div>
 
@@ -92,9 +141,6 @@ export function CashFlowSection({
         </span>
         <span className="border border-border px-2 py-1.5 rounded-full">
           Period: {format(selectedMonthDate, "MMM")} 1–{format(new Date(), "MMM d")}
-        </span>
-        <span className="underline underline-offset-[2px] cursor-pointer text-foreground flex flex-col justify-center items-start">
-          View details
         </span>
       </div>
     </section>

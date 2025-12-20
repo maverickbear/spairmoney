@@ -327,7 +327,7 @@ export class TransactionsService {
           suggested_subcategory_id: null,
           user_id: userId,
           household_id: householdId,
-          tags: null,
+          tags: '',
           receipt_url: null,
           deleted_at: null,
         } as TransactionRow;
@@ -1052,7 +1052,7 @@ export class TransactionsService {
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
     const endDate = new Date(now);
-    endDate.setDate(endDate.getDate() + 15); // Look ahead 15 days
+    endDate.setDate(endDate.getDate() + 30); // Look ahead 30 days to match component filter
     endDate.setHours(23, 59, 59, 999);
 
     // Get all scheduled planned payments
@@ -1121,7 +1121,7 @@ export class TransactionsService {
         }
       }
 
-      // Only include if within the next 15 days and not already in planned payments
+      // Only include if within the next 30 days and not already in planned payments
       if (nextDate <= endDate) {
         const alreadyExists = plannedPayments.some(
           (pp) => pp.source === "recurring" && 

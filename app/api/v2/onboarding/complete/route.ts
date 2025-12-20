@@ -105,41 +105,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 3: Generate initial budgets ONLY if income and ruleType are provided
-    try {
-      const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
-      const onboardingService = makeOnboardingService();
-      
-      // Verify that income and ruleType are provided
-      if (!validated.step2?.incomeRange) {
-        console.log("[ONBOARDING-COMPLETE] No income range provided, skipping budget generation");
-      } else {
-        const ruleType = validated.step2.ruleType as BudgetRuleType | undefined;
-        
-        // Only generate budgets if ruleType is explicitly provided
-        if (!ruleType) {
-          console.log("[ONBOARDING-COMPLETE] No ruleType provided, skipping budget generation");
-        } else {
-      const { getActiveHouseholdId } = await import("@/lib/utils/household");
-      const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-      
-      if (householdId) {
-        await onboardingService.generateInitialBudgets(
-          userId,
-          validated.step2.incomeRange,
-          accessToken,
-          refreshToken,
-              ruleType,
-          validated.step2.incomeAmount
-        );
-        console.log("[ONBOARDING-COMPLETE] Initial budgets created successfully");
-          }
-        }
-      }
-    } catch (error) {
-      // Log but don't fail - budgets can be created later
-      console.error("[ONBOARDING-COMPLETE] Error generating initial budgets:", error);
-    }
+    // Step 3: Budgets are no longer created automatically during onboarding
+    // Users will create budgets manually by selecting categories in the budgets page
 
     // Step 4: Create subscription (or use existing if already created)
     try {

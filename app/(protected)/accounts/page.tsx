@@ -3,11 +3,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Button } from "@/components/ui/button";
-import { Plus, CreditCard, Edit, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { CreditCard, Edit, Trash2, Loader2 } from "lucide-react";
 import { AccountForm } from "@/components/forms/account-form";
 import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
-import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import { ImportStatusBanner } from "@/src/presentation/components/features/accounts/import-status-banner";
@@ -224,13 +223,6 @@ export default function AccountsPage() {
     }
   }
 
-  async function handleAddAccount() {
-    if (!checkWriteAccess()) return;
-    // Load limit before opening form/sheet for immediate display
-    await loadAccountLimit();
-    // The dropdown will handle opening the appropriate form
-  }
-
   async function handleDelete(id: string) {
     if (!checkWriteAccess()) return;
     
@@ -401,8 +393,8 @@ export default function AccountsPage() {
         />
 
       <div className="w-full p-4 lg:p-8">
-        {/* Action Buttons - Moved from header */}
-        {accounts.length > 0 && canWrite && (
+        {/* Action Buttons - Always visible */}
+        {canWrite && (
           <div className="flex items-center gap-2 justify-end mb-6">
             <AddAccountDropdown
               onSuccess={() => {
@@ -486,14 +478,6 @@ export default function AccountsPage() {
                         <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                           Connect your bank account or create a manual account to get started tracking your finances.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-                          {canWrite && (
-                            <Button onClick={handleAddAccount} size="medium" variant="outline">
-                              <Plus className="mr-2 h-4 w-4" />
-                              Add Account
-                            </Button>
-                          )}
-                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -733,14 +717,6 @@ export default function AccountsPage() {
                     <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                       Connect your bank account or create a manual account to get started tracking your finances.
                     </p>
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-                      {canWrite && (
-                        <Button onClick={handleAddAccount} size="medium" variant="outline">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Account
-                        </Button>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -832,20 +808,6 @@ export default function AccountsPage() {
 
 
       {ConfirmDialog}
-
-      {/* Mobile Fixed Button - Above bottom nav */}
-      {canWrite && accounts.length > 0 && (
-        <div className="fixed bottom-20 left-0 right-0 z-[60] lg:hidden px-4">
-          <Button
-            size="medium"
-            className="w-full"
-            onClick={handleAddAccount}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Account
-          </Button>
-        </div>
-      )}
 
       </div>
   );

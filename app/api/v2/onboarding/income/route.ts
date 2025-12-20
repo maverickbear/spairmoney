@@ -63,33 +63,8 @@ export async function POST(request: NextRequest) {
     // Save expected income (with optional custom amount)
     await service.saveExpectedIncome(userId, validated, accessToken, refreshToken, incomeAmount);
 
-    // Generate initial budgets ONLY if ruleType is explicitly provided
-    // Do NOT auto-suggest - user must choose a rule during onboarding
-    if (ruleType) {
-    try {
-      const { getActiveHouseholdId } = await import("@/lib/utils/household");
-      const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-      
-      if (householdId) {
-          // Only generate budgets if user explicitly provided a rule type
-        await service.generateInitialBudgets(
-          userId,
-          validated,
-          accessToken,
-          refreshToken,
-            ruleType,
-          incomeAmount
-        );
-      }
-      // If no household, budgets will be generated when household is created
-    } catch (error) {
-      // Log but don't fail the request if budget generation fails
-      console.error("Error generating initial budgets:", error);
-    }
-    }
-    // If no ruleType provided, do NOT create budgets automatically
-
-    // Note: Emergency fund goal must be created manually by the user
+    // Budgets are no longer created automatically during onboarding
+    // Users will create budgets manually by selecting categories in the budgets page
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {

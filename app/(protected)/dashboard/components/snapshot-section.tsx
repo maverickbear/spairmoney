@@ -1,8 +1,9 @@
 "use client";
 
+import { Suspense } from "react";
 import { useMemo } from "react";
 import { formatMoney } from "@/components/common/money";
-import { SimplifiedCard } from "./simplified-card";
+import { WidgetExpandableCard } from "@/components/dashboard/widget-expandable-card";
 import { convertToMonthlyPayment } from "@/lib/utils/debts";
 import type { TransactionWithRelations } from "@/src/domain/transactions/transactions.types";
 import type { GoalWithCalculations } from "@/src/domain/goals/goals.types";
@@ -10,6 +11,27 @@ import type { DebtWithCalculations } from "@/src/domain/debts/debts.types";
 import type { BasePlannedPayment } from "@/src/domain/planned-payments/planned-payments.types";
 import type { UserServiceSubscription } from "@/src/domain/subscriptions/subscriptions.types";
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
+import { AvailableThisMonthWidget } from "./widgets/available-this-month-widget";
+import { SpareScoreWidget } from "./widgets/spare-score-widget";
+
+// Helper function to convert recurring frequency to monthly amount
+function convertRecurringToMonthly(
+  amount: number,
+  frequency?: string
+): number {
+  if (!frequency) return Math.abs(amount);
+  const validFrequencies: Array<"monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"> = [
+    "monthly",
+    "biweekly",
+    "weekly",
+    "semimonthly",
+    "daily",
+  ];
+  if (validFrequencies.includes(frequency as typeof validFrequencies[number])) {
+    return convertToMonthlyPayment(Math.abs(amount), frequency as typeof validFrequencies[number]);
+  }
+  return Math.abs(amount);
+}
 
 interface SnapshotSectionProps {
   selectedMonthTransactions: TransactionWithRelations[];
@@ -19,6 +41,8 @@ interface SnapshotSectionProps {
   goals: GoalWithCalculations[];
   debts: DebtWithCalculations[];
   financialHealth: FinancialHealthData | null;
+  chartTransactions: Array<{ month: string; income: number; expenses: number }>;
+  selectedMonthDate: Date;
 }
 
 export function SnapshotSection({
@@ -29,6 +53,8 @@ export function SnapshotSection({
   goals,
   debts,
   financialHealth,
+  chartTransactions,
+  selectedMonthDate,
 }: SnapshotSectionProps) {
   // Calculate current income from transactions
   const currentIncome = useMemo(() => {
@@ -43,51 +69,18 @@ export function SnapshotSection({
   // Calculate total bills (recurring payments + subscriptions + planned payments)
   const totalBills = useMemo(() => {
     return (
-      recurringPayments.reduce((sum: number, rp: any) => {
-        let monthlyAmount = Math.abs(rp.amount || 0);
-        if (rp.recurringFrequency) {
-          switch (rp.recurringFrequency) {
-            case "weekly":
-              monthlyAmount = Math.abs(rp.amount || 0) * 4.33;
-              break;
-            case "biweekly":
-              monthlyAmount = Math.abs(rp.amount || 0) * 2.17;
-              break;
-            case "semimonthly":
-              monthlyAmount = Math.abs(rp.amount || 0) * 2;
-              break;
-            case "daily":
-              monthlyAmount = Math.abs(rp.amount || 0) * 30;
-              break;
-            default:
-              monthlyAmount = Math.abs(rp.amount || 0);
-          }
-        }
+      recurringPayments.reduce((sum: number, rp: TransactionWithRelations) => {
+        const recurringFrequency = (rp as TransactionWithRelations & { recurringFrequency?: string }).recurringFrequency;
+        const monthlyAmount = convertRecurringToMonthly(rp.amount || 0, recurringFrequency);
         return sum + monthlyAmount;
       }, 0) +
       subscriptions
-        .filter((s: any) => s.isActive)
-        .reduce((sum: number, sub: any) => {
-          let monthlyAmount = sub.amount || 0;
-          switch (sub.billingFrequency) {
-            case "weekly":
-              monthlyAmount = (sub.amount || 0) * 4.33;
-              break;
-            case "biweekly":
-              monthlyAmount = (sub.amount || 0) * 2.17;
-              break;
-            case "semimonthly":
-              monthlyAmount = (sub.amount || 0) * 2;
-              break;
-            case "daily":
-              monthlyAmount = (sub.amount || 0) * 30;
-              break;
-            default:
-              monthlyAmount = sub.amount || 0;
-          }
+        .filter((s: UserServiceSubscription) => s.isActive)
+        .reduce((sum: number, sub: UserServiceSubscription) => {
+          const monthlyAmount = convertToMonthlyPayment(sub.amount || 0, sub.billingFrequency);
           return sum + monthlyAmount;
         }, 0) +
-      plannedPayments.reduce((sum: number, pp: any) => {
+      plannedPayments.reduce((sum: number, pp: BasePlannedPayment) => {
         return sum + (pp.amount || 0);
       }, 0)
     );
@@ -96,20 +89,20 @@ export function SnapshotSection({
   // Calculate total goals contributions
   const totalGoalsContributions = useMemo(() => {
     return goals
-      .filter((g: any) => !g.isCompleted && !g.isPaused && g.monthlyContribution)
-      .reduce((sum: number, g: any) => sum + (g.monthlyContribution || 0), 0);
+      .filter((g: GoalWithCalculations) => !g.isCompleted && !g.isPaused && g.monthlyContribution)
+      .reduce((sum: number, g: GoalWithCalculations) => sum + (g.monthlyContribution || 0), 0);
   }, [goals]);
 
   // Calculate total minimum debt payments
   const totalMinimumDebtPayments = useMemo(() => {
     return debts
-      .filter((d: any) => !d.isPaidOff && !d.isPaused)
-      .reduce((sum: number, debt: any) => {
+      .filter((d: DebtWithCalculations) => !d.isPaidOff && !d.isPaused)
+      .reduce((sum: number, debt: DebtWithCalculations) => {
         let monthlyPayment = debt.monthlyPayment || 0;
         if (debt.paymentAmount && debt.paymentFrequency) {
           monthlyPayment = convertToMonthlyPayment(
             debt.paymentAmount,
-            debt.paymentFrequency as "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily"
+            debt.paymentFrequency
           );
         }
         if (debt.additionalContributions && debt.additionalContributionAmount) {
@@ -160,18 +153,41 @@ export function SnapshotSection({
       </div>
 
       <div className="grid gap-3.5 grid-cols-1 md:grid-cols-2">
-        <SimplifiedCard
+        <WidgetExpandableCard
           label="Available this month"
           value={formatMoney(availableThisMonth)}
           subtitle="After bills, goals, and minimum debt payments."
           pill={{ text: "Month" }}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <AvailableThisMonthWidget
+                selectedMonthTransactions={selectedMonthTransactions}
+                recurringPayments={recurringPayments}
+                subscriptions={subscriptions}
+                plannedPayments={plannedPayments}
+                goals={goals}
+                debts={debts}
+                chartTransactions={chartTransactions}
+                selectedMonthDate={selectedMonthDate}
+              />
+            </Suspense>
+          }
+          title="Available This Month"
+          description="Detailed breakdown of your available funds"
         />
 
-        <SimplifiedCard
+        <WidgetExpandableCard
           label="Spare Score"
           value={spareScoreDisplay}
           subtitle={focusArea}
           pill={scoreLabel}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <SpareScoreWidget financialHealth={financialHealth} />
+            </Suspense>
+          }
+          title="Spare Score Details"
+          description="Your financial health score and insights"
         />
       </div>
     </section>

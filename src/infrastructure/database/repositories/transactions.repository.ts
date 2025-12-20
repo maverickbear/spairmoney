@@ -284,7 +284,7 @@ export class TransactionsRepository implements ITransactionsRepository {
         subcategory_id: data.subcategoryId ?? null,
         description: data.description ?? null,
         description_search: data.descriptionSearch ?? null,
-        tags: data.tags ?? null,
+        tags: data.tags ?? '',
         is_recurring: data.isRecurring ?? false,
         expense_type: data.expenseType ?? null,
         transfer_to_id: data.transferToId ?? null,
@@ -344,7 +344,7 @@ export class TransactionsRepository implements ITransactionsRepository {
     if (data.subcategoryId !== undefined) updateData.subcategory_id = data.subcategoryId;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.descriptionSearch !== undefined) updateData.description_search = data.descriptionSearch;
-    if (data.tags !== undefined) updateData.tags = data.tags;
+    if (data.tags !== undefined) updateData.tags = data.tags ?? '';
     if (data.isRecurring !== undefined) updateData.is_recurring = data.isRecurring;
     if (data.expenseType !== undefined) updateData.expense_type = data.expenseType;
     if (data.transferToId !== undefined) updateData.transfer_to_id = data.transferToId;

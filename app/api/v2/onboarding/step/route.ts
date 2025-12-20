@@ -113,52 +113,12 @@ export async function POST(request: NextRequest) {
       }
 
       case "budgets": {
-        if (!validated.data.step2) {
-          throw new AppError("Step 2 data is required for budgets step", 400);
-        }
-
-        const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
-        const onboardingService = makeOnboardingService();
-        
-        // Verify that income and ruleType are provided
-        if (!validated.data.step2.incomeRange) {
-          return NextResponse.json({
-            success: false,
-            step: "budgets",
-            message: "Income range is required to generate budgets",
-          }, { status: 400 });
-        }
-
-        const ruleType = validated.data.step2.ruleType as BudgetRuleType | undefined;
-        
-        // Only generate budgets if ruleType is explicitly provided
-        if (!ruleType) {
-          return NextResponse.json({
-            success: false,
-            step: "budgets",
-            message: "Budget rule type is required to generate budgets",
-          }, { status: 400 });
-        }
-
-        const { getActiveHouseholdId } = await import("@/lib/utils/household");
-        const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-        
-        if (householdId) {
-          await onboardingService.generateInitialBudgets(
-            userId,
-            validated.data.step2.incomeRange,
-            accessToken,
-            refreshToken,
-            ruleType,
-            validated.data.step2.incomeAmount
-          );
-          console.log("[ONBOARDING-STEP] Initial budgets created successfully");
-        }
-
+        // Budgets are no longer created automatically during onboarding
+        // Users will create budgets manually by selecting categories in the budgets page
         return NextResponse.json({
           success: true,
           step: "budgets",
-          message: "Initial budgets created successfully",
+          message: "Budget step completed. Users can create budgets manually in the budgets page.",
         });
       }
 

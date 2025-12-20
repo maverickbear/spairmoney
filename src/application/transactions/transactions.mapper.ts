@@ -50,7 +50,7 @@ export class TransactionsMapper {
       subcategory_id: domain.subcategoryId ?? null,
       description: domain.description ?? null,
       description_search: domain.descriptionSearch ?? null,
-      tags: domain.tags ?? null,
+      tags: domain.tags ?? '',
       is_recurring: domain.isRecurring ?? false,
       expense_type: domain.expenseType ?? null,
       transfer_to_id: domain.transferToId ?? null,

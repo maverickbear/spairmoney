@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeBudgetsService } from "@/src/application/budgets/budgets.factory";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { BudgetFormData } from "@/src/domain/budgets/budgets.validations";
 import { AppError } from "@/src/application/shared/app-error";
 import { ZodError } from "zod";
@@ -33,8 +34,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get session tokens for Supabase RLS
+    const authService = makeAuthService();
+    const { accessToken, refreshToken } = await authService.getSessionTokens();
+
     const service = makeBudgetsService();
-    const budgets = await service.getBudgets(period);
+    const budgets = await service.getBudgets(period, accessToken, refreshToken);
     
     // Budgets change occasionally, use semi-static cache
     const cacheHeaders = getCacheHeaders('semi-static');

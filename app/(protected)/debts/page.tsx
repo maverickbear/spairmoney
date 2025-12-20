@@ -5,7 +5,15 @@ import { usePagePerformance } from "@/hooks/use-page-performance";
 import { DebtCard } from "@/components/debts/debt-card";
 import { DebtForm } from "@/components/forms/debt-form";
 import { Button } from "@/components/ui/button";
-import { Plus, CreditCard, Loader2 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, CreditCard, Loader2, Edit, Trash2, Pause, Play, DollarSign } from "lucide-react";
 import { RecordPaymentDialog } from "@/components/debts/record-payment-dialog";
 import { useToast } from "@/components/toast-provider";
 import { formatMoney } from "@/components/common/money";
@@ -15,7 +23,8 @@ import { EmptyState } from "@/components/common/empty-state";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
-import { FeatureGuard } from "@/components/common/feature-guard";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface Debt {
   id: string;
@@ -176,18 +185,25 @@ export default function DebtsPage() {
   });
 
 
+  const loanTypeLabels: Record<string, string> = {
+    mortgage: "Mortgage",
+    car_loan: "Car Loan",
+    personal_loan: "Personal Loan",
+    credit_card: "Credit Card",
+    student_loan: "Student Loan",
+    business_loan: "Business Loan",
+    other: "Other",
+  };
+
   return (
-    <FeatureGuard 
-      feature="hasDebts"
-      headerTitle="Debts"
-    >
+    <div>
       <PageHeader
         title="Debts"
       />
 
       <div className="w-full p-4 lg:p-8">
-        {/* Action Buttons - Moved from header */}
-        {!(sortedDebts.length === 0 && filterBy === "all") && canWrite && (
+        {/* Action Buttons */}
+        {canWrite && (
           <div className="flex items-center gap-2 justify-end mb-6">
             <Button
               size="medium"
@@ -203,71 +219,16 @@ export default function DebtsPage() {
           </div>
         )}
 
-      {loading && debts.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 flex-1">
-                      <Skeleton className="h-[60px] w-[60px] rounded-full flex-shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-24" />
-                      </div>
-                    </div>
-                    <Skeleton className="h-8 w-8 rounded" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[1, 2, 3, 4].map((j) => (
-                      <div key={j} className="space-y-1">
-                        <Skeleton className="h-3 w-16" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 pt-3 border-t">
-                    {[1, 2].map((j) => (
-                      <div key={j} className="space-y-1">
-                        <Skeleton className="h-3 w-16" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+        {/* Mobile Card View */}
+        <div className="lg:hidden space-y-3">
+          {loading && !hasLoaded ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <div className="text-muted-foreground">Loading debts...</div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {sortedDebts.map((debt) => (
-            <DebtCard
-              key={debt.id}
-              debt={debt}
-              onEdit={(d) => {
-                if (!checkWriteAccess()) return;
-                setSelectedDebt({ ...d, createdAt: debt.createdAt, updatedAt: debt.updatedAt });
-                setIsFormOpen(true);
-              }}
-              onDelete={(id) => {
-                if (!checkWriteAccess()) return;
-                if (deletingId !== id) {
-                  handleDelete(id);
-                }
-              }}
-              onPause={(id, isPaused) => {
-                if (pausingId !== id) {
-                  handlePause(id, isPaused);
-                }
-              }}
-              onPayment={handlePayment}
-            />
-          ))}
-
-          {sortedDebts.length === 0 && (
-            <div className="col-span-full w-full h-full min-h-[400px]">
+          ) : sortedDebts.length === 0 ? (
+            <div className="w-full h-full min-h-[400px]">
               <EmptyState
                 icon={CreditCard}
                 title={filterBy === "all" ? "No debts created yet" : `No ${filterBy} debts found`}
@@ -278,9 +239,215 @@ export default function DebtsPage() {
                 }
               />
             </div>
+          ) : (
+            sortedDebts.map((debt) => (
+              <DebtCard
+                key={debt.id}
+                debt={debt}
+                onEdit={(d) => {
+                  if (!checkWriteAccess()) return;
+                  setSelectedDebt({ ...d, createdAt: debt.createdAt, updatedAt: debt.updatedAt });
+                  setIsFormOpen(true);
+                }}
+                onDelete={(id) => {
+                  if (!checkWriteAccess()) return;
+                  if (deletingId !== id) {
+                    handleDelete(id);
+                  }
+                }}
+                onPause={(id, isPaused) => {
+                  if (pausingId !== id) {
+                    handlePause(id, isPaused);
+                  }
+                }}
+                onPayment={handlePayment}
+              />
+            ))
           )}
         </div>
-      )}
+
+        {/* Desktop Table View */}
+        <div className="hidden lg:block rounded-lg border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs md:text-sm">Name</TableHead>
+                <TableHead className="text-xs md:text-sm">Loan Type</TableHead>
+                <TableHead className="text-xs md:text-sm">Current Balance</TableHead>
+                <TableHead className="text-xs md:text-sm">Monthly Payment</TableHead>
+                <TableHead className="text-xs md:text-sm">Interest Rate</TableHead>
+                <TableHead className="text-xs md:text-sm">Progress</TableHead>
+                <TableHead className="text-xs md:text-sm">Months Remaining</TableHead>
+                <TableHead className="text-xs md:text-sm">Status</TableHead>
+                <TableHead className="text-xs md:text-sm">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && !hasLoaded ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    Loading debts...
+                  </TableCell>
+                </TableRow>
+              ) : sortedDebts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    {filterBy === "all" ? "No debts created yet" : `No ${filterBy} debts found`}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedDebts.map((debt) => {
+                  const progressPct = debt.progressPct || 0;
+                  const clampedProgress = Math.min(progressPct, 100);
+                  const loanTypeLabel = loanTypeLabels[debt.loanType] || debt.loanType;
+
+                  return (
+                    <TableRow key={debt.id} className={debt.isPaidOff ? "opacity-75" : ""}>
+                      <TableCell className="font-medium text-xs md:text-sm">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{debt.name}</span>
+                          {debt.priority && (
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "text-xs w-fit",
+                                debt.priority === "High" && "border-sentiment-negative text-sentiment-negative",
+                                debt.priority === "Medium" && "border-sentiment-warning text-sentiment-warning",
+                                debt.priority === "Low" && "border-interactive-primary text-interactive-primary"
+                              )}
+                            >
+                              {debt.priority}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {loanTypeLabel}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {formatMoney(debt.currentBalance)}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {formatMoney(debt.monthlyPayment)}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {debt.interestRate.toFixed(2)}%
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        <div className="flex items-center gap-2 min-w-[120px]">
+                          <div className="relative flex-1 h-2 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={cn(
+                                "h-full transition-all",
+                                progressPct >= 100 ? "bg-sentiment-positive" : "bg-interactive-primary"
+                              )}
+                              style={{ width: `${clampedProgress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs whitespace-nowrap">
+                            {progressPct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {debt.monthsRemaining !== null && debt.monthsRemaining !== undefined
+                          ? `${Math.ceil(debt.monthsRemaining)}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {debt.isPaidOff && (
+                            <Badge variant="default" className="bg-sentiment-positive text-white text-xs">
+                              Paid Off
+                            </Badge>
+                          )}
+                          {debt.isPaused && (
+                            <Badge variant="outline" className="border-sentiment-warning text-sentiment-warning text-xs">
+                              Paused
+                            </Badge>
+                          )}
+                          {!debt.isPaidOff && !debt.isPaused && (
+                            <Badge variant="outline" className="text-xs">
+                              Active
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {canWrite && (
+                          <div className="flex space-x-1 md:space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 md:h-10 md:w-10"
+                              onClick={() => {
+                                if (!checkWriteAccess()) return;
+                                setSelectedDebt({ ...debt, createdAt: debt.createdAt, updatedAt: debt.updatedAt });
+                                setIsFormOpen(true);
+                              }}
+                            >
+                              <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 md:h-10 md:w-10"
+                              onClick={() => {
+                                if (!checkWriteAccess()) return;
+                                if (pausingId !== debt.id) {
+                                  handlePause(debt.id, debt.isPaused);
+                                }
+                              }}
+                              disabled={pausingId === debt.id || debt.isPaidOff}
+                            >
+                              {pausingId === debt.id ? (
+                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                              ) : debt.isPaused ? (
+                                <Play className="h-3 w-3 md:h-4 md:w-4" />
+                              ) : (
+                                <Pause className="h-3 w-3 md:h-4 md:w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 md:h-10 md:w-10"
+                              onClick={() => {
+                                if (!checkWriteAccess()) return;
+                                handlePayment(debt.id);
+                              }}
+                              disabled={debt.isPaidOff || debt.isPaused}
+                            >
+                              <DollarSign className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 md:h-10 md:w-10"
+                              onClick={() => {
+                                if (!checkWriteAccess()) return;
+                                if (deletingId !== debt.id) {
+                                  handleDelete(debt.id);
+                                }
+                              }}
+                              disabled={deletingId === debt.id}
+                            >
+                              {deletingId === debt.id ? (
+                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
       <DebtForm
         debt={selectedDebt || undefined}
@@ -357,7 +524,7 @@ export default function DebtsPage() {
           </Button>
         </div>
       )}
-    </FeatureGuard>
+    </div>
   );
 }
 

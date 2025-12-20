@@ -19,18 +19,53 @@ export const logger = {
   error: (...args: unknown[]) => {
     // Erros sempre são logados, mas apenas em desenvolvimento mostram stack trace completo
     if (isDevelopment) {
-      // Serialize Supabase errors properly
+      // Serialize errors properly to avoid empty objects
       const serializedArgs = args.map(arg => {
-        // Check if it's a Supabase error object (has code, message, details, hint properties)
-        if (arg && typeof arg === 'object' && 'code' in arg && 'message' in arg) {
+        // Handle Error instances
+        if (arg instanceof Error) {
           return {
-            code: (arg as any).code,
-            message: (arg as any).message,
-            details: (arg as any).details,
-            hint: (arg as any).hint,
-            error: arg,
+            name: arg.name,
+            message: arg.message,
+            stack: arg.stack,
+            ...(arg as any).code && { code: (arg as any).code },
+            ...(arg as any).details && { details: (arg as any).details },
+            ...(arg as any).hint && { hint: (arg as any).hint },
           };
         }
+        
+        // Check if it's a Supabase error object (has code, message, details, hint properties)
+        if (arg && typeof arg === 'object' && 'code' in arg && 'message' in arg) {
+          const errorObj = arg as any;
+          return {
+            code: errorObj.code ?? null,
+            message: errorObj.message ?? null,
+            details: errorObj.details ?? null,
+            hint: errorObj.hint ?? null,
+          };
+        }
+        
+        // Handle plain objects - ensure they're serializable
+        if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+          try {
+            // Try to serialize to ensure it's not circular
+            JSON.stringify(arg);
+            return arg;
+          } catch {
+            // If circular, extract enumerable properties
+            const result: Record<string, unknown> = {};
+            for (const key in arg) {
+              if (Object.prototype.hasOwnProperty.call(arg, key)) {
+                try {
+                  result[key] = (arg as Record<string, unknown>)[key];
+                } catch {
+                  result[key] = '[Non-serializable]';
+                }
+              }
+            }
+            return result;
+          }
+        }
+        
         return arg;
       });
       console.error(...serializedArgs);

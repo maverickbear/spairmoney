@@ -31,6 +31,7 @@ interface MultiSelectProps {
   placeholder?: string;
   emptyMessage?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function MultiSelect({
@@ -40,6 +41,7 @@ export function MultiSelect({
   placeholder = "Select items...",
   emptyMessage = "No items found.",
   className,
+  disabled = false,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -82,6 +84,7 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className={cn(
             "w-full justify-between min-h-10 h-auto",
             className

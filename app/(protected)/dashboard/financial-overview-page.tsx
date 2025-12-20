@@ -65,7 +65,7 @@ export function FinancialOverviewPage({
 }: FinancialOverviewPageProps) {
   // Local state for dashboard data - initialized from props
   const [selectedMonthTransactions, setSelectedMonthTransactions] = useState(initialSelectedMonthTransactions);
-  const [, setLastMonthTransactions] = useState(initialLastMonthTransactions);
+  const [lastMonthTransactions, setLastMonthTransactions] = useState(initialLastMonthTransactions);
   const [, setSavings] = useState(initialSavings);
   const [totalBalance, setTotalBalance] = useState(initialTotalBalance);
   const [, setLastMonthTotalBalance] = useState(initialLastMonthTotalBalance);
@@ -74,7 +74,7 @@ export function FinancialOverviewPage({
   const [upcomingTransactions, setUpcomingTransactions] = useState(initialUpcomingTransactions);
   const [financialHealth, setFinancialHealth] = useState(initialFinancialHealth);
   const [goals, setGoals] = useState(initialGoals);
-  const [, setChartTransactions] = useState(initialChartTransactions);
+  const [chartTransactions, setChartTransactions] = useState(initialChartTransactions);
   const [liabilities, setLiabilities] = useState(initialLiabilities);
   const [debts, setDebts] = useState(initialDebts);
   const [recurringPayments, setRecurringPayments] = useState(initialRecurringPayments);
@@ -239,6 +239,8 @@ export function FinancialOverviewPage({
         goals={goals}
         debts={debts}
         financialHealth={financialHealth}
+        chartTransactions={chartTransactions}
+        selectedMonthDate={selectedMonthDate}
       />
 
       <CashFlowSection
@@ -246,12 +248,16 @@ export function FinancialOverviewPage({
         expenses={currentExpenses}
         netCashFlow={netCashFlow}
         selectedMonthDate={selectedMonthDate}
+        selectedMonthTransactions={pastSelectedMonthTransactions}
+        lastMonthTransactions={lastMonthTransactions}
+        chartTransactions={chartTransactions}
       />
 
       <PlanningSection
         upcomingTransactions={upcomingTransactions}
         budgets={budgets}
         financialHealth={financialHealth}
+        accounts={accounts}
       />
 
       <WealthSection
@@ -259,6 +265,9 @@ export function FinancialOverviewPage({
         totalAssets={totalAssets}
         totalDebts={totalDebts}
         accounts={accounts}
+        debts={debts}
+        liabilities={liabilities}
+        chartTransactions={chartTransactions}
       />
       </div>
       </div>

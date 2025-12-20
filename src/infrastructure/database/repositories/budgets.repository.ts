@@ -6,6 +6,7 @@
 
 import { createServerClient } from "../supabase-server";
 import { logger } from "@/lib/utils/logger";
+import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
 import { IBudgetsRepository } from "./interfaces/budgets.repository.interface";
 
 export interface BudgetRow {
@@ -15,6 +16,7 @@ export interface BudgetRow {
   category_id: string | null;
   subcategory_id: string | null;
   user_id: string;
+  household_id: string | null;
   note: string | null;
   is_recurring: boolean;
   created_at: string;
@@ -43,6 +45,7 @@ export interface BudgetInsertData {
   category_id: string | null;
   subcategory_id: string | null;
   user_id: string;
+  household_id: string | null;
   note: string | null;
   is_recurring: boolean;
   created_at: string;
@@ -70,9 +73,9 @@ export class BudgetsRepository implements IBudgetsRepository {
   ): Promise<BudgetRow[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
 
-    // Format period as first day of month
+    // Format period as first day of month - use same format as createBudget
     const periodStart = new Date(period.getFullYear(), period.getMonth(), 1);
-    const periodStr = `${periodStart.getFullYear()}-${String(periodStart.getMonth() + 1).padStart(2, '0')}-${String(periodStart.getDate()).padStart(2, '0')} 00:00:00`;
+    const periodStr = formatTimestamp(periodStart);
 
     const { data: budgets, error } = await supabase
       .from("budgets")
@@ -182,6 +185,7 @@ export class BudgetsRepository implements IBudgetsRepository {
     categoryId: string | null;
     subcategoryId: string | null;
     userId: string;
+    householdId: string | null;
     note: string | null;
     isRecurring: boolean;
     createdAt: string;
@@ -197,6 +201,7 @@ export class BudgetsRepository implements IBudgetsRepository {
       category_id: data.categoryId,
       subcategory_id: data.subcategoryId,
       user_id: data.userId,
+      household_id: data.householdId,
       note: data.note,
       is_recurring: data.isRecurring,
       created_at: data.createdAt,
@@ -336,7 +341,8 @@ export class BudgetsRepository implements IBudgetsRepository {
     period: string,
     categoryId: string | null,
     subcategoryId: string | null,
-    userId: string
+    userId: string,
+    householdId?: string | null
   ): Promise<boolean> {
     const supabase = await createServerClient();
 
@@ -344,13 +350,22 @@ export class BudgetsRepository implements IBudgetsRepository {
       .from("budgets")
       .select("id")
       .eq("period", period)
-      .eq("user_id", userId)
+      .is("deleted_at", null)
       .limit(1);
 
+    // Filter by household if provided, otherwise by user
+    if (householdId) {
+      query = query.eq("household_id", householdId);
+    } else {
+      query = query.eq("user_id", userId);
+    }
+
     if (subcategoryId) {
+      // Check for subcategory budget
       query = query.eq("subcategory_id", subcategoryId);
     } else if (categoryId) {
-      query = query.eq("category_id", categoryId);
+      // Check for category budget (must have subcategory_id IS NULL)
+      query = query.eq("category_id", categoryId).is("subcategory_id", null);
     }
 
     const { data, error } = await query;

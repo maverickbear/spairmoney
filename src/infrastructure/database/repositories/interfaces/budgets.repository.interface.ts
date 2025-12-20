@@ -23,6 +23,7 @@ export interface IBudgetsRepository {
     categoryId: string | null;
     subcategoryId: string | null;
     userId: string;
+    householdId: string | null;
     note: string | null;
     isRecurring: boolean;
     createdAt: string;
@@ -57,7 +58,8 @@ export interface IBudgetsRepository {
     period: string,
     categoryId: string | null,
     subcategoryId: string | null,
-    userId: string
+    userId: string,
+    householdId?: string | null
   ): Promise<boolean>;
 }
 

@@ -1,24 +1,33 @@
 "use client";
 
+import { Suspense } from "react";
 import { useMemo } from "react";
 import { formatMoney } from "@/components/common/money";
-import { SimplifiedCard } from "./simplified-card";
+import { WidgetExpandableCard } from "@/components/dashboard/widget-expandable-card";
 import { format, differenceInDays } from "date-fns";
 import { calculateBudgetStatus } from "@/lib/utils/budget-utils";
 import type { UpcomingTransaction } from "@/src/domain/transactions/transactions.types";
 import type { BudgetWithRelations } from "@/src/domain/budgets/budgets.types";
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
+import type { AccountWithBalance } from "@/src/domain/accounts/accounts.types";
+import { UpcomingPaymentsWidget } from "./widgets/upcoming-payments-widget";
+import { UpcomingPaymentsCard } from "./widgets/upcoming-payments-card";
+import { BudgetStatusWidget } from "./widgets/budget-status-widget";
+import { BudgetStatusCard } from "./widgets/budget-status-card";
+import { EmergencyFundWidget } from "./widgets/emergency-fund-widget";
 
 interface PlanningSectionProps {
   upcomingTransactions: UpcomingTransaction[];
   budgets: BudgetWithRelations[];
   financialHealth: FinancialHealthData | null;
+  accounts: AccountWithBalance[];
 }
 
 export function PlanningSection({
   upcomingTransactions,
   budgets,
   financialHealth,
+  accounts,
 }: PlanningSectionProps) {
   // Calculate upcoming payments total and next payment
   const upcomingPaymentsData = useMemo(() => {
@@ -135,27 +144,22 @@ export function PlanningSection({
       </div>
 
       <div className="grid gap-3.5 grid-cols-1 md:grid-cols-3">
-        <SimplifiedCard
-          label="Upcoming payments"
-          value={formatMoney(upcomingPaymentsData.total)}
-          subtitle={upcomingPaymentsData.nextPayment}
-          pill={{ 
-            text: `${upcomingPaymentsData.count} ${upcomingPaymentsData.count === 1 ? "item" : "items"}` 
-          }}
-        />
+        <UpcomingPaymentsCard upcomingTransactions={upcomingTransactions} />
 
-        <SimplifiedCard
-          label="Budget status"
-          value={budgetStatus.totalAtRisk > 0 ? `${budgetStatus.totalAtRisk} over` : "On track"}
-          subtitle={budgetStatus.subtitle}
-          pill={budgetStatus.totalAtRisk > 0 ? { text: "Warning", variant: "warning" } : { text: "Good", variant: "positive" }}
-        />
+        <BudgetStatusCard budgets={budgets} />
 
-        <SimplifiedCard
+        <WidgetExpandableCard
           label="Emergency fund"
           value={`${emergencyFundMonths.toFixed(1)} mo`}
           subtitle={`Goal: ${recommendedMonths}–${recommendedMonths + 2} months coverage.`}
           pill={emergencyFundLabel}
+          expandedContent={
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+              <EmergencyFundWidget financialHealth={financialHealth} accounts={accounts} />
+            </Suspense>
+          }
+          title="Emergency Fund"
+          description="Your emergency fund status and progress"
         />
       </div>
     </section>

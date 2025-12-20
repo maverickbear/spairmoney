@@ -36,6 +36,7 @@ export const mockBudgetRow: BudgetRow = {
   category_id: "test-category-id",
   subcategory_id: null,
   user_id: "test-user-id",
+  household_id: null,
   note: null,
   is_recurring: false,
   created_at: new Date().toISOString(),

@@ -39,19 +39,44 @@ export class BudgetsService {
       return [];
     }
 
+    // Get user's household ID for filtering
+    const membersService = makeMembersService();
+    const householdId = await membersService.getActiveHouseholdId(userId);
+
     // SIMPLIFIED: Removed automatic recurring budget creation
     // Users now create budgets manually with full control
     // The isRecurring field is still stored but not used for automatic creation
     const rows = await this.repository.findAllByPeriod(period, accessToken, refreshToken);
 
+    // Filter budgets by household or user (household budgets are shared, user budgets are personal)
+    const filteredRows = rows.filter((row) => {
+      // Include if it belongs to the user's household
+      if (householdId && row.household_id === householdId) {
+        return true;
+      }
+      // Include if it belongs directly to the user
+      // When user has household: include budgets with matching household_id OR personal budgets (household_id is null)
+      // When user has no household: include all user budgets
+      if (row.user_id === userId) {
+        if (householdId) {
+          // User has household: include household budgets OR personal budgets
+          return row.household_id === householdId || row.household_id === null;
+        } else {
+          // User has no household: include all user budgets
+          return true;
+        }
+      }
+      return false;
+    });
+
     // Early return if no budgets
-    if (rows.length === 0) {
+    if (filteredRows.length === 0) {
       return [];
     }
 
     // Fetch related data
-    const categoryIds = [...new Set(rows.map(b => b.category_id).filter(Boolean) as string[])];
-    const subcategoryIds = [...new Set(rows.map(b => b.subcategory_id).filter(Boolean) as string[])];
+    const categoryIds = [...new Set(filteredRows.map(b => b.category_id).filter(Boolean) as string[])];
+    const subcategoryIds = [...new Set(filteredRows.map(b => b.subcategory_id).filter(Boolean) as string[])];
 
     // OPTIMIZATION: Fetch categories/subcategories first (needed for mapping)
     // Then fetch transactions in parallel with mapping operations
@@ -162,7 +187,7 @@ export class BudgetsService {
     }
 
     // Calculate actual spend per budget using pre-calculated maps
-    const budgets: BudgetWithRelations[] = rows.map(row => {
+    const budgets: BudgetWithRelations[] = filteredRows.map(row => {
       const category = row.category_id ? categoriesMap.get(row.category_id) : null;
       const subcategory = row.subcategory_id ? subcategoriesMap.get(row.subcategory_id) : null;
 
@@ -273,12 +298,17 @@ export class BudgetsService {
     const periodStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
     const periodStr = formatTimestamp(periodStart);
 
+    // Get household ID for the user
+    const membersService = makeMembersService();
+    const householdId = await membersService.getActiveHouseholdId(userId);
+
     // Check if budget already exists
     const exists = await this.repository.existsForPeriod(
       periodStr,
       data.categoryId || null,
       data.subcategoryId || null,
-      userId
+      userId,
+      householdId
     );
 
     if (exists) {
@@ -287,8 +317,6 @@ export class BudgetsService {
 
     const id = crypto.randomUUID();
     const now = formatTimestamp(new Date());
-    const membersService = makeMembersService();
-    const householdId = await membersService.getActiveHouseholdId(userId);
 
     const budgetRow = await this.repository.create({
       id,
@@ -297,6 +325,7 @@ export class BudgetsService {
       categoryId: data.categoryId || null,
       subcategoryId: data.subcategoryId || null,
       userId,
+      householdId,
       note: null,
       isRecurring: false,
       createdAt: now,
