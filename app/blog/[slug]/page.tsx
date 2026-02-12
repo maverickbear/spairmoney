@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { makeBlogService } from "@/src/application/blog/blog.factory";
@@ -12,15 +13,10 @@ interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateStaticParams() {
-  const blogService = makeBlogService();
-  const slugs = await blogService.getAllSlugs();
-  return slugs.map((slug) => ({ slug }));
-}
-
 export async function generateMetadata({
   params,
 }: BlogPostPageProps): Promise<Metadata> {
+  noStore();
   const { slug } = await params;
   const blogService = makeBlogService();
   const post = await blogService.getPostBySlug(slug);
@@ -52,6 +48,7 @@ export async function generateMetadata({
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
+  noStore();
   const { slug } = await params;
   const blogService = makeBlogService();
   const post = await blogService.getPostBySlug(slug);

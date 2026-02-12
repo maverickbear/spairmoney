@@ -1,4 +1,5 @@
 import { MetadataRoute } from "next";
+import { unstable_noStore as noStore } from "next/cache";
 import { makeBlogService } from "@/src/application/blog/blog.factory";
 
 /**
@@ -7,6 +8,7 @@ import { makeBlogService } from "@/src/application/blog/blog.factory";
  * Generates XML sitemap for search engines with all public pages
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  noStore();
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
   const currentDate = new Date();
   const blogService = makeBlogService();

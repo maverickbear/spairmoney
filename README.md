@@ -164,6 +164,10 @@
    
    # OpenAI (optional)
    OPENAI_API_KEY=your_openai_key
+   
+   # Blog – Sanity CMS (production: set in Vercel so blog uses Sanity; omit for static fallback)
+   NEXT_PUBLIC_SANITY_PROJECT_ID=your_sanity_project_id
+   NEXT_PUBLIC_SANITY_DATASET=production
    ```
 
 4. **Set up the database**
@@ -566,6 +570,7 @@ Ensure all environment variables are set:
 - Stripe keys
 - OpenAI API key (optional)
 - Encryption key
+- **Blog (production):** `NEXT_PUBLIC_SANITY_PROJECT_ID` and `NEXT_PUBLIC_SANITY_DATASET` so the blog uses Sanity CMS instead of static fallback
 
 ---
 
