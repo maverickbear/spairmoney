@@ -5,15 +5,16 @@
 
 import { BudgetRuleType } from "../budgets/budget-rules.types";
 
+/** @deprecated Use expectedAnnualIncome (single amount) instead. Kept for reading legacy data. */
 export type ExpectedIncomeRange = "0-50k" | "50k-100k" | "100k-150k" | "150k-250k" | "250k+" | null;
 
 // User goals for simplified onboarding
-export type UserGoal = 
-  | "track-spending" 
-  | "save-money" 
-  | "pay-debt" 
-  | "plan-budget" 
-  | "invest-wealth" 
+export type UserGoal =
+  | "track-spending"
+  | "save-money"
+  | "pay-debt"
+  | "plan-budget"
+  | "invest-wealth"
   | "household-finance";
 
 // Household type for simplified onboarding
@@ -28,7 +29,8 @@ export interface OnboardingStatusExtended {
   completedCount: number;
   totalCount: number;
   totalBalance?: number;
-  expectedIncome?: ExpectedIncomeRange;
+  /** Expected annual household income (single amount). */
+  expectedAnnualIncome?: number | null;
 }
 
 /**
@@ -36,14 +38,14 @@ export interface OnboardingStatusExtended {
  * Used for the new quick onboarding flow (30-45s)
  */
 export interface SimplifiedOnboardingRequest {
-  goals: UserGoal[]; // User can select multiple goals
+  goals: UserGoal[];
   householdType: HouseholdType;
-  incomeRange?: ExpectedIncomeRange | null; // Optional
-  incomeAmount?: number | null; // Optional custom amount
+  /** Expected annual household income (single amount). */
+  expectedAnnualIncome?: number | null;
   location?: {
     country: string;
     stateOrProvince: string | null;
-  } | null; // Optional
+  } | null;
 }
 
 /**
@@ -58,8 +60,8 @@ export interface CompleteOnboardingRequest {
     avatarUrl?: string | null;
   };
   step2: {
-    incomeRange: ExpectedIncomeRange;
-    incomeAmount?: number | null;
+    /** Expected annual household income (single amount). */
+    expectedAnnualIncome?: number | null;
     location?: {
       country: string;
       stateOrProvince: string | null;

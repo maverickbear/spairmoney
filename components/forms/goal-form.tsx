@@ -535,7 +535,7 @@ export function GoalForm({
                           </p>
                         ) : (
                           <p className="text-xs text-amber-600 dark:text-amber-400 pt-2 border-t">
-                            ⚠️ Add income transactions for accurate forecasts.
+                            ⚠️ Add income transactions or set household expected income in Settings for accurate forecasts.
                           </p>
                         )}
                       </div>

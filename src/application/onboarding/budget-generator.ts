@@ -41,28 +41,31 @@ export class BudgetGenerator {
     const periodStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
 
     // CRITICAL: Always fetch income from onboarding to ensure we use the user's declared income
-    // This guarantees budgets are calculated based on what the user entered during onboarding
     let incomeFromOnboarding: number;
     try {
       const { makeOnboardingService } = await import("../onboarding/onboarding.factory");
       const onboardingService = makeOnboardingService();
-      const { incomeRange, incomeAmount } = await onboardingService.getExpectedIncomeWithAmount(userId, accessToken, refreshToken);
-      
-      if (!incomeRange) {
-        logger.warn(`[BudgetGenerator] No income found in onboarding for user ${userId}, using provided monthlyIncome as fallback`);
+      const expectedAnnual = await onboardingService.getExpectedIncomeAmount(
+        userId,
+        accessToken,
+        refreshToken
+      );
+      incomeFromOnboarding = onboardingService.getMonthlyIncomeFromAnnual(expectedAnnual);
+      if (incomeFromOnboarding === 0) {
+        logger.warn(
+          `[BudgetGenerator] No income from onboarding for user ${userId}, using provided monthlyIncome as fallback`
+        );
         incomeFromOnboarding = monthlyIncome;
       } else {
-        // Calculate monthly income from onboarding (respects custom amount if provided)
-        incomeFromOnboarding = onboardingService.getMonthlyIncomeFromRange(incomeRange, incomeAmount);
-        if (incomeFromOnboarding === 0) {
-          logger.warn(`[BudgetGenerator] Invalid income from onboarding for user ${userId}, using provided monthlyIncome as fallback`);
-          incomeFromOnboarding = monthlyIncome;
-        } else {
-          logger.info(`[BudgetGenerator] Using income from onboarding: $${incomeFromOnboarding.toFixed(2)}/month (range: ${incomeRange}${incomeAmount ? `, custom: $${incomeAmount}/year` : ''})`);
-        }
+        logger.info(
+          `[BudgetGenerator] Using income from onboarding: $${incomeFromOnboarding.toFixed(2)}/month (annual: $${expectedAnnual})`
+        );
       }
     } catch (error) {
-      logger.warn(`[BudgetGenerator] Error fetching income from onboarding, using provided monthlyIncome as fallback:`, error);
+      logger.warn(
+        `[BudgetGenerator] Error fetching income from onboarding, using provided monthlyIncome as fallback:`,
+        error
+      );
       incomeFromOnboarding = monthlyIncome;
     }
 

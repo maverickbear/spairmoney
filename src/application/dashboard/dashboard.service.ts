@@ -159,13 +159,15 @@ export class DashboardService {
    * Get all dashboard widgets data
    * OPTIMIZED: Pre-fetch shared data (accounts) to avoid duplicate calls
    * @param viewAsUserId - When set, filter to this household member's accounts and transactions only
+   * @param householdId - When set, show data for this household only (income = that household's). When null/undefined (Everyone), income = sum of all user's households.
    */
   async getDashboardWidgets(
     userId: string,
     selectedDate?: Date,
     accessToken?: string,
     refreshToken?: string,
-    viewAsUserId?: string
+    viewAsUserId?: string,
+    householdId?: string | null
   ): Promise<DashboardWidgetsData> {
     const date = selectedDate || new Date();
     const selectedMonth = startOfMonth(date);
@@ -241,9 +243,14 @@ export class DashboardService {
       goalsService.getGoals(accessToken, refreshToken)
         .catch(e => { logger.error("Error pre-fetching goals:", e); return []; }),
 
-      // 6. Expected income (household-level, for "Income Previso" comparison)
-      onboardingService.getExpectedIncomeWithAmount(userId, accessToken, refreshToken)
-        .catch(e => { logger.warn("[DashboardService] Error fetching expected income:", e); return { incomeRange: null, incomeAmount: null }; }),
+      // 6. Expected income: total for Everyone, or selected member's income when viewAsUserId is set
+      onboardingService.getExpectedIncomeForDashboardView(
+        userId,
+        householdId ?? undefined,
+        viewAsUserId,
+        accessToken,
+        refreshToken
+      ),
     ]);
 
     const currentTransactions = Array.isArray(currentMonthTransactionsResult) ? currentMonthTransactionsResult : (currentMonthTransactionsResult?.transactions || []);
@@ -256,11 +263,9 @@ export class DashboardService {
     const spendingThisMonth = currentTransactions
       .filter((t) => t.type === "expense" && !t.transferFromId && !t.transferToId)
       .reduce((sum, t) => sum + Math.abs(getTransactionAmount(t.amount) || 0), 0);
-    const { incomeRange, incomeAmount } = expectedIncomeResult ?? { incomeRange: null, incomeAmount: null };
-    const expectedMonthlyIncome = incomeRange
-      ? onboardingService.getMonthlyIncomeFromRange(incomeRange, incomeAmount ?? null)
-      : 0;
-    const hasExpectedIncome = incomeRange != null;
+    const expectedAnnualIncome = typeof expectedIncomeResult === "number" ? expectedIncomeResult : null;
+    const expectedMonthlyIncome = onboardingService.getMonthlyIncomeFromAnnual(expectedAnnualIncome);
+    const hasExpectedIncome = expectedAnnualIncome != null && expectedAnnualIncome > 0;
     const spendingAsPercentOfExpected =
       expectedMonthlyIncome > 0 ? (spendingThisMonth / expectedMonthlyIncome) * 100 : null;
     const expectedIncomeOverviewBase: ExpectedIncomeOverview = {
@@ -350,6 +355,7 @@ export class DashboardService {
     };
 
     // Build accountStats with optional availableCard and savingsCard (use post–Promise.all data)
+    // Available = Chequings only (checking accounts). Savings/other types are not included.
     const totalChecking = accounts
       ? accounts.filter((a) => a.type === "checking").reduce((sum, a) => sum + (a.balance || 0), 0)
       : 0;
@@ -358,12 +364,7 @@ export class DashboardService {
           .filter((a) => a.type === "savings" || a.type === "cash")
           .reduce((sum, a) => sum + (a.balance || 0), 0)
       : 0;
-    const assetTypes = ["checking", "savings", "cash", "other", "investment"];
-    const totalAvailable = accounts
-      ? accounts
-          .filter((a) => assetTypes.includes(a.type))
-          .reduce((sum, a) => sum + (a.balance || 0), 0)
-      : 0;
+    const totalAvailable = totalChecking;
 
     const upcomingDueNext7 = upcomingPayments?.totalDueNext7Days ?? 0;
     const freeToSpend = totalAvailable - upcomingDueNext7;

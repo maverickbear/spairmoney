@@ -43,7 +43,14 @@ interface DashboardWidgetsClientProps {
  * No independent data fetching; Refresh button forces version check and refetch only if version changed.
  */
 export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientProps) {
-  const { data, loading, error, refresh, selectedMemberId, setSelectedMemberId } = useDashboardSnapshot();
+  const {
+    data,
+    loading,
+    error,
+    refresh,
+    selectedMemberId,
+    setSelectedMemberId,
+  } = useDashboardSnapshot();
   const [showSpareScoreDetails, setShowSpareScoreDetails] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [members, setMembers] = useState<HouseholdMemberOption[]>([]);
@@ -95,34 +102,46 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
     return null;
   }
 
+  const selectedMember = selectedMemberId
+    ? members.find((m) => (m.memberId ?? m.id) === selectedMemberId)
+    : null;
+  const selectedDisplayName = selectedMemberId === null
+    ? "Family"
+    : (selectedMember?.name || selectedMember?.email || "Member");
+
   return (
     <div className="w-full p-4 lg:p-6">
-      <div className="flex flex-row items-center justify-between mb-6 flex-wrap gap-3">
-        <div className="flex flex-row items-center gap-2 flex-wrap">
-          <h1 className="text-2xl font-bold tracking-normal">Your family finances at a glance</h1>
-          <Select
-            value={selectedMemberId ?? "everyone"}
-            onValueChange={(value) => setSelectedMemberId(value === "everyone" ? null : value)}
-          >
-            <SelectTrigger
-              className="w-auto min-w-[8rem] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 h-auto font-semibold text-lg text-foreground hover:bg-muted/50 rounded-md gap-0.5 [&>svg]:ml-0.5"
-              size="medium"
-            >
-              <SelectValue placeholder="Everyone" />
-            </SelectTrigger>
-            <SelectContent align="start">
-              <SelectItem value="everyone">Everyone</SelectItem>
-              {members.map((m) => {
-                const value = m.memberId ?? m.id;
-                const label = m.name || m.email || "Member";
-                return (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-row items-center justify-between mb-6 flex-nowrap gap-3 min-w-0">
+        <div className="flex flex-row items-center flex-nowrap min-w-0">
+          <h1 className="text-2xl font-bold tracking-normal">
+            <span className="inline-flex flex-nowrap items-baseline gap-1">
+              <Select
+                value={selectedMemberId ?? "everyone"}
+                onValueChange={(value) => setSelectedMemberId(value === "everyone" ? null : value)}
+              >
+                <SelectTrigger
+                  className="inline-flex w-auto max-w-none border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-2xl tracking-normal text-primary-text hover:text-primary cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none"
+                  size="medium"
+                  aria-label="Change whose finances to view"
+                >
+                  <span className="text-primary-text font-bold whitespace-nowrap">{selectedDisplayName}&apos;s </span>
+                </SelectTrigger>
+                <SelectContent align="start">
+                  <SelectItem value="everyone">Family</SelectItem>
+                  {members.map((m) => {
+                    const value = m.memberId ?? m.id;
+                    const label = m.name || m.email || "Member";
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <span className="text-foreground whitespace-nowrap">finances at a glance</span>
+            </span>
+          </h1>
         </div>
         <Button variant="outline" size="small" onClick={handleRefresh} disabled={loading || isRefreshing} className="gap-2">
           <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
@@ -136,15 +155,8 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
            <WidgetCard title="Available" className="min-h-0 h-auto">
               {(() => {
                 const available = data.accountStats?.totalAvailable ??
-                  (data.accountStats ? (data.accountStats.totalChecking ?? 0) + (data.accountStats.totalSavings ?? 0) : 0);
+                  (data.accountStats?.totalChecking ?? 0);
                 const card = data.accountStats?.availableCard;
-                const statusConfig = !card
-                  ? null
-                  : card.status === "at_risk"
-                    ? { label: "At risk", emoji: "🟡" }
-                    : card.status === "behind"
-                      ? { label: "Behind", emoji: "🔴" }
-                      : { label: "On track", emoji: "🟢" };
                 return (
                   <div className="flex flex-col gap-2">
                     <div className="text-2xl font-bold">
@@ -161,9 +173,6 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                     <p className="text-sm text-muted-foreground">
                       Projected end of month: {card?.projectedEndOfMonth != null ? formatMoney(card.projectedEndOfMonth) : "—"}
                     </p>
-                    <p className="text-sm font-medium mt-0.5">
-                      {statusConfig ? `${statusConfig.emoji} ${statusConfig.label}` : "—"}
-                    </p>
                   </div>
                 );
               })()}
@@ -177,15 +186,6 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
               {(() => {
                 const savings = data.accountStats?.totalSavings ?? 0;
                 const card = data.accountStats?.savingsCard;
-                const statusConfig = !card
-                  ? null
-                  : card.status === "at_risk"
-                    ? { label: "At risk", emoji: "🔴" }
-                    : card.status === "below_target"
-                      ? { label: "Below target", emoji: "🟡" }
-                      : card.status === "on_track"
-                        ? { label: "On track", emoji: "🟢" }
-                        : { label: "Growing steadily", emoji: "🟢" };
                 return (
                   <div className="flex flex-col gap-2">
                     <div className="text-2xl font-bold">
@@ -206,9 +206,6 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                         ? `Emergency fund covers ${card.emergencyFundMonths} months`
                         : "Emergency fund: —"}
                     </p>
-                    <p className="text-sm font-medium mt-0.5">
-                      {statusConfig ? `${statusConfig.emoji} ${statusConfig.label}` : "—"}
-                    </p>
                   </div>
                 );
               })()}
@@ -222,9 +219,6 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                 const changePct = nw?.changePercentage ?? 0;
                 const assets = nw?.totalAssets ?? 0;
                 const liabilities = nw?.totalLiabilities ?? 0;
-                const statusLabel =
-                  change > 0 ? "Improving" : change < 0 ? "Declining" : "Stable";
-                const statusEmoji = change > 0 ? "🟢" : change < 0 ? "🔴" : "🟡";
                 return (
                   <div className="flex flex-col gap-2">
                     <div className="text-2xl font-bold">
@@ -243,9 +237,6 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Liabilities: {hasData ? formatMoney(liabilities) : "—"}
-                    </p>
-                    <p className="text-sm font-medium mt-0.5">
-                      {hasData ? `${statusEmoji} ${statusLabel}` : "—"}
                     </p>
                   </div>
                 );

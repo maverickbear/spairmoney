@@ -99,9 +99,7 @@ export function SimplifiedOnboardingDialog({
       const onboardingData: SimplifiedOnboardingRequest = {
         goals: selectedGoals,
         householdType: householdType!,
-        // Income and location are optional - not collected in simplified onboarding
-        incomeRange: null,
-        incomeAmount: null,
+        expectedAnnualIncome: null,
         location: null,
       };
 

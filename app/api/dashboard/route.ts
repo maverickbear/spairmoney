@@ -21,22 +21,39 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const dateParam = searchParams.get("date");
     const memberIdParam = searchParams.get("memberId");
+    const householdIdParam = searchParams.get("householdId") ?? undefined;
     const selectedDate = dateParam ? new Date(dateParam) : new Date();
 
+    // When memberId is set: show only that household member's data (accounts, transactions).
+    // When omitted (Everyone): show aggregated data for all household members.
     let viewAsUserId: string | undefined;
     if (memberIdParam) {
       const membersService = makeMembersService();
       const members = await membersService.getHouseholdMembers(userId);
-      const isAllowed = members.some(
+      const member = members.find(
         (m) => (m.memberId ?? m.id) === memberIdParam
       );
-      if (!isAllowed) {
+      if (!member) {
         return NextResponse.json(
           { error: "Household member not found or access denied" },
           { status: 400 }
         );
       }
-      viewAsUserId = memberIdParam;
+      // Use the member's user id for filtering (accounts/transactions are keyed by user id)
+      viewAsUserId = member.memberId ?? memberIdParam;
+    }
+
+    let householdId: string | null | undefined = householdIdParam || null;
+    if (householdIdParam) {
+      const { HouseholdRepository } = await import("@/src/infrastructure/database/repositories/household.repository");
+      const householdRepo = new HouseholdRepository();
+      const userHouseholds = await householdRepo.findHouseholdsForUser(userId);
+      if (!userHouseholds.some((h) => h.id === householdIdParam)) {
+        return NextResponse.json(
+          { error: "Household not found or access denied" },
+          { status: 403 }
+        );
+      }
     }
 
     let accessToken: string | undefined;
@@ -62,7 +79,8 @@ export async function GET(request: NextRequest) {
       selectedDate,
       accessToken,
       refreshToken,
-      viewAsUserId
+      viewAsUserId,
+      householdId ?? undefined
     );
 
     const cacheHeaders = getCacheHeaders("dynamic");

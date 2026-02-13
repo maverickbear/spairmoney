@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { ProfileModule } from "../profile/profile-module";
 import { HouseholdIncomeSettings } from "@/src/presentation/components/features/onboarding/household-income-settings";
 import { BudgetPlanSettings } from "@/src/presentation/components/features/onboarding/budget-plan-settings";
-import { ChangePasswordForm } from "@/components/profile/change-password-form";
+import { RequestPasswordResetLink } from "@/components/profile/request-password-reset-link";
 import { DeleteAccountSection } from "@/components/profile/delete-account-section";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { PageHeader } from "@/components/common/page-header";
@@ -64,11 +64,8 @@ export default function MyAccountPage() {
               <AccordionTrigger>Change Password</AccordionTrigger>
               <AccordionContent className="p-0">
                 <div className="px-6 pb-4">
-                  <p className="text-sm text-muted-foreground">
-                    Update your password to keep your account secure
-                  </p>
+                  <RequestPasswordResetLink />
                 </div>
-                <ChangePasswordForm />
               </AccordionContent>
             </AccordionItem>
 

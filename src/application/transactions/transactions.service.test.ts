@@ -95,6 +95,7 @@ describe("TransactionsService", () => {
         currency_code: 'USD',
         household_id: null,
         deleted_at: null,
+        is_default: false,
       }]);
       mockCategoriesRepository.findCategoriesByIds.mockResolvedValue([{
         id: "test-category-id",
@@ -139,6 +140,7 @@ describe("TransactionsService", () => {
         currency_code: 'USD',
         household_id: null,
         deleted_at: null,
+        is_default: false,
       }]);
       mockCategoriesRepository.findCategoriesByIds.mockResolvedValue([{
         id: "test-category-id",
@@ -209,6 +211,7 @@ describe("TransactionsService", () => {
         currency_code: 'USD',
         household_id: null,
         deleted_at: null,
+        is_default: false,
       }]);
 
       // Execute
@@ -238,6 +241,7 @@ describe("TransactionsService", () => {
         currency_code: 'USD',
         household_id: null,
         deleted_at: null,
+        is_default: false,
       }]);
 
       // Execute
@@ -275,6 +279,7 @@ describe("TransactionsService", () => {
         currency_code: 'USD',
         household_id: null,
         deleted_at: null,
+        is_default: false,
       }]);
 
       // Execute
@@ -314,6 +319,7 @@ describe("TransactionsService", () => {
         currency_code: 'USD',
         household_id: null,
         deleted_at: null,
+        is_default: false,
       }]);
 
       // Execute

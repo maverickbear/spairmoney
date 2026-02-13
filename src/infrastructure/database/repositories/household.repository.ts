@@ -172,6 +172,42 @@ export class HouseholdRepository {
   }
 
   /**
+   * List households the user belongs to (active membership only).
+   */
+  async findHouseholdsForUser(
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<{ id: string; name: string }[]> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: rows, error } = await supabase
+      .from("household_members")
+      .select("household_id, household:households(id, name)")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .is("deleted_at", null);
+
+    if (error) {
+      logger.error("[HouseholdRepository] Error fetching households for user:", error);
+      return [];
+    }
+
+    if (!rows?.length) return [];
+
+    return rows
+      .filter((r) => r.household != null && typeof r.household === "object")
+      .map((r) => {
+        const h = Array.isArray(r.household) ? r.household[0] : r.household;
+        if (!h || typeof h !== "object" || !("id" in h) || !("name" in h)) {
+          return null;
+        }
+        return { id: String(h.id), name: String(h.name) };
+      })
+      .filter((x): x is { id: string; name: string } => x != null);
+  }
+
+  /**
    * Delete household by ID
    */
   async delete(householdId: string): Promise<void> {

@@ -151,36 +151,49 @@ export class AccountsService {
   }
 
   /**
-   * Create a new account
+   * Create a new account.
+   * When the caller is household admin/owner and passes ownerUserId, the account is linked to that member (account.user_id = ownerUserId).
    */
   async createAccount(data: AccountFormData): Promise<BaseAccount> {
-    // Get current user
     const userId = await getCurrentUserId();
     if (!userId) {
       throw new AppError("Unauthorized", 401);
     }
 
-    // Check account limit
     const limitGuard = await guardAccountLimit(userId);
     await throwIfNotAllowed(limitGuard);
 
-    // Generate UUID and timestamp
     const id = crypto.randomUUID();
     const now = formatTimestamp(new Date());
 
-    // Determine owner IDs
-    const ownerIds = data.ownerIds && data.ownerIds.length > 0 ? data.ownerIds : [userId];
-
-    // Get active household ID
     const membersService = makeMembersService();
     const householdId = await membersService.getActiveHouseholdId(userId);
 
-    // Create account via repository (repository maps camelCase to snake_case internally)
+    let accountUserId = userId;
+    let ownerIds: string[] = data.ownerIds && data.ownerIds.length > 0 ? data.ownerIds : [userId];
+
+    if (data.ownerUserId != null && data.ownerUserId !== userId) {
+      const role = await membersService.getUserRole(userId);
+      const isAdminOrOwner = role === "admin" || role === "super_admin";
+      if (!isAdminOrOwner) {
+        throw new AppError("Only household admin or owner can link an account to another member", 403);
+      }
+      const members = await membersService.getHouseholdMembers(userId);
+      const targetMember = members.find(
+        (m) => (m.memberId ?? m.id) === data.ownerUserId && m.status === "active"
+      );
+      if (!targetMember?.memberId) {
+        throw new AppError("Household member not found or cannot own accounts", 400);
+      }
+      accountUserId = targetMember.memberId;
+      ownerIds = [accountUserId];
+    }
+
     const accountRow = await this.repository.create({
       id,
       name: data.name,
       type: data.type,
-      userId,
+      userId: accountUserId,
       creditLimit: data.type === "credit" ? data.creditLimit : null,
       initialBalance: (data.type === "checking" || data.type === "savings" || data.type === "cash" || data.type === "other") ? (data.initialBalance ?? 0) : null,
       dueDayOfMonth: data.type === "credit" ? (data.dueDayOfMonth ?? null) : null,
@@ -190,11 +203,9 @@ export class AccountsService {
       updatedAt: now,
     });
 
-    // Create account owners
     if (ownerIds.length > 0) {
       await this.repository.setAccountOwners(id, ownerIds, now);
     }
-
 
     return AccountsMapper.toDomain(accountRow);
   }

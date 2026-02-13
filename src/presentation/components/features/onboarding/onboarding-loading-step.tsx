@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CompleteOnboardingRequest } from "@/src/domain/onboarding/onboarding.types";
-import { ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
 import { BudgetRuleType } from "@/src/domain/budgets/budget-rules.types";
 import { logger } from "@/src/infrastructure/utils/logger";
 
@@ -19,8 +18,7 @@ interface OnboardingLoadingStepProps {
     avatarUrl?: string | null;
   };
   step2Data?: {
-    incomeRange?: ExpectedIncomeRange;
-    incomeAmount?: number | null;
+    expectedAnnualIncome?: number | null;
     location?: {
       country: string;
       stateOrProvince: string | null;
@@ -186,25 +184,26 @@ export function OnboardingLoadingStep({
         hasStep3Data: !!step3Data,
         hasSessionData: !!sessionData,
         step1Name: step1Data?.name,
-        step2IncomeRange: step2Data?.incomeRange,
+        step2ExpectedAnnualIncome: step2Data?.expectedAnnualIncome,
         step3PlanId: step3Data?.planId,
         step3Interval: step3Data?.interval,
       });
-      
+
       if (step1Data && step2Data && step3Data) {
-        // Use props if provided
-        if (!step1Data.name || !step2Data.incomeRange || !step3Data.planId || !step3Data.interval) {
+        const hasIncome =
+          step2Data.expectedAnnualIncome != null && step2Data.expectedAnnualIncome > 0;
+        if (!step1Data.name || !hasIncome || !step3Data.planId || !step3Data.interval) {
           const missingFields = [];
           if (!step1Data.name) missingFields.push("step1.name");
-          if (!step2Data.incomeRange) missingFields.push("step2.incomeRange");
+          if (!hasIncome) missingFields.push("step2.expectedAnnualIncome");
           if (!step3Data.planId) missingFields.push("step3.planId");
           if (!step3Data.interval) missingFields.push("step3.interval");
           logger.error("[OnboardingLoadingStep] Missing required fields:", missingFields);
           throw new Error(`Missing required onboarding data: ${missingFields.join(", ")}`);
         }
-        
+
         logger.info("[OnboardingLoadingStep] Using props data");
-        
+
         dataToSend = {
           step1: {
             name: step1Data.name,
@@ -213,8 +212,7 @@ export function OnboardingLoadingStep({
             avatarUrl: step1Data.avatarUrl || null,
           },
           step2: {
-            incomeRange: step2Data.incomeRange,
-            incomeAmount: step2Data.incomeAmount || null,
+            expectedAnnualIncome: step2Data.expectedAnnualIncome ?? null,
             location: step2Data.location || null,
             ruleType: step2Data.ruleType,
           },
@@ -224,17 +222,21 @@ export function OnboardingLoadingStep({
           },
         };
       } else if (sessionData) {
-        // Fall back to sessionStorage
         logger.info("[OnboardingLoadingStep] Using sessionStorage data");
         const parsed = JSON.parse(sessionData);
-        
-        // Handle migration from old step4 structure to new step3 structure
-        const planData = parsed.step3 || parsed.step4; // Support both old and new structure
-        
-        if (!parsed.step1?.name || !parsed.step2?.incomeRange || !planData?.planId || !planData?.interval) {
+
+        const planData = parsed.step3 || parsed.step4;
+        const step2 = parsed.step2 || {};
+        const annualIncome =
+          step2.expectedAnnualIncome ??
+          step2.incomeAmount ??
+          null;
+        const hasIncome = annualIncome != null && annualIncome > 0;
+
+        if (!parsed.step1?.name || !hasIncome || !planData?.planId || !planData?.interval) {
           const missingFields = [];
           if (!parsed.step1?.name) missingFields.push("step1.name");
-          if (!parsed.step2?.incomeRange) missingFields.push("step2.incomeRange");
+          if (!hasIncome) missingFields.push("step2.expectedAnnualIncome");
           if (!planData?.planId) missingFields.push("step3.planId");
           if (!planData?.interval) missingFields.push("step3.interval");
           logger.error("[OnboardingLoadingStep] Missing required fields in sessionStorage:", missingFields);
@@ -248,10 +250,9 @@ export function OnboardingLoadingStep({
             avatarUrl: parsed.step1.avatarUrl || null,
           },
           step2: {
-            incomeRange: parsed.step2.incomeRange,
-            incomeAmount: parsed.step2.incomeAmount || null,
-            location: parsed.step2.location || null,
-            ruleType: parsed.step2.ruleType,
+            expectedAnnualIncome: annualIncome,
+            location: step2.location || null,
+            ruleType: step2.ruleType,
           },
           step3: {
             planId: planData.planId,

@@ -17,7 +17,7 @@ import { makeDebtsService } from "@/src/application/debts/debts.factory";
 import { makeProfileService } from "@/src/application/profile/profile.factory";
 import { makeOnboardingService } from "@/src/application/onboarding/onboarding.factory";
 import { getPlannedPaymentsForDashboard } from "@/src/application/planned-payments/get-dashboard-planned-payments";
-import { OnboardingStatusExtended, ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
+import { OnboardingStatusExtended } from "@/src/domain/onboarding/onboarding.types";
 import { TransactionWithRelations, UpcomingTransaction } from "@/src/domain/transactions/transactions.types";
 import { BudgetWithRelations } from "@/src/domain/budgets/budgets.types";
 import { GoalWithCalculations } from "@/src/domain/goals/goals.types";
@@ -39,7 +39,7 @@ interface CriticalDashboardData {
   accounts: AccountWithBalance[];
   plannedPayments: BasePlannedPayment[]; // Planned payments for the selected month
   onboardingStatus: OnboardingStatusExtended | null;
-  expectedIncomeRange: string | null; // Expected income range for display
+  expectedAnnualIncome: number | null; // Expected annual household income for display
 }
 
 // Chart transaction format (aggregated monthly data)
@@ -262,7 +262,7 @@ async function loadDashboardDataInternal(
         hasPersonalData: status.hasPersonalData,
         hasExpectedIncome: status.hasExpectedIncome,
         hasPlan: status.hasPlan,
-        expectedIncome: status.expectedIncome,
+        expectedAnnualIncome: status.expectedAnnualIncome,
         completedCount: status.completedCount,
         totalCount: status.totalCount,
       });
@@ -414,25 +414,20 @@ async function loadDashboardDataInternal(
   // Combine planned payments from upcomingTransactions with additional ones
   const allPlannedPayments = [...plannedPaymentsFromUpcoming, ...additionalPlannedPayments];
 
-  // OPTIMIZED: Fetch expected income range in parallel with other operations
-  // Calculate projected income immediately after to use in financial health
-  let expectedIncomeRange: ExpectedIncomeRange = null;
+  // Fetch expected annual income and derive monthly for financial health
   let projectedIncome: number | undefined;
-  
-  // Use existing onboardingService instead of creating new one
-  const expectedIncomeResult = userId ? await onboardingService.getExpectedIncome(userId, accessToken, refreshToken).catch((error) => {
-    logger.warn("Error getting expected income range:", error);
-    return null;
-  }) : null;
-  
-  expectedIncomeRange = expectedIncomeResult;
-  if (expectedIncomeRange && userId) {
-    try {
-      // Use existing onboardingService instead of creating new one
-      projectedIncome = onboardingService.getMonthlyIncomeFromRange(expectedIncomeRange);
-    } catch (error) {
-      logger.warn("Error calculating projected income:", error);
-    }
+
+  const expectedAnnualIncome = userId
+    ? await onboardingService
+        .getExpectedIncomeAmount(userId, accessToken, refreshToken)
+        .catch((error) => {
+          logger.warn("Error getting expected income:", error);
+          return null;
+        })
+    : null;
+
+  if (expectedAnnualIncome != null && expectedAnnualIncome > 0 && userId) {
+    projectedIncome = onboardingService.getMonthlyIncomeFromAnnual(expectedAnnualIncome);
   }
 
   // CRITICAL OPTIMIZATION: Only fetch essential data for first render
@@ -528,7 +523,7 @@ async function loadDashboardDataInternal(
     accounts,
     plannedPayments: uniquePlannedPayments,
     onboardingStatus,
-    expectedIncomeRange,
+    expectedAnnualIncome: expectedAnnualIncome ?? null,
   };
 
   // For backward compatibility, we'll still return the full structure

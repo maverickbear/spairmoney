@@ -5,8 +5,8 @@
 
 import { HouseholdRepository } from "@/src/infrastructure/database/repositories/household.repository";
 import { OnboardingMapper } from "./onboarding.mapper";
-import { ExpectedIncomeRange, OnboardingStatusExtended } from "../../domain/onboarding/onboarding.types";
-import { expectedIncomeRangeSchema } from "../../domain/onboarding/onboarding.validations";
+import { OnboardingStatusExtended } from "../../domain/onboarding/onboarding.types";
+import { expectedAnnualIncomeSchema } from "../../domain/onboarding/onboarding.validations";
 import { locationSchema } from "../../domain/taxes/taxes.validations";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 import { logger } from "@/src/infrastructure/utils/logger";
@@ -25,15 +25,6 @@ import { getAccountsForDashboard } from "../accounts/get-dashboard-accounts";
 import { makeProfileService } from "../profile/profile.factory";
 import { getDashboardSubscription } from "../subscriptions/get-dashboard-subscription";
 import { AppError } from "../shared/app-error";
-
-// Income range to monthly income conversion (using midpoint of range)
-const INCOME_RANGE_TO_MONTHLY: Record<NonNullable<ExpectedIncomeRange>, number> = {
-  "0-50k": 25000 / 12, // ~$2,083/month
-  "50k-100k": 75000 / 12, // ~$6,250/month
-  "100k-150k": 125000 / 12, // ~$10,417/month
-  "150k-250k": 200000 / 12, // ~$16,667/month
-  "250k+": 300000 / 12, // ~$25,000/month
-};
 
 export class OnboardingService {
   constructor(
@@ -168,25 +159,29 @@ export class OnboardingService {
   ): Promise<boolean> {
     try {
       const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-      
-      // If household exists, check household settings
+
       if (householdId) {
         const settings = await this.householdRepository.getSettings(
           householdId,
           accessToken,
           refreshToken
         );
-
-        if (settings?.expectedIncome !== undefined && settings.expectedIncome !== null) {
+        if (
+          settings?.expectedAnnualIncome !== undefined &&
+          settings.expectedAnnualIncome !== null &&
+          settings.expectedAnnualIncome > 0
+        ) {
           return true;
         }
       }
 
-      // Fallback to temporary income in profile
       const profileService = makeProfileService();
       const profile = await profileService.getProfile(accessToken, refreshToken);
-      
-      return profile?.temporaryExpectedIncome !== undefined && profile.temporaryExpectedIncome !== null;
+      const hasTemporary =
+        profile?.temporaryExpectedIncomeAmount !== undefined &&
+        profile.temporaryExpectedIncomeAmount !== null &&
+        profile.temporaryExpectedIncomeAmount > 0;
+      return hasTemporary;
     } catch (error) {
       logger.error("[OnboardingService] Error checking income onboarding status:", error);
       return false;
@@ -194,54 +189,62 @@ export class OnboardingService {
   }
 
   /**
-   * Save expected income to household settings
-   * If no household exists, stores temporarily in User profile until household is created
+   * Save expected annual income.
+   * If householdId is provided and user has access, save to that household; otherwise use active household or temporary profile.
+   * When memberIncomes is provided, it is persisted and expectedAnnualIncome is set to the sum of values (or to expectedAnnualIncome if provided).
    */
   async saveExpectedIncome(
     userId: string,
-    incomeRange: ExpectedIncomeRange,
+    expectedAnnualIncome: number | null,
     accessToken?: string,
     refreshToken?: string,
-    incomeAmount?: number | null
+    householdIdParam?: string | null,
+    memberIncomes?: Record<string, number> | null
   ): Promise<void> {
-    // Validate input
-    expectedIncomeRangeSchema.parse(incomeRange);
-    
-    // Validate incomeAmount if provided
-    if (incomeAmount !== undefined && incomeAmount !== null) {
-      if (incomeAmount <= 0) {
-        throw new AppError("Expected income amount must be positive", 400);
+    const totalFromMembers =
+      memberIncomes != null
+        ? Object.values(memberIncomes).reduce((sum, v) => sum + (typeof v === "number" ? v : 0), 0)
+        : null;
+    const effectiveTotal =
+      totalFromMembers != null && totalFromMembers > 0
+        ? totalFromMembers
+        : expectedAnnualIncome;
+
+    if (effectiveTotal !== null && effectiveTotal !== undefined) {
+      expectedAnnualIncomeSchema.parse(effectiveTotal);
+      if (effectiveTotal <= 0) {
+        throw new AppError("Expected income must be positive", 400);
       }
     }
 
-    const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-    
-    // If no household exists, store temporarily in User profile
+    const householdId =
+      householdIdParam ?? (await getActiveHouseholdId(userId, accessToken, refreshToken));
+
     if (!householdId) {
-      logger.info(`[OnboardingService] No household found for user ${userId}, storing income temporarily in profile`);
-      
+      logger.info(
+        `[OnboardingService] No household found for user ${userId}, storing income temporarily in profile`
+      );
       const profileService = makeProfileService();
-      await profileService.updateProfile({ 
-        temporaryExpectedIncome: incomeRange,
-        temporaryExpectedIncomeAmount: incomeAmount ?? null,
+      await profileService.updateProfile({
+        temporaryExpectedIncome: null,
+        temporaryExpectedIncomeAmount: effectiveTotal ?? expectedAnnualIncome,
       });
-      
-      logger.info(`[OnboardingService] Stored temporary expected income for user ${userId}: ${incomeRange}${incomeAmount ? ` (amount: $${incomeAmount})` : ''}`);
+      logger.info(
+        `[OnboardingService] Stored temporary expected income for user ${userId}: ${effectiveTotal ?? expectedAnnualIncome ?? "null"}`
+      );
       return;
     }
 
-    // Get current settings
     const currentSettings = await this.householdRepository.getSettings(
       householdId,
       accessToken,
       refreshToken
     );
 
-    // Update settings
     const updatedSettings = OnboardingMapper.settingsToDatabase({
       ...currentSettings,
-      expectedIncome: incomeRange,
-      expectedIncomeAmount: incomeAmount ?? null,
+      expectedAnnualIncome: effectiveTotal ?? expectedAnnualIncome ?? undefined,
+      ...(memberIncomes != null && { memberIncomes }),
     });
 
     await this.householdRepository.updateSettings(
@@ -251,7 +254,9 @@ export class OnboardingService {
       refreshToken
     );
 
-    logger.info(`[OnboardingService] Saved expected income for user ${userId}: ${incomeRange}${incomeAmount ? ` (amount: $${incomeAmount})` : ''}`);
+    logger.info(
+      `[OnboardingService] Saved expected income for user ${userId}, household ${householdId}: ${effectiveTotal ?? expectedAnnualIncome ?? "null"}${memberIncomes != null ? " (per-member)" : ""}`
+    );
   }
 
   /**
@@ -410,69 +415,131 @@ export class OnboardingService {
   }
 
   /**
-   * Get expected income from household settings or temporary profile storage
+   * Get expected annual income for a specific household (by id).
    */
-  async getExpectedIncome(
-    userId: string,
+  async getExpectedIncomeForHousehold(
+    householdId: string,
     accessToken?: string,
     refreshToken?: string
-  ): Promise<ExpectedIncomeRange> {
-    const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-    
-    // If household exists, check household settings first
-    if (householdId) {
-      const settings = await this.householdRepository.getSettings(
-        householdId,
-        accessToken,
-        refreshToken
-      );
-
-      if (settings?.expectedIncome !== undefined && settings.expectedIncome !== null) {
-        return settings.expectedIncome;
-      }
-    }
-
-    // Fallback to temporary income in profile
-    const profileService = makeProfileService();
-    const profile = await profileService.getProfile(accessToken, refreshToken);
-    
-    return profile?.temporaryExpectedIncome ?? null;
+  ): Promise<number | null> {
+    const settings = await this.householdRepository.getSettings(
+      householdId,
+      accessToken,
+      refreshToken
+    );
+    const amount = settings?.expectedAnnualIncome;
+    return amount != null && amount > 0 ? amount : null;
   }
 
   /**
-   * Get expected income with amount (range and custom amount if available)
+   * Get income data for a household: total and per-member incomes (for the income edit dialog).
    */
-  async getExpectedIncomeWithAmount(
+  async getIncomeDataForHousehold(
+    householdId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<{ expectedAnnualIncome: number | null; memberIncomes: Record<string, number> }> {
+    const settings = await this.householdRepository.getSettings(
+      householdId,
+      accessToken,
+      refreshToken
+    );
+    const expectedAnnualIncome =
+      settings?.expectedAnnualIncome != null && settings.expectedAnnualIncome > 0
+        ? settings.expectedAnnualIncome
+        : null;
+    const memberIncomes = settings?.memberIncomes ?? {};
+    return { expectedAnnualIncome, memberIncomes };
+  }
+
+  /**
+   * Get expected annual income for the dashboard based on current view.
+   * - When viewAsUserId is set: returns that member's expected income (uses householdId or active household).
+   * - When householdId is set and viewAsUserId is not set: returns household total (Everyone in that household).
+   * - When neither applies: returns sum across all user's households (Everyone).
+   */
+  async getExpectedIncomeForDashboardView(
+    userId: string,
+    householdId: string | null | undefined,
+    viewAsUserId: string | null | undefined,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<number | null> {
+    if (viewAsUserId) {
+      const effectiveHouseholdId =
+        householdId && householdId !== ""
+          ? householdId
+          : await getActiveHouseholdId(userId, accessToken, refreshToken);
+      if (effectiveHouseholdId) {
+        const { memberIncomes } = await this.getIncomeDataForHousehold(
+          effectiveHouseholdId,
+          accessToken,
+          refreshToken
+        );
+        const amount = memberIncomes[viewAsUserId];
+        return typeof amount === "number" && amount >= 0 ? amount : null;
+      }
+    }
+    if (householdId && householdId !== "") {
+      return this.getExpectedIncomeForHousehold(householdId, accessToken, refreshToken);
+    }
+    const sum = await this.getExpectedIncomeSumForUser(userId, accessToken, refreshToken);
+    return sum > 0 ? sum : null;
+  }
+
+  /**
+   * Get expected annual income for the user's active household (or temporary profile if no household).
+   */
+  async getExpectedIncomeAmount(
     userId: string,
     accessToken?: string,
     refreshToken?: string
-  ): Promise<{ incomeRange: ExpectedIncomeRange; incomeAmount?: number | null }> {
+  ): Promise<number | null> {
     const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-    
-    // If household exists, check household settings first
+
     if (householdId) {
-      const settings = await this.householdRepository.getSettings(
+      const amount = await this.getExpectedIncomeForHousehold(
         householdId,
         accessToken,
         refreshToken
       );
-
-      if (settings?.expectedIncome !== undefined && settings.expectedIncome !== null) {
-        return {
-          incomeRange: settings.expectedIncome,
-          incomeAmount: settings.expectedIncomeAmount ?? null,
-        };
-      }
+      if (amount != null) return amount;
     }
 
-    // Fallback to temporary income in profile
     const profileService = makeProfileService();
     const profile = await profileService.getProfile(accessToken, refreshToken);
-    
-    return {
-      incomeRange: profile?.temporaryExpectedIncome ?? null,
-      incomeAmount: profile?.temporaryExpectedIncomeAmount ?? null,
-    };
+    const temp = profile?.temporaryExpectedIncomeAmount;
+    return temp != null && temp > 0 ? temp : null;
+  }
+
+  /**
+   * Get sum of expected annual income across all households the user belongs to.
+   * Used for dashboard "Everyone" view.
+   */
+  async getExpectedIncomeSumForUser(
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<number> {
+    const households = await this.householdRepository.findHouseholdsForUser(
+      userId,
+      accessToken,
+      refreshToken
+    );
+    let sum = 0;
+    for (const h of households) {
+      const amount = await this.getExpectedIncomeForHousehold(h.id, accessToken, refreshToken);
+      if (amount != null && amount > 0) sum += amount;
+    }
+    return sum;
+  }
+
+  /**
+   * Convert expected annual income to monthly.
+   */
+  getMonthlyIncomeFromAnnual(expectedAnnualIncome: number | null): number {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0) return 0;
+    return expectedAnnualIncome / 12;
   }
 
   /**
@@ -537,43 +604,20 @@ export class OnboardingService {
   }
 
   /**
-   * Get monthly income from expected income range or custom amount
-   * If incomeAmount is provided, uses that value directly (converted to monthly)
-   * Otherwise, uses the range midpoint
-   */
-  getMonthlyIncomeFromRange(incomeRange: ExpectedIncomeRange, incomeAmount?: number | null): number {
-    // If custom amount is provided, use it directly
-    if (incomeAmount !== undefined && incomeAmount !== null && incomeAmount > 0) {
-      return incomeAmount / 12;
-    }
-
-    // Otherwise, use range midpoint
-    if (!incomeRange) {
-      return 0;
-    }
-
-    return INCOME_RANGE_TO_MONTHLY[incomeRange] || 0;
-  }
-
-  /**
-   * Generate initial budgets based on expected income and optional budget rule
+   * Generate initial budgets based on expected annual income and optional budget rule
    */
   async generateInitialBudgets(
     userId: string,
-    incomeRange: ExpectedIncomeRange,
+    expectedAnnualIncome: number,
     accessToken?: string,
     refreshToken?: string,
-    ruleType?: import("../../domain/budgets/budget-rules.types").BudgetRuleType,
-    incomeAmount?: number | null
+    ruleType?: import("../../domain/budgets/budget-rules.types").BudgetRuleType
   ): Promise<void> {
-    if (!incomeRange) {
-      throw new AppError("Income range is required to generate budgets", 400);
+    if (expectedAnnualIncome <= 0) {
+      throw new AppError("Expected income is required to generate budgets", 400);
     }
 
-    const monthlyIncome = this.getMonthlyIncomeFromRange(incomeRange, incomeAmount);
-    if (monthlyIncome === 0) {
-      throw new AppError("Invalid income range", 400);
-    }
+    const monthlyIncome = this.getMonthlyIncomeFromAnnual(expectedAnnualIncome);
 
     // Get location if available
     const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);

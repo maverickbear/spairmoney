@@ -14,8 +14,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { IncomeOnboardingForm } from "./income-onboarding-form";
 import { BudgetRuleSelector } from "@/src/presentation/components/features/budgets/budget-rule-selector";
 import { useToast } from "@/components/toast-provider";
-import { ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
-import { BudgetRuleType, BudgetRuleProfile } from "@/src/domain/budgets/budget-rules.types";
+import { BudgetRuleType } from "@/src/domain/budgets/budget-rules.types";
 
 interface IncomeOnboardingDialogProps {
   open: boolean;
@@ -29,32 +28,31 @@ export function IncomeOnboardingDialog({
   onSuccess,
 }: IncomeOnboardingDialogProps) {
   const { toast } = useToast();
-  const [selectedIncome, setSelectedIncome] = useState<ExpectedIncomeRange>(null);
+  const [expectedAnnualIncome, setExpectedAnnualIncome] = useState<number | null>(null);
   const [selectedRule, setSelectedRule] = useState<BudgetRuleType | undefined>(undefined);
   const [recommendedRule, setRecommendedRule] = useState<BudgetRuleType | undefined>(undefined);
   const [step, setStep] = useState<"income" | "rule">("income");
   const [loading, setLoading] = useState(false);
 
-  // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
       setStep("income");
-      setSelectedIncome(null);
+      setExpectedAnnualIncome(null);
       setSelectedRule(undefined);
       setRecommendedRule(undefined);
     }
   }, [open]);
 
-  // Get recommended rule when income is selected
   useEffect(() => {
-    if (selectedIncome && step === "income") {
+    if (expectedAnnualIncome != null && expectedAnnualIncome > 0 && step === "income") {
       async function getRecommendedRule() {
         try {
-          const response = await fetch(`/api/v2/budgets/rules/suggest?incomeRange=${selectedIncome}`);
+          const response = await fetch(
+            `/api/v2/budgets/rules/suggest?expectedAnnualIncome=${expectedAnnualIncome}`
+          );
           if (response.ok) {
             const data = await response.json();
             setRecommendedRule(data.rule.id);
-            // No card should be selected by default
           }
         } catch (error) {
           console.error("Error getting recommended rule:", error);
@@ -62,13 +60,14 @@ export function IncomeOnboardingDialog({
       }
       getRecommendedRule();
     }
-  }, [selectedIncome, step]);
+  }, [expectedAnnualIncome, step]);
 
   async function handleIncomeNext() {
-    if (!selectedIncome) {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0) {
       toast({
-        title: "Please select an income range",
-        description: "Select your expected annual household income to personalize your dashboard.",
+        title: "Please enter your annual income",
+        description:
+          "Enter your expected annual household income to personalize your dashboard.",
         variant: "destructive",
       });
       return;
@@ -77,10 +76,11 @@ export function IncomeOnboardingDialog({
   }
 
   async function handleSubmit() {
-    if (!selectedIncome) {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0) {
       toast({
-        title: "Please select an income range",
-        description: "Select your expected annual household income to personalize your dashboard.",
+        title: "Please enter your annual income",
+        description:
+          "Enter your expected annual household income to personalize your dashboard.",
         variant: "destructive",
       });
       return;
@@ -94,10 +94,7 @@ export function IncomeOnboardingDialog({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
-          incomeRange: selectedIncome,
-          ruleType: selectedRule,
-        }),
+        body: JSON.stringify({ expectedAnnualIncome }),
       });
 
       if (!response.ok) {
@@ -105,9 +102,24 @@ export function IncomeOnboardingDialog({
         throw new Error(error.error || "Failed to save income");
       }
 
+      if (selectedRule) {
+        const ruleResponse = await fetch("/api/v2/onboarding/budget-rule", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ruleType: selectedRule }),
+        });
+        if (!ruleResponse.ok) {
+          const error = await ruleResponse.json();
+          throw new Error(error.error || "Failed to save budget rule");
+        }
+      }
+
       toast({
         title: "Income saved",
-        description: "Your dashboard has been personalized based on your expected income and budget rule.",
+        description:
+          "Your dashboard has been personalized based on your expected income and budget rule.",
         variant: "success",
       });
 
@@ -119,7 +131,8 @@ export function IncomeOnboardingDialog({
       console.error("Error saving income:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save income. Please try again.",
+        description:
+          error instanceof Error ? error.message : "Failed to save income. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -127,27 +140,28 @@ export function IncomeOnboardingDialog({
     }
   }
 
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="text-left">
           <DialogTitle>
-            {step === "income" ? "Annual Household Income" : "Choose Your Budget Rule"}
+            {step === "income"
+              ? "Annual Household Income"
+              : "Choose Your Budget Rule"}
           </DialogTitle>
           <DialogDescription>
-            {step === "income" 
+            {step === "income"
               ? "Used to tailor your budgets and insights. Not shared with anyone."
               : "Select a budget rule that fits your lifestyle. We'll automatically generate budgets based on your income."}
           </DialogDescription>
         </DialogHeader>
         <div className="pt-4 px-6 pb-4">
           {step === "income" ? (
-            <IncomeOnboardingForm 
-              hideCard 
+            <IncomeOnboardingForm
+              hideCard
               showButtons={false}
-              selectedIncome={selectedIncome}
-              onIncomeChange={setSelectedIncome}
+              selectedExpectedAnnualIncome={expectedAnnualIncome}
+              onExpectedAnnualIncomeChange={setExpectedAnnualIncome}
             />
           ) : (
             <BudgetRuleSelector
@@ -174,7 +188,12 @@ export function IncomeOnboardingDialog({
             <Button
               type="button"
               onClick={step === "income" ? handleIncomeNext : handleSubmit}
-              disabled={loading || (step === "income" && !selectedIncome) || (step === "rule" && !selectedRule)}
+              disabled={
+                loading ||
+                (step === "income" &&
+                  (expectedAnnualIncome == null || expectedAnnualIncome <= 0)) ||
+                (step === "rule" && !selectedRule)
+              }
               className="flex-1 sm:flex-none"
             >
               {loading ? (
@@ -194,4 +213,3 @@ export function IncomeOnboardingDialog({
     </Dialog>
   );
 }
-

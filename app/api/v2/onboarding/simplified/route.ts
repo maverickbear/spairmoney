@@ -23,14 +23,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { goals, householdType, incomeRange, incomeAmount, location, planId, interval } = body;
+    const { goals, householdType, expectedAnnualIncome, location, planId, interval } = body;
 
     // Validate input
     const validated = simplifiedOnboardingSchema.parse({
       goals,
       householdType,
-      incomeRange: incomeRange || null,
-      incomeAmount: incomeAmount || null,
+      expectedAnnualIncome: expectedAnnualIncome ?? null,
       location: location || null,
     });
 
@@ -45,31 +44,23 @@ export async function POST(request: NextRequest) {
     const refreshToken = request.cookies.get("sb-refresh-token")?.value;
 
     // Step 1: Save income and location if provided
-    if (validated.incomeRange || validated.location) {
+    if (
+      (validated.expectedAnnualIncome != null && validated.expectedAnnualIncome > 0) ||
+      validated.location
+    ) {
       try {
         const onboardingService = makeOnboardingService();
-        
-        if (validated.incomeRange) {
+
+        if (validated.expectedAnnualIncome != null && validated.expectedAnnualIncome > 0) {
           await onboardingService.saveExpectedIncome(
             userId,
-            validated.incomeRange,
+            validated.expectedAnnualIncome,
             accessToken,
-            refreshToken,
-            validated.incomeAmount || null
+            refreshToken
           );
-          
-          // Save location if provided
-          if (validated.location) {
-            await onboardingService.saveLocation(
-              userId,
-              validated.location.country,
-              validated.location.stateOrProvince,
-              accessToken,
-              refreshToken
-            );
-          }
-        } else if (validated.location) {
-          // Save location only if income not provided
+        }
+
+        if (validated.location) {
           await onboardingService.saveLocation(
             userId,
             validated.location.country,
@@ -80,27 +71,24 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate initial budgets if income provided
-        if (validated.incomeRange) {
+        if (validated.expectedAnnualIncome != null && validated.expectedAnnualIncome > 0) {
           try {
             const { makeBudgetRulesService } = await import("@/src/application/budgets/budget-rules.factory");
             const budgetRulesService = makeBudgetRulesService();
-            const monthlyIncome = onboardingService.getMonthlyIncomeFromRange(
-              validated.incomeRange,
-              validated.incomeAmount
+            const monthlyIncome = onboardingService.getMonthlyIncomeFromAnnual(
+              validated.expectedAnnualIncome
             );
             const suggestion = budgetRulesService.suggestRule(monthlyIncome);
-            
+
             await onboardingService.generateInitialBudgets(
               userId,
-              validated.incomeRange,
+              validated.expectedAnnualIncome,
               accessToken,
               refreshToken,
-              suggestion.rule.id,
-              validated.incomeAmount
+              suggestion.rule.id
             );
           } catch (budgetError) {
             console.error("[SIMPLIFIED-ONBOARDING] Error generating budgets:", budgetError);
-            // Don't fail onboarding if budget generation fails
           }
         }
       } catch (error) {

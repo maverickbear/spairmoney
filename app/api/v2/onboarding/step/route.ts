@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
 import { profileSchema } from "@/src/domain/profile/profile.validations";
-import { expectedIncomeRangeSchema } from "@/src/domain/onboarding/onboarding.validations";
+import { expectedAnnualIncomeSchema } from "@/src/domain/onboarding/onboarding.validations";
 import { locationSchema } from "@/src/domain/taxes/taxes.validations";
 import { BudgetRuleType } from "@/src/domain/budgets/budget-rules.types";
 import { z } from "zod";
@@ -17,8 +17,7 @@ const stepRequestSchema = z.object({
       avatarUrl: z.string().optional().nullable(),
     }).optional(),
     step2: z.object({
-      incomeRange: expectedIncomeRangeSchema,
-      incomeAmount: z.number().positive().nullable().optional(),
+      expectedAnnualIncome: expectedAnnualIncomeSchema,
       location: locationSchema.optional().nullable(),
       ruleType: z.string().optional(),
     }).optional(),
@@ -95,13 +94,13 @@ export async function POST(request: NextRequest) {
           }
         }
         
-        // Save expected income
+        // Save expected income (single annual amount)
+        const annual = validated.data.step2.expectedAnnualIncome ?? null;
         await onboardingService.saveExpectedIncome(
           userId,
-          validated.data.step2.incomeRange,
+          annual,
           accessToken,
-          refreshToken,
-          validated.data.step2.incomeAmount
+          refreshToken
         );
         console.log("[ONBOARDING-STEP] Expected income saved successfully");
 

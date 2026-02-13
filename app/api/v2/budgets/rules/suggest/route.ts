@@ -15,31 +15,25 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const incomeRange = searchParams.get("incomeRange") || null;
-    // SIMPLIFIED: Removed cityCost parameter - no longer needed
+    const incomeParam = searchParams.get("expectedAnnualIncome");
+    const expectedAnnualFromQuery =
+      incomeParam != null ? Number(incomeParam) : null;
 
     const service = makeBudgetRulesService();
 
-    // If incomeRange is provided, convert to monthly income
+    const accessToken = request.cookies.get("sb-access-token")?.value;
+    const refreshToken = request.cookies.get("sb-refresh-token")?.value;
+    const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
+    const onboardingService = makeOnboardingService();
+
     let monthlyIncome = 0;
-    if (incomeRange) {
-      const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
-      const onboardingService = makeOnboardingService();
-      monthlyIncome = onboardingService.getMonthlyIncomeFromRange(
-        incomeRange as import("@/src/domain/onboarding/onboarding.types").ExpectedIncomeRange
-      );
-    } else {
-      // Try to get from user's saved income
-      const accessToken = request.cookies.get("sb-access-token")?.value;
-      const refreshToken = request.cookies.get("sb-refresh-token")?.value;
-      
-      const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
-      const onboardingService = makeOnboardingService();
-      const savedIncomeRange = await onboardingService.getExpectedIncome(userId, accessToken, refreshToken);
-      
-      if (savedIncomeRange) {
-        monthlyIncome = onboardingService.getMonthlyIncomeFromRange(savedIncomeRange);
-      }
+    const expectedAnnual =
+      expectedAnnualFromQuery != null && expectedAnnualFromQuery > 0
+        ? expectedAnnualFromQuery
+        : await onboardingService.getExpectedIncomeAmount(userId, accessToken, refreshToken);
+
+    if (expectedAnnual != null && expectedAnnual > 0) {
+      monthlyIncome = onboardingService.getMonthlyIncomeFromAnnual(expectedAnnual);
     }
 
     // If no income available, default to 50/30/20

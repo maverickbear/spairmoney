@@ -31,6 +31,8 @@
     /* Primary colors (Interactive Primary) */
     --primary: 142 57% 56%;
     /* For neutral interactive elements or emphasising active items in a list: #4FCF7D */
+    --primary-text: 142 57% 40%;
+    /* Darker green for text (~20% darker than primary). Use for clickable labels, links in content, etc. */
     --primary-foreground: 0 0% 100%;
     /* Use for copy on negative buttons. Turns dark on dark mode to keep elements visible: #FFFFFF */
 
@@ -170,6 +172,8 @@
     /* Primary colors (Interactive Primary) */
     --primary: 142 57% 56%;
     /* For neutral interactive elements or emphasising active items in a list: #4FCF7D */
+    --primary-text: 142 57% 55%;
+    /* Darker green for text in dark mode (slightly darker than primary for readability on dark bg). */
     --primary-foreground: 0 0% 100%;
     /* Use for copy on negative buttons. Turns dark on dark mode to keep elements visible: #FFFFFF */
 

@@ -379,12 +379,14 @@ export default function AccountsPage() {
             </div>
           )}
           {canWrite && (
-            <AddAccountDropdown
-              onSuccess={() => {
-                loadAccounts(true);
-              }}
-              canWrite={canWrite}
-            />
+            <div className="ml-auto">
+              <AddAccountDropdown
+                onSuccess={() => {
+                  loadAccounts(true);
+                }}
+                canWrite={canWrite}
+              />
+            </div>
           )}
         </div>
 

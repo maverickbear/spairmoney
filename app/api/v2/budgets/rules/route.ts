@@ -55,26 +55,23 @@ export async function POST(request: NextRequest) {
     const accessToken = request.cookies.get("sb-access-token")?.value;
     const refreshToken = request.cookies.get("sb-refresh-token")?.value;
 
-    // Get user's expected income to calculate budgets
     const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
     const onboardingService = makeOnboardingService();
-    const { incomeRange, incomeAmount } = await onboardingService.getExpectedIncomeWithAmount(userId, accessToken, refreshToken);
+    const expectedAnnualIncome = await onboardingService.getExpectedIncomeAmount(userId, accessToken, refreshToken);
 
-    if (!incomeRange) {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0) {
       return NextResponse.json(
-        { error: "Expected income not set. Please set your income range first." },
+        { error: "Expected income not set. Please set your income first." },
         { status: 400 }
       );
     }
 
-    // Generate budgets using the selected rule and user's income from onboarding
     await onboardingService.generateInitialBudgets(
       userId,
-      incomeRange,
+      expectedAnnualIncome,
       accessToken,
       refreshToken,
-      ruleType,
-      incomeAmount
+      ruleType
     );
 
     return NextResponse.json({ 

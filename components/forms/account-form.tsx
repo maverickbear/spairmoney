@@ -62,6 +62,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
   const { toast } = useToast();
   const [households, setHouseholds] = useState<Household[]>([]);
   const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
+  const [primaryOwnerId, setPrimaryOwnerId] = useState<string | null>(null);
   const [loadingHouseholds, setLoadingHouseholds] = useState(false);
   const [userRole, setUserRole] = useState<"admin" | "member" | "super_admin" | null>(null);
   const [accountLimit, setAccountLimit] = useState<{ current: number; limit: number } | null>(null);
@@ -184,9 +185,8 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
           dueDayOfMonth: account.dueDayOfMonth ?? undefined,
         });
       } else {
-        // When creating new account, always include current user ID
-        // Don't set selectedOwnerIds here - it will be set automatically in onSubmit
         setSelectedOwnerIds([]);
+        setPrimaryOwnerId(currentUserId ?? null);
         form.reset({
           name: "",
           type: "checking",
@@ -235,25 +235,21 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
         }
       }
 
-      // Always include current user ID as owner
-      // If user has paid plan and selected additional households, include them too
       let finalOwnerIds: string[] = [currentUserId];
-      
-      // If user has paid plan (member or admin role) and selected additional households, add them
       if ((userRole === "member" || userRole === "admin") && selectedOwnerIds.length > 0) {
-        // Add selected household IDs (these are additional to the current user)
         finalOwnerIds = [currentUserId, ...selectedOwnerIds];
       }
 
       const url = account ? `/api/v2/accounts/${account.id}` : "/api/v2/accounts";
       const method = account ? "PATCH" : "POST";
 
-      // Prepare data: include creditLimit and dueDayOfMonth if type is credit, initialBalance if checking/savings/cash
-      // Always include ownerIds to ensure they are saved in AccountOwner table
+      const isLinkingToAnotherMember = !account && primaryOwnerId != null && primaryOwnerId !== currentUserId;
+
       const payload: AccountFormData = {
         name: data.name,
         type: data.type,
-        ownerIds: finalOwnerIds, // Always include ownerIds to save in Supabase
+        ownerIds: isLinkingToAnotherMember ? [] : finalOwnerIds,
+        ...(isLinkingToAnotherMember && primaryOwnerId ? { ownerUserId: primaryOwnerId } : {}),
         ...(data.type === "credit" && data.creditLimit !== undefined 
           ? { creditLimit: data.creditLimit } 
           : {}),
@@ -268,14 +264,6 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
             } 
           : {}),
       };
-
-      console.log("Submitting account form:", {
-        account: account?.id,
-        payload,
-        finalOwnerIds,
-        selectedOwnerIds,
-        userRole,
-      });
 
       const res = await fetch(url, {
         method,
@@ -398,6 +386,37 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                 </Select>
               </div>
 
+              {!account && (userRole === "admin" || userRole === "super_admin") && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Account owner</label>
+                  <p className="text-xs text-muted-foreground">
+                    Link this account to a household member. It will appear under their name on the dashboard.
+                  </p>
+                  {loadingHouseholds ? (
+                    <p className="text-sm text-muted-foreground">Loading members...</p>
+                  ) : (
+                    <Select
+                      value={primaryOwnerId ?? currentUserId ?? ""}
+                      onValueChange={(value) => setPrimaryOwnerId(value || null)}
+                    >
+                      <SelectTrigger size="medium">
+                        <SelectValue placeholder="Me" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={currentUserId ?? ""}>Me</SelectItem>
+                        {households
+                          .filter((h) => h.id !== currentUserId)
+                          .map((h) => (
+                            <SelectItem key={h.id} value={h.id}>
+                              {h.name || h.email}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
               {accountType === "credit" && (
                 <>
                   <div className="space-y-1">
@@ -452,7 +471,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                 </div>
               )}
 
-              {(userRole === "member" || userRole === "admin") && (
+              {(userRole === "member" || userRole === "admin") && (primaryOwnerId === currentUserId || primaryOwnerId == null) && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Additional Account Owners</label>
                   <p className="text-xs text-muted-foreground">

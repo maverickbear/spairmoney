@@ -1,132 +1,69 @@
 /**
- * Format Expected Income Range for Display
- * Utility functions for formatting expected income ranges
+ * Format Expected Income for Display
+ * Utility functions for formatting expected annual income
  */
 
-import { ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
 import { formatMoney } from "@/components/common/money";
 
 /**
- * Format expected income range to display string
+ * Format expected annual income for display (e.g. "$75,000")
  */
-export function formatExpectedIncomeRange(incomeRange: ExpectedIncomeRange | string | null): string {
-  if (!incomeRange) {
+export function formatExpectedAnnualIncome(annualIncome: number | null | undefined): string {
+  if (annualIncome == null || annualIncome <= 0) {
     return "";
   }
-
-  const range = incomeRange as string;
-  
-  if (range === "0-50k") {
-    return "$0 - $50,000";
-  }
-  if (range === "50k-100k") {
-    return "$50,000 - $100,000";
-  }
-  if (range === "100k-150k") {
-    return "$100,000 - $150,000";
-  }
-  if (range === "150k-250k") {
-    return "$150,000 - $250,000";
-  }
-  if (range === "250k+") {
-    return "$250,000+";
-  }
-
-  return range;
+  return formatMoney(annualIncome);
 }
 
 /**
- * Get short format for expected income range
+ * Format monthly income derived from annual for display (e.g. "$6,250/month")
  */
-export function formatExpectedIncomeRangeShort(incomeRange: ExpectedIncomeRange | string | null): string {
-  if (!incomeRange) {
+export function formatMonthlyFromAnnual(annualIncome: number | null | undefined): string {
+  if (annualIncome == null || annualIncome <= 0) {
     return "";
   }
-
-  const range = incomeRange as string;
-  
-  if (range === "0-50k") {
-    return "$0-50k";
-  }
-  if (range === "50k-100k") {
-    return "$50k-100k";
-  }
-  if (range === "100k-150k") {
-    return "$100k-150k";
-  }
-  if (range === "150k-250k") {
-    return "$150k-250k";
-  }
-  if (range === "250k+") {
-    return "$250k+";
-  }
-
-  return range;
+  const monthly = annualIncome / 12;
+  return `${formatMoney(monthly)}/month`;
 }
 
 /**
- * Get monthly income value from annual income range
- * Uses the same conversion logic as OnboardingService.getMonthlyIncomeFromRange
+ * Format expected income with monthly equivalent
+ * Returns string like "$75,000 ($6,250/month)" or just annual if showMonthly is false
  */
-function getMonthlyIncomeFromRange(incomeRange: ExpectedIncomeRange | string | null): number {
-  if (!incomeRange) {
-    return 0;
-  }
-
-  const range = incomeRange as string;
-  
-  // Income range to monthly income conversion (using midpoint of range)
-  const INCOME_RANGE_TO_MONTHLY: Record<NonNullable<ExpectedIncomeRange>, number> = {
-    "0-50k": 25000 / 12, // ~$2,083/month
-    "50k-100k": 75000 / 12, // ~$6,250/month
-    "100k-150k": 125000 / 12, // ~$10,417/month
-    "150k-250k": 200000 / 12, // ~$16,667/month
-    "250k+": 300000 / 12, // ~$25,000/month
-  };
-
-  return INCOME_RANGE_TO_MONTHLY[range as NonNullable<ExpectedIncomeRange>] || 0;
-}
-
-/**
- * Format monthly income from annual income range for display
- * Returns formatted string like "$2,083/month" or empty string if no range
- */
-export function formatMonthlyIncomeFromRange(incomeRange: ExpectedIncomeRange | string | null): string {
-  if (!incomeRange) {
-    return "";
-  }
-
-  const monthlyIncome = getMonthlyIncomeFromRange(incomeRange);
-  if (monthlyIncome === 0) {
-    return "";
-  }
-
-  return formatMoney(monthlyIncome);
-}
-
-/**
- * Format expected income range with monthly equivalent
- * Returns string like "$50,000 - $100,000 ($6,250/month)" or just the range if monthly is not needed
- */
-export function formatExpectedIncomeRangeWithMonthly(
-  incomeRange: ExpectedIncomeRange | string | null,
-  showMonthly: boolean = true
+export function formatExpectedIncomeWithMonthly(
+  annualIncome: number | null | undefined,
+  showMonthly = true
 ): string {
-  if (!incomeRange) {
+  if (annualIncome == null || annualIncome <= 0) {
     return "";
   }
-
-  const annualRange = formatExpectedIncomeRange(incomeRange);
-  
+  const annual = formatMoney(annualIncome);
   if (!showMonthly) {
-    return annualRange;
+    return annual;
   }
-
-  const monthlyIncome = formatMonthlyIncomeFromRange(incomeRange);
-  if (!monthlyIncome) {
-    return annualRange;
-  }
-
-  return `${annualRange} (${monthlyIncome}/month)`;
+  const monthly = formatMonthlyFromAnnual(annualIncome);
+  return `${annual} (${monthly})`;
 }
 
+/** @deprecated Use formatExpectedAnnualIncome or formatExpectedIncomeWithMonthly */
+export function formatExpectedIncomeRange(_incomeRange: unknown): string {
+  return "";
+}
+
+/** @deprecated Use formatMonthlyFromAnnual */
+export function formatExpectedIncomeRangeShort(_incomeRange: unknown): string {
+  return "";
+}
+
+/** @deprecated Use formatMonthlyFromAnnual */
+export function formatMonthlyIncomeFromRange(_incomeRange: unknown): string {
+  return "";
+}
+
+/** @deprecated Use formatExpectedIncomeWithMonthly */
+export function formatExpectedIncomeRangeWithMonthly(
+  _incomeRange: unknown,
+  _showMonthly?: boolean
+): string {
+  return "";
+}

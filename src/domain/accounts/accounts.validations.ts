@@ -6,6 +6,8 @@ export const accountSchema = z.object({
   creditLimit: z.number().positive("Credit limit must be positive").optional().nullable(),
   initialBalance: z.number().optional().nullable(),
   ownerIds: z.array(z.string().uuid()).optional(),
+  /** When set by household admin/owner, the account is linked to this member (account.user_id = ownerUserId). */
+  ownerUserId: z.string().uuid().optional().nullable(),
   dueDayOfMonth: z.number().int().min(1).max(31).optional().nullable(),
   currencyCode: z.enum(["USD", "CAD", "EUR", "GBP", "MXN", "AUD", "JPY", "CHF", "NZD", "BRL"]).optional().nullable(),
 }).refine((data) => {

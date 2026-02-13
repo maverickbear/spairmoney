@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -13,24 +12,15 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Save } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
-import { ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
-import { cn } from "@/lib/utils";
+import { formatMoney } from "@/components/common/money";
 
-const INCOME_RANGES: Array<{ value: NonNullable<ExpectedIncomeRange>; label: string }> = [
-  { value: "0-50k", label: "$0 - $50,000" },
-  { value: "50k-100k", label: "$50,000 - $100,000" },
-  { value: "100k-150k", label: "$100,000 - $150,000" },
-  { value: "150k-250k", label: "$150,000 - $250,000" },
-  { value: "250k+", label: "$250,000+" },
-];
-
-function convertToIncomeRange(value: number): ExpectedIncomeRange {
-  if (value < 50000) return "0-50k";
-  if (value < 100000) return "50k-100k";
-  if (value < 150000) return "100k-150k";
-  if (value < 250000) return "150k-250k";
-  return "250k+";
+interface MemberOption {
+  id: string;
+  memberId: string | null;
+  name: string | null;
+  email: string;
+  isOwner?: boolean;
 }
 
 interface ExpectedIncomeEditDialogProps {
@@ -45,84 +35,76 @@ export function ExpectedIncomeEditDialog({
   onSuccess,
 }: ExpectedIncomeEditDialogProps) {
   const { toast } = useToast();
-  const [selectedIncome, setSelectedIncome] = useState<ExpectedIncomeRange>(null);
-  const [customIncome, setCustomIncome] = useState<number | undefined>(undefined);
-  const [useCustom, setUseCustom] = useState(false);
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [memberIncomes, setMemberIncomes] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const customIncomeInputRef = useRef<HTMLInputElement>(null);
+
+  const totalHouseholdIncome = useMemo(
+    () => Object.values(memberIncomes).reduce((sum, amount) => sum + (amount || 0), 0),
+    [memberIncomes]
+  );
 
   useEffect(() => {
     if (open) {
-      loadCurrentData();
+      loadMembers();
     }
   }, [open]);
 
-  useEffect(() => {
-    if (open && useCustom && customIncomeInputRef.current) {
-      const t = setTimeout(() => customIncomeInputRef.current?.focus(), 100);
-      return () => clearTimeout(t);
-    }
-  }, [open, useCustom]);
-
-  async function loadCurrentData() {
+  async function loadMembers() {
     if (!open) return;
     setLoading(true);
     try {
-      const incomeResponse = await fetch("/api/v2/onboarding/income");
-      if (incomeResponse.ok) {
-        const incomeData = await incomeResponse.json();
-        if (incomeData.expectedIncome) {
-          setSelectedIncome(incomeData.expectedIncome);
-        }
-        if (
-          incomeData.expectedIncomeAmount != null &&
-          incomeData.expectedIncomeAmount !== undefined
-        ) {
-          setCustomIncome(incomeData.expectedIncomeAmount);
-          setUseCustom(true);
+      const [membersRes, incomeRes] = await Promise.all([
+        fetch("/api/v2/members", { cache: "no-store" }),
+        fetch("/api/v2/onboarding/income"),
+      ]);
+      if (membersRes.ok) {
+        const data = await membersRes.json();
+        const list: MemberOption[] = data.members ?? [];
+        setMembers(list);
+        const initialIncomes: Record<string, number> = {};
+        if (incomeRes.ok) {
+          const incomeData = await incomeRes.json();
+          const savedMemberIncomes = (incomeData.memberIncomes ?? {}) as Record<string, number>;
+          list.forEach((m) => {
+            const key = m.memberId ?? m.id;
+            initialIncomes[key] = savedMemberIncomes[key] ?? 0;
+          });
+          if (Object.keys(savedMemberIncomes).length === 0 && (incomeData.expectedAnnualIncome ?? 0) > 0) {
+            const currentTotal = incomeData.expectedAnnualIncome as number;
+            if (list.length > 0) {
+              const firstKey = list[0].memberId ?? list[0].id;
+              initialIncomes[firstKey] = currentTotal;
+            }
+          }
         } else {
-          setCustomIncome(undefined);
-          setUseCustom(false);
+          list.forEach((m) => {
+            const key = m.memberId ?? m.id;
+            initialIncomes[key] = 0;
+          });
         }
+        setMemberIncomes(initialIncomes);
       }
     } catch (error) {
-      console.error("Error loading expected income:", error);
+      console.error("Error loading members:", error);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleIncomeChange(value: string) {
-    if (value === "custom") {
-      setUseCustom(true);
-      return;
-    }
-    setUseCustom(false);
-    setCustomIncome(undefined);
-    setSelectedIncome(value as ExpectedIncomeRange);
-  }
-
-  function handleCustomIncomeChange(value: number | undefined) {
-    setCustomIncome(value);
-    if (value !== undefined && value > 0) {
-      setSelectedIncome(convertToIncomeRange(value));
-    }
+  function setMemberIncome(memberKey: string, value: number | undefined) {
+    setMemberIncomes((prev) => ({
+      ...prev,
+      [memberKey]: value ?? 0,
+    }));
   }
 
   async function handleSave() {
-    if (useCustom && (!customIncome || customIncome <= 0)) {
+    if (totalHouseholdIncome <= 0) {
       toast({
-        title: "Enter your expected annual income",
-        description: "Enter your expected annual household income to update.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!selectedIncome && !useCustom) {
-      toast({
-        title: "Select an income range",
-        description: "Select your expected household income to update.",
+        title: "Enter household income",
+        description: "Add the expected annual income for at least one member.",
         variant: "destructive",
       });
       return;
@@ -130,19 +112,13 @@ export function ExpectedIncomeEditDialog({
 
     setSaving(true);
     try {
-      const body: { incomeRange: ExpectedIncomeRange; incomeAmount?: number | null } = {
-        incomeRange: selectedIncome,
-      };
-      if (useCustom && customIncome && customIncome > 0) {
-        body.incomeAmount = customIncome;
-      } else {
-        body.incomeAmount = null;
-      }
-
       const res = await fetch("/api/v2/onboarding/income", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          expectedAnnualIncome: totalHouseholdIncome,
+          memberIncomes: memberIncomes,
+        }),
       });
 
       if (!res.ok) {
@@ -152,7 +128,7 @@ export function ExpectedIncomeEditDialog({
 
       toast({
         title: "Income updated",
-        description: "Your income has been saved.",
+        description: "Household income has been saved.",
         variant: "success",
       });
       onSuccess();
@@ -170,77 +146,58 @@ export function ExpectedIncomeEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Income</DialogTitle>
         </DialogHeader>
         <div className="px-6 pb-4 space-y-4">
           <p className="text-sm text-muted-foreground">
-            Used to compare your spending with what you expect to earn this month.
+            Used to compare your spending with what you expect to earn this month. Enter each
+            member&apos;s annual income; the total is used for the household.
           </p>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <>
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">Annual household income</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {INCOME_RANGES.map((range) => {
-                    const isSelected = !useCustom && selectedIncome === range.value;
-                    return (
-                      <Card
-                        key={range.value}
-                        className={cn(
-                          "cursor-pointer transition-all hover:border-primary/50",
-                          isSelected && "border-primary border-2 bg-primary/5"
-                        )}
-                        onClick={() => handleIncomeChange(range.value)}
-                      >
-                        <CardContent className="p-3 flex items-center justify-between">
-                          <span className="text-xs font-medium">{range.label}</span>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                  <Card
-                    className={cn(
-                      "cursor-pointer transition-all hover:border-primary/50",
-                      useCustom && "border-primary border-2 bg-primary/5"
-                    )}
-                    onClick={() => handleIncomeChange("custom")}
-                  >
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <span className="text-xs font-medium">Custom</span>
-                    </CardContent>
-                  </Card>
+            <div className="space-y-4">
+              {members.map((member) => {
+                const key = member.memberId ?? member.id;
+                const label = member.name || member.email || "Member";
+                return (
+                  <div key={key} className="space-y-2">
+                    <Label htmlFor={`income-${key}`} className="text-sm font-medium">
+                      {label}
+                    </Label>
+                    <DollarAmountInput
+                      id={`income-${key}`}
+                      value={memberIncomes[key] || undefined}
+                      onChange={(value) => setMemberIncome(key, value)}
+                      placeholder="$ 0.00"
+                      className="w-full"
+                    />
+                  </div>
+                );
+              })}
+              {members.length === 0 && !loading && (
+                <p className="text-sm text-muted-foreground">
+                  No household members found. Add members in settings to enter their income.
+                </p>
+              )}
+              <div className="space-y-2 pt-2 border-t">
+                <Label className="text-sm font-semibold">Total household income</Label>
+                <div
+                  className="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium"
+                  aria-readonly
+                >
+                  {formatMoney(totalHouseholdIncome)}
                 </div>
               </div>
-              {useCustom && (
-                <div className="space-y-2">
-                  <Label htmlFor="custom-income" className="text-sm text-muted-foreground">
-                    Enter annual household income
-                  </Label>
-                  <DollarAmountInput
-                    ref={customIncomeInputRef}
-                    id="custom-income"
-                    value={customIncome ?? undefined}
-                    onChange={handleCustomIncomeChange}
-                    placeholder="$ 0.00"
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={saving}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
           <Button
@@ -248,7 +205,8 @@ export function ExpectedIncomeEditDialog({
             disabled={
               saving ||
               loading ||
-              (!selectedIncome && !(useCustom && customIncome && customIncome > 0))
+              totalHouseholdIncome <= 0 ||
+              members.length === 0
             }
           >
             {saving ? (

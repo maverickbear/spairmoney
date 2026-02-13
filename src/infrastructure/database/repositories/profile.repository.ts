@@ -15,6 +15,7 @@ export interface UserRow {
   phone_number: string | null;
   date_of_birth: string | null;
   temporary_expected_income: string | null;
+  temporary_expected_income_amount: number | null;
   role: string | null;
   created_at: string;
   updated_at: string;
@@ -33,7 +34,7 @@ export class ProfileRepository {
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, email, name, avatar_url, phone_number, date_of_birth, temporary_expected_income, role, created_at, updated_at")
+      .select("id, email, name, avatar_url, phone_number, date_of_birth, temporary_expected_income, temporary_expected_income_amount, role, created_at, updated_at")
       .eq("id", userId)
       .is("deleted_at", null) // Exclude deleted users
       .single();
@@ -60,6 +61,7 @@ export class ProfileRepository {
       phoneNumber: string | null;
       dateOfBirth: string | null;
       temporaryExpectedIncome: string | null;
+      temporaryExpectedIncomeAmount: number | null;
       updatedAt: string;
     }>
   ): Promise<UserRow> {
@@ -71,13 +73,14 @@ export class ProfileRepository {
     if (data.phoneNumber !== undefined) updateData.phone_number = data.phoneNumber;
     if (data.dateOfBirth !== undefined) updateData.date_of_birth = data.dateOfBirth;
     if (data.temporaryExpectedIncome !== undefined) updateData.temporary_expected_income = data.temporaryExpectedIncome;
+    if (data.temporaryExpectedIncomeAmount !== undefined) updateData.temporary_expected_income_amount = data.temporaryExpectedIncomeAmount;
     if (data.updatedAt !== undefined) updateData.updated_at = data.updatedAt;
 
     const { data: user, error } = await supabase
       .from("users")
       .update(updateData)
       .eq("id", userId)
-      .select("id, email, name, avatar_url, phone_number, date_of_birth, temporary_expected_income, role, created_at, updated_at")
+      .select("id, email, name, avatar_url, phone_number, date_of_birth, temporary_expected_income, temporary_expected_income_amount, role, created_at, updated_at")
       .single();
 
     if (error) {

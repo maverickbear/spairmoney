@@ -13,10 +13,15 @@ import type { DashboardWidgetsData } from "@/src/domain/dashboard/types";
 
 const STORAGE_KEY_PREFIX = "dashboard";
 const STORAGE_VIEW_EVERYONE = "everyone";
+const STORAGE_HOUSEHOLD_ALL = "all";
 
-/** View key for storage: "everyone" or member id. Same cache + version flow for all views. */
-function getViewKey(memberId: string | null): string {
-  return memberId ?? STORAGE_VIEW_EVERYONE;
+const VIEW_KEY_SEP = "__";
+
+/** View key for storage: encodes member + household so cache is correct per view. */
+function getViewKey(memberId: string | null, householdId: string | null): string {
+  const m = memberId ?? STORAGE_VIEW_EVERYONE;
+  const h = householdId ?? STORAGE_HOUSEHOLD_ALL;
+  return `${m}${VIEW_KEY_SEP}${h}`;
 }
 
 function loadStoredSnapshot(viewKey: string): {
@@ -59,7 +64,7 @@ function clearStoredVersion(viewKey?: string) {
     if (viewKey) {
       localStorage.removeItem(`${STORAGE_KEY_PREFIX}-version-${viewKey}`);
     } else {
-      [STORAGE_VIEW_EVERYONE, ...getStoredViewKeys()].forEach((key) =>
+      getStoredViewKeys().forEach((key) =>
         localStorage.removeItem(`${STORAGE_KEY_PREFIX}-version-${key}`)
       );
     }
@@ -82,12 +87,13 @@ interface DashboardSnapshotContextValue {
   version: string | null;
   loading: boolean;
   error: string | null;
-  /** Selected household member id; null = "Everyone". When set, dashboard shows that member's data only. */
+  /** Selected household member id; null = "Everyone". */
   selectedMemberId: string | null;
   setSelectedMemberId: (memberId: string | null) => void;
-  /** Force version check; if version changed (or force is true), refetch dashboard and update snapshot. */
+  /** Selected household id; null = "Everyone" (sum of all households' income). When set, dashboard shows that household's data. */
+  selectedHouseholdId: string | null;
+  setSelectedHouseholdId: (householdId: string | null) => void;
   refresh: (force?: boolean) => Promise<void>;
-  /** Mark local snapshot as stale (e.g. after Realtime event). Next version check will refetch. */
   markStale: () => void;
 }
 
@@ -116,13 +122,15 @@ export function DashboardSnapshotProvider({ children, selectedDate }: DashboardS
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null);
   const initialLoadDone = useRef(false);
   const versionCheckInProgress = useRef(false);
 
   const fetchDashboard = useCallback(
-    async (memberId: string | null) => {
+    async (memberId: string | null, householdId: string | null) => {
       const params = new URLSearchParams({ date: date.toISOString() });
       if (memberId) params.set("memberId", memberId);
+      if (householdId) params.set("householdId", householdId);
       const res = await fetch(`/api/dashboard?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`Dashboard fetch failed: ${res.statusText}`);
       return res.json() as Promise<DashboardWidgetsData>;
@@ -150,8 +158,12 @@ export function DashboardSnapshotProvider({ children, selectedDate }: DashboardS
         ) {
           return;
         }
-        const memberIdForFetch = viewKey === STORAGE_VIEW_EVERYONE ? null : viewKey;
-        const payload = await fetchDashboard(memberIdForFetch);
+        const sepIdx = viewKey.indexOf(VIEW_KEY_SEP);
+        const memberPart = sepIdx >= 0 ? viewKey.slice(0, sepIdx) : viewKey;
+        const householdPart = sepIdx >= 0 ? viewKey.slice(sepIdx + VIEW_KEY_SEP.length) : STORAGE_HOUSEHOLD_ALL;
+        const memberIdForFetch = memberPart === STORAGE_VIEW_EVERYONE ? null : memberPart;
+        const householdIdForFetch = householdPart === STORAGE_HOUSEHOLD_ALL ? null : householdPart;
+        const payload = await fetchDashboard(memberIdForFetch, householdIdForFetch);
         setData(payload);
         setVersion(currentVersion);
         saveSnapshot(payload, currentVersion, dateKey, viewKey);
@@ -169,23 +181,21 @@ export function DashboardSnapshotProvider({ children, selectedDate }: DashboardS
     [dateKey, version, fetchDashboard]
   );
 
-  /** Version check; refetch when server version differs or when force is true (e.g. user clicked Refresh). */
   const refresh = useCallback(async (force = false) => {
     setError(null);
-    const viewKey = getViewKey(selectedMemberId);
+    const viewKey = getViewKey(selectedMemberId, selectedHouseholdId);
     await checkVersionAndRefetchIfNeeded(viewKey, force);
-  }, [checkVersionAndRefetchIfNeeded, selectedMemberId]);
+  }, [checkVersionAndRefetchIfNeeded, selectedMemberId, selectedHouseholdId]);
 
   const markStale = useCallback(() => {
     clearStoredVersion();
     setVersion(null);
-    // Trigger immediate refetch so the dashboard updates without waiting for the next poll
-    const viewKey = getViewKey(selectedMemberId);
+    const viewKey = getViewKey(selectedMemberId, selectedHouseholdId);
     void checkVersionAndRefetchIfNeeded(viewKey, true);
-  }, [selectedMemberId, checkVersionAndRefetchIfNeeded]);
+  }, [selectedMemberId, selectedHouseholdId, checkVersionAndRefetchIfNeeded]);
 
   useEffect(() => {
-    const viewKey = getViewKey(selectedMemberId);
+    const viewKey = getViewKey(selectedMemberId, selectedHouseholdId);
     const stored = loadStoredSnapshot(viewKey);
 
     const hasValidShape =
@@ -209,7 +219,7 @@ export function DashboardSnapshotProvider({ children, selectedDate }: DashboardS
       initialLoadDone.current = true;
       setLoading(false);
     });
-  }, [dateKey, selectedMemberId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when date or member changes
+  }, [dateKey, selectedMemberId, selectedHouseholdId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when date, member or household changes
 
   const value: DashboardSnapshotContextValue = {
     data,
@@ -218,6 +228,8 @@ export function DashboardSnapshotProvider({ children, selectedDate }: DashboardS
     error,
     selectedMemberId,
     setSelectedMemberId,
+    selectedHouseholdId,
+    setSelectedHouseholdId,
     refresh,
     markStale,
   };

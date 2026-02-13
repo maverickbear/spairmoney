@@ -69,14 +69,6 @@ export function ExpectedIncomeWidget({
                   Next paycheck: —
                 </p>
               )}
-              <p className="text-sm font-medium mt-0.5">
-                {data.status === "below_target" ||
-                (data.actualIncomeThisMonth <= 0 && data.expectedMonthlyIncome > 0)
-                  ? "🔴 Below target"
-                  : data.status === "slightly_below_target"
-                    ? "🟡 Slightly below target"
-                    : "🟢 On track"}
-              </p>
             </>
           ) : (
             <div className="flex flex-col gap-3 py-1">

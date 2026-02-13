@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
 import { profileSchema } from "@/src/domain/profile/profile.validations";
-import { expectedIncomeRangeSchema } from "@/src/domain/onboarding/onboarding.validations";
+import { expectedAnnualIncomeSchema } from "@/src/domain/onboarding/onboarding.validations";
 import { BudgetRuleType } from "@/src/domain/budgets/budget-rules.types";
 import { locationSchema } from "@/src/domain/taxes/taxes.validations";
 import { z } from "zod";
@@ -15,8 +15,7 @@ const completeOnboardingSchema = z.object({
     avatarUrl: z.string().optional().nullable(),
   }),
   step2: z.object({
-    incomeRange: expectedIncomeRangeSchema,
-    incomeAmount: z.number().positive().nullable().optional(),
+    expectedAnnualIncome: expectedAnnualIncomeSchema,
     location: locationSchema.nullable().optional(),
     ruleType: z.string().optional(),
   }),
@@ -88,13 +87,13 @@ export async function POST(request: NextRequest) {
         console.log("[ONBOARDING-COMPLETE] Location saved successfully");
       }
       
-      // Save expected income
+      // Save expected income (single annual amount)
+      const annual = validated.step2.expectedAnnualIncome ?? null;
       await onboardingService.saveExpectedIncome(
         userId,
-        validated.step2.incomeRange,
+        annual,
         accessToken,
-        refreshToken,
-        validated.step2.incomeAmount
+        refreshToken
       );
       console.log("[ONBOARDING-COMPLETE] Expected income saved successfully");
     } catch (error) {
@@ -225,8 +224,8 @@ export async function POST(request: NextRequest) {
           errorMessage = "Name is required";
         } else if (field.includes("step2.location")) {
           errorMessage = "Please select your location";
-        } else if (field.includes("step2.incomeRange")) {
-          errorMessage = "Please select an income range";
+        } else if (field.includes("step2.expectedAnnualIncome")) {
+          errorMessage = "Please enter your expected annual income";
         } else if (field.includes("step3.planId")) {
           errorMessage = "Please select a subscription plan";
         } else if (field.includes("step3.interval")) {

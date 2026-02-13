@@ -11,7 +11,6 @@ import { PlanSelectionStep } from "./plan-selection-step";
 import { OnboardingLoadingStep } from "./onboarding-loading-step";
 import { OnboardingSuccessStep } from "./onboarding-success-step";
 import { useToast } from "@/components/toast-provider";
-import { ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
 import { BudgetRuleType } from "@/src/domain/budgets/budget-rules.types";
 import { CustomOnboardingDialog } from "./custom-onboarding-dialog";
 import { useSubscriptionContext } from "@/contexts/subscription-context";
@@ -53,8 +52,7 @@ export function MultiStepOnboardingDialog({
   const [step1FormValid, setStep1FormValid] = useState(false);
 
   // Step 2 state (Income + Location)
-  const [selectedIncome, setSelectedIncome] = useState<ExpectedIncomeRange>(null);
-  const [selectedCustomIncome, setSelectedCustomIncome] = useState<number | null>(null);
+  const [expectedAnnualIncome, setExpectedAnnualIncome] = useState<number | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ country: string; stateOrProvince: string | null } | null>(null);
   const [selectedRule, setSelectedRule] = useState<BudgetRuleType | undefined>(undefined);
   const [recommendedRule, setRecommendedRule] = useState<BudgetRuleType | undefined>(undefined);
@@ -86,17 +84,14 @@ export function MultiStepOnboardingDialog({
             setStep1Completed(!!parsed.step1?.name);
           }
           if (parsed.step2) {
-            setSelectedIncome(parsed.step2.incomeRange || null);
-            setSelectedCustomIncome(parsed.step2.incomeAmount ?? null);
+            const income = parsed.step2.expectedAnnualIncome ?? parsed.step2.incomeAmount ?? null;
+            setExpectedAnnualIncome(income);
             setSelectedLocation(parsed.step2.location || null);
             setSelectedRule(parsed.step2.ruleType);
-            setStep2Completed(!!parsed.step2?.incomeRange && !!parsed.step2?.ruleType);
-            // Only restore to "rule" substep if user had already selected a rule
-            // (meaning they had clicked Continue on the income step)
+            setStep2Completed(!!(income != null && income > 0) && !!parsed.step2?.ruleType);
             if (parsed.step2.ruleType) {
               setStep2SubStep("rule");
             } else {
-              // Keep user on income step so they can review and click Continue
               setStep2SubStep("income");
             }
           }
@@ -126,38 +121,41 @@ export function MultiStepOnboardingDialog({
   // Save to sessionStorage whenever data changes (with debouncing to prevent loops)
   const previousDataRef = useRef<string | null>(null);
   useEffect(() => {
-    if (open && (step1Data || selectedIncome || selectedPlanId)) {
+    if (open && (step1Data || expectedAnnualIncome != null || selectedPlanId)) {
       const dataToSave = {
         step1: step1Data,
-        step2: selectedIncome ? { 
-          incomeRange: selectedIncome, 
-          incomeAmount: selectedCustomIncome,
+        step2: expectedAnnualIncome != null ? {
+          expectedAnnualIncome,
           location: selectedLocation,
-          ruleType: selectedRule 
+          ruleType: selectedRule,
         } : null,
         step3: selectedPlanId ? { planId: selectedPlanId, interval: selectedInterval } : null,
-        currentStep: currentStep, // Save current step to restore navigation state
+        currentStep: currentStep,
       };
       const dataString = JSON.stringify(dataToSave);
-      
-      // Only save if data actually changed to prevent infinite loops
+
       if (previousDataRef.current !== dataString) {
         previousDataRef.current = dataString;
         sessionStorage.setItem(SESSION_STORAGE_KEY, dataString);
       }
     }
-  }, [open, step1Data, selectedIncome, selectedCustomIncome, selectedLocation, selectedRule, selectedPlanId, selectedInterval, currentStep]);
+  }, [open, step1Data, expectedAnnualIncome, selectedLocation, selectedRule, selectedPlanId, selectedInterval, currentStep]);
 
-  // Get recommended rule when income is selected
   useEffect(() => {
-    if (selectedIncome && step2SubStep === "income" && currentStep === 2) {
+    if (
+      expectedAnnualIncome != null &&
+      expectedAnnualIncome > 0 &&
+      step2SubStep === "income" &&
+      currentStep === 2
+    ) {
       async function getRecommendedRule() {
         try {
-          const response = await fetch(`/api/v2/budgets/rules/suggest?incomeRange=${selectedIncome}`);
+          const response = await fetch(
+            `/api/v2/budgets/rules/suggest?expectedAnnualIncome=${expectedAnnualIncome}`
+          );
           if (response.ok) {
             const data = await response.json();
             setRecommendedRule(data.rule.id);
-            // No card should be selected by default
           }
         } catch (error) {
           logger.error("Error getting recommended rule:", error);
@@ -165,7 +163,7 @@ export function MultiStepOnboardingDialog({
       }
       getRecommendedRule();
     }
-  }, [selectedIncome, step2SubStep, currentStep]);
+  }, [expectedAnnualIncome, step2SubStep, currentStep]);
 
   async function loadProfile() {
     try {
@@ -230,10 +228,10 @@ export function MultiStepOnboardingDialog({
   }
 
   function handleStep2IncomeNext() {
-    if (!selectedIncome) {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0) {
       toast({
-        title: "Please select an income range",
-        description: "Select your expected annual household income to continue.",
+        title: "Please enter your annual income",
+        description: "Enter your expected annual household income to continue.",
         variant: "destructive",
       });
       return;
@@ -242,10 +240,10 @@ export function MultiStepOnboardingDialog({
   }
 
   function handleStep2Submit() {
-    if (!selectedIncome) {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0) {
       toast({
-        title: "Please select an income range",
-        description: "Select your expected annual household income to continue.",
+        title: "Please enter your annual income",
+        description: "Enter your expected annual household income to continue.",
         variant: "destructive",
       });
       return;
@@ -280,13 +278,12 @@ export function MultiStepOnboardingDialog({
     const parsed = savedData ? JSON.parse(savedData) : {};
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
       ...parsed,
-      step2: { 
-        incomeRange: selectedIncome, 
-        incomeAmount: selectedCustomIncome,
+      step2: {
+        expectedAnnualIncome,
         location: selectedLocation,
-        ruleType: selectedRule 
+        ruleType: selectedRule,
       },
-      currentStep: 3, // Save current step
+      currentStep: 3,
     }));
   }
 
@@ -317,7 +314,7 @@ export function MultiStepOnboardingDialog({
       return;
     }
 
-    if (!selectedIncome || !selectedRule) {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0 || !selectedRule) {
       toast({
         title: "Missing information",
         description: "Please complete all steps before continuing.",
@@ -491,7 +488,7 @@ export function MultiStepOnboardingDialog({
       return Boolean(step1FormValid || step1Data?.name);
     } else if (currentStep === 2) {
       if (step2SubStep === "income") {
-        return !!selectedIncome;
+        return expectedAnnualIncome != null && expectedAnnualIncome > 0;
       } else {
         return !!selectedRule;
       }
@@ -605,12 +602,10 @@ export function MultiStepOnboardingDialog({
               <IncomeOnboardingForm
                 hideCard
                 showButtons={false}
-                selectedIncome={selectedIncome}
-                selectedCustomIncome={selectedCustomIncome}
-                selectedCountry={selectedLocation?.country || null}
+                selectedExpectedAnnualIncome={expectedAnnualIncome}
+                onExpectedAnnualIncomeChange={setExpectedAnnualIncome}
+                selectedCountry={(selectedLocation?.country as "US" | "CA" | undefined) ?? null}
                 selectedStateOrProvince={selectedLocation?.stateOrProvince || null}
-                onIncomeChange={setSelectedIncome}
-                onCustomIncomeChange={setSelectedCustomIncome}
                 onLocationChange={handleLocationChange}
               />
             ) : (
@@ -645,9 +640,8 @@ export function MultiStepOnboardingDialog({
               dateOfBirth: step1Data.dateOfBirth,
               avatarUrl: step1Data.avatarUrl,
             } : undefined}
-            step2Data={selectedIncome ? { 
-              incomeRange: selectedIncome, 
-              incomeAmount: selectedCustomIncome,
+            step2Data={expectedAnnualIncome != null ? {
+              expectedAnnualIncome,
               location: selectedLocation ?? undefined,
               ruleType: selectedRule,
             } : undefined}

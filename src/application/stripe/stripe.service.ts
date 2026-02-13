@@ -1545,25 +1545,25 @@ export class StripeService {
       const profileService = makeProfileService();
       const profile = await profileService.getProfile();
       
-      if (profile?.temporaryExpectedIncome) {
+      const RANGE_TO_ANNUAL: Record<string, number> = {
+        "0-50k": 25_000,
+        "50k-100k": 75_000,
+        "100k-150k": 125_000,
+        "150k-250k": 200_000,
+        "250k+": 300_000,
+      };
+      const temporaryAnnual =
+        profile?.temporaryExpectedIncomeAmount ??
+        (profile?.temporaryExpectedIncome
+          ? RANGE_TO_ANNUAL[profile.temporaryExpectedIncome] ?? null
+          : null);
+      if (temporaryAnnual != null && temporaryAnnual > 0) {
         const { makeOnboardingService } = await import("@/src/application/onboarding/onboarding.factory");
         const onboardingService = makeOnboardingService();
-        const incomeRange = profile.temporaryExpectedIncome;
-        const incomeAmount = profile.temporaryExpectedIncomeAmount;
-        
-        // Save income to household settings
-        await onboardingService.saveExpectedIncome(
-          userId,
-          incomeRange,
-          undefined,
-          undefined,
-          incomeAmount
-        );
-        
-        // Clear temporary income from profile
-        await profileService.updateProfile({ 
+        await onboardingService.saveExpectedIncome(userId, temporaryAnnual);
+        await profileService.updateProfile({
           temporaryExpectedIncome: null,
-          temporaryExpectedIncomeAmount: null 
+          temporaryExpectedIncomeAmount: null,
         });
       }
 

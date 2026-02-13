@@ -11,9 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Save } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
-import { ExpectedIncomeRange } from "@/src/domain/onboarding/onboarding.types";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
-import { cn } from "@/lib/utils";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { locationSchema, LocationFormData } from "@/src/domain/taxes/taxes.validations";
@@ -90,31 +88,11 @@ const CANADIAN_PROVINCES = [
   { value: "YT", label: "Yukon" },
 ];
 
-const INCOME_RANGES: Array<{ value: NonNullable<ExpectedIncomeRange>; label: string }> = [
-  { value: "0-50k", label: "$0 - $50,000" },
-  { value: "50k-100k", label: "$50,000 - $100,000" },
-  { value: "100k-150k", label: "$100,000 - $150,000" },
-  { value: "150k-250k", label: "$150,000 - $250,000" },
-  { value: "250k+", label: "$250,000+" },
-];
-
-// Convert numeric value to ExpectedIncomeRange
-function convertToIncomeRange(value: number): ExpectedIncomeRange {
-  if (value < 50000) return "0-50k";
-  if (value < 100000) return "50k-100k";
-  if (value < 150000) return "100k-150k";
-  if (value < 250000) return "150k-250k";
-  return "250k+";
-}
-
 export function HouseholdIncomeSettings() {
   const { toast } = useToast();
-  const [selectedIncome, setSelectedIncome] = useState<ExpectedIncomeRange>(null);
-  const [customIncome, setCustomIncome] = useState<number | undefined>(undefined);
-  const [useCustom, setUseCustom] = useState(false);
+  const [expectedAnnualIncome, setExpectedAnnualIncome] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const customIncomeInputRef = useRef<HTMLInputElement>(null);
 
   // Location form
   const locationForm = useForm<LocationFormData>({
@@ -143,31 +121,20 @@ export function HouseholdIncomeSettings() {
     loadCurrentData();
   }, []);
 
-  // Focus the input when custom option is selected
-  useEffect(() => {
-    if (useCustom && customIncomeInputRef.current) {
-      setTimeout(() => {
-        customIncomeInputRef.current?.focus();
-      }, 100);
-    }
-  }, [useCustom]);
-
   async function loadCurrentData() {
     try {
       setLoading(true);
-      
-      // Load income
+
       const incomeResponse = await fetch("/api/v2/onboarding/income");
       if (incomeResponse.ok) {
         const incomeData = await incomeResponse.json();
-        if (incomeData.expectedIncome) {
-          setSelectedIncome(incomeData.expectedIncome);
-        }
-        
-        // If there's a custom amount, show it and enable custom mode
-        if (incomeData.expectedIncomeAmount !== null && incomeData.expectedIncomeAmount !== undefined) {
-          setCustomIncome(incomeData.expectedIncomeAmount);
-          setUseCustom(true);
+        if (
+          incomeData.expectedAnnualIncome != null &&
+          incomeData.expectedAnnualIncome > 0
+        ) {
+          setExpectedAnnualIncome(incomeData.expectedAnnualIncome);
+        } else {
+          setExpectedAnnualIncome(undefined);
         }
       }
 
@@ -192,41 +159,11 @@ export function HouseholdIncomeSettings() {
     }
   }
 
-  function handleIncomeChange(value: string) {
-    if (value === "custom") {
-      setUseCustom(true);
-      return;
-    }
-    
-    setUseCustom(false);
-    setCustomIncome(undefined);
-    const incomeValue = value as ExpectedIncomeRange;
-    setSelectedIncome(incomeValue);
-  }
-
-  function handleCustomIncomeChange(value: number | undefined) {
-    setCustomIncome(value);
-    // Convert custom value to nearest range only if we have a valid value
-    if (value !== undefined && value > 0) {
-      const incomeRange = convertToIncomeRange(value);
-      setSelectedIncome(incomeRange);
-    }
-  }
-
   async function handleSave() {
-    if (useCustom && (!customIncome || customIncome <= 0)) {
+    if (expectedAnnualIncome == null || expectedAnnualIncome <= 0) {
       toast({
         title: "Please enter your annual household income",
         description: "Enter your expected annual household income to update your settings.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (!selectedIncome && !useCustom) {
-      toast({
-        title: "Please select an income range",
-        description: "Select your expected household income to update your settings.",
         variant: "destructive",
       });
       return;
@@ -246,25 +183,12 @@ export function HouseholdIncomeSettings() {
     try {
       setSaving(true);
 
-      // Save income
-      const incomeRequestBody: { incomeRange: ExpectedIncomeRange; incomeAmount?: number | null } = {
-        incomeRange: selectedIncome,
-      };
-      
-      // Include custom amount if user provided one
-      if (useCustom && customIncome && customIncome > 0) {
-        incomeRequestBody.incomeAmount = customIncome;
-      } else {
-        // If not using custom, clear the custom amount
-        incomeRequestBody.incomeAmount = null;
-      }
-
       const incomeResponse = await fetch("/api/v2/onboarding/income", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(incomeRequestBody),
+        body: JSON.stringify({ expectedAnnualIncome }),
       });
 
       if (!incomeResponse.ok) {
@@ -404,64 +328,33 @@ export function HouseholdIncomeSettings() {
           {/* Income Section */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Annual Household Income</Label>
+              <Label htmlFor="expected-annual-income" className="text-sm font-semibold">
+                Annual Household Income
+              </Label>
               <p className="text-xs text-muted-foreground">
                 Used to personalize your budgets and calculate accurate emergency fund targets.
               </p>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {INCOME_RANGES.map((range) => {
-                const isSelected = !useCustom && selectedIncome === range.value;
-                return (
-                  <Card
-                    key={range.value}
-                    className={cn(
-                      "cursor-pointer transition-all hover:border-primary/50",
-                      isSelected && "border-primary border-2 bg-primary/5"
-                    )}
-                    onClick={() => handleIncomeChange(range.value)}
-                  >
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <span className="text-sm font-medium">{range.label}</span>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-              <Card
-                className={cn(
-                  "cursor-pointer transition-all hover:border-primary/50",
-                  useCustom && "border-primary border-2 bg-primary/5"
-                )}
-                onClick={() => handleIncomeChange("custom")}
-              >
-                <CardContent className="p-4 flex items-center justify-between">
-                  <span className="text-sm font-medium">Custom amount</span>
-                </CardContent>
-              </Card>
-            </div>
-
-            {useCustom && (
-              <div className="pt-2">
-                <Label htmlFor="custom-income" className="text-sm text-muted-foreground mb-1 block">
-                  Enter your annual household income
-                </Label>
-                <DollarAmountInput
-                  ref={customIncomeInputRef}
-                  id="custom-income"
-                  value={customIncome || undefined}
-                  onChange={handleCustomIncomeChange}
-                  placeholder="$ 0.00"
-                  className="w-full"
-                />
-              </div>
-            )}
+            <DollarAmountInput
+              id="expected-annual-income"
+              value={expectedAnnualIncome ?? undefined}
+              onChange={(value) => setExpectedAnnualIncome(value)}
+              placeholder="$ 0.00"
+              className="w-full"
+            />
           </div>
         </div>
 
         <div className="flex justify-end pt-4">
           <Button
             onClick={handleSave}
-            disabled={saving || (!selectedIncome && !(useCustom && customIncome && customIncome > 0)) || !selectedCountry || !selectedStateOrProvince}
+            disabled={
+              saving ||
+              expectedAnnualIncome == null ||
+              expectedAnnualIncome <= 0 ||
+              !selectedCountry ||
+              !selectedStateOrProvince
+            }
             size="medium"
           >
             {saving ? (

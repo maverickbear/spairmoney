@@ -12,6 +12,7 @@
 
 import { cacheLife, cacheTag } from "next/cache";
 import { makeGoalsService } from "./goals.factory";
+import { makeOnboardingService } from "../onboarding/onboarding.factory";
 import { getCurrentUserId } from "../shared/feature-guard";
 import { logger } from "@/src/infrastructure/utils/logger";
 
@@ -69,28 +70,45 @@ async function getIncomeBasisCachedInternal(
 
   log.debug("Computing income basis (cache miss)", { userId, expectedIncome });
 
-  // Create new promise and cache it
+  // Create new promise: transaction-based first, then fallback to household expected income
   const service = makeGoalsService();
-  const dataPromise = service.calculateIncomeBasis(expectedIncome, accessToken, refreshToken);
-  
+  const dataPromise = (async (): Promise<number> => {
+    const fromTransactions = await service.calculateIncomeBasis(
+      expectedIncome,
+      accessToken,
+      refreshToken
+    );
+    if (fromTransactions > 0) return fromTransactions;
+
+    // Use household expected annual income as fallback for goal forecasts
+    const onboardingService = makeOnboardingService();
+    const annual = await onboardingService.getExpectedIncomeAmount(
+      userId,
+      accessToken,
+      refreshToken
+    );
+    if (annual != null && annual > 0) {
+      const monthly = onboardingService.getMonthlyIncomeFromAnnual(annual);
+      log.debug("Using household expected income as income basis", { annual, monthly });
+      return monthly;
+    }
+    return 0;
+  })();
+
   // Cache the promise with timestamp to deduplicate concurrent calls
   requestCache.set(cacheKey, { promise: dataPromise, timestamp: Date.now() });
-  
+
   // Clean up after promise resolves (success or failure)
-  // Use a longer delay to allow concurrent calls to reuse the promise
   dataPromise
     .then(() => {
-      // Clean up after TTL expires to allow concurrent calls to reuse
       setTimeout(() => {
         const cached = requestCache.get(cacheKey);
-        // Only delete if this is still the same promise (not replaced)
         if (cached && cached.promise === dataPromise) {
           requestCache.delete(cacheKey);
         }
       }, CACHE_TTL);
     })
     .catch(() => {
-      // Clean up immediately on error, but only if it's still the same promise
       const cached = requestCache.get(cacheKey);
       if (cached && cached.promise === dataPromise) {
         requestCache.delete(cacheKey);

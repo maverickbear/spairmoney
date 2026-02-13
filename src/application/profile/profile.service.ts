@@ -174,6 +174,9 @@ export class ProfileService {
     if (data.temporaryExpectedIncome !== undefined) {
       updateData.temporaryExpectedIncome = data.temporaryExpectedIncome as string | null;
     }
+    if (data.temporaryExpectedIncomeAmount !== undefined) {
+      updateData.temporaryExpectedIncomeAmount = data.temporaryExpectedIncomeAmount;
+    }
 
     // Remove undefined values
     Object.keys(updateData).forEach(key => {

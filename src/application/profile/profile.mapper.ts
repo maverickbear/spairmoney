@@ -18,6 +18,7 @@ export class ProfileMapper {
       phoneNumber: row.phone_number,
       dateOfBirth: row.date_of_birth,
       temporaryExpectedIncome: (row.temporary_expected_income as import("../../domain/onboarding/onboarding.types").ExpectedIncomeRange) || null,
+      temporaryExpectedIncomeAmount: row.temporary_expected_income_amount ?? null,
     };
   }
 
