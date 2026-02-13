@@ -5,7 +5,7 @@
  */
 
 import { getStripeClient } from "@/src/infrastructure/external/stripe/stripe-client";
-import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 import { CheckoutSessionResult, WebhookEventResult } from "../../domain/stripe/stripe.types";
 import Stripe from "stripe";
 import { logger } from "@/src/infrastructure/utils/logger";
@@ -14,11 +14,92 @@ import { SubscriptionsRepository } from "@/src/infrastructure/database/repositor
 import { AppError } from "../shared/app-error";
 import { getActiveHouseholdId } from "@/lib/utils/household";
 
+/** Plan row shape from app_plans (snake_case from DB). */
+type PlanPriceIds = {
+  stripe_product_id: string | null;
+  stripe_price_id_monthly: string | null;
+  stripe_price_id_yearly: string | null;
+};
+
 export class StripeService {
   constructor(
     private webhookEventsRepository: WebhookEventsRepository = new WebhookEventsRepository(),
     private subscriptionsRepository: SubscriptionsRepository = new SubscriptionsRepository()
   ) {}
+
+  /**
+   * Resolves the active Stripe price ID for a plan and interval.
+   * When the price is updated in Stripe (e.g. Dashboard), a new price is created and the old one archived.
+   * This method uses the stored price if still active, otherwise fetches the current active price for the
+   * product and interval from Stripe, then updates Supabase so future requests use the new ID.
+   */
+  async resolveActivePriceId(
+    planId: string,
+    plan: PlanPriceIds,
+    interval: "month" | "year"
+  ): Promise<string | null> {
+    const stripe = getStripeClient();
+    const storedPriceId =
+      interval === "month" ? plan.stripe_price_id_monthly : plan.stripe_price_id_yearly;
+
+    if (storedPriceId) {
+      try {
+        const price = await stripe.prices.retrieve(storedPriceId);
+        if (price.active) {
+          return storedPriceId;
+        }
+      } catch {
+        // Price may be archived or invalid; resolve from product below.
+      }
+    }
+
+    const productId = plan.stripe_product_id;
+    if (!productId) {
+      return storedPriceId ?? null;
+    }
+
+    const prices = await stripe.prices.list({
+      product: productId,
+      active: true,
+    });
+
+    const match = prices.data
+      .filter((p) => {
+        const rec = p.recurring;
+        if (!rec) return false;
+        if (interval === "year") {
+          return (
+            (rec.interval === "year" && (rec.interval_count ?? 1) === 1) ||
+            (rec.interval === "month" && (rec.interval_count ?? 1) === 12)
+          );
+        }
+        return rec.interval === "month" && (rec.interval_count ?? 1) === 1;
+      })
+      .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0];
+
+    if (!match) {
+      return storedPriceId ?? null;
+    }
+
+    if (match.id !== storedPriceId) {
+      const supabase = createServiceRoleClient();
+      const column =
+        interval === "month" ? "stripe_price_id_monthly" : "stripe_price_id_yearly";
+      await supabase
+        .from("app_plans")
+        .update({ [column]: match.id, updated_at: new Date().toISOString() })
+        .eq("id", planId);
+      logger.info("[StripeService] Synced plan price ID from Stripe", {
+        planId,
+        interval,
+        previousId: storedPriceId,
+        newId: match.id,
+      });
+    }
+
+    return match.id;
+  }
+
   /**
    * Create a checkout session for trial (no authentication required)
    * NOTE: This method requires payment method collection. For trial without card,
@@ -46,10 +127,7 @@ export class StripeService {
         return { url: null, error: "Plan not found" };
       }
 
-      const priceId = interval === "month" 
-        ? plan.stripe_price_id_monthly 
-        : plan.stripe_price_id_yearly;
-
+      const priceId = await this.resolveActivePriceId(planId, plan, interval);
       if (!priceId) {
         return { url: null, error: "Stripe price ID not configured for this plan" };
       }
@@ -155,10 +233,7 @@ export class StripeService {
         return { url: null, error: "Plan not found" };
       }
 
-      const priceId = interval === "month" 
-        ? plan.stripe_price_id_monthly 
-        : plan.stripe_price_id_yearly;
-
+      const priceId = await this.resolveActivePriceId(planId, plan, interval);
       if (!priceId) {
         return { url: null, error: "Stripe price ID not configured for this plan" };
       }
@@ -293,10 +368,7 @@ export class StripeService {
         return { url: null, error: "Plan not found" };
       }
 
-      const priceId = interval === "month"
-        ? plan.stripe_price_id_monthly
-        : plan.stripe_price_id_yearly;
-
+      const priceId = await this.resolveActivePriceId(planId, plan, interval);
       if (!priceId) {
         return { url: null, error: "Stripe price ID not configured for this plan" };
       }
@@ -1255,10 +1327,7 @@ export class StripeService {
         return { success: false, error: "Plan not found" };
       }
 
-      const newPriceId = interval === "month" 
-        ? newPlan.stripe_price_id_monthly 
-        : newPlan.stripe_price_id_yearly;
-
+      const newPriceId = await this.resolveActivePriceId(newPlanId, newPlan, interval);
       if (!newPriceId) {
         return { success: false, error: "Stripe price ID not configured for this plan" };
       }
@@ -1509,10 +1578,7 @@ export class StripeService {
         return { success: false, error: "Plan not found" };
       }
 
-      const priceId = interval === "month" 
-        ? plan.stripe_price_id_monthly 
-        : plan.stripe_price_id_yearly;
-
+      const priceId = await this.resolveActivePriceId(planId, plan, interval);
       if (!priceId) {
         return { success: false, error: "Stripe price ID not configured for this plan" };
       }

@@ -8,6 +8,7 @@ import { getActiveHouseholdId } from "@/lib/utils/household";
 import { getStripeClient } from "@/src/infrastructure/external/stripe/stripe-client";
 import { makeSubscriptionsService } from "../subscriptions/subscriptions.factory";
 import { makeMembersService } from "../members/members.factory";
+import { makeStripeService } from "../stripe/stripe.factory";
 import { logger } from "@/src/infrastructure/utils/logger";
 
 export interface StartTrialResult {
@@ -169,8 +170,9 @@ export class TrialService {
         logger.info("[TrialService] Stripe customer created:", { customerId, email: authUser.email, name: userData?.name });
       }
 
-      // Get price ID (default to monthly)
-      const priceId = plan.stripe_price_id_monthly;
+      // Resolve active price (handles Stripe price updates / archived prices)
+      const stripeService = makeStripeService();
+      const priceId = await stripeService.resolveActivePriceId(planId, plan, "month");
       if (!priceId) {
         return { success: false, error: "Stripe price ID not configured for this plan" };
       }
