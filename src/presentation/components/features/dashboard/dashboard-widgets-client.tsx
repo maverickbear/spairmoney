@@ -111,14 +111,14 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
 
   return (
     <div className="w-full p-4 sm:p-5 xl:p-6 min-w-0 overflow-hidden">
-      <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-3 mb-4 xl:mb-6 min-w-0">
-        <h1 className="text-lg sm:text-xl xl:text-2xl font-bold tracking-normal min-w-0 flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+      <div className="flex flex-row items-center justify-between gap-3 mb-4 xl:mb-6 min-w-0">
+        <h1 className="text-lg sm:text-xl xl:text-2xl font-bold tracking-normal min-w-0 flex-1 flex items-baseline gap-x-1 overflow-hidden" title={`${selectedDisplayName}'s finances at a glance`}>
           <Select
             value={selectedMemberId ?? "everyone"}
             onValueChange={(value) => setSelectedMemberId(value === "everyone" ? null : value)}
           >
             <SelectTrigger
-              className="inline-flex w-auto max-w-[50%] xs:max-w-none border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal text-primary-text hover:text-primary cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate"
+              className="inline-flex w-auto max-w-[50%] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal text-primary-text hover:text-primary cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate min-w-0"
               size="medium"
               aria-label="Change whose finances to view"
             >
@@ -137,11 +137,11 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
               })}
             </SelectContent>
           </Select>
-          <span className="text-foreground">finances at a glance</span>
+          <span className="text-foreground truncate min-w-0">finances at a glance</span>
         </h1>
-        <Button variant="outline" size="small" onClick={handleRefresh} disabled={loading || isRefreshing} className="gap-2 shrink-0 self-start xs:self-center">
+        <Button variant="outline" size="small" onClick={handleRefresh} disabled={loading || isRefreshing} className="gap-2 shrink-0 min-h-[44px] min-w-[44px] md:min-w-0 md:min-h-0 p-0 md:px-3 md:py-2" aria-label="Refresh">
           <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          Refresh
+          <span className="hidden md:inline">Refresh</span>
         </Button>
       </div>
 
@@ -221,13 +221,15 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
            </WidgetCard>
         </div>
 
-        {/* Spare Score + Quick Transaction - single col until xl so 1024px has full width */}
+        {/* Spare Score + Quick Transaction (Quick Transaction hidden on mobile) */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 xl:gap-6 mb-4 xl:mb-6 [&>*]:min-w-0">
           <SpareScoreFullWidthWidget
             data={data.spareScore}
             onOpenDetails={() => setShowSpareScoreDetails(true)}
           />
-          <AddTransactionWidget onTransactionAdded={handleRefresh} />
+          <div className="hidden xl:block min-w-0">
+            <AddTransactionWidget onTransactionAdded={handleRefresh} />
+          </div>
         </div>
 
         <SpareScoreDetailsDialog
