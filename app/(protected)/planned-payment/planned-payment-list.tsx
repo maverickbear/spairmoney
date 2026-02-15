@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/components/common/money";
 import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Calendar, Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Calendar, Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight, Plus, Pencil } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import type { BasePlannedPayment as PlannedPayment } from "@/src/domain/planned-payments/planned-payments.types";
 import { PLANNED_HORIZON_DAYS } from "@/src/domain/planned-payments/planned-payments.types";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
+import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { PageHeader } from "@/components/common/page-header";
 import {
   Table,
@@ -51,7 +52,8 @@ export function PlannedPaymentList() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  
+  const [editingPayment, setEditingPayment] = useState<PlannedPayment | null>(null);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -540,7 +542,7 @@ export function PlannedPaymentList() {
   }, [loading, expenseCount, incomeCount, transferCount]);
 
   return (
-    <SimpleTabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full">
+    <SimpleTabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="w-full pb-32 lg:pb-0">
       <PageHeader
         title="Planned Payment"
       />
@@ -671,6 +673,16 @@ export function PlannedPaymentList() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingPayment(payment);
+                                setIsFormOpen(true);
+                              }}
+                              disabled={isProcessing || payment.status !== "scheduled"}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleMarkAsPaid(payment)}
                               disabled={isProcessing}
@@ -850,6 +862,16 @@ export function PlannedPaymentList() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingPayment(payment);
+                                  setIsFormOpen(true);
+                                }}
+                                disabled={isProcessing || payment.status !== "scheduled"}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
                                 onClick={() => handleMarkAsPaid(payment)}
                                 disabled={isProcessing}
                               >
@@ -994,6 +1016,16 @@ export function PlannedPaymentList() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingPayment(payment);
+                                  setIsFormOpen(true);
+                                }}
+                                disabled={isProcessing || payment.status !== "scheduled"}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleMarkAsPaid(payment)}
                                 disabled={isProcessing}
@@ -1143,6 +1175,16 @@ export function PlannedPaymentList() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingPayment(payment);
+                                  setIsFormOpen(true);
+                                }}
+                                disabled={isProcessing || payment.status !== "scheduled"}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
                                 onClick={() => handleMarkAsPaid(payment)}
                                 disabled={isProcessing}
                               >
@@ -1262,27 +1304,33 @@ export function PlannedPaymentList() {
         )}
       </div>
 
-      {/* Transaction Form for creating planned payments */}
+      {/* Transaction Form for creating or editing planned payments */}
       <TransactionForm
         open={isFormOpen}
-        onOpenChange={setIsFormOpen}
+        onOpenChange={(open) => {
+          setIsFormOpen(open);
+          if (!open) setEditingPayment(null);
+        }}
+        plannedPayment={editingPayment}
         onSuccess={() => {
+          setEditingPayment(null);
           loadCounts();
           loadPlannedPayments();
         }}
         defaultType={activeTab}
       />
 
-      {/* Mobile Floating Action Button */}
-      <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+      {/* Mobile Add bar - fixed above bottom nav */}
+      <MobileAddBar>
         <Button
           size="medium"
-          className="h-14 w-14 rounded-full shadow-lg"
+          className="w-full max-w-sm"
           onClick={() => setIsFormOpen(true)}
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="h-4 w-4 mr-2" />
+          Add Planned Payment
         </Button>
-      </div>
+      </MobileAddBar>
     </SimpleTabs>
   );
 }

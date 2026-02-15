@@ -6,7 +6,7 @@
  * This service maintains backward compatibility with old names
  */
 
-import { PlannedPaymentsRepository } from "@/src/infrastructure/database/repositories/planned-payments.repository";
+import { PlannedPaymentsRepository, PlannedPaymentRow } from "@/src/infrastructure/database/repositories/planned-payments.repository";
 import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
 import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
 import { DebtsRepository } from "@/src/infrastructure/database/repositories/debts.repository";
@@ -146,6 +146,28 @@ export class PlannedPaymentsService {
   }
 
   /**
+   * Get a single planned payment by ID. Returns null if not found or not owned by the current user.
+   */
+  async getPlannedPaymentById(
+    id: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<BaseFinancialEvent | null> {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return null;
+    }
+
+    const row = await this.repository.findById(id, accessToken, refreshToken);
+    if (!row || row.user_id !== userId) {
+      return null;
+    }
+
+    const relations = await this.fetchRelations(row, accessToken, refreshToken);
+    return PlannedPaymentsMapper.toDomain(row, relations);
+  }
+
+  /**
    * Create a new planned payment
    */
   async createPlannedPayment(
@@ -196,7 +218,8 @@ export class PlannedPaymentsService {
   }
 
   /**
-   * Update a planned payment
+   * Update a planned payment.
+   * Only scheduled payments can be updated. Ownership is enforced.
    */
   async updatePlannedPayment(
     id: string,
@@ -207,63 +230,78 @@ export class PlannedPaymentsService {
       throw new AppError("Unauthorized", 401);
     }
 
-    const updateData: any = {};
+    const existing = await this.repository.findById(id);
+    if (!existing) {
+      throw new AppError("Planned payment not found", 404);
+    }
+    if (existing.user_id !== userId) {
+      throw new AppError("Planned payment not found", 404);
+    }
+    if (existing.status !== "scheduled") {
+      throw new AppError("Only scheduled planned payments can be edited", 400);
+    }
+
+    // Build snake_case payload for repository
+    const updatePayload: Record<string, unknown> = {};
 
     if (data.date !== undefined) {
       const date = data.date instanceof Date ? data.date : new Date(data.date);
-      updateData.date = formatDateOnly(date);
+      updatePayload.date = formatDateOnly(date);
     }
 
     if (data.amount !== undefined) {
-      updateData.amount = data.amount;
+      updatePayload.amount = data.amount;
     }
 
     if (data.accountId !== undefined) {
-      updateData.accountId = data.accountId;
+      updatePayload.account_id = data.accountId;
     }
 
     if (data.type !== undefined) {
-      updateData.type = data.type;
+      updatePayload.type = data.type;
       if (data.type === "transfer") {
-        updateData.toAccountId = data.toAccountId || null;
-        updateData.categoryId = null;
-        updateData.subcategoryId = null;
+        updatePayload.to_account_id = data.toAccountId || null;
+        updatePayload.category_id = null;
+        updatePayload.subcategory_id = null;
       } else {
-        updateData.toAccountId = null;
-        updateData.categoryId = data.categoryId || null;
-        updateData.subcategoryId = data.subcategoryId || null;
+        updatePayload.to_account_id = null;
+        updatePayload.category_id = data.categoryId || null;
+        updatePayload.subcategory_id = data.subcategoryId || null;
       }
     } else {
       if (data.toAccountId !== undefined) {
-        updateData.toAccountId = data.toAccountId;
+        updatePayload.to_account_id = data.toAccountId;
       }
       if (data.categoryId !== undefined) {
-        updateData.categoryId = data.categoryId;
+        updatePayload.category_id = data.categoryId;
       }
       if (data.subcategoryId !== undefined) {
-        updateData.subcategoryId = data.subcategoryId;
+        updatePayload.subcategory_id = data.subcategoryId;
       }
     }
 
     if (data.description !== undefined) {
-      updateData.description = encryptDescription(data.description || null);
+      updatePayload.description = encryptDescription(data.description || null);
     }
 
     if (data.source !== undefined) {
-      updateData.source = data.source;
+      updatePayload.source = data.source;
     }
 
     if (data.debtId !== undefined) {
-      updateData.debtId = data.debtId;
+      updatePayload.debt_id = data.debtId;
     }
 
     if (data.subscriptionId !== undefined) {
-      updateData.subscriptionId = data.subscriptionId;
+      updatePayload.subscription_id = data.subscriptionId;
     }
 
-    const updatedRow = await this.repository.update(id, updateData);
+    if (data.goalId !== undefined) {
+      updatePayload.goal_id = data.goalId;
+    }
 
-    // Fetch related data
+    const updatedRow = await this.repository.update(id, updatePayload as Partial<PlannedPaymentRow>);
+
     const relations = await this.fetchRelations(updatedRow);
 
     return PlannedPaymentsMapper.toDomain(updatedRow, relations);

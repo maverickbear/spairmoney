@@ -230,6 +230,10 @@ export interface ExpectedIncomeOverview {
   spendingThisMonth: number;
   spendingAsPercentOfExpected: number | null; // when expected > 0
   hasExpectedIncome: boolean;
+  /** True when expectedMonthlyIncome was converted from annual gross to monthly after-tax using household location */
+  expectedIncomeIsAfterTax?: boolean;
+  /** True when user has set annual income but country/state not set — prompt to set location to see after-tax comparison */
+  needsLocationForAfterTax?: boolean;
   /** Days until next paycheck (optional, for "Next paycheck in X days") */
   nextPaycheckDays?: number | null;
   /** Amount of next paycheck (optional) */

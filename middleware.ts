@@ -265,7 +265,10 @@ export async function middleware(request: NextRequest) {
         } else {
           const { data: userData } = await supabase.from("core.users").select("role").eq("id", user.id).single();
           if (userData?.role !== "super_admin") {
-            return NextResponse.redirect(new URL("/dashboard", request.url));
+            // Not a portal admin: send to admin login so they can sign in with an admin account (separate environment)
+            const redirectUrl = new URL("/admin/login", request.url);
+            redirectUrl.searchParams.set("redirect", pathname);
+            return NextResponse.redirect(redirectUrl);
           }
         }
       } catch {

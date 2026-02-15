@@ -78,13 +78,13 @@ export function getClassificationFromScore(score: number): SpareScoreClassificat
 export function getMessageFromClassification(classification: SpareScoreClassification): string {
   switch (classification) {
     case "Excellent":
-      return "You're living below your means — great job!";
+      return "This month you're living below your means — great job!";
     case "Strong":
     case "Fair":
-      return "Your expenses are balanced but close to your limit.";
+      return "This month your expenses are balanced but close to your limit.";
     case "Fragile":
     case "Critical":
-      return "Warning: you're spending more than you earn!";
+      return "This month you're spending more than you earned.";
     default:
       return "";
   }

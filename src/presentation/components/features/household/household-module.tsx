@@ -36,7 +36,14 @@ function getInitials(name: string | null | undefined): string {
   return name[0].toUpperCase();
 }
 
-export function HouseholdModule() {
+export interface HouseholdModuleProps {
+  /** When true, opens the invite form (e.g. from page MobileAddBar). */
+  externalInviteOpen?: boolean;
+  /** Called when the invite form closes so the page can sync state. */
+  onExternalInviteOpenChange?: (open: boolean) => void;
+}
+
+export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange }: HouseholdModuleProps = {}) {
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess, canWrite } = useWriteGuard();
   const [members, setMembers] = useState<HouseholdMember[]>([]);
@@ -54,6 +61,14 @@ export function HouseholdModule() {
       loadData();
     }
   }, [limitsLoading]);
+
+  // Sync external invite state from page (e.g. MobileAddBar) into the form
+  useEffect(() => {
+    if (externalInviteOpen) {
+      setEditingMember(undefined);
+      setIsFormOpen(true);
+    }
+  }, [externalInviteOpen]);
 
   // OPTIMIZED: Fetch only members data, role comes from Context
   async function loadData() {
@@ -128,6 +143,7 @@ export function HouseholdModule() {
   }
 
   function handleFormClose() {
+    onExternalInviteOpenChange?.(false);
     setIsFormOpen(false);
     setEditingMember(undefined);
   }
@@ -143,13 +159,17 @@ export function HouseholdModule() {
       headerTitle="Household Members"
     >
       <div>
-        <div className="flex items-center justify-end mb-4">
+        <div className="hidden lg:flex items-center justify-end mb-4">
           {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && members.length > 0 && canWrite && (
             <Button
               size="medium"
               onClick={() => {
                 if (!checkWriteAccess()) return;
-                setIsFormOpen(true);
+                if (onExternalInviteOpenChange) {
+                  onExternalInviteOpenChange(true);
+                } else {
+                  setIsFormOpen(true);
+                }
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -316,22 +336,6 @@ export function HouseholdModule() {
           onSuccess={handleFormSuccess}
         />
         {ConfirmDialog}
-
-        {/* Mobile Floating Action Button */}
-        {(currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && canWrite && (
-          <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
-            <Button
-              size="medium"
-              className="h-14 w-14 rounded-full shadow-lg"
-              onClick={() => {
-                if (!checkWriteAccess()) return;
-                setIsFormOpen(true);
-              }}
-            >
-              <Plus className="h-6 w-6" />
-            </Button>
-          </div>
-        )}
       </div>
     </FeatureGuard>
   );

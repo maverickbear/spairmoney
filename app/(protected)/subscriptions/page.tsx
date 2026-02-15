@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import type { UserServiceSubscription } from "@/src/domain/subscriptions/subscriptions.types";
@@ -472,9 +473,9 @@ export default function SubscriptionsPage() {
         title="Subscriptions"
       />
 
-      <div className="w-full p-4 lg:p-8">
+      <div className="w-full p-4 lg:p-8 pb-32 lg:pb-8">
         {/* Action Buttons - Moved from header */}
-        <div className="flex items-center gap-2 justify-end mb-6">
+        <div className="flex items-center gap-2 justify-end mb-6 flex-wrap">
           {selectedSubscriptions.size > 0 && canWrite && (
             <Button
               size="medium"
@@ -518,6 +519,7 @@ export default function SubscriptionsPage() {
           {canWrite && (
             <Button
               size="medium"
+              className="hidden lg:inline-flex"
               onClick={() => {
                 if (!checkWriteAccess()) return;
                 setSelectedSubscription(null);
@@ -1044,6 +1046,23 @@ export default function SubscriptionsPage() {
       </Dialog>
 
       {ConfirmDialog}
+
+      {/* Mobile Add bar - fixed above bottom nav */}
+      {canWrite && (
+        <MobileAddBar>
+          <Button
+            size="mobileAdd"
+            onClick={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedSubscription(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Subscription
+          </Button>
+        </MobileAddBar>
+      )}
     </div>
   );
 }

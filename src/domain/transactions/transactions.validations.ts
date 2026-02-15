@@ -22,8 +22,8 @@ const transactionSchemaBase = z.object({
   accountId: z.string().min(1, "Account is required"),
   toAccountId: z.string().optional(), // For transfer transactions (outgoing)
   transferFromId: z.string().optional(), // For transfer transactions (incoming, e.g., credit card payments)
-  categoryId: z.string().optional(),
-  subcategoryId: z.string().optional(),
+  categoryId: z.string().nullish(),
+  subcategoryId: z.string().nullish(),
   merchant: z.string().optional(),
   description: z.string().optional(),
   recurring: z.boolean().default(false),

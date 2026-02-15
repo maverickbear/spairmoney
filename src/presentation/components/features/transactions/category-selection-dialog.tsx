@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { CategorySelectionModal } from "./category-selection-modal";
 import type { Transaction } from "@/src/domain/transactions/transactions.types";
 import type { Category } from "@/src/domain/categories/categories.types";
@@ -23,6 +24,7 @@ interface CategorySelectionDialogProps {
   onCategorySelect: (categoryId: string | null, subcategoryId: string | null) => void;
   onClear: () => void;
   onSave: () => void;
+  saving?: boolean;
   clearTrigger: number;
 }
 
@@ -36,6 +38,7 @@ export function CategorySelectionDialog({
   onCategorySelect,
   onClear,
   onSave,
+  saving = false,
   clearTrigger,
 }: CategorySelectionDialogProps) {
   const handleClear = () => {
@@ -62,11 +65,18 @@ export function CategorySelectionDialog({
           clearTrigger={clearTrigger}
         />
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={handleClear}>
+          <Button type="button" variant="outline" onClick={handleClear} disabled={saving}>
             Clear
           </Button>
-          <Button type="button" onClick={onSave}>
-            Save
+          <Button type="button" onClick={onSave} disabled={saving}>
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+                Saving
+              </>
+            ) : (
+              "Save"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

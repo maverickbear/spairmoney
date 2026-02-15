@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { formatDateOnly } from "@/src/infrastructure/utils/timestamp";
 
 interface AddTransactionWidgetProps {
   onTransactionAdded?: () => void;
@@ -48,6 +50,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
   const [type, setType] = useState<"expense" | "income" | "transfer">("expense");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [transactionDate, setTransactionDate] = useState<Date>(() => new Date());
   const [loading, setLoading] = useState(false);
   
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -130,7 +133,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
         type,
         amount: parseFloat(amount),
         description,
-        date: new Date().toISOString().split("T")[0],
+        date: formatDateOnly(transactionDate),
         accountId,
         categoryId: type === "transfer" ? null : (categoryId || null),
         subcategoryId: type === "transfer" ? null : (subcategoryId || null),
@@ -160,6 +163,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
       
       setAmount("");
       setDescription("");
+      setTransactionDate(new Date());
       setCategoryId("");
       setSubcategoryId("");
       router.refresh();
@@ -295,15 +299,26 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="description" className="text-xs text-muted-foreground">Description</Label>
-          <Input
-            id="description"
-            placeholder="What was it for?"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="h-9 text-sm"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
+          <div className="space-y-1.5 min-w-0">
+            <Label htmlFor="description" className="text-xs text-muted-foreground">Description</Label>
+            <Input
+              id="description"
+              placeholder="What was it for?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5 sm:w-[140px]">
+            <Label className="text-xs text-muted-foreground">Date</Label>
+            <DatePicker
+              date={transactionDate}
+              onDateChange={(d) => setTransactionDate(d ?? new Date())}
+              size="small"
+              className="h-9"
+            />
+          </div>
         </div>
 
         <Button

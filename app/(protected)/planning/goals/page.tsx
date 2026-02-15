@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import { Badge } from "@/components/ui/badge";
@@ -171,10 +172,10 @@ export default function GoalsPage() {
     <div>
       <PageHeader title="Goals" />
 
-      <div className="w-full p-4 lg:p-8">
-        {/* Action Buttons */}
+      <div className="w-full p-4 lg:p-8 pb-32 lg:pb-8">
+        {/* Action Buttons - desktop only */}
         {canWrite && (
-          <div className="flex items-center gap-2 justify-end mb-6">
+          <div className="hidden lg:flex items-center gap-2 justify-end mb-6">
             <Button
               size="medium"
               onClick={() => {
@@ -514,21 +515,21 @@ export default function GoalsPage() {
       {ConfirmDialog}
       </div>
 
-      {/* Mobile Floating Action Button */}
+      {/* Mobile Add bar - fixed above bottom nav */}
       {canWrite && (
-        <div className="fixed bottom-20 right-4 z-[60] lg:hidden">
+        <MobileAddBar>
           <Button
-            size="medium"
-            className="h-14 w-14 rounded-full shadow-lg"
+            size="mobileAdd"
             onClick={() => {
               if (!checkWriteAccess()) return;
               setSelectedGoal(null);
               setIsFormOpen(true);
             }}
           >
-            <Plus className="h-6 w-6" />
+            <Plus className="h-4 w-4 mr-2" />
+            Create Goal
           </Button>
-        </div>
+        </MobileAddBar>
       )}
     </div>
   );

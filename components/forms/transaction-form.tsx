@@ -87,6 +87,8 @@ interface TransactionFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction?: Transaction | null;
+  /** When set, form is in "edit planned payment" mode: loads this payment and submits via PATCH */
+  plannedPayment?: import("@/src/domain/planned-payments/planned-payments.types").BasePlannedPayment | null;
   onSuccess?: () => void;
   defaultType?: "expense" | "income" | "transfer";
 }
@@ -124,7 +126,7 @@ interface Category {
   }>;
 }
 
-export function TransactionForm({ open, onOpenChange, transaction, onSuccess, defaultType = "expense" }: TransactionFormProps) {
+export function TransactionForm({ open, onOpenChange, transaction, plannedPayment, onSuccess, defaultType = "expense" }: TransactionFormProps) {
   // Set date after component mounts to avoid SSR/prerendering issues
   const [defaultDate, setDefaultDate] = useState<Date | null>(null);
 
@@ -298,6 +300,31 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
           form.trigger();
         }, 100);
         // Category will be loaded by the useEffect that handles transaction editing
+      } else if (plannedPayment) {
+        // Edit planned payment: load form with planned payment data
+        setShouldShowForm(true);
+        loadData();
+        loadTransactionLimit();
+        const amount = plannedPayment.amount && plannedPayment.amount > 0 ? plannedPayment.amount : 0.01;
+        const formData: Partial<TransactionFormData> = {
+          date: plannedPayment.date instanceof Date ? plannedPayment.date : new Date(plannedPayment.date),
+          type: plannedPayment.type,
+          amount,
+          accountId: plannedPayment.accountId || "",
+          toAccountId: plannedPayment.toAccountId || undefined,
+          categoryId: plannedPayment.categoryId || undefined,
+          subcategoryId: plannedPayment.subcategoryId || undefined,
+          merchant: undefined,
+          description: plannedPayment.description || "",
+          recurring: false,
+          recurringFrequency: undefined,
+        };
+        form.reset(formData);
+        setSelectedCategoryId(plannedPayment.categoryId || "");
+        if (plannedPayment.categoryId) {
+          loadSubcategoriesForCategory(plannedPayment.categoryId);
+        }
+        setTimeout(() => form.trigger(), 100);
       } else {
         // If creating a new transaction, check if there are accounts
         checkAccountsAndShowForm();
@@ -307,7 +334,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       setShowAccountDialog(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, transaction]);
+  }, [open, transaction, plannedPayment]);
 
 
   async function checkAccountsAndShowForm() {
@@ -571,7 +598,7 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
     }
   }
 
-  // Initialize form when editing a transaction
+  // Initialize form when editing a transaction or planned payment
   useEffect(() => {
     if (open && transaction && transaction.categoryId) {
       setSelectedCategoryId(transaction.categoryId);
@@ -580,8 +607,15 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
         loadSubcategoriesForCategory(transaction.categoryId);
       }
     }
+    if (open && plannedPayment && plannedPayment.categoryId) {
+      setSelectedCategoryId(plannedPayment.categoryId);
+      form.setValue("categoryId", plannedPayment.categoryId);
+      if (plannedPayment.subcategoryId) {
+        loadSubcategoriesForCategory(plannedPayment.categoryId);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, transaction]);
+  }, [open, transaction, plannedPayment]);
 
   function handleCategoryChange(categoryId: string) {
     // Handle special "Add Category" action
@@ -629,6 +663,44 @@ export function TransactionForm({ open, onOpenChange, transaction, onSuccess, de
       // Also sync from form value to selectedCategoryId if form has value but state doesn't
       if (data.type !== "transfer" && data.categoryId && data.categoryId !== "" && !selectedCategoryId) {
         setSelectedCategoryId(data.categoryId);
+      }
+
+      // Edit planned payment: PATCH and exit
+      if (plannedPayment) {
+        const transactionDate = data.date instanceof Date ? data.date : new Date(data.date);
+        const response = await fetch(`/api/v2/planned-payments/${plannedPayment.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: transactionDate instanceof Date ? toDateOnlyString(transactionDate) : transactionDate,
+            type: data.type,
+            amount: data.amount,
+            accountId: data.accountId,
+            toAccountId: data.type === "transfer" ? (data.toAccountId || null) : null,
+            categoryId: data.type === "transfer" ? null : (data.categoryId || null),
+            subcategoryId: data.type === "transfer" ? null : (data.subcategoryId || null),
+            description: data.description || null,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to update planned payment");
+        }
+
+        toast({
+          title: "Planned payment updated",
+          description: "Your planned payment has been saved.",
+          variant: "success",
+        });
+
+        onSuccess?.();
+        if (closeDialog) {
+          onOpenChange(false);
+          form.reset();
+        }
+        setIsSubmitting(false);
+        return;
       }
 
       // Check if date is in the future

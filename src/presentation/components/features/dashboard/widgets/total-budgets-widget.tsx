@@ -13,6 +13,9 @@ interface TotalBudgetsWidgetProps {
 export function TotalBudgetsWidget({ data, className }: TotalBudgetsWidgetProps) {
   if (!data) return null;
 
+  const totalSpent = data.categories.reduce((sum, cat) => sum + cat.spent, 0);
+  const totalRemaining = data.totalAmount - totalSpent;
+
   const SeeAllLink = () => (
     <Link
       href="/planning/budgets"
@@ -29,9 +32,15 @@ export function TotalBudgetsWidget({ data, className }: TotalBudgetsWidgetProps)
       headerAction={<SeeAllLink />}
     >
       <div className="flex flex-col h-full space-y-6">
-        <div>
+        <div className="flex flex-col gap-0.5">
           <span className="text-3xl font-bold tracking-tight">
-            ${data.totalAmount.toLocaleString()}
+            ${totalRemaining.toLocaleString()}
+            <span className="text-muted-foreground font-semibold">
+              {" "}/ ${data.totalAmount.toLocaleString()}
+            </span>
+          </span>
+          <span className="text-xs text-muted-foreground">
+            available / total set
           </span>
         </div>
 

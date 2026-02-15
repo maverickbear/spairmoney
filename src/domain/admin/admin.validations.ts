@@ -1,5 +1,26 @@
 import { z } from "zod";
 import { planFeaturesSchema } from "@/src/domain/subscriptions/subscriptions.validations";
+import { ADMIN_ALLOWED_EMAIL_DOMAIN } from "./admin.constants";
+
+/**
+ * Email allowed for admin registration and invites only.
+ * Validates format and that domain is exactly @sparefinance.com (case-insensitive).
+ */
+function isAllowedAdminEmailDomain(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  const atIndex = normalized.indexOf("@");
+  if (atIndex <= 0 || atIndex === normalized.length - 1) return false;
+  const domain = normalized.slice(atIndex + 1);
+  return domain === ADMIN_ALLOWED_EMAIL_DOMAIN;
+}
+
+export const adminEmailSchema = z
+  .string()
+  .min(1, "Email is required")
+  .email("Invalid email address")
+  .refine(isAllowedAdminEmailDomain, {
+    message: "You can't register at this time.",
+  });
 
 /**
  * Promo code validation schemas

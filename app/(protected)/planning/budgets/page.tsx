@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Wallet, Loader2, Plus, Trash2 } from "lucide-react";
 import { CategoryBudgetSlider } from "@/src/presentation/components/features/budgets/category-budget-slider";
+import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import {
@@ -208,9 +209,9 @@ export default function BudgetsPage() {
     <div>
       <PageHeader title="Budgets" />
 
-      <div className="w-full p-4 lg:p-8">
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 justify-end mb-6">
+      <div className="w-full p-4 lg:p-8 pb-32 lg:pb-8">
+        {/* Action Buttons - desktop only */}
+        <div className="hidden lg:flex items-center gap-2 justify-end mb-6">
           <Button
             size="medium"
             onClick={handleOpenDialog}
@@ -343,6 +344,14 @@ export default function BudgetsPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Mobile Add bar - fixed above bottom nav */}
+      <MobileAddBar>
+        <Button size="mobileAdd" onClick={handleOpenDialog}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Budget
+        </Button>
+      </MobileAddBar>
     </div>
   );
 }

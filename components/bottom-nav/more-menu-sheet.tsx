@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuthSafe } from "@/contexts/auth-context";
 import { useSubscriptionSafe } from "@/contexts/subscription-context";
@@ -13,7 +12,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import {
   Wallet,
   PiggyBank,
@@ -31,7 +29,6 @@ import {
   Edit,
   CheckCircle2,
   ArrowRight,
-  Bell,
   FileText,
   Lightbulb,
   LayoutDashboard,
@@ -42,11 +39,8 @@ import {
   Search,
   Palette,
   Shield,
-  Moon,
-  Sun,
   LogOut,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { logger } from "@/src/infrastructure/utils/logger";
 
 interface NavItem {
@@ -100,11 +94,10 @@ function buildNavCategories(): NavCategory[] {
     },
   ];
 
-  // Add Legal & Preferences section (theme toggle for all users)
+  // Add Legal & Preferences section
   const legalItems: NavItem[] = [
     { href: "/privacy-policy", label: "Privacy Policy", icon: Shield },
     { href: "/terms-of-service", label: "Terms of Service", icon: FileText },
-    { href: "#", label: "Theme", icon: Sun },
   ];
 
   categories.push({
@@ -172,9 +165,6 @@ export function MoreMenuSheet({
 }: MoreMenuSheetProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  
   // Use Context instead of local state and fetch
   const { user, checking: checkingAuth } = useAuthSafe();
   const { subscription, plan, checking: checkingSubscription } = useSubscriptionSafe();
@@ -255,19 +245,15 @@ export function MoreMenuSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent 
-        side="bottom" 
-        className="max-h-[90vh] flex flex-col p-0"
+      <SheetContent
+        side="left"
+        className="w-[80vw] max-w-[400px] h-full flex flex-col p-0"
       >
         <SheetTitle className="sr-only">More Menu</SheetTitle>
-        {/* Drag Handle */}
-        <div className="flex justify-center pt-3 pb-2 relative">
-          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
-        </div>
 
-        <div className="space-y-6 px-6 overflow-y-auto flex-1 pb-6">
-          {/* Profile Header */}
-          <div className="flex items-center gap-4 pt-2">
+        {/* Fixed header: avatar + profile */}
+        <div className="flex-shrink-0 border-b border-border px-6 pt-6 pb-4">
+          <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
               {userProfile?.avatarUrl ? (
                 <img
@@ -308,19 +294,10 @@ export function MoreMenuSheet({
               <Edit className="h-4 w-4" />
             </Button>
           </div>
+        </div>
 
-          {/* Availability/Notifications Section */}
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold text-foreground">Notifications</span>
-            </div>
-            <Switch
-              checked={notificationsEnabled}
-              onCheckedChange={setNotificationsEnabled}
-            />
-          </div>
-
+        {/* Scrollable content */}
+        <div className="space-y-6 px-6 overflow-y-auto flex-1 py-6">
           {/* Profile Progress Banner */}
           {profileProgress < 100 && (
             <Card className="bg-sentiment-warning/90 dark:bg-sentiment-warning/80 border-0">
@@ -385,37 +362,6 @@ export function MoreMenuSheet({
                   const Icon = item.icon;
                   const active = isActive(item.href);
                   const isLast = index === category.items.length - 1;
-                  
-                  // Handle theme toggle in Legal & Preferences
-                  if (category.title === "Legal & Preferences" && item.label === "Theme") {
-                    return (
-                      <button
-                        key="theme-toggle"
-                        onClick={() => {
-                          setTheme(theme === "dark" ? "light" : "dark");
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2 w-full",
-                          "transition-all duration-200",
-                          "hover:bg-muted/50 active:scale-[0.98]",
-                          !isLast && "border-b border-border",
-                          "text-foreground"
-                        )}
-                      >
-                        <div className="p-1.5 rounded-lg transition-colors flex-shrink-0 bg-muted">
-                          {theme === "dark" ? (
-                            <Sun className="h-4 w-4" />
-                          ) : (
-                            <Moon className="h-4 w-4" />
-                          )}
-                        </div>
-                        <span className="text-sm font-medium flex-1 text-left">
-                          {theme === "dark" ? "Light Mode" : "Dark Mode"}
-                        </span>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    );
-                  }
                   
                   // Handle "soon" items - render as disabled button instead of link
                   if (item.soon) {

@@ -77,6 +77,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
+import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { ImportStatusBanner } from "@/src/presentation/components/features/accounts/import-status-banner";
 
 interface Account {
@@ -200,6 +201,7 @@ export default function TransactionsPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [clearCategoryTrigger, setClearCategoryTrigger] = useState(0);
+  const [categorySaveLoading, setCategorySaveLoading] = useState(false);
   const [dateRange, setDateRange] = useState<"all-dates" | "today" | "past-7-days" | "past-15-days" | "past-30-days" | "past-90-days" | "last-3-months" | "last-month" | "last-6-months" | "past-6-months" | "this-month" | "this-year" | "year-to-date" | "last-year" | "custom">("all-dates");
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
   const [filters, setFilters] = useState({
@@ -1132,11 +1134,10 @@ export default function TransactionsPage() {
   async function handleCategoryUpdate(categoryId: string | null, subcategoryId: string | null = null) {
     if (!transactionForCategory) return;
 
-    // Store transaction reference before async operations
     const transactionToUpdate = transactionForCategory;
+    setCategorySaveLoading(true);
 
     try {
-      // Build update data
       const updateData: { categoryId?: string | null; subcategoryId?: string | null } = {};
       updateData.categoryId = categoryId;
       updateData.subcategoryId = subcategoryId || null;
@@ -1154,60 +1155,19 @@ export default function TransactionsPage() {
         throw new Error(error.error || "Failed to update transaction");
       }
 
-      // Fetch updated transaction with relations to get category/subcategory data
-      const updatedResponse = await fetch(`/api/v2/transactions/${transactionToUpdate.id}`);
-      if (updatedResponse.ok) {
-        const updatedTransaction = await updatedResponse.json();
-        // Update transaction in state with full category/subcategory data
-        setTransactions(prev => prev.map(tx => 
-          tx.id === transactionToUpdate.id 
-            ? {
-                ...tx,
-                categoryId: updatedTransaction.categoryId || undefined,
-                subcategoryId: updatedTransaction.subcategoryId || undefined,
-                category: updatedTransaction.category || null,
-                subcategory: updatedTransaction.subcategory || null,
-              }
-            : tx
-        ));
-      } else {
-        // Fallback: Update with local category data if API call fails
-        if (categoryId) {
-          const updatedCategory = categories.find(c => c.id === categoryId);
-          if (updatedCategory) {
-            // Find subcategory if provided
-            let updatedSubcategory = null;
-            if (subcategoryId && updatedCategory.subcategories) {
-              updatedSubcategory = updatedCategory.subcategories.find(s => s.id === subcategoryId) || null;
+      // Use PATCH response (includes category/subcategory) — no second request
+      const updatedTransaction = await response.json();
+      setTransactions(prev => prev.map(tx =>
+        tx.id === transactionToUpdate.id
+          ? {
+              ...tx,
+              categoryId: updatedTransaction.categoryId ?? undefined,
+              subcategoryId: updatedTransaction.subcategoryId ?? undefined,
+              category: updatedTransaction.category ?? null,
+              subcategory: updatedTransaction.subcategory ?? null,
             }
-            
-            setTransactions(prev => prev.map(tx => 
-              tx.id === transactionToUpdate.id 
-                ? { 
-                    ...tx, 
-                    categoryId: categoryId || undefined, 
-                    subcategoryId: subcategoryId || undefined,
-                    category: { id: updatedCategory.id, name: updatedCategory.name },
-                    subcategory: updatedSubcategory ? { id: updatedSubcategory.id, name: updatedSubcategory.name, logo: updatedSubcategory.logo || null } : null
-                  }
-                : tx
-            ));
-          }
-        } else {
-          // If category is cleared, remove category and subcategory objects
-          setTransactions(prev => prev.map(tx => 
-            tx.id === transactionToUpdate.id 
-              ? { 
-                  ...tx, 
-                  categoryId: undefined, 
-                  subcategoryId: undefined,
-                  category: null,
-                  subcategory: null
-                }
-              : tx
-          ));
-        }
-      }
+          : tx
+      ));
 
       toast({
         title: "Category updated",
@@ -1235,6 +1195,8 @@ export default function TransactionsPage() {
         description: error instanceof Error ? error.message : "Failed to update category",
         variant: "destructive",
       });
+    } finally {
+      setCategorySaveLoading(false);
     }
   }
 
@@ -1892,7 +1854,7 @@ export default function TransactionsPage() {
                 setSelectedTransaction(null);
                 setIsFormOpen(true);
               }} 
-              className="text-xs md:text-sm"
+              className="hidden lg:inline-flex text-xs md:text-sm"
             >
               <Plus className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
               <span className="hidden md:inline">Add Transaction</span>
@@ -2692,8 +2654,24 @@ export default function TransactionsPage() {
         onSave={() => {
           handleCategoryUpdate(selectedCategoryId, selectedSubcategoryId);
         }}
+        saving={categorySaveLoading}
         clearTrigger={clearCategoryTrigger}
       />
+      {canWrite && (
+        <MobileAddBar>
+          <Button
+            size="mobileAdd"
+            onClick={() => {
+              if (!checkWriteAccess()) return;
+              setSelectedTransaction(null);
+              setIsFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Transaction
+          </Button>
+        </MobileAddBar>
+      )}
       {DeleteConfirmDialog}
       {DeleteMultipleConfirmDialog}
 

@@ -9,6 +9,7 @@ import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
+import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { AddAccountDropdown } from "@/src/presentation/components/features/accounts/add-account-dropdown";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { AccountCard } from "@/components/banking/account-card";
@@ -379,7 +380,7 @@ export default function AccountsPage() {
             </div>
           )}
           {canWrite && (
-            <div className="ml-auto">
+            <div className="ml-auto hidden lg:block">
               <AddAccountDropdown
                 onSuccess={() => {
                   loadAccounts(true);
@@ -390,7 +391,7 @@ export default function AccountsPage() {
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 pb-32 lg:pb-0">
           {/* Desktop Table */}
           <div className="hidden lg:block rounded-md border">
             <Table>
@@ -721,6 +722,20 @@ export default function AccountsPage() {
 
       {ConfirmDialog}
 
+      {/* Mobile Add bar - fixed above bottom nav */}
+      {canWrite && (
+        <MobileAddBar>
+          <AddAccountDropdown
+            onSuccess={() => loadAccounts(true)}
+            canWrite={canWrite}
+            trigger={
+              <Button size="mobileAdd">
+                Add Account
+              </Button>
+            }
+          />
+        </MobileAddBar>
+      )}
       </div>
   );
 }

@@ -27,21 +27,21 @@ export function WidgetCard({
   compact = false 
 }: WidgetCardProps) {
   return (
-    <Card className={cn("w-full flex flex-col", compact ? "min-h-[280px]" : "min-h-[320px]", className)}>
-      <CardHeader className={cn("pb-3", compact && "pb-2")}>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className={cn("text-base font-semibold", compact && "text-sm")}>
+    <Card className={cn("w-full flex flex-col min-w-0 overflow-hidden", compact ? "min-h-[280px]" : "min-h-[320px]", className)}>
+      <CardHeader className={cn("pb-3 min-w-0 overflow-hidden", compact && "pb-2")}>
+        <div className="flex items-center justify-between gap-2 min-w-0 min-h-10">
+          <div className="min-w-0 flex-1">
+            <CardTitle className={cn("text-base font-semibold truncate", compact && "text-sm")}>
               {title}
             </CardTitle>
             {subtitle && (
               <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
             )}
           </div>
-          {headerAction}
+          {headerAction && <div className="shrink-0">{headerAction}</div>}
         </div>
       </CardHeader>
-      <CardContent className={cn("flex-1 flex flex-col", compact ? "pt-0 space-y-3" : "pt-0 space-y-4")}>
+      <CardContent className={cn("flex-1 flex flex-col min-w-0 overflow-hidden", compact ? "pt-0 space-y-3" : "pt-0 space-y-4")}>
         {children}
       </CardContent>
     </Card>

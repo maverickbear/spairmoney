@@ -21,5 +21,9 @@ export interface TaxCalculationResult {
   afterTaxIncome: number; // Annual income after taxes
   federalTax: number; // Federal tax amount
   stateOrProvincialTax: number; // State/provincial tax amount
+  /** Federal brackets used for the calculation (for display in UI) */
+  federalBrackets?: TaxBracket[];
+  /** State/provincial rate as decimal (e.g. 0.0933 for 9.33%) — for display in UI */
+  stateOrProvincialRate?: number;
 }
 

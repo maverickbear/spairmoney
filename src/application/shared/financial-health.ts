@@ -194,7 +194,7 @@ async function calculateFinancialHealthInternal(
         monthlyExpenses: projectedExpenses,
         netAmount: projectedNet,
         savingsRate: projectedSavingsRate,
-        message: "This is a projected score based on your expected income. Add your accounts and transactions to see your actual Spare Score.",
+        message: "This is a projected score based on your expected income. Add transactions for this month to see your actual Spare Score.",
         spendingDiscipline,
         debtExposure: "Low" as const,
         emergencyFundMonths: 0,
@@ -202,14 +202,14 @@ async function calculateFinancialHealthInternal(
         alerts: [{
           id: "projected_score",
           title: "Projected Score",
-          description: "This score is based on your expected income. Add your accounts and transactions to see your actual financial health.",
+          description: "This score is based on your expected income. Add this month's transactions to see your actual Spare Score.",
           severity: "info" as const,
-          action: "Add your accounts and transactions to get started.",
+          action: "Add transactions for this month to get started.",
         }],
         suggestions: [{
           id: "connect_account",
-          title: "Add your accounts and transactions",
-          description: "Add accounts and transactions manually or import from CSV to see your actual transactions and get personalized insights.",
+          title: "Add this month's transactions",
+          description: "Add income and expense transactions for this month to see how you're doing and get insights.",
           impact: "high" as const,
         }],
       };
@@ -223,22 +223,22 @@ async function calculateFinancialHealthInternal(
       monthlyExpenses: 0,
       netAmount: 0,
       savingsRate: 0,
-      message: "Add income and expense transactions to calculate your Spare Score.",
+      message: "Add income and expenses for this month to see your Spare Score.",
       spendingDiscipline: "Unknown" as const,
       debtExposure: "Low" as const,
       emergencyFundMonths: 0,
       isEmptyState: true,
       alerts: [{
         id: "no_transactions",
-        title: "No Transactions",
-        description: "You don't have any transactions for this month. Add income and expense transactions to get your Spare Score.",
+        title: "No Transactions This Month",
+        description: "You don't have any transactions for this month. Add income and expenses to see how you're doing and get your Spare Score.",
         severity: "info" as const,
-        action: "Add transactions to see your Spare Score.",
+        action: "Add this month's transactions to see your Spare Score.",
       }],
       suggestions: [{
         id: "add_transactions",
-        title: "Add Transactions",
-        description: "Start by adding your income and expense transactions for this month to calculate your Spare Score.",
+        title: "Add This Month's Transactions",
+        description: "Add income and expense transactions for this month to see how much came in, how much went out, and your Spare Score.",
         impact: "high" as const,
       }],
     };
@@ -886,72 +886,72 @@ function identifyAlerts(data: {
 }> {
   const alerts = [];
 
-  // Cash flow: expenses exceeding income
+  // Cash flow: this month — expenses exceeding income (primary insight)
   if (data.monthlyIncome > 0 && data.monthlyExpenses > data.monthlyIncome) {
     const excessPercentage = ((data.monthlyExpenses / data.monthlyIncome - 1) * 100).toFixed(1);
     alerts.push({
       id: "expenses_exceeding_income",
-      title: "Negative Cash Flow",
-      description: `Your monthly expenses (${formatMoney(data.monthlyExpenses)}) are ${excessPercentage}% higher than your income (${formatMoney(data.monthlyIncome)}).`,
+      title: "Spending More Than You Earned This Month",
+      description: `This month you spent ${formatMoney(data.monthlyExpenses)} and earned ${formatMoney(data.monthlyIncome)} — ${excessPercentage}% over your income.`,
       severity: "critical" as const,
-      action: "Review your expenses and identify where you can reduce costs.",
+      action: "Review this month's expenses and see where you can reduce spending.",
     });
   } else if (data.monthlyIncome === 0 && data.monthlyExpenses > 0) {
     alerts.push({
       id: "expenses_exceeding_income",
-      title: "Negative Cash Flow",
-      description: `You have monthly expenses (${formatMoney(data.monthlyExpenses)}) but no income recorded for this month.`,
+      title: "Spending With No Income This Month",
+      description: `This month you have ${formatMoney(data.monthlyExpenses)} in expenses but no income recorded.`,
       severity: "critical" as const,
-      action: "Add income transactions or review your expenses.",
+      action: "Add income transactions or review this month's expenses.",
     });
   }
 
-  // Savings: negative or low rate
+  // Savings: this month — negative or low rate
   if (data.savingsRate < 0) {
     alerts.push({
       id: "negative_savings_rate",
-      title: "Negative Savings Rate",
-      description: `You are spending ${formatMoney(Math.abs(data.netAmount))} more than you earn per month.`,
+      title: "Spending More Than You Earned This Month",
+      description: `This month you spent ${formatMoney(Math.abs(data.netAmount))} more than you earned.`,
       severity: "critical" as const,
-      action: "Create a strict budget and increase your income or reduce expenses.",
+      action: "Reduce expenses or add income so next month you don't spend more than you earn.",
     });
   }
   if (data.savingsRate > 0 && data.savingsRate < 10) {
     alerts.push({
       id: "low_savings_rate",
-      title: "Low Savings Rate",
-      description: `You are saving only ${data.savingsRate.toFixed(1)}% of your income. Aim for at least 20%.`,
+      title: "Low Savings Rate This Month",
+      description: `This month you're saving only ${data.savingsRate.toFixed(1)}% of your income. Aim for at least 20%.`,
       severity: "warning" as const,
-      action: "Try to increase your savings rate to at least 20%.",
+      action: "Try to increase savings next month to at least 20% of income.",
     });
   }
   if (data.savingsRate > 0 && data.savingsRate < 5) {
     alerts.push({
       id: "very_low_savings_rate",
-      title: "Very Low Savings Rate",
-      description: `Your savings rate of ${data.savingsRate.toFixed(1)}% is below recommended.`,
+      title: "Very Low Savings This Month",
+      description: `This month's savings rate is ${data.savingsRate.toFixed(1)}% — below recommended.`,
       severity: "info" as const,
-      action: "Consider reviewing your expenses to increase your savings capacity.",
+      action: "Review this month's expenses to free up more for savings next month.",
     });
   }
 
-  // Emergency fund (pillar 2)
+  // Emergency fund (context: current balance vs this month's expenses)
   if (data.emergencyFundMonths !== undefined && data.emergencyFundMonths < 6) {
     alerts.push({
       id: "emergency_fund_low",
       title: "Low Emergency Fund",
-      description: `You have ${data.emergencyFundMonths.toFixed(1)} months of expenses covered. Recommended: 6 months.`,
+      description: `Right now you have ${data.emergencyFundMonths.toFixed(1)} months of expenses (based on this month's spending) covered. Recommended: 6 months.`,
       severity: (data.emergencyFundMonths < 1 ? "critical" : data.emergencyFundMonths < 2 ? "warning" : "info") as "critical" | "warning" | "info",
       action: "Build your emergency fund to cover at least 6 months of essential expenses.",
     });
   }
 
-  // Debt load (pillar 3)
+  // Debt load (context: payments vs this month's income)
   if (data.debtExposure === "High") {
     alerts.push({
       id: "debt_load_high",
       title: "High Debt Load",
-      description: "Your monthly debt payments are a high share of your income.",
+      description: "Your monthly debt payments are a high share of this month's income.",
       severity: "warning" as const,
       action: "Review your debts and consider reducing the load below 30% of income.",
     });
@@ -977,40 +977,40 @@ function generateSuggestions(data: {
 }> {
   const suggestions = [];
 
-  // Cash flow: recovery +8 to +12 for positive cash flow next month (doc)
+  // This month: spending more than earning (primary suggestion)
   if (data.monthlyExpenses > data.monthlyIncome) {
     const reductionNeeded = data.monthlyExpenses - data.monthlyIncome;
     suggestions.push({
       id: "reduce_expenses",
-      title: "Reach Positive Cash Flow",
-      description: `Reduce expenses by ${formatMoney(reductionNeeded)}/month to balance income and expenses. This can recover about 8–12 points on your Spare Score.`,
+      title: "Spend Less Than You Earn Next Month",
+      description: `This month you spent ${formatMoney(reductionNeeded)} more than you earned. Reducing next month's expenses by that amount (or adding income) can recover about 8–12 points on your Spare Score.`,
       impact: "high" as const,
     });
   }
   if (data.savingsRate < 0) {
     suggestions.push({
       id: "increase_income_or_reduce_expenses",
-      title: "Increase Income or Reduce Expenses",
-      description: "Prioritize increasing income or reducing expenses. Positive cash flow next month can recover 8–12 points.",
+      title: "Next Month: Earn More Than You Spend",
+      description: "This month you spent more than you earned. Next month, aim for positive cash flow — that can recover about 8–12 points.",
       impact: "high" as const,
     });
   }
 
-  // Savings: 20% target
+  // This month: savings rate
   if (data.savingsRate >= 0 && data.savingsRate < 10) {
     const targetSavings = data.monthlyIncome * 0.2;
     suggestions.push({
       id: "increase_savings_rate",
-      title: "Aim for 20% Savings Rate",
-      description: `Save at least 20% of income (${formatMoney(targetSavings)}/month) to avoid penalties on the Savings Behavior pillar.`,
+      title: "Aim for 20% Savings Next Month",
+      description: `This month you saved less than 20%. Saving at least ${formatMoney(targetSavings)} next month (20% of income) can improve your score.`,
       impact: "high" as const,
     });
   }
   if (data.savingsRate >= 10 && data.savingsRate < 20) {
     suggestions.push({
       id: "review_spending",
-      title: "Review Expenses",
-      description: "Analyze expense categories and find ways to reduce without affecting quality of life.",
+      title: "Review This Month's Expenses",
+      description: "Look at this month's expense categories and find ways to reduce spending next month without affecting quality of life.",
       impact: "medium" as const,
     });
   }
@@ -1040,24 +1040,24 @@ function generateSuggestions(data: {
   if (data.monthlyExpenses > data.monthlyIncome * 0.9) {
     suggestions.push({
       id: "create_budget",
-      title: "Create Budget",
-      description: "Create a detailed budget to control expenses and save regularly.",
+      title: "Use a Budget Next Month",
+      description: "Create or follow a budget so next month's expenses stay under control and you can save.",
       impact: "medium" as const,
     });
   }
   if (data.savingsRate >= 20 && data.savingsRate < 30) {
     suggestions.push({
       id: "optimize_savings",
-      title: "Optimize Savings",
-      description: "You're on the right track. Consider automating savings.",
+      title: "Good Month — Keep It Up",
+      description: "This month your savings rate is solid. Try to keep it up next month.",
       impact: "low" as const,
     });
   }
   if (data.savingsRate >= 30) {
     suggestions.push({
       id: "maintain_good_habits",
-      title: "Maintain Good Practices",
-      description: "You're maintaining a healthy savings rate. Keep it up!",
+      title: "Strong Month",
+      description: "This month you're saving well. Keep it up next month.",
       impact: "low" as const,
     });
   }

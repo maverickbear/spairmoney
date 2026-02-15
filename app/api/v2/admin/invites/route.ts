@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeAdminService } from "@/src/application/admin/admin.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
+import { adminEmailSchema } from "@/src/domain/admin/admin.validations";
 
 /**
  * POST /api/v2/admin/invites
  * Body: { email: string }
- * Creates an admin invite (super_admin only). Returns { id, email, token, expiresAt } for the invite link.
+ * Creates an admin invite (super_admin only). Only @sparefinance.com emails allowed.
  */
 export async function POST(request: NextRequest) {
   const userId = await getCurrentUserId();
@@ -15,15 +16,14 @@ export async function POST(request: NextRequest) {
   }
   try {
     const body = await request.json();
-    const email = typeof body?.email === "string" ? body.email.trim() : "";
-    if (!email) {
-      return NextResponse.json(
-        { message: "Email is required" },
-        { status: 400 }
-      );
+    const rawEmail = typeof body?.email === "string" ? body.email.trim() : "";
+    const emailParsed = adminEmailSchema.safeParse(rawEmail);
+    if (!emailParsed.success) {
+      const msg = emailParsed.error.errors[0]?.message ?? "You can't register at this time.";
+      return NextResponse.json({ message: msg }, { status: 400 });
     }
     const adminService = makeAdminService();
-    const invite = await adminService.createAdminInvite(email, userId);
+    const invite = await adminService.createAdminInvite(emailParsed.data, userId);
     return NextResponse.json(invite);
   } catch (err) {
     if (err instanceof AppError) {

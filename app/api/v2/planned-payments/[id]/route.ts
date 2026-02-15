@@ -1,11 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makePlannedPaymentsService } from "@/src/application/planned-payments/planned-payments.factory";
-// Use new domain types (with backward compatibility)
-import { PlannedPaymentFormData, plannedPaymentSchema } from "@/src/domain/financial-events/financial-events.validations";
+import { plannedPaymentSchema } from "@/src/domain/financial-events/financial-events.validations";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
 import { ZodError } from "zod";
 import { AppError } from "@/src/application/shared/app-error";
-import { revalidateTag } from 'next/cache';
+import { revalidateTag } from "next/cache";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const service = makePlannedPaymentsService();
+    const plannedPayment = await service.getPlannedPaymentById(id);
+
+    if (!plannedPayment) {
+      return NextResponse.json({ error: "Planned payment not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(plannedPayment, { status: 200 });
+  } catch (error) {
+    console.error("Error fetching planned payment:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to fetch planned payment" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function PATCH(
   request: NextRequest,

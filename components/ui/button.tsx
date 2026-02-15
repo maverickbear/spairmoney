@@ -62,6 +62,14 @@ const buttonVariants = cva(
           componentSizes.button.icon.medium.rounded,
           "min-h-[44px] min-w-[44px] lg:min-h-0 lg:min-w-0"
         ),
+        /** Full-width, no rounded corners. For use inside MobileAddBar (mobile only). */
+        mobileAdd: cn(
+          componentSizes.button.medium.height,
+          componentSizes.button.medium.paddingX,
+          componentSizes.button.medium.paddingY,
+          componentSizes.button.medium.text,
+          "rounded-none w-full min-h-[44px] lg:min-h-0"
+        ),
       },
     },
     defaultVariants: {

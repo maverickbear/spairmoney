@@ -5,7 +5,6 @@ import type { ExpectedIncomeOverview } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/components/common/money";
-import { Pencil } from "lucide-react";
 import { ExpectedIncomeEditDialog } from "./expected-income-edit-dialog";
 import { cn } from "@/lib/utils";
 
@@ -36,37 +35,38 @@ export function ExpectedIncomeWidget({
         className={cn("min-h-0 h-auto", className)}
         headerAction={
           <Button
-            variant="outline"
-            size="icon"
+            variant="link"
+            size="small"
             onClick={() => setEditOpen(true)}
-            className="h-8 w-8 lg:h-10 lg:w-10"
+            className="h-auto p-0 text-sm font-normal text-muted-foreground hover:text-foreground"
             aria-label="Adjust income"
           >
-            <Pencil className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+            Adjust
           </Button>
         }
       >
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 min-w-0 overflow-hidden">
           {hasExpectedIncome && data ? (
             <>
-              <div className="text-2xl font-bold">
+              <div className="text-base sm:text-xl xl:text-2xl font-bold tabular-nums truncate" title={formatMoney(data.actualIncomeThisMonth)}>
                 {formatMoney(data.actualIncomeThisMonth)}
               </div>
-              {data.expectedMonthlyIncome > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {Math.round((data.actualIncomeThisMonth / data.expectedMonthlyIncome) * 100)}% of expected income
+              {data.needsLocationForAfterTax ? (
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Set country & state in Adjust to see after-tax expected income.
                 </p>
-              )}
-              <p className="text-sm text-muted-foreground">
-                Expected: {formatMoney(data.expectedMonthlyIncome)}
-              </p>
+              ) : data.expectedMonthlyIncome > 0 ? (
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                  {Math.round((data.actualIncomeThisMonth / data.expectedMonthlyIncome) * 100)}% of expected (after tax)
+                </p>
+              ) : null}
               {data.nextPaycheckDays != null && data.nextPaycheckAmount != null ? (
-                <p className="text-sm text-muted-foreground">
-                  Next paycheck in {data.nextPaycheckDays} days ({formatMoney(data.nextPaycheckAmount)})
+                <p className="text-xs sm:text-sm text-muted-foreground truncate" title={`Next: ${formatMoney(data.nextPaycheckAmount)} in ${data.nextPaycheckDays} days`}>
+                  Next: {formatMoney(data.nextPaycheckAmount)} in {data.nextPaycheckDays} days
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Next paycheck: —
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Next: —
                 </p>
               )}
             </>

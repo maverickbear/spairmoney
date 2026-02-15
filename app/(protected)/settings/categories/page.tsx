@@ -3,6 +3,7 @@
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { useEffect, useState } from "react";
 import { CategoriesModule } from "@/src/presentation/components/features/categories/categories-module";
+import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -24,9 +25,9 @@ export default function CategoriesPage() {
     <div>
       <PageHeader title="Categories" />
 
-      <div className="w-full p-4 lg:p-8">
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 justify-end mb-6">
+      <div className="w-full p-4 lg:p-8 pb-32 lg:pb-8">
+        {/* Action Buttons - desktop only */}
+        <div className="hidden lg:flex items-center gap-2 justify-end mb-6">
           <Button
             onClick={() => {
               if (!checkWriteAccess()) return;
@@ -42,6 +43,20 @@ export default function CategoriesPage() {
           isCreateDialogOpen={isCreateDialogOpen}
           onCreateDialogChange={setIsCreateDialogOpen}
         />
+
+      {/* Mobile Add bar - fixed above bottom nav */}
+      <MobileAddBar>
+        <Button
+          size="mobileAdd"
+          onClick={() => {
+            if (!checkWriteAccess()) return;
+            setIsCreateDialogOpen(true);
+          }}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add New Category
+        </Button>
+      </MobileAddBar>
       </div>
     </div>
   );

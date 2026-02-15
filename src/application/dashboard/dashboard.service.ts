@@ -264,16 +264,58 @@ export class DashboardService {
       .filter((t) => t.type === "expense" && !t.transferFromId && !t.transferToId)
       .reduce((sum, t) => sum + Math.abs(getTransactionAmount(t.amount) || 0), 0);
     const expectedAnnualIncome = typeof expectedIncomeResult === "number" ? expectedIncomeResult : null;
-    const expectedMonthlyIncome = onboardingService.getMonthlyIncomeFromAnnual(expectedAnnualIncome);
+    let expectedMonthlyIncome = onboardingService.getMonthlyIncomeFromAnnual(expectedAnnualIncome);
+    let expectedIncomeIsAfterTax = false;
+
+    // Always use after-tax for expected income so the user has a real picture. When household has
+    // location (country + state/province), compute monthly after-tax; otherwise do not show a
+    // before-tax comparison (set expectedMonthlyIncome to 0 until location is set).
+    if (
+      expectedAnnualIncome != null &&
+      expectedAnnualIncome > 0 &&
+      householdId &&
+      accessToken &&
+      refreshToken
+    ) {
+      try {
+        const { HouseholdRepository } = await import("@/src/infrastructure/database/repositories/household.repository");
+        const householdRepository = new HouseholdRepository();
+        const settings = await householdRepository.getSettings(householdId, accessToken, refreshToken);
+        if (settings?.country && settings?.stateOrProvince) {
+          const { makeTaxesService } = await import("@/src/application/taxes/taxes.factory");
+          const taxesService = makeTaxesService();
+          expectedMonthlyIncome = await taxesService.calculateMonthlyAfterTaxIncome(
+            settings.country,
+            expectedAnnualIncome,
+            settings.stateOrProvince
+          );
+          expectedIncomeIsAfterTax = true;
+          logger.debug(
+            "[DashboardService] Using after-tax expected income for Income card",
+            { annualGross: expectedAnnualIncome, monthlyAfterTax: expectedMonthlyIncome }
+          );
+        } else {
+          // No location: do not use gross for comparison; user must set country & state for after-tax
+          expectedMonthlyIncome = 0;
+        }
+      } catch (error) {
+        logger.warn("[DashboardService] Could not compute after-tax expected income:", error);
+        expectedMonthlyIncome = 0;
+      }
+    }
+
     const hasExpectedIncome = expectedAnnualIncome != null && expectedAnnualIncome > 0;
     const spendingAsPercentOfExpected =
       expectedMonthlyIncome > 0 ? (spendingThisMonth / expectedMonthlyIncome) * 100 : null;
+    const needsLocationForAfterTax = hasExpectedIncome && expectedMonthlyIncome === 0;
     const expectedIncomeOverviewBase: ExpectedIncomeOverview = {
       expectedMonthlyIncome,
       actualIncomeThisMonth,
       spendingThisMonth,
       spendingAsPercentOfExpected,
       hasExpectedIncome,
+      expectedIncomeIsAfterTax: expectedIncomeIsAfterTax || undefined,
+      needsLocationForAfterTax: needsLocationForAfterTax || undefined,
     };
 
     // OPTIMIZATION: Calculate Financial Health ONCE and share it
@@ -552,10 +594,10 @@ export class DashboardService {
   }> {
     const drivers = [];
 
-    // Pillar: Cash flow
+    // Pillar: Cash flow (this month)
     if (financialHealth.netAmount < 0) {
       drivers.push({
-        label: "Negative cash flow",
+        label: "Negative cash flow this month",
         change: Math.abs(financialHealth.netAmount),
         changeType: 'increase' as const,
         impact: 'high' as const,
@@ -563,7 +605,7 @@ export class DashboardService {
       });
     }
 
-    // Spending discipline (savings behavior)
+    // Spending discipline this month (savings behavior)
     if (financialHealth.spendingDiscipline) {
       const disciplineMap: Record<string, number> = {
         'Excellent': 0,
@@ -576,7 +618,7 @@ export class DashboardService {
       const currentLevel = disciplineMap[financialHealth.spendingDiscipline] || 0;
       if (currentLevel > 0) {
         drivers.push({
-          label: `Spending discipline: ${financialHealth.spendingDiscipline}`,
+          label: `Spending this month: ${financialHealth.spendingDiscipline}`,
           change: currentLevel,
           changeType: 'increase' as const,
           impact: currentLevel > 20 ? 'high' as const : 'medium' as const,
@@ -585,10 +627,10 @@ export class DashboardService {
       }
     }
 
-    // Driver 2: Savings rate
+    // Savings rate this month
     if (financialHealth.savingsRate < 0) {
       drivers.push({
-        label: "Negative savings rate",
+        label: "Spending more than you earned this month",
         change: Math.abs(financialHealth.savingsRate),
         changeType: 'increase' as const,
         impact: 'high' as const,
@@ -596,7 +638,7 @@ export class DashboardService {
       });
     } else if (financialHealth.savingsRate < 10) {
       drivers.push({
-        label: `Low savings rate: ${financialHealth.savingsRate.toFixed(1)}%`,
+        label: `Low savings rate this month: ${financialHealth.savingsRate.toFixed(1)}%`,
         change: 10 - financialHealth.savingsRate,
         changeType: 'increase' as const,
         impact: 'high' as const,

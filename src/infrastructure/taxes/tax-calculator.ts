@@ -46,16 +46,17 @@ function calculateProgressiveTax(income: number, brackets: TaxBracket[]): number
 
 /**
  * Calculate US taxes (federal + state)
+ * Uses federal brackets and state rates from DB (admin tax-rates) when available.
  */
 export async function calculateUSTaxes(
   annualIncome: number,
   state?: string | null
 ): Promise<TaxCalculationResult> {
-  // Get federal brackets (try database first, fallback to hardcoded)
+  // Get federal brackets: DB (most recent year from admin) first, then hardcoded fallback
   let federalBrackets = getUSFederalBrackets();
   try {
     const repository = new FederalBracketsRepository();
-    const dbBrackets = await repository.findByCountryAndYear("US", 2024);
+    const dbBrackets = await repository.findCurrentByCountry("US");
     if (dbBrackets.length > 0) {
       federalBrackets = dbBrackets.map((b) => ({
         min: b.minIncome,
@@ -89,25 +90,24 @@ export async function calculateUSTaxes(
     afterTaxIncome: Math.round(afterTaxIncome * 100) / 100,
     federalTax: Math.round(federalTax * 100) / 100,
     stateOrProvincialTax: Math.round(stateTax * 100) / 100,
+    federalBrackets,
+    stateOrProvincialRate: stateRate > 0 ? stateRate : undefined,
   };
 }
 
 /**
  * Calculate Canada taxes (federal + provincial)
+ * Uses federal brackets and provincial rates from DB (admin tax-rates) when available.
  */
 export async function calculateCanadaTaxes(
   annualIncome: number,
   province?: string | null
 ): Promise<TaxCalculationResult> {
-  // Get federal brackets (try database first, fallback to hardcoded)
+  // Get federal brackets: DB (most recent year from admin) first, then hardcoded fallback
   let federalBrackets = getCanadaFederalBrackets();
   try {
     const repository = new FederalBracketsRepository();
-    // Try 2025 first, then 2024
-    let dbBrackets = await repository.findByCountryAndYear("CA", 2025);
-    if (dbBrackets.length === 0) {
-      dbBrackets = await repository.findByCountryAndYear("CA", 2024);
-    }
+    const dbBrackets = await repository.findCurrentByCountry("CA");
     if (dbBrackets.length > 0) {
       federalBrackets = dbBrackets.map((b) => ({
         min: b.minIncome,
@@ -141,6 +141,8 @@ export async function calculateCanadaTaxes(
     afterTaxIncome: Math.round(afterTaxIncome * 100) / 100,
     federalTax: Math.round(federalTax * 100) / 100,
     stateOrProvincialTax: Math.round(provincialTax * 100) / 100,
+    federalBrackets,
+    stateOrProvincialRate: provincialRate > 0 ? provincialRate : undefined,
   };
 }
 

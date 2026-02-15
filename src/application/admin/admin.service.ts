@@ -10,6 +10,7 @@ import { AccountsRepository } from "@/src/infrastructure/database/repositories/a
 import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
 import { SubscriptionServicesRepository } from "@/src/infrastructure/database/repositories/subscription-services.repository";
 import { AdminUser, PromoCode, SystemCategory, SystemSubcategory } from "../../domain/admin/admin.types";
+import { adminEmailSchema } from "../../domain/admin/admin.validations";
 import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 import Stripe from "stripe";
 import { makeCategoriesService } from "@/src/application/categories/categories.factory";
@@ -1497,6 +1498,7 @@ export class AdminService {
 
   /**
    * Create an admin invitation (super_admin only). Returns invite with token for link.
+   * Only @sparefinance.com emails are allowed.
    */
   async createAdminInvite(
     email: string,
@@ -1506,12 +1508,17 @@ export class AdminService {
     if (!isSuper) {
       throw new AppError("Only super admins can create admin invites", 403);
     }
+    const parsed = adminEmailSchema.safeParse(email?.trim());
+    if (!parsed.success) {
+      const msg = parsed.error.errors[0]?.message ?? "You can't register at this time.";
+      throw new AppError(msg, 400);
+    }
     const crypto = await import("crypto");
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
     return this.repository.createAdminInvitation({
-      email,
+      email: parsed.data,
       token,
       createdBy,
       expiresAt,
@@ -1520,6 +1527,7 @@ export class AdminService {
 
   /**
    * Register a new admin (super_admin) using a valid invite token.
+   * Invite email must be @sparefinance.com (defense in depth).
    */
   async registerAdminWithInvite(
     token: string,
@@ -1536,10 +1544,14 @@ export class AdminService {
     if (invite.expiresAt < new Date()) {
       throw new AppError("This invite has expired", 400);
     }
+    const emailParsed = adminEmailSchema.safeParse(invite.email);
+    if (!emailParsed.success) {
+      throw new AppError("You can't register at this time.", 400);
+    }
 
     const serviceRoleClient = createServiceRoleClient();
     const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
-      email: invite.email,
+      email: emailParsed.data,
       password,
       email_confirm: true,
       user_metadata: { name: name || undefined, full_name: name || undefined },
@@ -1560,7 +1572,7 @@ export class AdminService {
     try {
       await this.authRepository.createUser({
         id: userId,
-        email: invite.email,
+        email: emailParsed.data,
         name: name || null,
         role: "super_admin",
       });
@@ -1577,18 +1589,23 @@ export class AdminService {
 
   /**
    * Register a new portal admin with name, email, and password only.
-   * No invite. User is created only in auth + admin table (not in users table).
-   * They get access to Portal Management via isSuperAdmin (checks admin table).
+   * No invite. Only @sparefinance.com emails are allowed.
+   * User is created only in auth + admin table (not in users table).
    */
   async registerAdminDirect(
     name: string,
     email: string,
     password: string
   ): Promise<{ userId: string }> {
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !name?.trim() || !password) {
+    if (!name?.trim() || !password) {
       throw new AppError("Name, email, and password are required", 400);
     }
+    const parsed = adminEmailSchema.safeParse(email?.trim());
+    if (!parsed.success) {
+      const msg = parsed.error.errors[0]?.message ?? "You can't register at this time.";
+      throw new AppError(msg, 400);
+    }
+    const trimmedEmail = parsed.data;
 
     const serviceRoleClient = createServiceRoleClient();
     const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({

@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, AlertCircle } from "lucide-react";
 import { passwordValidation } from "@/src/domain/auth/auth.validations";
+import { adminEmailSchema } from "@/src/domain/admin/admin.validations";
 import { supabase } from "@/lib/supabase";
 
 const adminRegisterSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
-    email: z.string().email("Invalid email address"),
+    email: adminEmailSchema,
     password: passwordValidation,
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
