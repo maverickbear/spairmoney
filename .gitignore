@@ -116,6 +116,11 @@ schema_only.sql
 sourcemaps/
 
 # ============================================
+# Embedded clone (do not track — use this repo only)
+# ============================================
+/spairmoney/
+
+# ============================================
 # Cache and temporary files
 # ============================================
 .cache/
