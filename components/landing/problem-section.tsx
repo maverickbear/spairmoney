@@ -10,7 +10,7 @@ const CARDS = [
     iconBg: "bg-primary/20",
     iconColor: "text-primary",
     title: "Everything in one place",
-    description: "Accounts and info scattered across apps and spreadsheets? Spare Finance brings it all together so you see your full picture at a glance.",
+    description: "Accounts and info scattered across apps and spreadsheets? Spair Money brings it all together so you see your full picture at a glance.",
   },
   {
     icon: TrendingUp,

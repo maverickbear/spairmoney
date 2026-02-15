@@ -15,7 +15,7 @@ import {
 import { calculateTotalExpenses } from "../dashboard/utils/transaction-helpers";
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
 
-interface SpareScoreInsightsPageProps {
+interface SpairScoreInsightsPageProps {
   financialHealth: FinancialHealthData | null;
   currentIncome: number;
   currentExpenses: number;
@@ -24,14 +24,14 @@ interface SpareScoreInsightsPageProps {
   lastMonthTransactions: any[];
 }
 
-export function SpareScoreInsightsPage({
+export function SpairScoreInsightsPage({
   financialHealth,
   currentIncome,
   currentExpenses,
   emergencyFundMonths,
   selectedMonthTransactions,
   lastMonthTransactions,
-}: SpareScoreInsightsPageProps) {
+}: SpairScoreInsightsPageProps) {
   // Helper function to parse date from Supabase format
   const parseTransactionDate = (dateStr: string | Date): Date => {
     if (dateStr instanceof Date) {
@@ -273,7 +273,7 @@ export function SpareScoreInsightsPage({
           <div className="flex items-start justify-between gap-8 mb-6">
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                Current Spare Score
+                Current Spair Score
               </p>
               <div className="flex items-baseline gap-2 mb-1">
                 <p className="text-5xl font-bold text-foreground">{financialHealth.score}</p>
@@ -532,7 +532,7 @@ export function SpareScoreInsightsPage({
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">Great job!</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-            Your Spare Score looks good. Keep up the excellent work!
+            Your Spair Score looks good. Keep up the excellent work!
           </p>
         </div>
       )}

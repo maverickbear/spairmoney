@@ -7,7 +7,7 @@ import { BlogPostHero } from "@/components/blog/blog-post-hero";
 import { BlogPostStructuredData } from "@/components/blog/blog-structured-data";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
+  process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -25,7 +25,7 @@ export async function generateMetadata({
   }
   const url = `${BASE_URL}/blog/${post.slug}`;
   return {
-    title: `${post.title} | Spare Finance Blog`,
+    title: `${post.title} | Spair Money Blog`,
     description: post.description,
     alternates: { canonical: url },
     openGraph: {
@@ -36,7 +36,7 @@ export async function generateMetadata({
       publishedTime: post.datePublished,
       modifiedTime: post.dateModified,
       authors: [post.author],
-      siteName: "Spare Finance",
+      siteName: "Spair Money",
     },
     twitter: {
       card: "summary_large_image",

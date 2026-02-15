@@ -464,7 +464,7 @@ export function SEOSettingsForm() {
                   id="title"
                   value={settings.title}
                   onChange={(e) => updateField(["title"], e.target.value)}
-                  placeholder="Spare Finance - Powerful Tools for Easy Money Management"
+                  placeholder="Spair Money - Powerful Tools for Easy Money Management"
                 />
                 <p className="text-xs text-muted-foreground">
                   Main title that appears in browser tabs and search results
@@ -477,7 +477,7 @@ export function SEOSettingsForm() {
                   id="titleTemplate"
                   value={settings.titleTemplate}
                   onChange={(e) => updateField(["titleTemplate"], e.target.value)}
-                  placeholder="%s | Spare Finance"
+                  placeholder="%s | Spair Money"
                 />
                 <p className="text-xs text-muted-foreground">
                   Template for page titles. Use %s as placeholder for page name
@@ -787,7 +787,7 @@ export function SEOSettingsForm() {
                   id="twitter-creator"
                   value={settings.twitter.creator}
                   onChange={(e) => updateField(["twitter", "creator"], e.target.value)}
-                  placeholder="@sparefinance"
+                  placeholder="@spairmoney"
                 />
               </div>
             </CardContent>
@@ -903,7 +903,7 @@ export function SEOSettingsForm() {
                       id="social-twitter"
                       value={settings.organization.socialLinks.twitter}
                       onChange={(e) => updateField(["organization", "socialLinks", "twitter"], e.target.value)}
-                      placeholder="https://twitter.com/sparefinance"
+                      placeholder="https://twitter.com/spairmoney"
                     />
                   </div>
                   <div className="space-y-2">
@@ -912,7 +912,7 @@ export function SEOSettingsForm() {
                       id="social-linkedin"
                       value={settings.organization.socialLinks.linkedin}
                       onChange={(e) => updateField(["organization", "socialLinks", "linkedin"], e.target.value)}
-                      placeholder="https://linkedin.com/company/sparefinance"
+                      placeholder="https://linkedin.com/company/spairmoney"
                     />
                   </div>
                   <div className="space-y-2">
@@ -921,7 +921,7 @@ export function SEOSettingsForm() {
                       id="social-facebook"
                       value={settings.organization.socialLinks.facebook}
                       onChange={(e) => updateField(["organization", "socialLinks", "facebook"], e.target.value)}
-                      placeholder="https://facebook.com/sparefinance"
+                      placeholder="https://facebook.com/spairmoney"
                     />
                   </div>
                   <div className="space-y-2">
@@ -930,7 +930,7 @@ export function SEOSettingsForm() {
                       id="social-instagram"
                       value={settings.organization.socialLinks.instagram}
                       onChange={(e) => updateField(["organization", "socialLinks", "instagram"], e.target.value)}
-                      placeholder="https://instagram.com/sparefinance"
+                      placeholder="https://instagram.com/spairmoney"
                     />
                   </div>
                 </div>

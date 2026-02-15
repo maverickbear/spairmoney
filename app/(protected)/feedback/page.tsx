@@ -69,7 +69,7 @@ export default function FeedbackPage() {
 
       toast({
         title: "Thank you for your feedback!",
-        description: "Your feedback helps us improve Spare Finance.",
+        description: "Your feedback helps us improve Spair Money.",
       });
 
       form.reset();
@@ -97,7 +97,7 @@ export default function FeedbackPage() {
         <CardHeader>
           <CardTitle>Rate Your Experience</CardTitle>
           <CardDescription>
-            How would you rate your experience with Spare Finance?
+            How would you rate your experience with Spair Money?
           </CardDescription>
         </CardHeader>
         <CardContent>

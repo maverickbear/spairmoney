@@ -19,7 +19,7 @@ import {
   penaltySavings,
   penaltyStability,
   getClassificationFromScore,
-} from "../shared/spare-score-calculator";
+} from "../shared/spair-score-calculator";
 // CRITICAL: Use static import to ensure React cache() works correctly
 import { getAccountsForDashboard } from "../accounts/get-dashboard-accounts";
 import { makeProfileService } from "../profile/profile.factory";
@@ -648,7 +648,7 @@ export class OnboardingService {
   }
 
   /**
-   * Calculate initial health score based on projected income (penalty-based, docs/Spare_Score.md)
+   * Calculate initial health score based on projected income (penalty-based, docs/Spair_Score.md)
    */
   calculateInitialHealthScore(monthlyIncome: number): FinancialHealthData {
     const monthlyExpenses = monthlyIncome * 0.8;
@@ -680,7 +680,7 @@ export class OnboardingService {
       monthlyExpenses,
       netAmount,
       savingsRate,
-      message: "This is a projected score based on your expected income. Add your accounts and transactions to see your actual Spare Score.",
+      message: "This is a projected score based on your expected income. Add your accounts and transactions to see your actual Spair Score.",
       spendingDiscipline,
       debtExposure: "Low" as const,
       emergencyFundMonths,

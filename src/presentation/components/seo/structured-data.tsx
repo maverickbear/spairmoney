@@ -42,9 +42,9 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
   const settings = seoSettings;
 
   // Fallback to defaults if no settings
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
   const org = settings?.organization || {
-    name: "Spare Finance",
+    name: "Spair Money",
     logo: `${baseUrl}/icon-512x512.png`,
     url: baseUrl,
     socialLinks: {
@@ -56,8 +56,8 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
   };
 
   const app = settings?.application || {
-    name: "Spare Finance",
-    description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
+    name: "Spair Money",
+    description: "Take control of your finances with Spair Money. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
     category: "FinanceApplication",
     operatingSystem: "Web",
     price: "0",

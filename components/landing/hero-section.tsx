@@ -38,7 +38,7 @@ export function HeroSection() {
           <div ref={imageRef} className={cn("relative order-1 lg:order-2 aspect-[4/3] max-w-xl mx-auto w-full bg-[#f8f4f1] transition-all duration-700 delay-150 ease-out", imageInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8")}>
             <LandingImage
               src="hero.jpg"
-              alt="Spare Finance dashboard: your money in one place with Spare Score and spending overview"
+              alt="Spair Money dashboard: your money in one place with Spair Score and spending overview"
               fill
               priority
               className="rounded-[32px]"

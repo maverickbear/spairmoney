@@ -80,7 +80,7 @@ export function suggestTransactionType(value: string): TransactionType | null {
 /**
  * Learn from user mappings and store in localStorage
  */
-const STORAGE_KEY = "spare_transaction_type_mappings";
+const STORAGE_KEY = "spair_transaction_type_mappings";
 
 export interface LearnedMapping {
   csvValue: string;

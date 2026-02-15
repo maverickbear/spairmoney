@@ -9,7 +9,7 @@ import { makeBlogService } from "@/src/application/blog/blog.factory";
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   noStore();
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
   const currentDate = new Date();
   const blogService = makeBlogService();
   const posts = await blogService.getAllPosts();

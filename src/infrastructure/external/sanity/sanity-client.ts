@@ -1,5 +1,5 @@
 /**
- * Sanity client for the Spare Finance app.
+ * Sanity client for the Spair Money app.
  * Infrastructure layer – used by sanity-blog.repository only.
  */
 

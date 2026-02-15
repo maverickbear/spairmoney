@@ -4,7 +4,7 @@ import { ADMIN_ALLOWED_EMAIL_DOMAIN } from "./admin.constants";
 
 /**
  * Email allowed for admin registration and invites only.
- * Validates format and that domain is exactly @sparefinance.com (case-insensitive).
+ * Validates format and that domain is exactly @spair.co (case-insensitive).
  */
 function isAllowedAdminEmailDomain(value: string): boolean {
   const normalized = value.trim().toLowerCase();

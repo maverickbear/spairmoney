@@ -4,7 +4,7 @@ import { makeAuthService } from "@/src/application/auth/auth.factory";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Account Blocked - Spare Finance",
+  title: "Account Blocked - Spair Money",
   description: "Your account has been blocked. Please contact support for assistance.",
 };
 
@@ -58,11 +58,11 @@ export default async function AccountBlockedPage() {
                 </p>
                 <div className="pt-2">
                   <Link
-                    href="mailto:support@sparefinance.com"
+                    href="mailto:support@spair.co"
                     className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:underline"
                   >
                     <Mail className="w-4 h-4" />
-                    support@sparefinance.com
+                    support@spair.co
                   </Link>
                 </div>
               </div>

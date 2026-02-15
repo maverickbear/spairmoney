@@ -39,7 +39,7 @@ export function CookieConsentBanner() {
             {/* Body text */}
             <p className="text-sm text-foreground">
               We use cookies to improve your experience, analyze traffic, and
-              remember your preferences. By continuing to use Spare Finance, you
+              remember your preferences. By continuing to use Spair Money, you
               agree to our Privacy Policy.
             </p>
 

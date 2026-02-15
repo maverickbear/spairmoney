@@ -48,7 +48,7 @@ export function PublicHeader({ isAuthenticated: _initialAuth }: PublicHeaderProp
           <Link
             href="/"
             className="flex shrink-0 items-center"
-            aria-label="Spare Finance home"
+            aria-label="Spair Money home"
           >
             <Logo
               variant="icon"

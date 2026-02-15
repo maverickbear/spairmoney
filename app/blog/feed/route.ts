@@ -1,7 +1,7 @@
 import { makeBlogService } from "@/src/application/blog/blog.factory";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
+  process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
 
 function escapeXml(unsafe: string): string {
   return unsafe
@@ -26,7 +26,7 @@ export async function GET() {
   const rss = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Spare Finance Blog</title>
+    <title>Spair Money Blog</title>
     <link>${BASE_URL}/blog</link>
     <description>Practical personal finance articles: budgeting, expense tracking, saving, and financial peace.</description>
     <language>en-us</language>

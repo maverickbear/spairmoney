@@ -1,7 +1,7 @@
 /**
  * Subscriptions Repository
  * 
- * ⚠️ IMPORTANT: This repository handles SPARE FINANCE APP subscriptions (billing)
+ * ⚠️ IMPORTANT: This repository handles SPAIR MONEY APP subscriptions (billing)
  * NOT external service subscriptions. For external services, see UserSubscriptionsRepository.
  * 
  * Data access layer for app subscriptions (app_plans, app_subscriptions) - only handles database operations

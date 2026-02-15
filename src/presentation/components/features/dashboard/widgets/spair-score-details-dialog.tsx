@@ -8,7 +8,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { SpareScoreDetails } from "@/src/domain/dashboard/types";
+import type { SpairScoreDetails } from "@/src/domain/dashboard/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, AlertCircle, Info, CheckCircle2 } from "lucide-react";
@@ -21,22 +21,22 @@ import {
 } from "recharts";
 import { formatMoney } from "@/components/common/money";
 
-interface SpareScoreDetailsDialogProps {
+interface SpairScoreDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  data: SpareScoreDetails | undefined;
+  data: SpairScoreDetails | undefined;
 }
 
-export function SpareScoreDetailsDialog({
+export function SpairScoreDetailsDialog({
   open,
   onOpenChange,
   data,
-}: SpareScoreDetailsDialogProps) {
+}: SpairScoreDetailsDialogProps) {
   if (!data) return null;
 
   const empty = data.isEmptyState ?? false; // No transactions this month — show "—" instead of 0
 
-  // Next tier boundaries: 85 Excellent, 70 Strong, 55 Fair, 40 Fragile (docs/Spare_Score.md)
+  // Next tier boundaries: 85 Excellent, 70 Strong, 55 Fair, 40 Fragile (docs/Spair_Score.md)
   const currentScore = data.score;
   const nextMilestone =
     currentScore < 40 ? 40 :
@@ -87,7 +87,7 @@ export function SpareScoreDetailsDialog({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-[40vw] w-full p-0 flex flex-col gap-0 bg-background border-l">
         <SheetHeader className="p-6 pb-4 border-b">
-          <SheetTitle className="text-xl">Spare Score Details</SheetTitle>
+          <SheetTitle className="text-xl">Spair Score Details</SheetTitle>
           <SheetDescription>
             Your financial health score and insights
           </SheetDescription>

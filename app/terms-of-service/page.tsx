@@ -4,8 +4,8 @@ import { ContentPageLayout } from "@/components/common/content-page-layout";
 import { LegalSection } from "@/components/common/legal-section";
 
 export const metadata = {
-  title: "Terms of Service - Spare Finance",
-  description: "Terms of Service for Spare Finance",
+  title: "Terms of Service - Spair Money",
+  description: "Terms of Service for Spair Money",
 };
 
 const LAST_UPDATED = "February 1, 2025";
@@ -43,9 +43,9 @@ export default async function TermsOfServicePage() {
       <article className="space-y-6">
         <LegalSection title="Agreement to Terms">
           <p>
-            Spare Finance is a product created by Maverick Bear Design, a
+            Spair Money is a product created by Maverick Bear Design, a
             Canadian company. These Terms of Service (&quot;Terms&quot;) constitute a
-            legally binding agreement between you and Spare Finance (&quot;we,&quot;
+            legally binding agreement between you and Spair Money (&quot;we,&quot;
             &quot;our,&quot; or &quot;us&quot;) regarding your use of our financial management
             application and services (the &quot;Service&quot;).
           </p>
@@ -179,7 +179,7 @@ export default async function TermsOfServicePage() {
         <LegalSection title="Subscription Plans and Payment">
           <div>
             <h3>Available Plans</h3>
-            <p>Spare Finance offers the following subscription plans:</p>
+            <p>Spair Money offers the following subscription plans:</p>
             <ul>
               <li>
                 <strong>{proPlanName} Plan:</strong> $
@@ -259,7 +259,7 @@ export default async function TermsOfServicePage() {
         <LegalSection title="Intellectual Property">
           <p>
             The Service, including its original content, features, and
-            functionality, is owned by Spare Finance and is protected by
+            functionality, is owned by Spair Money and is protected by
             international copyright, trademark, patent, trade secret, and other
             intellectual property laws.
           </p>
@@ -345,7 +345,7 @@ export default async function TermsOfServicePage() {
 
         <LegalSection title="Indemnification">
           <p>
-            You agree to indemnify, defend, and hold harmless Spare Finance and
+            You agree to indemnify, defend, and hold harmless Spair Money and
             its officers, directors, employees, and agents from any claims,
             damages, losses, liabilities, and expenses (including legal fees)
             arising from:
@@ -438,13 +438,13 @@ export default async function TermsOfServicePage() {
             You have the right to access, correct, delete, or export your
             personal data. You may also object to certain processing activities
             or request restriction of processing. To exercise these rights,
-            please contact us at legal@sparefinance.com.
+            please contact us at legal@spair.co.
           </p>
         </LegalSection>
 
         <LegalSection title="Governing Law">
           <p>
-            Spare Finance is operated by Maverick Bear Design, a Canadian
+            Spair Money is operated by Maverick Bear Design, a Canadian
             company. These Terms shall be governed by and construed in
             accordance with the laws of Canada and the province in which
             Maverick Bear Design operates, without regard to its conflict of law
@@ -467,9 +467,9 @@ export default async function TermsOfServicePage() {
           </p>
           <div className="space-y-2 text-sm [&_strong]:text-foreground">
             <p><strong>Company:</strong> Maverick Bear Design (Canadian company)</p>
-            <p><strong>Product:</strong> Spare Finance</p>
-            <p><strong>Email:</strong> legal@sparefinance.com</p>
-            <p><strong>Support:</strong> support@sparefinance.com</p>
+            <p><strong>Product:</strong> Spair Money</p>
+            <p><strong>Email:</strong> legal@spair.co</p>
+            <p><strong>Support:</strong> support@spair.co</p>
           </div>
         </LegalSection>
       </article>

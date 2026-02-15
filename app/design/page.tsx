@@ -92,7 +92,7 @@ export default function DesignPage() {
     <div className="w-full">
       <PageHeader 
         title="Design System" 
-        description="Documentation and guidelines for the Spare Finance design system"
+        description="Documentation and guidelines for the Spair Money design system"
       />
       
       <div className="p-4 lg:p-8 space-y-8">

@@ -13,7 +13,7 @@ import { AuthProvider } from "@/contexts/auth-context";
 // PlanLimitsProvider removed - SubscriptionProvider in protected layout handles this
 
 export const metadata: Metadata = {
-  title: "Spare Finance - Personal Finance",
+  title: "Spair Money - Personal Finance",
   description: "Track expenses, budgets, and investments",
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],

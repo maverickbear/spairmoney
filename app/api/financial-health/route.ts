@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error("Error calculating financial health:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to calculate Spare Score" },
+      { error: error.message || "Failed to calculate Spair Score" },
       { status: 500 }
     );
   }

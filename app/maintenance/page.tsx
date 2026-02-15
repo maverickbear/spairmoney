@@ -4,7 +4,7 @@ import { makeAuthService } from "@/src/application/auth/auth.factory";
 import { unstable_noStore as noStore } from "next/cache";
 
 export const metadata = {
-  title: "Maintenance - Spare Finance",
+  title: "Maintenance - Spair Money",
   description: "We are currently under maintenance. We'll be back soon.",
 };
 

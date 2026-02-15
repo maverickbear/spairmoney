@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { SpareScoreWidgetData } from "@/src/domain/dashboard/types";
+import type { SpairScoreWidgetData } from "@/src/domain/dashboard/types";
 import { Info } from "lucide-react";
 
 const GaugeComponent = dynamic(() => import("react-gauge-component"), { ssr: false });
@@ -35,8 +35,8 @@ function getProgressToNextLevel(score: number): number | null {
   return null;
 }
 
-/** Spare Score bands: Critical 0-39, Fragile 40-54, Fair 55-69, Strong 70-84, Excellent 85-100 */
-const SPARE_SCORE_ARC = {
+/** Spair Score bands: Critical 0-39, Fragile 40-54, Fair 55-69, Strong 70-84, Excellent 85-100 */
+const SPAIR_SCORE_ARC = {
   width: 0.12,
   padding: 0.01,
   cornerRadius: 8,
@@ -49,12 +49,12 @@ const SPARE_SCORE_ARC = {
   ],
 };
 
-interface SpareScoreFullWidthWidgetProps {
-  data: SpareScoreWidgetData | null;
+interface SpairScoreFullWidthWidgetProps {
+  data: SpairScoreWidgetData | null;
   onOpenDetails: () => void;
 }
 
-export function SpareScoreFullWidthWidget({ data, onOpenDetails }: SpareScoreFullWidthWidgetProps) {
+export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFullWidthWidgetProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -114,21 +114,21 @@ export function SpareScoreFullWidthWidget({ data, onOpenDetails }: SpareScoreFul
         {/* Title with info + insight and Details on the right */}
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Spare Score</h2>
+            <h2 className="text-lg font-semibold">Spair Score</h2>
             <Popover open={infoOpen} onOpenChange={setInfoOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   className="inline-flex items-center justify-center rounded-full p-1 text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  aria-label="What is Spare Score?"
+                  aria-label="What is Spair Score?"
                 >
                   <Info className="h-4 w-4" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-80 p-4 space-y-3" align="start">
-                <p className="text-sm font-medium">What is Spare Score?</p>
+                <p className="text-sm font-medium">What is Spair Score?</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Spare Score is your financial health rating from 0 to 100. It reflects your ability to afford your lifestyle, absorb shocks, and keep healthy money habits — not how much you have. The score is coaching-oriented and action-driven: it helps you see what to improve and how.
+                  Spair Score is your financial health rating from 0 to 100. It reflects your ability to afford your lifestyle, absorb shocks, and keep healthy money habits — not how much you have. The score is coaching-oriented and action-driven: it helps you see what to improve and how.
                 </p>
                 <Button size="small" className="w-full" onClick={handleViewDetails}>
                   View Details
@@ -164,7 +164,7 @@ export function SpareScoreFullWidthWidget({ data, onOpenDetails }: SpareScoreFul
                 {mounted ? (
                   <GaugeComponent
                     type="semicircle"
-                    arc={SPARE_SCORE_ARC}
+                    arc={SPAIR_SCORE_ARC}
                     value={hasData ? score : 0}
                     minValue={0}
                     maxValue={100}

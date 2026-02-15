@@ -6,7 +6,7 @@
 import type { BlogPost, BlogPostListItem } from "@/src/domain/blog/blog.types";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
+  process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
 
 interface BlogListStructuredDataProps {
   posts: BlogPostListItem[];
@@ -16,13 +16,13 @@ export function BlogListStructuredData({ posts }: BlogListStructuredDataProps) {
   const schema = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    name: "Spare Finance Blog",
+    name: "Spair Money Blog",
     description:
       "Practical personal finance articles: budgeting, expense tracking, saving, and financial peace.",
     url: `${BASE_URL}/blog`,
     publisher: {
       "@type": "Organization",
-      name: "Spare Finance",
+      name: "Spair Money",
       url: BASE_URL,
     },
     blogPost: posts.map((p) => ({
@@ -71,7 +71,7 @@ export function BlogPostStructuredData({ post }: BlogPostStructuredDataProps) {
     },
     publisher: {
       "@type": "Organization",
-      name: "Spare Finance",
+      name: "Spair Money",
       url: BASE_URL,
       logo: {
         "@type": "ImageObject",

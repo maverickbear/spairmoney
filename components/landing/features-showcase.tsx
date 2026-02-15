@@ -5,11 +5,11 @@ import { FeatureSpotlightSection } from "./feature-spotlight-section";
 const FEATURES = [
   {
     image: "dashboard.jpg",
-    imageAlt: "Dashboard with Spare Score and your money in one place",
+    imageAlt: "Dashboard with Spair Score and your money in one place",
     title: "Your money in one place, with a clear health score.",
-    tagline: "Stay on top of your finances with Spare Finance",
+    tagline: "Stay on top of your finances with Spair Money",
     description:
-      "The dashboard shows all your accounts, recent activity, and your Spare Score in one view. See where you stand and what to do next—no more jumping between apps or spreadsheets.",
+      "The dashboard shows all your accounts, recent activity, and your Spair Score in one view. See where you stand and what to do next—no more jumping between apps or spreadsheets.",
     reverse: false,
   },
   {
@@ -34,7 +34,7 @@ const FEATURES = [
     image: "family.jpg",
     imageAlt: "Household managing money together",
     title: "Manage money together.",
-    tagline: "Household sharing with Spare Finance",
+    tagline: "Household sharing with Spair Money",
     description:
       "Invite your partner or family to the same household. Share accounts, budgets, and goals so everyone is aligned. Build wealth together, not just pay bills alone.",
     reverse: true,

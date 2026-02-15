@@ -7,7 +7,7 @@ import { LayoutDashboard, Target, BarChart3, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const OFFERS = [
-  { title: "Dashboard & score", description: "Your financial picture and health score.", icon: LayoutDashboard, image: "dashboard.jpg", imageAlt: "Dashboard and Spare Score" },
+  { title: "Dashboard & score", description: "Your financial picture and health score.", icon: LayoutDashboard, image: "dashboard.jpg", imageAlt: "Dashboard and Spair Score" },
   { title: "Budgets & goals", description: "Spend on purpose. Save for what matters.", icon: Target, image: "budgets.jpg", imageAlt: "Budgets and goals" },
   { title: "Tracking & reports", description: "Transactions, categories, and insights.", icon: BarChart3, image: "reports.jpg", imageAlt: "Reports and insights" },
   { title: "Household", description: "Manage money together.", icon: Users, image: "family.jpg", imageAlt: "Household and family" },

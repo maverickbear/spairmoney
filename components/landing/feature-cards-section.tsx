@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 const FEATURES = [
   {
     number: "01",
-    title: "Dashboard & Spare Score",
+    title: "Dashboard & Spair Score",
     description: "Your money in one place, plus a clear health score so you know where you stand.",
     icon: LayoutDashboard,
     image: "dashboard.jpg",
-    imageAlt: "Dashboard with Spare Score and overview",
+    imageAlt: "Dashboard with Spair Score and overview",
   },
   {
     number: "02",

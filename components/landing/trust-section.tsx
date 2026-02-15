@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 
 const TESTIMONIALS = [
-  { stars: 5, quote: "Finally, one place where I see everything. No more spreadsheets. Budgets and the Spare Score actually help me stay on track.", name: "James W.", role: "Designer" },
+  { stars: 5, quote: "Finally, one place where I see everything. No more spreadsheets. Budgets and the Spair Score actually help me stay on track.", name: "James W.", role: "Designer" },
   { stars: 5, quote: "Simple and clear. My finances finally make sense. The dashboard is exactly what I needed.", name: "Sarah L.", role: "Teacher" },
   { stars: 4, quote: "Really solid app for tracking expenses and goals. Would be perfect if it had a mobile app—I'd use it even more on the go.", name: "Michael B.", role: "Freelancer" },
   { stars: 5, quote: "Tracking expenses used to be a chore. Now it takes seconds. Category suggestions are spot on.", name: "Emily C.", role: "Parent" },
@@ -15,7 +15,7 @@ const TESTIMONIALS = [
   { stars: 5, quote: "The goals feature kept me accountable. Hit my first savings target in years. No complaints.", name: "Jennifer K.", role: "User" },
   { stars: 5, quote: "Clean interface, does what it says. Bank-level security and no upsells. Refreshing.", name: "Christopher T.", role: "Developer" },
   { stars: 4, quote: "Works well for me and my partner. Only suggestion: dark mode on the dashboard would be easier on the eyes at night.", name: "Amanda R.", role: "Consultant" },
-  { stars: 5, quote: "Worth every penny. Budgets, goals, and the Spare Score in one place. Finally stopped overspending.", name: "Daniel P.", role: "User" },
+  { stars: 5, quote: "Worth every penny. Budgets, goals, and the Spair Score in one place. Finally stopped overspending.", name: "Daniel P.", role: "User" },
   { stars: 5, quote: "Straightforward and reliable. CSV import saved me hours. Recommended to a few friends already.", name: "Nicole G.", role: "Small business" },
 ];
 

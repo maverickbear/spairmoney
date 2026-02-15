@@ -28,7 +28,7 @@ async function testWelcomeEmail() {
       to: email,
       userName: "", // Não usado mais
       founderName: "Naor Tartarotti",
-      appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com",
+      appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://spair.co",
     });
 
     console.log("");

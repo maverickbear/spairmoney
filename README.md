@@ -1,4 +1,4 @@
-# 💰 Spare Finance
+# 💰 Spair Money
 
 > Complete personal finance management platform built with Next.js 16, React 19, TypeScript, and Supabase.
 
@@ -32,7 +32,7 @@
 ### 📊 Financial Dashboard
 - **Real-time Overview**: Track income, expenses, and net worth
 - **Interactive Charts**: Beautiful visualizations with Recharts
-- **Spare Score**: AI-powered insights
+- **Spair Score**: AI-powered insights
 - **Month Selector**: Navigate through historical data
 - **Customizable Widgets**: Modular dashboard components
 
@@ -129,8 +129,8 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/naortartarotti/spare-finance.git
-   cd spare-finance
+   git clone https://github.com/maverickbear/spairmoney.git
+   cd spairmoney
    ```
 
 2. **Install dependencies**
@@ -205,7 +205,7 @@ docker-compose down
 ## 📁 Project Structure
 
 ```
-spare-finance/
+spairmoney/
 ├── app/                          # Next.js App Router
 │   ├── (auth-required)/         # Routes requiring authentication
 │   ├── (protected)/             # Main dashboard and features
@@ -640,7 +640,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👥 Team
 
 **Developer**: Naor Tartarotti  
-**Repository**: [github.com/naortartarotti/spare-finance](https://github.com/naortartarotti/spare-finance)
+**Repository**: [github.com/maverickbear/spairmoney](https://github.com/maverickbear/spairmoney)
 
 ---
 
@@ -657,8 +657,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - 📧 **Email**: [your-email@example.com]
-- 🐛 **Issues**: [GitHub Issues](https://github.com/naortartarotti/spare-finance/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/naortartarotti/spare-finance/discussions)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/maverickbear/spairmoney/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/maverickbear/spairmoney/discussions)
 
 ---
 

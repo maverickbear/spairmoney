@@ -27,7 +27,7 @@ export const widgetNextStepSchema = z.object({
 });
 
 // Widget-specific schemas
-export const spareScoreDriverSchema = z.object({
+export const spairScoreDriverSchema = z.object({
   label: z.string(),
   change: z.number(),
   changeType: z.enum(['increase', 'decrease']),
@@ -35,13 +35,13 @@ export const spareScoreDriverSchema = z.object({
   actionHref: z.string(),
 });
 
-export const spareScoreWidgetDataSchema = z.object({
+export const spairScoreWidgetDataSchema = z.object({
   score: z.number().min(0).max(100),
   classification: z.enum(["Excellent", "Strong", "Fair", "Fragile", "Critical"]),
   trend: z.enum(['up', 'down', 'stable']),
   trendValue: z.number().optional(),
   lastMonthScore: z.number().min(0).max(100).optional(),
-  topDrivers: z.array(spareScoreDriverSchema),
+  topDrivers: z.array(spairScoreDriverSchema),
   message: z.string(),
   isProjected: z.boolean().optional(),
   actions: z.array(widgetActionSchema),
@@ -228,7 +228,7 @@ export const investmentPortfolioWidgetDataSchema = z.object({
 });
 
 export const dashboardWidgetsDataSchema = z.object({
-  spareScore: spareScoreWidgetDataSchema.nullable(),
+  spairScore: spairScoreWidgetDataSchema.nullable(),
   netWorth: netWorthWidgetDataSchema.nullable(),
   cashFlow: cashFlowWidgetDataSchema.nullable(),
   budgetPerformance: budgetPerformanceWidgetDataSchema.nullable(),

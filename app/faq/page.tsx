@@ -43,19 +43,19 @@ export default function FAQPage() {
 
   const faqCategories = useMemo(() => [
     {
-      title: "About Spare Finance",
+      title: "About Spair Money",
       questions: [
         {
-          question: "What is Spare Finance?",
-          answer: "Spare Finance is a simple app that helps you manage all your money in one place. You can track your spending, set budgets, save for goals, and see where your money goes—all in one easy-to-use platform.",
+          question: "What is Spair Money?",
+          answer: "Spair Money is a simple app that helps you manage all your money in one place. You can track your spending, set budgets, save for goals, and see where your money goes—all in one easy-to-use platform.",
         },
         {
-          question: "How does Spare Finance work?",
+          question: "How does Spair Money work?",
           answer: "It's really simple! You add your accounts and transactions manually or import from CSV. The app automatically sorts your spending into categories, helps you create budgets, and shows you how much you're saving. Everything is organized so you can see your finances at a glance.",
         },
         {
           question: "Do I need to be tech-savvy to use it?",
-          answer: "Not at all! Spare Finance is designed for everyone. The interface is clean and easy to understand. If you can use a smartphone or computer, you can use Spare Finance. No special skills needed!",
+          answer: "Not at all! Spair Money is designed for everyone. The interface is clean and easy to understand. If you can use a smartphone or computer, you can use Spair Money. No special skills needed!",
         },
         {
           question: "Is my financial information safe?",
@@ -174,11 +174,11 @@ export default function FAQPage() {
         },
         {
           question: "How do I get help if I have questions?",
-          answer: "We're here to help! You can email us at support@sparefinance.com anytime, or visit the 'Help & Support' section in the app after you sign in. Our team will get back to you and help with whatever you need!",
+          answer: "We're here to help! You can email us at support@spair.co anytime, or visit the 'Help & Support' section in the app after you sign in. Our team will get back to you and help with whatever you need!",
         },
         {
           question: "Do you offer support in other languages?",
-          answer: "Yes! Spare Finance is available in multiple languages, and our support team can help you in various languages too. Just let us know your preferred language and we'll do our best to help!",
+          answer: "Yes! Spair Money is available in multiple languages, and our support team can help you in various languages too. Just let us know your preferred language and we'll do our best to help!",
         },
         {
           question: "What happens if I delete my account?",
@@ -206,15 +206,15 @@ export default function FAQPage() {
       questions: [
         {
           question: "What devices can I use?",
-          answer: "You can use Spare Finance on almost any device! It works on your computer, tablet, or smartphone—anything with a web browser. No need to download an app—just open your browser and go to the website. It works great on all screen sizes!",
+          answer: "You can use Spair Money on almost any device! It works on your computer, tablet, or smartphone—anything with a web browser. No need to download an app—just open your browser and go to the website. It works great on all screen sizes!",
         },
         {
           question: "Which web browsers work?",
-          answer: "Spare Finance works on all popular browsers like Chrome, Firefox, Safari, Edge, and Opera. For the best experience, make sure you're using the latest version of your browser. It's free to update!",
+          answer: "Spair Money works on all popular browsers like Chrome, Firefox, Safari, Edge, and Opera. For the best experience, make sure you're using the latest version of your browser. It's free to update!",
         },
         {
           question: "Can I use it without internet?",
-          answer: "Right now, you need an internet connection to use Spare Finance. But we're working on adding offline features so you can view and edit your transactions even when you're not connected. Stay tuned!",
+          answer: "Right now, you need an internet connection to use Spair Money. But we're working on adding offline features so you can view and edit your transactions even when you're not connected. Stay tuned!",
         },
         {
           question: "Where is my data stored?",
@@ -262,7 +262,7 @@ export default function FAQPage() {
           <HelpCircle className="h-10 w-10 shrink-0 text-primary sm:h-12 sm:w-12" />
         ),
         title: "Frequently Asked Questions",
-        subtitle: "Find answers to the most common questions about Spare Finance",
+        subtitle: "Find answers to the most common questions about Spair Money",
       }}
     >
       <div className="space-y-8 sm:space-y-10">
@@ -382,10 +382,10 @@ export default function FAQPage() {
               <p>
                 <strong className="text-foreground">Email:</strong>{" "}
                 <a
-                  href="mailto:support@sparefinance.com"
+                  href="mailto:support@spair.co"
                   className="break-all text-primary underline underline-offset-4 hover:text-primary/90"
                 >
-                  support@sparefinance.com
+                  support@spair.co
                 </a>
               </p>
               <p className="text-muted-foreground">

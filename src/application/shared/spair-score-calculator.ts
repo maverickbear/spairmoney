@@ -1,11 +1,11 @@
 /**
- * Pure Spare Score penalty and classification helpers (docs/Spare_Score.md).
+ * Pure Spair Score penalty and classification helpers (docs/Spair_Score.md).
  * No "use server" — safe to import from both server-action and non–server-action code.
  */
 import type { DebtWithCalculations } from "../../domain/debts/debts.types";
 
 /** Score bands: 85-100 Excellent, 70-84 Strong, 55-69 Fair, 40-54 Fragile, <40 Critical */
-export type SpareScoreClassification = "Excellent" | "Strong" | "Fair" | "Fragile" | "Critical";
+export type SpairScoreClassification = "Excellent" | "Strong" | "Fair" | "Fragile" | "Critical";
 
 const DEBT_TYPE_MULTIPLIER: Record<string, number> = {
   mortgage: 0.6,
@@ -67,7 +67,7 @@ export function penaltyStability(_level?: "High" | "Medium" | "Low" | "Chaotic")
   return 0;
 }
 
-export function getClassificationFromScore(score: number): SpareScoreClassification {
+export function getClassificationFromScore(score: number): SpairScoreClassification {
   if (score >= 85) return "Excellent";
   if (score >= 70) return "Strong";
   if (score >= 55) return "Fair";
@@ -75,7 +75,7 @@ export function getClassificationFromScore(score: number): SpareScoreClassificat
   return "Critical";
 }
 
-export function getMessageFromClassification(classification: SpareScoreClassification): string {
+export function getMessageFromClassification(classification: SpairScoreClassification): string {
   switch (classification) {
     case "Excellent":
       return "This month you're living below your means — great job!";

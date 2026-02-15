@@ -25,14 +25,14 @@ import {
   getClassificationFromScore,
   getMessageFromClassification,
   computeEffectiveMonthlyDebtPayment,
-} from "./spare-score-calculator";
-import type { SpareScoreClassification } from "./spare-score-calculator";
+} from "./spair-score-calculator";
+import type { SpairScoreClassification } from "./spair-score-calculator";
 
-export type { SpareScoreClassification } from "./spare-score-calculator";
+export type { SpairScoreClassification } from "./spair-score-calculator";
 
 export interface FinancialHealthData {
   score: number;
-  classification: SpareScoreClassification;
+  classification: SpairScoreClassification;
   monthlyIncome: number;
   monthlyExpenses: number;
   netAmount: number;
@@ -178,7 +178,7 @@ async function calculateFinancialHealthInternal(
       const pStab = penaltyStability();
       const rawScore = 100 + pCF + pEF + pDebt + pSav + pStab;
       const score = Math.max(0, Math.min(100, Math.round(rawScore)));
-      const classification: SpareScoreClassification = getClassificationFromScore(score);
+      const classification: SpairScoreClassification = getClassificationFromScore(score);
 
       let spendingDiscipline: "Excellent" | "Good" | "Fair" | "Poor" | "Critical" | "Unknown";
       if (projectedSavingsRate >= 30) spendingDiscipline = "Excellent";
@@ -194,7 +194,7 @@ async function calculateFinancialHealthInternal(
         monthlyExpenses: projectedExpenses,
         netAmount: projectedNet,
         savingsRate: projectedSavingsRate,
-        message: "This is a projected score based on your expected income. Add transactions for this month to see your actual Spare Score.",
+        message: "This is a projected score based on your expected income. Add transactions for this month to see your actual Spair Score.",
         spendingDiscipline,
         debtExposure: "Low" as const,
         emergencyFundMonths: 0,
@@ -202,7 +202,7 @@ async function calculateFinancialHealthInternal(
         alerts: [{
           id: "projected_score",
           title: "Projected Score",
-          description: "This score is based on your expected income. Add this month's transactions to see your actual Spare Score.",
+          description: "This score is based on your expected income. Add this month's transactions to see your actual Spair Score.",
           severity: "info" as const,
           action: "Add transactions for this month to get started.",
         }],
@@ -223,7 +223,7 @@ async function calculateFinancialHealthInternal(
       monthlyExpenses: 0,
       netAmount: 0,
       savingsRate: 0,
-      message: "Add income and expenses for this month to see your Spare Score.",
+      message: "Add income and expenses for this month to see your Spair Score.",
       spendingDiscipline: "Unknown" as const,
       debtExposure: "Low" as const,
       emergencyFundMonths: 0,
@@ -231,14 +231,14 @@ async function calculateFinancialHealthInternal(
       alerts: [{
         id: "no_transactions",
         title: "No Transactions This Month",
-        description: "You don't have any transactions for this month. Add income and expenses to see how you're doing and get your Spare Score.",
+        description: "You don't have any transactions for this month. Add income and expenses to see how you're doing and get your Spair Score.",
         severity: "info" as const,
-        action: "Add this month's transactions to see your Spare Score.",
+        action: "Add this month's transactions to see your Spair Score.",
       }],
       suggestions: [{
         id: "add_transactions",
         title: "Add This Month's Transactions",
-        description: "Add income and expense transactions for this month to see how much came in, how much went out, and your Spare Score.",
+        description: "Add income and expense transactions for this month to see how much came in, how much went out, and your Spair Score.",
         impact: "high" as const,
       }],
     };
@@ -353,7 +353,7 @@ async function calculateFinancialHealthInternal(
     }
   }
 
-  // Penalty-based score (Spare Score = 100 - sum(penalties), docs/Spare_Score.md)
+  // Penalty-based score (Spair Score = 100 - sum(penalties), docs/Spair_Score.md)
   const penaltyCF = penaltyCashFlow(monthlyIncome, monthlyExpenses, netAmount);
   const penaltyEF = penaltyEmergencyFund(emergencyFundMonths);
   const penaltySav = penaltySavings(savingsRate);
@@ -410,7 +410,7 @@ async function calculateFinancialHealthInternal(
     rawScore = Math.max(rawScore, lastMonthScore - 15);
   }
   const score = Math.max(0, Math.min(100, Math.round(rawScore)));
-  const classification: SpareScoreClassification = getClassificationFromScore(score);
+  const classification: SpairScoreClassification = getClassificationFromScore(score);
   const message = getMessageFromClassification(classification);
 
   // Identify alerts
@@ -606,7 +606,7 @@ export async function calculateFinancialHealth(
       monthlyExpenses: 0,
       netAmount: 0,
       savingsRate: 0,
-      message: "Unable to calculate Spare Score at this time. Please check your transactions.",
+      message: "Unable to calculate Spair Score at this time. Please check your transactions.",
       spendingDiscipline: "Unknown" as const,
       debtExposure: "Low" as const,
       emergencyFundMonths: 0,
@@ -719,7 +719,7 @@ export async function recalculateFinancialHealthFromTransactions(
   const penaltyStab = penaltyStability();
   const rawScore = 100 + penaltyCF + penaltyEF + penaltyDebtFromExposure + penaltySav + penaltyStab;
   const score = Math.max(0, Math.min(100, Math.round(rawScore)));
-  const classification: SpareScoreClassification = getClassificationFromScore(score);
+  const classification: SpairScoreClassification = getClassificationFromScore(score);
   const message = getMessageFromClassification(classification);
 
   // Calculate spending discipline
@@ -983,7 +983,7 @@ function generateSuggestions(data: {
     suggestions.push({
       id: "reduce_expenses",
       title: "Spend Less Than You Earn Next Month",
-      description: `This month you spent ${formatMoney(reductionNeeded)} more than you earned. Reducing next month's expenses by that amount (or adding income) can recover about 8–12 points on your Spare Score.`,
+      description: `This month you spent ${formatMoney(reductionNeeded)} more than you earned. Reducing next month's expenses by that amount (or adding income) can recover about 8–12 points on your Spair Score.`,
       impact: "high" as const,
     });
   }

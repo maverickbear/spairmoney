@@ -4,8 +4,8 @@ import { ContentPageLayout } from "@/components/common/content-page-layout";
 import { LegalSection } from "@/components/common/legal-section";
 
 export const metadata = {
-  title: "Privacy Policy - Spare Finance",
-  description: "Privacy Policy for Spare Finance",
+  title: "Privacy Policy - Spair Money",
+  description: "Privacy Policy for Spair Money",
 };
 
 const LAST_UPDATED = "February 1, 2025";
@@ -43,8 +43,8 @@ export default async function PrivacyPolicyPage() {
       <article className="space-y-6">
         <LegalSection title="Introduction">
           <p>
-            Spare Finance is a product created by Maverick Bear Design, a
-            Canadian company. At Spare Finance (&quot;we,&quot; &quot;our,&quot; or
+            Spair Money is a product created by Maverick Bear Design, a
+            Canadian company. At Spair Money (&quot;we,&quot; &quot;our,&quot; or
             &quot;us&quot;), we are committed to protecting your privacy. This
             Privacy Policy explains how we collect, use, disclose, and safeguard
             your information when you use our financial management application
@@ -461,7 +461,7 @@ export default async function PrivacyPolicyPage() {
             </li>
           </ul>
           <p>
-            To exercise these rights, please contact us at legal@sparefinance.com
+            To exercise these rights, please contact us at legal@spair.co
             or use the account settings in the application.
           </p>
         </LegalSection>
@@ -506,7 +506,7 @@ export default async function PrivacyPolicyPage() {
           </ul>
           <p>
             You can request immediate deletion of your data by contacting us at
-            legal@sparefinance.com. We will process deletion requests in
+            legal@spair.co. We will process deletion requests in
             accordance with applicable data protection laws.
           </p>
         </LegalSection>
@@ -568,7 +568,7 @@ export default async function PrivacyPolicyPage() {
           </div>
           <p>
             To exercise any of these rights, please contact us at
-            legal@sparefinance.com. We will respond to your request within 30
+            legal@spair.co. We will respond to your request within 30
             days (or as required by applicable law).
           </p>
         </LegalSection>
@@ -580,14 +580,14 @@ export default async function PrivacyPolicyPage() {
           </p>
           <div className="space-y-2 text-sm [&_strong]:text-foreground">
             <p><strong>Company:</strong> Maverick Bear Design (Canadian company)</p>
-            <p><strong>Product:</strong> Spare Finance</p>
-            <p><strong>Privacy & Legal:</strong> legal@sparefinance.com</p>
-            <p><strong>Security:</strong> security@sparefinance.com</p>
-            <p><strong>Support:</strong> support@sparefinance.com</p>
+            <p><strong>Product:</strong> Spair Money</p>
+            <p><strong>Privacy & Legal:</strong> legal@spair.co</p>
+            <p><strong>Security:</strong> security@spair.co</p>
+            <p><strong>Support:</strong> support@spair.co</p>
           </div>
           <p>
             For data protection inquiries, data subject access requests, or to
-            exercise your privacy rights, please email legal@sparefinance.com
+            exercise your privacy rights, please email legal@spair.co
             with &quot;Privacy Request&quot; in the subject line.
           </p>
         </LegalSection>

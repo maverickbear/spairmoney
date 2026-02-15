@@ -1170,7 +1170,7 @@ export function CsvImportDialog({
                     <section className="space-y-4">
                       <div className="space-y-1">
                         <h3 className="text-lg font-semibold">{uniqueTransactionTypes.length > 0 ? "5" : "4"}. Map Account Names</h3>
-                        <p className="text-sm text-muted-foreground">Match CSV account names to your Spare Finance accounts</p>
+                        <p className="text-sm text-muted-foreground">Match CSV account names to your Spair Money accounts</p>
                       </div>
                       <div className="bg-background border rounded-lg p-5 space-y-4">
                         {uniqueAccountNames.map((csvAccountName) => {

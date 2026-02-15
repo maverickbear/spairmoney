@@ -7,7 +7,7 @@ import { adminEmailSchema } from "@/src/domain/admin/admin.validations";
 /**
  * POST /api/v2/admin/invites
  * Body: { email: string }
- * Creates an admin invite (super_admin only). Only @sparefinance.com emails allowed.
+ * Creates an admin invite (super_admin only). Only @spair.co emails allowed.
  */
 export async function POST(request: NextRequest) {
   const userId = await getCurrentUserId();

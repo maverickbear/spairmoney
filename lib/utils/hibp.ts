@@ -55,7 +55,7 @@ export async function isPasswordCompromised(password: string): Promise<boolean> 
       // Query HIBP API with only the prefix (k-anonymity)
       const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
         headers: {
-          "User-Agent": "SpareFinance-PasswordCheck/1.0",
+          "User-Agent": "SpairMoney-PasswordCheck/1.0",
           "Add-Padding": "true", // Add padding to prevent timing attacks
         },
       });

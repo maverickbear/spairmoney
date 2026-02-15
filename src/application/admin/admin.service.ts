@@ -439,9 +439,9 @@ export class AdminService {
    */
   private getDefaultSeoSettings() {
     return {
-      title: "Spare Finance - Powerful Tools for Easy Money Management",
-      titleTemplate: "%s | Spare Finance",
-      description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household. Start your 30-day free trial today.",
+      title: "Spair Money - Powerful Tools for Easy Money Management",
+      titleTemplate: "%s | Spair Money",
+      description: "Take control of your finances with Spair Money. Track expenses, manage budgets, set savings goals, and build wealth together with your household. Start your 30-day free trial today.",
       keywords: [
         "personal finance",
         "expense tracking",
@@ -458,27 +458,27 @@ export class AdminService {
         "money tracker",
         "expense manager",
       ],
-      author: "Spare Finance",
-      publisher: "Spare Finance",
+      author: "Spair Money",
+      publisher: "Spair Money",
       openGraph: {
-        title: "Spare Finance - Powerful Tools for Easy Money Management",
-        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
+        title: "Spair Money - Powerful Tools for Easy Money Management",
+        description: "Take control of your finances with Spair Money. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
         image: "/og-image.png",
         imageWidth: 1200,
         imageHeight: 630,
-        imageAlt: "Spare Finance - Personal Finance Management Platform",
+        imageAlt: "Spair Money - Personal Finance Management Platform",
       },
       twitter: {
         card: "summary_large_image",
-        title: "Spare Finance - Powerful Tools for Easy Money Management",
-        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together.",
+        title: "Spair Money - Powerful Tools for Easy Money Management",
+        description: "Take control of your finances with Spair Money. Track expenses, manage budgets, set savings goals, and build wealth together.",
         image: "/og-image.png",
-        creator: "@sparefinance",
+        creator: "@spairmoney",
       },
       organization: {
-        name: "Spare Finance",
+        name: "Spair Money",
         logo: "/icon-512x512.png",
-        url: process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com",
+        url: process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co",
         socialLinks: {
           twitter: "",
           linkedin: "",
@@ -487,8 +487,8 @@ export class AdminService {
         },
       },
       application: {
-        name: "Spare Finance",
-        description: "Take control of your finances with Spare Finance. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
+        name: "Spair Money",
+        description: "Take control of your finances with Spair Money. Track expenses, manage budgets, set savings goals, and build wealth together with your household.",
         category: "FinanceApplication",
         operatingSystem: "Web",
         price: "0",
@@ -1498,7 +1498,7 @@ export class AdminService {
 
   /**
    * Create an admin invitation (super_admin only). Returns invite with token for link.
-   * Only @sparefinance.com emails are allowed.
+   * Only @spair.co emails are allowed.
    */
   async createAdminInvite(
     email: string,
@@ -1527,7 +1527,7 @@ export class AdminService {
 
   /**
    * Register a new admin (super_admin) using a valid invite token.
-   * Invite email must be @sparefinance.com (defense in depth).
+   * Invite email must be @spair.co (defense in depth).
    */
   async registerAdminWithInvite(
     token: string,
@@ -1589,7 +1589,7 @@ export class AdminService {
 
   /**
    * Register a new portal admin with name, email, and password only.
-   * No invite. Only @sparefinance.com emails are allowed.
+   * No invite. Only @spair.co emails are allowed.
    * User is created only in auth + admin table (not in users table).
    */
   async registerAdminDirect(

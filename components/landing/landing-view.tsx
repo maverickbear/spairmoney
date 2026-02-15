@@ -7,7 +7,6 @@ import { RealitySection } from "./reality-section";
 import { DebtAwarenessSection } from "./debt-awareness-section";
 import { ProductOverviewSection } from "./product-overview-section";
 import { FeaturesShowcase } from "./features-showcase";
-import { IntegrationsSection } from "./integrations-section";
 import { MobileMockupSection } from "./mobile-mockup-section";
 import { TrustSection } from "./trust-section";
 import { PricingSection } from "./pricing-section";
@@ -24,7 +23,6 @@ export function LandingView() {
         <RealitySection />
         <DebtAwarenessSection />
         <FeaturesShowcase />
-        <IntegrationsSection />
         <MobileMockupSection />
         <TrustSection />
         <PricingSection />

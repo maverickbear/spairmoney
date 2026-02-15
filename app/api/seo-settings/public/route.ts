@@ -20,8 +20,8 @@ export async function GET() {
         error?.message?.includes('fetch() rejects')) {
       // Return default SEO settings during prerendering
       return NextResponse.json({
-        title: "Spare Finance - Powerful Tools for Easy Money Management",
-        description: "Take control of your finances with Spare Finance.",
+        title: "Spair Money - Powerful Tools for Easy Money Management",
+        description: "Take control of your finances with Spair Money.",
         googleTagId: null,
       });
     }

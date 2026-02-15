@@ -21,7 +21,7 @@ export class UserSubscriptionsService {
   /**
    * Get all user service subscriptions (e.g., Netflix, Spotify, etc.)
    * 
-   * ⚠️ IMPORTANT: This returns EXTERNAL service subscriptions, NOT Spare Finance app subscriptions.
+   * ⚠️ IMPORTANT: This returns EXTERNAL service subscriptions, NOT Spair Money app subscriptions.
    * For app subscriptions, use SubscriptionsService.
    * 
    * Note: This method returns user service subscriptions, NOT Stripe subscription plans.

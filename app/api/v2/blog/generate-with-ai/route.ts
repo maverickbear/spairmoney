@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const prompt = `You are a writer for Spare Finance, a personal finance app blog. Write a short, practical blog post in English.
+    const prompt = `You are a writer for Spair Money, a personal finance app blog. Write a short, practical blog post in English.
 
 Topic: ${topic}
 ${keywords?.length ? `Keywords to include (optional): ${keywords.join(", ")}` : ""}

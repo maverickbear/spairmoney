@@ -10,21 +10,21 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SpareScoreWidgetData } from "@/src/domain/dashboard/types";
+import type { SpairScoreWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetEmptyState } from "./widget-empty-state";
 import { WidgetCard } from "./widget-card";
 import { TrendingUp as TrendingUpIcon } from "lucide-react";
 
-interface SpareScoreWidgetProps {
-  data: SpareScoreWidgetData | null;
+interface SpairScoreWidgetProps {
+  data: SpairScoreWidgetData | null;
   loading?: boolean;
   error?: string | null;
 }
 
-export function SpareScoreWidget({ data, loading, error }: SpareScoreWidgetProps) {
+export function SpairScoreWidget({ data, loading, error }: SpairScoreWidgetProps) {
   if (loading) {
     return (
-      <WidgetCard title="Spare Score" subtitle="Monthly score">
+      <WidgetCard title="Spair Score" subtitle="Monthly score">
         <div className="animate-pulse space-y-3">
           <div className="h-10 bg-muted rounded w-24" />
           <div className="h-4 bg-muted rounded w-32" />
@@ -35,7 +35,7 @@ export function SpareScoreWidget({ data, loading, error }: SpareScoreWidgetProps
 
   if (error) {
     return (
-      <WidgetCard title="Spare Score" subtitle="Monthly score">
+      <WidgetCard title="Spair Score" subtitle="Monthly score">
         <div className="text-sm text-muted-foreground">
           <p>Error: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
@@ -48,10 +48,10 @@ export function SpareScoreWidget({ data, loading, error }: SpareScoreWidgetProps
 
   if (!data) {
     return (
-      <WidgetCard title="Spare Score" subtitle="Monthly score">
+      <WidgetCard title="Spair Score" subtitle="Monthly score">
         <WidgetEmptyState
           title="Start tracking your finances"
-          description="Get your Spare Score based on income, expenses, and savings"
+          description="Get your Spair Score based on income, expenses, and savings"
           primaryAction={{
             label: "Add Transaction",
             href: "/transactions/new",
@@ -126,7 +126,7 @@ export function SpareScoreWidget({ data, loading, error }: SpareScoreWidgetProps
   const empty = data.details?.isEmptyState ?? false;
 
   return (
-    <WidgetCard title="Spare Score" subtitle="Monthly score" compact>
+    <WidgetCard title="Spair Score" subtitle="Monthly score" compact>
       {/* Score Display */}
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-2">

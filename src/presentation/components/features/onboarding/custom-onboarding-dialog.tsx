@@ -106,7 +106,7 @@ export function CustomOnboardingDialog({
             Onboarding
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Complete your onboarding to get started with Spare Finance
+            Complete your onboarding to get started with Spair Money
           </DialogPrimitive.Description>
           <div className="flex flex-col h-full overflow-y-auto">
             {children}

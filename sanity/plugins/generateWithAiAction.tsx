@@ -53,7 +53,7 @@ export const generateWithAiAction: DocumentActionComponent = (props) => {
             description: data.description || '',
             slug: data.slug ? { _type: 'slug', current: data.slug } : undefined,
             datePublished: today,
-            author: 'Spare Finance',
+            author: 'Spair Money',
             body: blocks,
           })
           .commit()

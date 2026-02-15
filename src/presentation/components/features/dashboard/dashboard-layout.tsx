@@ -13,7 +13,7 @@ interface DashboardLayoutProps {
  * Responsive grid layout for dashboard widgets
  * 
  * Desktop (12-column grid):
- * - Top section: Spare Score (6 col), Net Worth (3 col), Cash Flow (3 col)
+ * - Top section: Spair Score (6 col), Net Worth (3 col), Cash Flow (3 col)
  * - Middle section: Left (6 col) for Budgets, Right (6 col) for Goals
  * - Bottom section: Debt (6 col), Investments (6 col)
  * 

@@ -78,7 +78,7 @@ export interface BaseLimitCheckResult {
  * User Service Subscription types
  * 
  * ⚠️ IMPORTANT: These are for EXTERNAL service subscriptions (Netflix, Spotify, ChatGPT, etc.)
- * NOT for Spare Finance app subscriptions. For app subscriptions, see AppSubscription type.
+ * NOT for Spair Money app subscriptions. For app subscriptions, see AppSubscription type.
  * 
  * This tracks user's personal expenses for external services they subscribe to.
  */

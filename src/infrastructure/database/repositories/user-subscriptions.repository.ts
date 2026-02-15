@@ -2,7 +2,7 @@
  * User Subscriptions Repository
  * 
  * ⚠️ IMPORTANT: This repository handles EXTERNAL service subscriptions (Netflix, Spotify, etc.)
- * NOT Spare Finance app subscriptions. For app subscriptions, see SubscriptionsRepository.
+ * NOT Spair Money app subscriptions. For app subscriptions, see SubscriptionsRepository.
  * 
  * Data access layer for UserServiceSubscription (external services only)
  */

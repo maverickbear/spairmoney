@@ -5,8 +5,8 @@ import { Logo } from "@/components/common/logo";
 import { AdminRegisterForm } from "./admin-register-form";
 
 export const metadata = {
-  title: "Admin registration | Spare Finance",
-  description: "Create an admin account for the Spare Finance admin portal.",
+  title: "Admin registration | Spair Money",
+  description: "Create an admin account for the Spair Money admin portal.",
 };
 
 export default function AdminRegisterPage() {

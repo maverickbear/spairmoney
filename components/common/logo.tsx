@@ -19,7 +19,7 @@ interface LogoProps {
 }
 
 /**
- * Logo component for Spare Finance
+ * Logo component for Spair Money
  * 
  * Variants:
  * - icon: Just the "S" icon (for collapsed nav, small spaces)
@@ -182,7 +182,7 @@ export function Logo({
       >
         <Image
           src={getLogoPath()}
-          alt="Spare Finance"
+          alt="Spair Money"
           width={imageWidth}
           height={imageHeight}
           priority={priority}
@@ -198,7 +198,7 @@ export function Logo({
         />
       </div>
       {showText && variant === "icon" && (
-        <span className="text-xl font-bold">Spare Finance</span>
+        <span className="text-xl font-bold">Spair Money</span>
       )}
     </div>
   );

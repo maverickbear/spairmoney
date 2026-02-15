@@ -510,7 +510,7 @@ export class AuthService {
   async signInWithGoogle(redirectTo?: string, flow?: "signin" | "signup"): Promise<{ url: string | null; error: string | null }> {
     try {
       const supabase = await createServerClient();
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
       const redirectUrl = redirectTo || `${appUrl}/auth/callback`;
 
       // For signup, use "select_account consent" to force account selection and consent screen

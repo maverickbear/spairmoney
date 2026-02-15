@@ -206,7 +206,7 @@ function AcceptInvitationForm() {
               <div className="p-2 bg-primary rounded-lg">
                 <Wallet className="w-8 h-8 text-black" />
               </div>
-              <h1 className="text-3xl font-bold">Spare Finance</h1>
+              <h1 className="text-3xl font-bold">Spair Money</h1>
             </div>
             <p className="text-lg text-muted-foreground max-w-md">
               Manage your personal finances intelligently and make more informed decisions about your money.
@@ -268,7 +268,7 @@ function AcceptInvitationForm() {
               <div className="p-2 bg-primary rounded-lg">
                 <Wallet className="w-6 h-6 text-black" />
               </div>
-              <h1 className="text-2xl font-bold">Spare Finance</h1>
+              <h1 className="text-2xl font-bold">Spair Money</h1>
             </div>
             <p className="text-muted-foreground text-sm">
               Accept your invitation and create your account

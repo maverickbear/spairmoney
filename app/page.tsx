@@ -4,14 +4,14 @@ import { headers } from "next/headers";
 import { StructuredData } from "@/src/presentation/components/seo/structured-data";
 import { makeAuthService } from "@/src/application/auth/auth.factory";
 
-const envUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
+const envUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
 const baseUrl = envUrl.includes("=") ? envUrl.split("=")[1] : envUrl;
 
 const defaultSEOSettings = {
-  title: "Spare Finance - Personal Finance at Peace",
-  titleTemplate: "%s | Spare Finance",
+  title: "Spair Money - Personal Finance at Peace",
+  titleTemplate: "%s | Spair Money",
   description:
-    "Track accounts and transactions, see your whole picture, and move from anxiety to control. Dashboard, reports, Spare Score, budgets, goals, receipts, and household—one calm place for your money. Start your 30-day free trial.",
+    "Track accounts and transactions, see your whole picture, and move from anxiety to control. Dashboard, reports, Spair Score, budgets, goals, receipts, and household—one calm place for your money. Start your 30-day free trial.",
   keywords: [
     "personal finance",
     "expense tracking",
@@ -28,23 +28,23 @@ const defaultSEOSettings = {
     "money tracker",
     "expense manager",
   ],
-  author: "Spare Finance",
-  publisher: "Spare Finance",
+  author: "Spair Money",
+  publisher: "Spair Money",
   openGraph: {
-    title: "Spare Finance - Personal Finance at Peace",
+    title: "Spair Money - Personal Finance at Peace",
     description:
       "Track accounts and transactions, see your whole picture. One calm place for your money. Start your 30-day free trial.",
     image: "/og-image.png",
     imageWidth: 1200,
     imageHeight: 630,
-    imageAlt: "Spare Finance - Personal Finance Management",
+    imageAlt: "Spair Money - Personal Finance Management",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Spare Finance - Personal Finance at Peace",
+    title: "Spair Money - Personal Finance at Peace",
     description: "One calm place for your money. Start your 30-day free trial.",
     image: "/og-image.png",
-    creator: "@sparefinance",
+    creator: "@spairmoney",
   },
 };
 
@@ -87,7 +87,7 @@ export async function generateMetadata() {
       type: "website",
       locale: "en_US",
       url: baseUrl,
-      siteName: "Spare Finance",
+      siteName: "Spair Money",
       title: settings.openGraph.title,
       description: settings.openGraph.description,
       images: [{ url: settings.openGraph.image, width: settings.openGraph.imageWidth, height: settings.openGraph.imageHeight, alt: settings.openGraph.imageAlt }],

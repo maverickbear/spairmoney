@@ -13,8 +13,8 @@ import { AddTransactionWidget } from "./widgets/add-transaction-widget";
 import { ExpectedIncomeWidget } from "./widgets/expected-income-widget";
 import { WidgetCard } from "./widgets/widget-card";
 import { formatMoney } from "@/components/common/money";
-import { SpareScoreDetailsDialog } from "./widgets/spare-score-details-dialog";
-import { SpareScoreFullWidthWidget } from "./widgets/spare-score-full-width-widget";
+import { SpairScoreDetailsDialog } from "./widgets/spair-score-details-dialog";
+import { SpairScoreFullWidthWidget } from "./widgets/spair-score-full-width-widget";
 import { RefreshCcw } from "lucide-react";
 import { useDashboardSnapshot } from "@/src/presentation/contexts/dashboard-snapshot-context";
 import {
@@ -51,7 +51,7 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
     selectedMemberId,
     setSelectedMemberId,
   } = useDashboardSnapshot();
-  const [showSpareScoreDetails, setShowSpareScoreDetails] = useState(false);
+  const [showSpairScoreDetails, setShowSpairScoreDetails] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [members, setMembers] = useState<HouseholdMemberOption[]>([]);
 
@@ -221,21 +221,21 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
            </WidgetCard>
         </div>
 
-        {/* Spare Score + Quick Transaction (Quick Transaction hidden on mobile) */}
+        {/* Spair Score + Quick Transaction (Quick Transaction hidden on mobile) */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 xl:gap-6 mb-4 xl:mb-6 [&>*]:min-w-0">
-          <SpareScoreFullWidthWidget
-            data={data.spareScore}
-            onOpenDetails={() => setShowSpareScoreDetails(true)}
+          <SpairScoreFullWidthWidget
+            data={data.spairScore}
+            onOpenDetails={() => setShowSpairScoreDetails(true)}
           />
           <div className="hidden xl:block min-w-0">
             <AddTransactionWidget onTransactionAdded={handleRefresh} />
           </div>
         </div>
 
-        <SpareScoreDetailsDialog
-          open={showSpareScoreDetails}
-          onOpenChange={setShowSpareScoreDetails}
-          data={data.spareScore?.details}
+        <SpairScoreDetailsDialog
+          open={showSpairScoreDetails}
+          onOpenChange={setShowSpairScoreDetails}
+          data={data.spairScore?.details}
         />
 
         {/* Top Section: Total Budgets + Spending */}

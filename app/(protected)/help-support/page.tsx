@@ -89,7 +89,7 @@ export default function HelpSupportPage() {
           <div>
             <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
             <p className="text-sm text-muted-foreground mt-1">
-            Find answers to the most common questions about Spare Finance
+            Find answers to the most common questions about Spair Money
             </p>
           </div>
 

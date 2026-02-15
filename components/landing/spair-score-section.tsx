@@ -13,7 +13,7 @@ const BULLETS = [
   "Get clear next steps.",
 ];
 
-export function SpareScoreSection() {
+export function SpairScoreSection() {
   const { ref, inView } = useInView();
 
   return (
@@ -23,8 +23,8 @@ export function SpareScoreSection() {
           <div className={cn("order-2 lg:order-1 transition-all duration-700", inView ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-6")}>
             <div className="relative aspect-[4/3] max-w-md mx-auto rounded-[32px] bg-[#f8f4f1] overflow-hidden">
               <LandingImage
-                src="spare-score.jpg"
-                alt="Spare Score: your financial health at a glance, 0–100"
+                src="spair-score.jpg"
+                alt="Spair Score: your financial health at a glance, 0–100"
                 fill
                 className="object-cover"
                 sizes="(max-width: 448px) 100vw, 448px"
@@ -32,7 +32,7 @@ export function SpareScoreSection() {
             </div>
           </div>
           <div className={cn("order-1 lg:order-2 transition-all duration-700 delay-150", inView ? "opacity-100 translate-x-0" : "opacity-0 translate-x-6")}>
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground">Spare Score — your financial health at a glance.</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground">Spair Score — your financial health at a glance.</h2>
             <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
               A simple 0–100 score based on cash flow, emergency fund, debt, and savings. No punishment for missing data; it&apos;s coaching-oriented and explainable.
             </p>

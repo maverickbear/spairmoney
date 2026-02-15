@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 const INCLUDED = [
   "Unlimited transactions and accounts",
-  "Dashboard and Spare Score",
+  "Dashboard and Spair Score",
   "Budgets, goals, and reports",
   "Receipt scanning",
   "Advanced reports",

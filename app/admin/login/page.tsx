@@ -5,8 +5,8 @@ import { Shield, Users, Settings2, ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/common/logo";
 
 export const metadata = {
-  title: "Admin sign in | Spare Finance",
-  description: "Sign in to the Spare Finance admin area.",
+  title: "Admin sign in | Spair Money",
+  description: "Sign in to the Spair Money admin area.",
 };
 
 export default function AdminLoginPage() {

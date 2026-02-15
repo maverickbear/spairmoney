@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { loadDashboardData } from "../dashboard/data-loader";
 import { startOfMonth } from "date-fns/startOfMonth";
 import { endOfMonth } from "date-fns/endOfMonth";
-import { SpareScoreInsightsPage } from "./insights-content";
+import { SpairScoreInsightsPage } from "./insights-content";
 import { PageHeader } from "@/components/common/page-header";
 import { Loader2 } from "lucide-react";
 import { recalculateFinancialHealthFromTransactions } from "@/src/application/shared/financial-health";
@@ -75,7 +75,7 @@ async function InsightsContent() {
   }
 
   // Recalculate financial health using only past transactions
-  // This ensures the Spare Score matches the income/expenses shown
+  // This ensures the Spair Score matches the income/expenses shown
   // Emergency fund months will be recalculated using the system Goal "Emergency Funds"
   const financialHealth = data.financialHealth 
     ? await recalculateFinancialHealthFromTransactions(
@@ -90,7 +90,7 @@ async function InsightsContent() {
   const emergencyFundMonths = financialHealth?.emergencyFundMonths ?? data.financialHealth?.emergencyFundMonths ?? 0;
 
   return (
-    <SpareScoreInsightsPage
+    <SpairScoreInsightsPage
       financialHealth={financialHealth}
       currentIncome={currentIncome}
       currentExpenses={currentExpenses}
@@ -104,7 +104,7 @@ async function InsightsContent() {
 export default function InsightsPage() {
   return (
     <>
-      <PageHeader title="Spare Score Insights & Actions" />
+      <PageHeader title="Spair Score Insights & Actions" />
       <div className="w-full p-4 lg:p-8">
         <Suspense fallback={
           <div className="flex items-center justify-center py-12">

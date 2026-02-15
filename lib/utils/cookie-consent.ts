@@ -7,7 +7,7 @@
 
 export type CookieConsentStatus = "accepted" | "rejected" | "unknown";
 
-const STORAGE_KEY = "sparefinance_cookie_consent";
+const STORAGE_KEY = "spairmoney_cookie_consent";
 
 /**
  * Get the current cookie consent status from localStorage

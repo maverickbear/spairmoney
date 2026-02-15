@@ -8,7 +8,7 @@ import { adminEmailSchema } from "@/src/domain/admin/admin.validations";
  * POST /api/v2/admin/signup
  * Body: { name, email, password }
  * Registers a new admin (super_admin) with name, email, and password only.
- * Only @sparefinance.com emails are allowed. No invite.
+ * Only @spair.co emails are allowed. No invite.
  */
 export async function POST(request: NextRequest) {
   try {

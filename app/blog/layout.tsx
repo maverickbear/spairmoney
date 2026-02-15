@@ -2,25 +2,25 @@ import type { Metadata } from "next";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { SimpleFooter } from "@/components/common/simple-footer";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.sparefinance.com";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
 
 export const metadata: Metadata = {
-  title: "Blog - Personal Finance Tips & Guides | Spare Finance",
+  title: "Blog - Personal Finance Tips & Guides | Spair Money",
   description:
-    "Practical personal finance articles: budgeting, expense tracking, saving, and financial peace. Tips and guides from Spare Finance.",
+    "Practical personal finance articles: budgeting, expense tracking, saving, and financial peace. Tips and guides from Spair Money.",
   openGraph: {
     type: "website",
     locale: "en_US",
     url: `${baseUrl}/blog`,
-    siteName: "Spare Finance",
-    title: "Blog - Personal Finance Tips & Guides | Spare Finance",
+    siteName: "Spair Money",
+    title: "Blog - Personal Finance Tips & Guides | Spair Money",
     description:
       "Practical personal finance articles: budgeting, expense tracking, saving, and financial peace.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Blog - Personal Finance Tips & Guides | Spare Finance",
-    description: "Practical personal finance articles and guides from Spare Finance.",
+    title: "Blog - Personal Finance Tips & Guides | Spair Money",
+    description: "Practical personal finance articles and guides from Spair Money.",
   },
   alternates: {
     canonical: `${baseUrl}/blog`,

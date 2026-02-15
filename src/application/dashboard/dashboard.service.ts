@@ -11,7 +11,7 @@ import { UpdateCheckResult } from "@/src/domain/dashboard/dashboard.types";
 import type {
   DashboardWidgetsData,
   ExpectedIncomeOverview,
-  SpareScoreWidgetData,
+  SpairScoreWidgetData,
   NetWorthWidgetData,
   CashFlowWidgetData,
   BudgetPerformanceWidgetData,
@@ -341,7 +341,7 @@ export class DashboardService {
 
     // Fetch all widget data in parallel using pre-fetched data
     const [
-      spareScore,
+      spairScore,
       netWorth,
       cashFlow,
       budgetPerformance,
@@ -357,7 +357,7 @@ export class DashboardService {
       recurring,
       subscriptions,
     ] = await Promise.all([
-      this.getSpareScoreWidget(userId, date, accessToken, refreshToken, accounts, goals, debts, currentTransactions, financialHealth),
+      this.getSpairScoreWidget(userId, date, accessToken, refreshToken, accounts, goals, debts, currentTransactions, financialHealth),
       this.getNetWorthWidget(userId, accessToken, refreshToken, accounts, debts),
       this.getCashFlowWidget(userId, selectedMonth, selectedMonthEnd, previousMonth, previousMonthEnd, accessToken, refreshToken, currentTransactions, previousTransactions),
       this.getBudgetPerformanceWidget(userId, selectedMonth, accessToken, refreshToken, budgets),
@@ -455,7 +455,7 @@ export class DashboardService {
       : null;
 
     return {
-      spareScore,
+      spairScore,
       netWorth,
       cashFlow,
       budgetPerformance,
@@ -476,10 +476,10 @@ export class DashboardService {
   }
 
   /**
-   * Widget 1: Get Spare Score Widget Data
+   * Widget 1: Get Spair Score Widget Data
    * OPTIMIZED: Accept accounts parameter to avoid duplicate fetch
    */
-  async getSpareScoreWidget(
+  async getSpairScoreWidget(
     userId: string,
     selectedDate?: Date,
     accessToken?: string,
@@ -489,7 +489,7 @@ export class DashboardService {
     preFetchedDebts?: DebtWithCalculations[] | null,
     preFetchedTransactions?: TransactionWithRelations[] | null,
     preCalculatedFinancialHealth?: FinancialHealthData | null
-  ): Promise<SpareScoreWidgetData | null> {
+  ): Promise<SpairScoreWidgetData | null> {
     try {
       // Reuse pre-calculated financial health if available, otherwise calculate
       let financialHealth = preCalculatedFinancialHealth;
@@ -529,7 +529,7 @@ export class DashboardService {
       }
 
       // Calculate top 3 drivers
-      const topDrivers = this.calculateSpareScoreDrivers(financialHealth);
+      const topDrivers = this.calculateSpairScoreDrivers(financialHealth);
 
       // Build actions
       const actions = [
@@ -577,15 +577,15 @@ export class DashboardService {
         insights,
       };
     } catch (error) {
-      logger.error("[DashboardService] Error getting Spare Score widget:", error);
+      logger.error("[DashboardService] Error getting Spair Score widget:", error);
       return null;
     }
   }
 
   /**
-   * Calculate top 3 drivers for Spare Score
+   * Calculate top 3 drivers for Spair Score
    */
-  private calculateSpareScoreDrivers(financialHealth: any): Array<{
+  private calculateSpairScoreDrivers(financialHealth: any): Array<{
     label: string;
     change: number;
     changeType: 'increase' | 'decrease';

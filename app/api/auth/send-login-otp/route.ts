@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     if (!userError && userData?.is_blocked && userData?.role !== "super_admin") {
       console.log("[SEND-LOGIN-OTP] User is blocked:", authData.user.id);
       return NextResponse.json(
-        { error: "Your account has been blocked. Please contact support@sparefinance.com for assistance." },
+        { error: "Your account has been blocked. Please contact support@spair.co for assistance." },
         { status: 403 }
       );
     }

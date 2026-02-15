@@ -508,7 +508,7 @@ export function MultiStepOnboardingDialog({
     } else if (currentStep === 4) {
       return "Preparing Your Platform";
     } else {
-      return "Welcome to Spare Finance!";
+      return "Welcome to Spair Money!";
     }
   }
 

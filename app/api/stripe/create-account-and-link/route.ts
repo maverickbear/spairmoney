@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: name || "",
         },
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com"}/dashboard`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://spair.co"}/dashboard`,
       },
     });
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (linkResult.success && authData.user.email) {
       try {
         const { sendWelcomeEmail } = await import("@/lib/utils/email");
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
         
         await sendWelcomeEmail({
           to: authData.user.email,

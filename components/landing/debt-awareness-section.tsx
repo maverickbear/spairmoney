@@ -68,7 +68,7 @@ export function DebtAwarenessSection() {
         </div>
         <div className="mt-14 text-center">
           <p className="text-lg md:text-xl text-foreground max-w-2xl mx-auto leading-relaxed">
-            Spare Finance is here to help—<strong>more organized</strong>, <strong>less work</strong> than spreadsheets, <strong>available anywhere</strong>.
+            Spair Money is here to help—<strong>more organized</strong>, <strong>less work</strong> than spreadsheets, <strong>available anywhere</strong>.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Button

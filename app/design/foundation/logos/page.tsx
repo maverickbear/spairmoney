@@ -155,7 +155,7 @@ export default function LogosPage() {
           <CardHeader>
             <CardTitle>Usage Guidelines</CardTitle>
             <CardDescription>
-              Best practices for using Spare Finance logos
+              Best practices for using Spair Money logos
             </CardDescription>
           </CardHeader>
           <CardContent>

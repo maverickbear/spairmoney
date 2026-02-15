@@ -59,7 +59,7 @@ export function LandingHeader() {
       >
         <nav className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
           <div className="flex items-center justify-between h-16 md:h-[72px]">
-            <Link href="/" className="flex items-center shrink-0" aria-label="Spare Finance home">
+            <Link href="/" className="flex items-center shrink-0" aria-label="Spair Money home">
               <Logo variant="icon" color="auto" width={32} height={32} className="md:hidden" />
               <Logo variant="full" color="auto" width={140} height={32} className="hidden md:block" />
             </Link>

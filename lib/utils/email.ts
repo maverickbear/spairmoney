@@ -63,13 +63,13 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
   
   console.log("[EMAIL] ✅ Resend initialized successfully");
 
-  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
   const invitationLink = `${appUrl}/members/accept?token=${data.invitationToken}`;
 
   console.log("[EMAIL] Invitation link generated:", invitationLink);
 
-  // Always use noreply@sparefinance.com as the sender with "Spare Finance" as display name
-  const finalFromEmail = "Spare Finance <noreply@sparefinance.com>";
+  // Always use noreply@spair.co as the sender with "Spair Money" as display name
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
 
   console.log("[EMAIL] Sending email from:", finalFromEmail, "to:", data.to);
   console.log("[EMAIL] Final from email value:", JSON.stringify(finalFromEmail));
@@ -79,7 +79,7 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
     const emailPayload = {
       from: finalFromEmail,
       to: data.to,
-      subject: `${data.ownerName} invited you to Spare Finance`,
+      subject: `${data.ownerName} invited you to Spair Money`,
       html: getInvitationEmailTemplate({
         memberName: data.memberName,
         ownerName: data.ownerName,
@@ -115,7 +115,7 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
         const warningMessage = `
 ⚠️  Resend Domain Verification Required:
 The invitation was created successfully, but the email could not be sent automatically.
-This is because the domain sparefinance.com is not verified in Resend.
+This is because the domain spair.co is not verified in Resend.
 
 📋 The invitation link is: ${invitationLink}
 
@@ -123,11 +123,11 @@ You can manually share this link with the invited member.
 
 🔧 To enable email sending:
 1. Go to https://resend.com/domains
-2. Add and verify the domain: sparefinance.com
+2. Add and verify the domain: spair.co
 3. Configure DNS records (SPF, DKIM, DMARC) as instructed by Resend
 4. Wait for domain verification (may take a few hours)
 
-Once verified, emails will be sent from: noreply@sparefinance.com
+Once verified, emails will be sent from: noreply@spair.co
         `;
         console.warn("[EMAIL]", warningMessage);
         throw new Error(`Email not sent - domain verification required. Invitation link: ${invitationLink}`);
@@ -166,11 +166,11 @@ You can manually share this link with the invited member.
 
 🔧 To enable email sending:
 1. Go to https://resend.com/domains
-2. Add and verify the domain: sparefinance.com
+2. Add and verify the domain: spair.co
 3. Configure DNS records (SPF, DKIM, DMARC) as instructed by Resend
 4. Wait for domain verification (may take a few hours)
 
-Once verified, emails will be sent from: noreply@sparefinance.com
+Once verified, emails will be sent from: noreply@spair.co
       `);
     }
     
@@ -186,7 +186,7 @@ function getLogoUrl(appUrl?: string): string {
   
   if (!supabaseUrl) {
     // Fallback to hardcoded URL if env var is not set
-    return "https://app.sparefinance.com/storage/v1/object/public/images/logo-primary-lightbg-email.png";
+    return "https://app.spair.co/storage/v1/object/public/images/logo-primary-lightbg-email.png";
   }
   
   // Construct the public URL for the logo in the images bucket
@@ -230,7 +230,7 @@ function getInvitationEmailTemplate(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invitation to Spare Finance</title>
+  <title>Invitation to Spair Money</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -240,7 +240,7 @@ function getInvitationEmailTemplate(data: {
           <!-- Header -->
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background-color: #7BC85A; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Spare Finance</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Spair Money</h1>
             </td>
           </tr>
           
@@ -254,7 +254,7 @@ function getInvitationEmailTemplate(data: {
               </p>
               
               <p style="margin: 0 0 20px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                <strong>${data.ownerName}</strong> (${data.ownerEmail}) has invited you to join their household on Spare Finance.
+                <strong>${data.ownerName}</strong> (${data.ownerEmail}) has invited you to join their household on Spair Money.
               </p>
               
               <p style="margin: 0 0 30px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
@@ -287,7 +287,7 @@ function getInvitationEmailTemplate(data: {
           <tr>
             <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 8px 8px; text-align: center;">
               <p style="margin: 0; color: #8a8a8a; font-size: 12px;">
-                © ${new Date().getFullYear()} Spare Finance. All rights reserved.
+                © ${new Date().getFullYear()} Spair Money. All rights reserved.
               </p>
             </td>
           </tr>
@@ -319,9 +319,9 @@ export async function sendCheckoutPendingEmail(data: CheckoutPendingEmailData): 
 
   console.log("[EMAIL] ✅ Resend initialized successfully");
 
-  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
-  // Always use noreply@sparefinance.com as the sender with "Spare Finance" as display name
-  const finalFromEmail = "Spare Finance <noreply@sparefinance.com>";
+  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
+  // Always use noreply@spair.co as the sender with "Spair Money" as display name
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
 
   console.log("[EMAIL] Email configuration:", {
     from: finalFromEmail,
@@ -351,7 +351,7 @@ export async function sendCheckoutPendingEmail(data: CheckoutPendingEmailData): 
     const emailPayload = {
       from: finalFromEmail,
       to: data.to,
-      subject: `Complete your Spare Finance account setup`,
+      subject: `Complete your Spair Money account setup`,
       html: getCheckoutPendingEmailTemplate({
         planName: data.planName,
         trialInfo,
@@ -402,7 +402,7 @@ function getCheckoutPendingEmailTemplate(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Complete your Spare Finance account setup</title>
+  <title>Complete your Spair Money account setup</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -412,7 +412,7 @@ function getCheckoutPendingEmailTemplate(data: {
           <!-- Header -->
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background-color: #7BC85A; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Spare Finance</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Spair Money</h1>
             </td>
           </tr>
           
@@ -430,7 +430,7 @@ function getCheckoutPendingEmailTemplate(data: {
               </p>
               
               <p style="margin: 0 0 30px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                To start using Spare Finance, please complete your account setup by creating your password. This will only take a minute!
+                To start using Spair Money, please complete your account setup by creating your password. This will only take a minute!
               </p>
               
               <!-- CTA Button -->
@@ -469,7 +469,7 @@ function getCheckoutPendingEmailTemplate(data: {
           <tr>
             <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 8px 8px; text-align: center;">
               <p style="margin: 0; color: #8a8a8a; font-size: 12px;">
-                © ${new Date().getFullYear()} Spare Finance. All rights reserved.
+                © ${new Date().getFullYear()} Spair Money. All rights reserved.
               </p>
             </td>
           </tr>
@@ -501,8 +501,8 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
   
   console.log("[EMAIL] ✅ Resend initialized successfully");
 
-  // Always use noreply@sparefinance.com as the sender with "Spare Finance" as display name
-  const finalFromEmail = "Spare Finance <noreply@sparefinance.com>";
+  // Always use noreply@spair.co as the sender with "Spair Money" as display name
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
 
   console.log("[EMAIL] Sending email from:", finalFromEmail, "to:", data.to);
   console.log("[EMAIL] Final from email value:", JSON.stringify(finalFromEmail));
@@ -512,7 +512,7 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
     const emailPayload = {
       from: finalFromEmail,
       to: data.to,
-      subject: "Reset your password - Spare Finance",
+      subject: "Reset your password - Spair Money",
       html: getPasswordResetEmailTemplate({
         userName: data.userName,
         resetLink: data.resetLink,
@@ -545,7 +545,7 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
         const warningMessage = `
 ⚠️  Resend Domain Verification Required:
 The password reset email could not be sent automatically.
-This is because the domain sparefinance.com is not verified in Resend.
+This is because the domain spair.co is not verified in Resend.
 
 📋 The password reset link is: ${data.resetLink}
 
@@ -553,11 +553,11 @@ You can manually share this link with the user if needed.
 
 🔧 To enable email sending:
 1. Go to https://resend.com/domains
-2. Add and verify the domain: sparefinance.com
+2. Add and verify the domain: spair.co
 3. Configure DNS records (SPF, DKIM, DMARC) as instructed by Resend
 4. Wait for domain verification (may take a few hours)
 
-Once verified, emails will be sent from: noreply@sparefinance.com
+Once verified, emails will be sent from: noreply@spair.co
         `;
         console.warn("[EMAIL]", warningMessage);
         throw new Error(`Email not sent - domain verification required. Reset link: ${data.resetLink}`);
@@ -588,7 +588,7 @@ Once verified, emails will be sent from: noreply@sparefinance.com
       console.warn(`
 ⚠️  Resend Domain Verification Required:
 The password reset email could not be sent automatically.
-This is because the domain sparefinance.com is not verified in Resend.
+This is because the domain spair.co is not verified in Resend.
 
 📋 The password reset link is: ${data.resetLink}
 
@@ -596,11 +596,11 @@ You can manually share this link with the user if needed.
 
 🔧 To enable email sending:
 1. Go to https://resend.com/domains
-2. Add and verify the domain: sparefinance.com
+2. Add and verify the domain: spair.co
 3. Configure DNS records (SPF, DKIM, DMARC) as instructed by Resend
 4. Wait for domain verification (may take a few hours)
 
-Once verified, emails will be sent from: noreply@sparefinance.com
+Once verified, emails will be sent from: noreply@spair.co
       `);
     }
     
@@ -621,7 +621,7 @@ function getPasswordResetEmailTemplate(data: {
     let html = fs.readFileSync(templatePath, 'utf-8');
     console.log("[EMAIL] Template loaded successfully, length:", html.length);
     
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
     const logoUrl = getLogoUrl(appUrl);
     
     // Replace template variables
@@ -642,7 +642,7 @@ function getPasswordResetEmailTemplate(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset Your Password - Spare Finance</title>
+  <title>Reset Your Password - Spair Money</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
@@ -651,7 +651,7 @@ function getPasswordResetEmailTemplate(data: {
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
           <tr>
             <td style="padding: 30px 40px 20px; text-align: left;">
-              <img src="${getLogoUrl()}" alt="Spare Finance" style="height: 32px; width: auto;" />
+              <img src="${getLogoUrl()}" alt="Spair Money" style="height: 32px; width: auto;" />
             </td>
           </tr>
           <tr>
@@ -692,7 +692,7 @@ function getPasswordResetEmailTemplate(data: {
               
               <p style="margin: 0; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
                 Best regards,<br>
-                Spare Finance
+                Spair Money
               </p>
             </td>
           </tr>
@@ -702,7 +702,7 @@ function getPasswordResetEmailTemplate(data: {
                 This message was sent to ${data.userEmail || ""}. If you have questions or complaints, please contact us.
               </p>
               <p style="margin: 0; color: #8a8a8a; font-size: 12px;">
-                © ${new Date().getFullYear()} Spare Finance. All rights reserved.
+                © ${new Date().getFullYear()} Spair Money. All rights reserved.
               </p>
             </td>
           </tr>
@@ -724,12 +724,12 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
     return;
   }
 
-  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
   const founderName = data.founderName || "Naor Tartarotti";
   
   // Use founder's email as the sender so replies go directly to the founder
-  // Default to naor@sparefinance.com if FOUNDER_EMAIL is not configured
-  const founderEmail = process.env.FOUNDER_EMAIL || "naor@sparefinance.com";
+  // Default to naor@spair.co if FOUNDER_EMAIL is not configured
+  const founderEmail = process.env.FOUNDER_EMAIL || "naor@spair.co";
   const finalFromEmail = `${founderName} <${founderEmail}>`;
 
   console.log("[EMAIL] Welcome email - Final from email value:", JSON.stringify(finalFromEmail));
@@ -738,7 +738,7 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
     const emailPayload = {
       from: finalFromEmail,
       to: data.to,
-      subject: `Welcome to Spare Finance!`,
+      subject: `Welcome to Spair Money!`,
       html: getWelcomeEmailTemplate({
         founderName,
         email: data.to,
@@ -768,7 +768,7 @@ function getWelcomeEmailTemplate(data: {
     const templatePath = path.join(process.cwd(), 'email-templates/welcome.html');
     let html = fs.readFileSync(templatePath, 'utf-8');
     
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
     const logoUrl = getLogoUrl(appUrl);
     
     // Replace variables
@@ -787,7 +787,7 @@ function getWelcomeEmailTemplate(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to Spare Finance</title>
+  <title>Welcome to Spair Money</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
@@ -796,19 +796,19 @@ function getWelcomeEmailTemplate(data: {
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
           <tr>
             <td style="padding: 30px 40px 20px; text-align: left;">
-              <img src="${getLogoUrl()}" alt="Spare Finance" style="height: 32px; width: auto;" />
+              <img src="${getLogoUrl()}" alt="Spair Money" style="height: 32px; width: auto;" />
             </td>
           </tr>
           <tr>
             <td style="padding: 0 40px 40px;">
               <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700; line-height: 1.3;">
-                Welcome to Spare Finance!
+                Welcome to Spair Money!
               </h1>
               <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
                 Hi,
               </p>
               <p style="margin:0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
-                I'm ${data.founderName}, founder of Spare Finance.
+                I'm ${data.founderName}, founder of Spair Money.
               </p>
               <p style="margin:0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
                 I hope you take full advantage of these 30 days to explore the platform and that it helps you organize your financial life, whether individually or as a family.
@@ -828,7 +828,7 @@ function getWelcomeEmailTemplate(data: {
                     <p style="margin:0; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
                       Best regards,<br>
                       ${data.founderName}<br>
-                      <span style="color: #8a8a8a; font-size: 14px;">Founder, Spare Finance</span>
+                      <span style="color: #8a8a8a; font-size: 14px;">Founder, Spair Money</span>
                     </p>
                   </td>
                 </tr>
@@ -841,7 +841,7 @@ function getWelcomeEmailTemplate(data: {
                 This message was sent to ${data.email}. If you have questions or complaints, please contact us.
               </p>
               <p style="margin: 0; color: #8a8a8a; font-size: 12px;">
-                © ${new Date().getFullYear()} Spare Finance. All rights reserved.
+                © ${new Date().getFullYear()} Spair Money. All rights reserved.
               </p>
             </td>
           </tr>

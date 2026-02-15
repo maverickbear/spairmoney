@@ -21,14 +21,14 @@ export function MobileMockupSection() {
           <div className="max-w-xl">
             <h2 className="text-2xl md:text-3xl font-bold text-foreground">Take it with you.</h2>
             <p className="mt-4 text-muted-foreground text-lg">
-              Your dashboard, budgets, and goals—wherever you are. Spare Finance works on any device.
+              Your dashboard, budgets, and goals—wherever you are. Spair Money works on any device.
             </p>
           </div>
           <div className={cn("relative w-full", inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 transition-all duration-700 delay-150")}>
             <div className="relative aspect-[4/3] max-w-lg mx-auto lg:ml-auto rounded-[32px] bg-[#f8f4f1] overflow-hidden">
               <LandingImage
-                src="dashboard.jpg"
-                alt="Spare Finance on mobile: take your dashboard and budgets with you"
+                src="mobile.png"
+                alt="Spair Money on mobile: take your dashboard and budgets with you"
                 fill
                 className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 50vw"

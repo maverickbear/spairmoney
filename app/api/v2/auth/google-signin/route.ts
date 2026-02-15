@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const { redirectTo, flow } = body; // flow: "signin" | "signup"
 
     // Build callback URL with flow context
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
     const callbackUrl = new URL("/auth/callback", appUrl);
     if (flow) {
       callbackUrl.searchParams.set("flow", flow); // Add flow parameter to callback

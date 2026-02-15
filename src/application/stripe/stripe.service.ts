@@ -158,7 +158,7 @@ export class StripeService {
       }
 
       // Create checkout session
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         payment_method_types: ["card"],
@@ -296,7 +296,7 @@ export class StripeService {
       }
 
       // Create checkout session
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         customer: customerId,
@@ -420,7 +420,7 @@ export class StripeService {
         }
       }
 
-      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com/").replace(/\/+$/, "");
+      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/").replace(/\/+$/, "");
       const successPath = returnUrl ? (returnUrl.startsWith("/") ? returnUrl : `/${returnUrl}`) : "/subscription/success";
       const cancelPath = cancelUrl || "/dashboard?openPricingModal=true&canceled=true";
 
@@ -482,7 +482,7 @@ export class StripeService {
         return { url: null, error: "No Stripe customer found" };
       }
 
-      let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sparefinance.com";
+      let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
       baseUrl = baseUrl.replace(/\/+$/, '');
       const returnUrl = `${baseUrl}/settings/billing?portal_return=true`;
       

@@ -86,7 +86,7 @@ export function FinancialHealthWidget({ data, lastMonthIncome, lastMonthExpenses
       <Card className="w-full max-w-full group">
         <CardHeader>
           <CardTitle className="text-lg font-semibold">
-            Spare Score
+            Spair Score
           </CardTitle>
           <CardDescription>
             Monthly Income vs Monthly Expenses comparison

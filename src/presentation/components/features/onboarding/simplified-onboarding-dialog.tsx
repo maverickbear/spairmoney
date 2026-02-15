@@ -129,7 +129,7 @@ export function SimplifiedOnboardingDialog({
       }
 
       toast({
-        title: "Welcome to Spare Finance!",
+        title: "Welcome to Spair Money!",
         description: "Your 30-day free trial has started. Enjoy full access to all features!",
         variant: "success",
       });
@@ -245,7 +245,7 @@ export function SimplifiedOnboardingDialog({
           {currentStep === "household" && (
             <div className="space-y-6">
               <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold">How will you use Spare Finance?</h2>
+                <h2 className="text-2xl font-bold">How will you use Spair Money?</h2>
                 <p className="text-muted-foreground">Choose the option that best describes your situation</p>
               </div>
               

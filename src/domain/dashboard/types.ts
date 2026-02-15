@@ -31,8 +31,8 @@ export interface BaseWidgetData {
   nextSteps?: WidgetNextStep[];
 }
 
-// Widget 1: Spare Score
-export interface SpareScoreDriver {
+// Widget 1: Spair Score
+export interface SpairScoreDriver {
   label: string;
   change: number; // percentage change
   changeType: 'increase' | 'decrease';
@@ -40,7 +40,7 @@ export interface SpareScoreDriver {
   actionHref: string;
 }
 
-export interface SpareScoreDetails {
+export interface SpairScoreDetails {
   score: number;
   classification: "Excellent" | "Strong" | "Fair" | "Fragile" | "Critical";
   monthlyIncome: number;
@@ -68,16 +68,16 @@ export interface SpareScoreDetails {
   }>;
 }
 
-export interface SpareScoreWidgetData extends BaseWidgetData {
+export interface SpairScoreWidgetData extends BaseWidgetData {
   score: number;
   classification: "Excellent" | "Strong" | "Fair" | "Fragile" | "Critical";
   trend: 'up' | 'down' | 'stable';
   trendValue?: number; // percentage change from last month
   lastMonthScore?: number;
-  topDrivers: SpareScoreDriver[];
+  topDrivers: SpairScoreDriver[];
   message: string;
   isProjected?: boolean;
-  details?: SpareScoreDetails;
+  details?: SpairScoreDetails;
 }
 
 // Widget 2: Net Worth
@@ -244,7 +244,7 @@ export interface ExpectedIncomeOverview {
 
 // Combined dashboard data
 export interface DashboardWidgetsData {
-  spareScore: SpareScoreWidgetData | null;
+  spairScore: SpairScoreWidgetData | null;
   netWorth: NetWorthWidgetData | null;
   cashFlow: CashFlowWidgetData | null;
   budgetPerformance: BudgetPerformanceWidgetData | null;

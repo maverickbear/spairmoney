@@ -21,7 +21,7 @@ export function LandingFooter() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-sm text-white">
-            Spare Finance — Personal finance at peace.
+            Spair Money — Personal finance at peace.
           </p>
           <nav className="flex flex-wrap items-center justify-center gap-6">
             {FOOTER_LINKS.map(({ label, href }) => (
@@ -36,7 +36,7 @@ export function LandingFooter() {
           </nav>
         </div>
         <div className="mt-8 pt-8 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-white">© {year} Spare Finance. All rights reserved.</p>
+          <p className="text-sm text-white">© {year} Spair Money. All rights reserved.</p>
         </div>
       </div>
     </footer>
