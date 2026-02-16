@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 const FOOTER_LINKS = [
   { label: "Features", href: "#features" },
   { label: "Pricing", href: "#pricing" },
+  { label: "FAQ", href: "#faq" },
+  { label: "Contact", href: "/contact" },
   { label: "Privacy", href: "/privacy-policy" },
   { label: "Terms", href: "/terms-of-service" },
   { label: "Help", href: "/faq" },

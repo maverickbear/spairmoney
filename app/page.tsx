@@ -2,6 +2,7 @@ import { Suspense, type ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { StructuredData } from "@/src/presentation/components/seo/structured-data";
+import { LandingFAQSchema } from "@/src/presentation/components/seo/landing-faq-schema";
 import { makeAuthService } from "@/src/application/auth/auth.factory";
 
 const envUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
@@ -74,32 +75,36 @@ export async function generateMetadata() {
   const seoSettings = await getSEOSettings();
   const settings = seoSettings || defaultSEOSettings;
 
+  const canonicalUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const ogImageUrl = settings.openGraph.image.startsWith("http") ? settings.openGraph.image : `${baseUrl}${settings.openGraph.image.replace(/^\//, "")}`;
+
   return {
     metadataBase: new URL(baseUrl),
     title: { default: settings.title, template: settings.titleTemplate },
     description: settings.description,
     keywords: settings.keywords,
-    authors: [{ name: settings.author }],
+    authors: [{ name: settings.author, url: baseUrl }],
     creator: settings.author,
     publisher: settings.publisher,
+    referrer: "origin-when-cross-origin",
     robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-video-preview": -1, "max-image-preview": "large", "max-snippet": -1 } },
     openGraph: {
       type: "website",
       locale: "en_US",
-      url: baseUrl,
+      url: canonicalUrl,
       siteName: "Spair Money",
       title: settings.openGraph.title,
       description: settings.openGraph.description,
-      images: [{ url: settings.openGraph.image, width: settings.openGraph.imageWidth, height: settings.openGraph.imageHeight, alt: settings.openGraph.imageAlt }],
+      images: [{ url: ogImageUrl, width: settings.openGraph.imageWidth, height: settings.openGraph.imageHeight, alt: settings.openGraph.imageAlt }],
     },
     twitter: {
       card: settings.twitter.card as "summary" | "summary_large_image",
       title: settings.twitter.title,
       description: settings.twitter.description,
-      images: [settings.twitter.image],
+      images: [ogImageUrl],
       creator: settings.twitter.creator,
     },
-    alternates: { canonical: baseUrl },
+    alternates: { canonical: canonicalUrl },
     category: "Finance",
     classification: "Business",
   };
@@ -182,6 +187,7 @@ export default function HomePage() {
       <Suspense fallback={null}>
         <SEOSettingsWrapper />
       </Suspense>
+      <LandingFAQSchema />
       <Suspense fallback={null}>
         <AuthCheck />
       </Suspense>

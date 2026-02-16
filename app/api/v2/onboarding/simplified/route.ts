@@ -97,39 +97,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 2: Save goals and household type preferences, then mark onboarding as complete
+    // Step 2: Ensure user has a household, then save goals and household type, then mark onboarding complete
     try {
-      const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
-      if (householdId) {
-        const onboardingService = makeOnboardingService();
-        const { HouseholdRepository } = await import("@/src/infrastructure/database/repositories/household.repository");
-        const { OnboardingMapper } = await import("@/src/application/onboarding/onboarding.mapper");
-        const householdRepository = new HouseholdRepository();
-        
-        // Get current settings (already mapped to domain type)
-        const currentSettings = await householdRepository.getSettings(householdId, accessToken, refreshToken);
-        
-        if (!currentSettings) {
-          throw new AppError("Household settings not found", 400);
-        }
-        
-        // Store goals and household type in household settings using mapper
-        const updatedSettings = OnboardingMapper.settingsToDatabase({
-          ...currentSettings,
-          onboardingGoals: goals,
-          onboardingHouseholdType: householdType,
-        });
-        
-        await householdRepository.updateSettings(householdId, updatedSettings, accessToken, refreshToken);
-        console.log("[SIMPLIFIED-ONBOARDING] Saved onboarding preferences to household settings");
-        
-        // Mark onboarding as complete immediately after saving preferences
-        await onboardingService.markOnboardingComplete(userId, householdId, accessToken, refreshToken);
-        console.log("[SIMPLIFIED-ONBOARDING] Marked onboarding as complete");
-      } else {
-        console.error("[SIMPLIFIED-ONBOARDING] No household found - cannot save preferences");
-        throw new AppError("Household not found", 400);
+      let householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+
+      if (!householdId) {
+        // Create personal household if none exists (e.g. signup didn't create one)
+        const { createServerClient } = await import("@/src/infrastructure/database/supabase-server");
+        const supabase = await createServerClient(accessToken, refreshToken);
+        const { data: userData } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", userId)
+          .single();
+
+        const { makeMembersService } = await import("@/src/application/members/members.factory");
+        const membersService = makeMembersService();
+        const householdName = userData?.name ? `${userData.name}'s Account` : "My Account";
+        const newHousehold = await membersService.createHousehold(userId, householdName, "personal");
+        householdId = newHousehold.id;
+        console.log("[SIMPLIFIED-ONBOARDING] Created personal household for user:", { userId, householdId });
       }
+
+      const onboardingService = makeOnboardingService();
+      const { HouseholdRepository } = await import("@/src/infrastructure/database/repositories/household.repository");
+      const { OnboardingMapper } = await import("@/src/application/onboarding/onboarding.mapper");
+      const householdRepository = new HouseholdRepository();
+
+      // Get current settings (already mapped to domain type)
+      const currentSettings = await householdRepository.getSettings(householdId, accessToken, refreshToken);
+
+      if (!currentSettings) {
+        throw new AppError("Household settings not found", 400);
+      }
+
+      // Store goals and household type in household settings using mapper
+      const updatedSettings = OnboardingMapper.settingsToDatabase({
+        ...currentSettings,
+        onboardingGoals: goals,
+        onboardingHouseholdType: householdType,
+      });
+
+      await householdRepository.updateSettings(householdId, updatedSettings, accessToken, refreshToken);
+      console.log("[SIMPLIFIED-ONBOARDING] Saved onboarding preferences to household settings");
+
+      // Mark onboarding as complete immediately after saving preferences
+      await onboardingService.markOnboardingComplete(userId, householdId, accessToken, refreshToken);
+      console.log("[SIMPLIFIED-ONBOARDING] Marked onboarding as complete");
     } catch (error) {
       console.error("[SIMPLIFIED-ONBOARDING] Error saving preferences:", error);
       // This is critical - if we can't save preferences, onboarding is incomplete

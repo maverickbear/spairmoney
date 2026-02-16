@@ -74,10 +74,11 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
   if (org.socialLinks.facebook) sameAs.push(org.socialLinks.facebook);
   if (org.socialLinks.instagram) sameAs.push(org.socialLinks.instagram);
 
-  // Organization Schema
+  // Organization Schema (with @id for WebSite publisher reference)
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": `${org.url}/#organization`,
     name: org.name,
     url: org.url,
     logo: org.logo.startsWith("http") ? org.logo : `${baseUrl}${org.logo}`,
@@ -87,6 +88,7 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
       "@type": "ContactPoint",
       contactType: "Customer Service",
       url: `${org.url}/faq`,
+      availableLanguage: "English",
     },
   };
 
@@ -97,6 +99,7 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
     name: org.name,
     url: org.url,
     description: description,
+    publisher: { "@id": `${org.url}/#organization` },
     potentialAction: {
       "@type": "SearchAction",
       target: {
@@ -105,6 +108,20 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
       },
       "query-input": "required name=search_term_string",
     },
+  };
+
+  // BreadcrumbList for homepage
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: org.url,
+      },
+    ],
   };
 
   // SoftwareApplication Schema
@@ -128,13 +145,6 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
       availability: "https://schema.org/InStock",
       priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], // 1 year from now
     },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.8",
-      ratingCount: "100",
-      bestRating: "5",
-      worstRating: "1",
-    },
     featureList: [
       "Expense Tracking",
       "Budget Management",
@@ -156,6 +166,10 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
       <script
         type="application/ld+json"
