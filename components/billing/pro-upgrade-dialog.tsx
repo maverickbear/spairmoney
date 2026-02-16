@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
-import { BillingIntervalToggle } from "@/components/billing/billing-interval-toggle";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,9 +10,13 @@ import { cn } from "@/lib/utils";
 const FEATURES = [
   "Unlimited transactions and accounts",
   "Dashboard and Spair Score",
-  "Budgets, goals, and reports",
+  "Budgets",
+  "Goals",
+  "Advanced reports",
   "Receipt scanning",
   "Household sharing",
+  "CSV import and export",
+  "Debt tracking",
 ];
 
 export type UpgradeDialogSubscriptionStatus = "no_subscription" | "cancelled" | "past_due" | "unpaid" | null;
@@ -37,9 +40,9 @@ function getCopy(subscriptionStatus: UpgradeDialogSubscriptionStatus) {
 
   if (isNoPlan) {
     return {
-      title: "Upgrade to Pro",
+      title: "Subscribe to Pro",
       description:
-        "Get full control of your money with the Pro plan. Start your 30-day free trial—you'll only be charged after the trial ends. Cancel anytime.",
+        "Get full control of your money with the Pro plan. Start your 30-day free trial.",
       primaryButton: "Start 30-day trial",
       secondaryButton: null as string | null,
     };
@@ -74,9 +77,9 @@ function getCopy(subscriptionStatus: UpgradeDialogSubscriptionStatus) {
   }
 
   return {
-    title: "Upgrade to Pro",
+    title: "Subscribe to Pro",
     description:
-      "Get full control of your money with the Pro plan. Start your 30-day free trial—you'll only be charged after the trial ends. Cancel anytime.",
+      "Get full control of your money with the Pro plan. Start your 30-day free trial.",
     primaryButton: "Start 30-day trial",
     secondaryButton: null as string | null,
   };
@@ -130,15 +133,9 @@ export function ProUpgradeDialog({
   const copy = getCopy(subscriptionStatus);
   const needsReactivation =
     subscriptionStatus === "cancelled" || subscriptionStatus === "past_due" || subscriptionStatus === "unpaid";
-  const priceMonthly = plan?.priceMonthly ?? 14.99;
-  const priceYearly = plan?.priceYearly ?? 149.9;
+  const priceMonthly = plan?.priceMonthly ?? 8;
+  const priceYearly = plan?.priceYearly ?? 72;
   const yearlyMonthly = priceYearly / 12;
-  const yearlySavingsPct = priceMonthly > 0 ? Math.round((1 - priceYearly / 12 / priceMonthly) * 100) : 0;
-  const priceLine1 =
-    interval === "month"
-      ? `$${priceMonthly.toFixed(2)} / month`
-      : `$${yearlyMonthly.toFixed(2)} / month`;
-  const priceLine2 = interval === "year" ? `Billed yearly $${priceYearly.toFixed(2)}` : null;
 
   function handlePrimary() {
     if (needsReactivation && (subscriptionStatus === "past_due" || subscriptionStatus === "unpaid") && onManageSubscription) {
@@ -164,10 +161,10 @@ export function ProUpgradeDialog({
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
           className={cn(
-            "fixed z-50 flex w-full max-w-lg flex-col overflow-hidden rounded-none border border-border bg-background p-0 shadow-lg",
-            "left-0 top-0 h-full max-h-screen translate-x-0 translate-y-0",
+            "fixed z-50 flex w-full max-w-[590px] flex-col overflow-hidden rounded-none border border-border bg-background p-0 shadow-lg",
+            "left-0 top-0 h-full max-h-screen translate-x-0 translate-y-0 sm:inset-auto sm:h-auto",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            "sm:left-[50%] sm:top-[50%] sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl"
+            "sm:left-[50%] sm:top-[50%] sm:max-w-[773px] sm:h-auto sm:max-h-[90vh] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl"
           )}
           onInteractOutside={(e) => !canClose && e.preventDefault()}
           onEscapeKeyDown={(e) => !canClose && e.preventDefault()}
@@ -178,28 +175,9 @@ export function ProUpgradeDialog({
           <DialogPrimitive.Description className="sr-only">
             {copy.description}
           </DialogPrimitive.Description>
-          <div className="flex min-h-0 flex-col sm:flex-row sm:min-h-[420px]">
-            {/* Left panel – branding green */}
-            <div className="flex shrink-0 flex-col justify-end bg-primary px-6 py-8 sm:w-[42%] sm:rounded-l-2xl sm:px-8 sm:py-10">
-              <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-                Pro plan
-              </h2>
-              {plansLoading ? (
-                <div className="mt-2 h-8 w-32 rounded bg-gray-900/20 animate-pulse" />
-              ) : (
-                <div className="mt-2 text-gray-900">
-                  <p className="text-lg font-medium sm:text-xl">{priceLine1}</p>
-                  {priceLine2 && (
-                    <p className="mt-0.5 text-sm text-gray-900/90">
-                      {priceLine2}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Right panel – form and actions */}
-            <div className="flex flex-1 flex-col overflow-y-auto bg-background px-6 py-6 sm:px-8 sm:py-8 sm:rounded-r-2xl">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto sm:flex-row sm:min-h-[420px] sm:overflow-visible sm:flex-initial">
+            {/* Left panel – form and features */}
+            <div className="flex flex-none flex-col bg-[#f8f4f1] px-6 py-6 sm:min-h-0 sm:min-w-0 sm:flex-1 sm:overflow-y-auto sm:px-8 sm:py-8 sm:rounded-l-2xl order-1 sm:order-1 sm:w-1/2">
               <h3 className="text-xl font-bold text-foreground">{copy.title}</h3>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{copy.description}</p>
 
@@ -214,19 +192,8 @@ export function ProUpgradeDialog({
                 ))}
               </ul>
 
-              {/* Billing toggle */}
-              <div className="mt-6">
-                <BillingIntervalToggle
-                  value={interval}
-                  onValueChange={setInterval}
-                  savePercent={yearlySavingsPct}
-                  label="Billing"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                {copy.secondaryButton && (
+              {copy.secondaryButton && (
+                <div className="mt-8">
                   <Button
                     type="button"
                     variant="outline"
@@ -235,12 +202,70 @@ export function ProUpgradeDialog({
                   >
                     {copy.secondaryButton}
                   </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Right panel – Pro plan, two option cards, and primary CTA */}
+            <div className="flex shrink-0 flex-col justify-end bg-background px-6 py-8 sm:w-1/2 sm:rounded-r-2xl sm:px-8 sm:py-10 order-2 sm:order-2">
+              <h3 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
+                Choose your Billing Period
+              </h3>
+
+              {/* Two plan options as cards – selected uses plan.id + interval for price ID */}
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-1">
+                {plansLoading ? (
+                  <>
+                    <div className="h-[88px] min-h-[88px] rounded-xl border border-border bg-muted/20 animate-pulse" />
+                    <div className="h-[88px] min-h-[88px] rounded-xl border border-border bg-muted/20 animate-pulse" />
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setInterval("month")}
+                      className={cn(
+                        "w-full rounded-xl border-2 p-4 text-left transition-colors",
+                        interval === "month"
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-muted/20 hover:border-muted-foreground/40"
+                      )}
+                    >
+                      <p className="text-lg font-bold text-gray-900 sm:text-xl">
+                        ${priceMonthly.toFixed(2)} / month
+                      </p>
+                      <p className="mt-0.5 text-sm text-gray-900/90">
+                        Annual cost ${(priceMonthly * 12).toFixed(2)}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInterval("year")}
+                      className={cn(
+                        "w-full rounded-xl border-2 p-4 text-left transition-colors",
+                        interval === "year"
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-muted/20 hover:border-muted-foreground/40"
+                      )}
+                    >
+                      <p className="text-lg font-bold text-gray-900 sm:text-xl">
+                        ${priceYearly.toFixed(2)} / year
+                      </p>
+                      <p className="mt-0.5 text-sm text-gray-900/90">
+                        Monthly cost ${yearlyMonthly.toFixed(2)}
+                      </p>
+                    </button>
+                  </>
                 )}
+              </div>
+
+              {/* Primary CTA – uses plan.id + interval (price ID resolved server-side) */}
+              <div className="mt-6">
                 <Button
                   type="button"
                   onClick={handlePrimary}
                   disabled={loading || plansLoading || !plan}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {loading ? (
                     <>
@@ -252,6 +277,11 @@ export function ProUpgradeDialog({
                   )}
                 </Button>
               </div>
+
+              {/* Footer disclaimer */}
+              <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
+                You will be charged after the trial ends. You can cancel at any time. Your plan will remain active until the end of the billing cycle.
+              </p>
             </div>
           </div>
 

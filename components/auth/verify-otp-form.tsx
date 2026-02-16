@@ -96,6 +96,11 @@ async function getPostLoginPath(): Promise<string> {
   return "/dashboard";
 }
 
+const ALLOWED_REDIRECT_PATHS = ["/dashboard", "/admin"] as const;
+function getAllowedRedirectPath(urlRedirectTo: string | null): string | null {
+  return urlRedirectTo && ALLOWED_REDIRECT_PATHS.includes(urlRedirectTo as any) ? urlRedirectTo : null;
+}
+
 interface VerifyOtpFormProps {
   email?: string;
 }
@@ -120,6 +125,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
   const fromInvitation = searchParams.get("from_invitation") === "true";
   const invitationId = searchParams.get("invitationId") || undefined;
   const userId = searchParams.get("userId") || undefined;
+  const urlRedirectTo = searchParams.get("redirectTo"); // e.g. /dashboard from Google callback
   
   // Detect if this is a Google OAuth login
   const oauthDataStr = searchParams.get("oauth_data") || "";
@@ -630,8 +636,8 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           return;
         }
 
-        // Redirect based on role: super_admin → /admin, others → /dashboard
-        const path = await getPostLoginPath();
+        // Redirect to dashboard (or URL redirectTo from Google callback), never to landing
+        const path = getAllowedRedirectPath(urlRedirectTo) ?? (await getPostLoginPath());
         const timestamp = Date.now();
         window.location.replace(`${path}?_t=${timestamp}`);
         return;
@@ -681,10 +687,8 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
             console.log("[OTP] Waiting for subscription cache to update...");
             await new Promise(resolve => setTimeout(resolve, 2000));
             
-            // Verify subscription is available before redirecting
-            // This ensures the household subscription is properly inherited
-            // Redirect after completing invitation (super_admin → /admin, others → /dashboard)
-            const path = await getPostLoginPath();
+            // Redirect after completing invitation (or use redirectTo from URL)
+            const path = getAllowedRedirectPath(urlRedirectTo) ?? (await getPostLoginPath());
             window.location.href = path;
             return;
           } else {
@@ -718,7 +722,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
             const linkData = await linkResponse.json();
             if (linkData.success) {
               console.log("[OTP] Subscription linked successfully");
-              const path = await getPostLoginPath();
+              const path = getAllowedRedirectPath(urlRedirectTo) ?? (await getPostLoginPath());
               router.push(path);
               return;
             }
@@ -740,8 +744,8 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         sessionStorage.setItem("onboarding-temp-data", JSON.stringify(onboardingData));
       }
 
-      // Redirect (super_admin → /admin, others → /dashboard) - onboarding dialog will handle plan selection and trial start
-      const path = await getPostLoginPath();
+      // Redirect to dashboard (or redirectTo from URL), never to landing
+      const path = getAllowedRedirectPath(urlRedirectTo) ?? (await getPostLoginPath());
       router.push(path);
     } catch (error) {
       console.error("Error verifying OTP:", error);

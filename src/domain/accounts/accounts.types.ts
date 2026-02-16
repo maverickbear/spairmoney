@@ -17,10 +17,19 @@ export interface BaseAccount {
   isDefault?: boolean;
 }
 
+/** Per-owner info for display (avatar, name) */
+export interface AccountOwnerInfo {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
 export interface AccountWithBalance extends BaseAccount {
   balance: number;
   householdName?: string | null;
   ownerIds?: string[];
+  /** Per-owner details for UI (avatar, name); when present, use for multiple avatars side-by-side */
+  owners?: AccountOwnerInfo[];
 }
 
 export interface AccountBalance {

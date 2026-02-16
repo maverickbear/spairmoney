@@ -33,6 +33,7 @@ export class TransactionsMapper {
       receiptUrl: row.receipt_url,
       userId: row.user_id,
       householdId: row.household_id,
+      competencyMonth: row.competency_month ?? undefined,
     };
   }
 
@@ -62,6 +63,7 @@ export class TransactionsMapper {
       receipt_url: domain.receiptUrl ?? null,
       user_id: domain.userId ?? null,
       household_id: domain.householdId ?? null,
+      competency_month: domain.competencyMonth ?? null,
     };
   }
 

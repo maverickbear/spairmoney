@@ -24,6 +24,7 @@ import type { GoalWithCalculations } from "@/src/domain/goals/goals.types";
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
 import type { Account } from "@/src/domain/accounts/accounts.types";
 import type { ReportPeriod, NetWorthData, CashFlowData, TrendData } from "@/src/domain/reports/reports.types";
+import { getEffectiveMonth } from "@/src/application/shared/effective-month";
 import { DebtAnalysisSection } from "@/components/reports/debt-analysis-section";
 import { GoalsProgressSection } from "@/components/reports/goals-progress-section";
 import { AccountBalancesSection } from "@/components/reports/account-balances-section";
@@ -75,31 +76,22 @@ export function ReportsContent({
 }: ReportsContentProps) {
   const currentMonth = startOfMonth(now);
   const lastMonth = subMonths(now, 1);
-  const lastMonthStart = startOfMonth(lastMonth);
-  const lastMonthEnd = endOfMonth(lastMonth);
+  const lastMonthKey = format(lastMonth, "yyyy-MM");
 
-  // Get last month transactions for comparison
+  // Get last month transactions for comparison (by effective month)
   const lastMonthTransactions = historicalTransactions.filter(
-    (tx) => {
-      const txDate = new Date(tx.date);
-      return txDate >= lastMonthStart && txDate <= lastMonthEnd;
-    }
+    (tx) => getEffectiveMonth(tx) === lastMonthKey
   );
 
-  // Process monthly data for income/expenses chart based on selected period
-  // For periods longer than 6 months, show all months; otherwise show the period
+  // Process monthly data for income/expenses chart based on selected period (by effective month)
   const months = eachMonthOfInterval({
     start: startOfMonth(dateRange.startDate),
     end: endOfMonth(dateRange.endDate),
   });
 
   const monthlyData = months.map((month) => {
-    const monthStart = startOfMonth(month);
-    const monthEnd = endOfMonth(month);
-    const monthTransactions = historicalTransactions.filter((tx) => {
-      const txDate = new Date(tx.date);
-      return txDate >= monthStart && txDate <= monthEnd;
-    });
+    const monthKey = format(month, "yyyy-MM");
+    const monthTransactions = historicalTransactions.filter((tx) => getEffectiveMonth(tx) === monthKey);
 
     const income = monthTransactions
       .filter((t) => t.type === "income")

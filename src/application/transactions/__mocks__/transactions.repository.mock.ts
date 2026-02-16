@@ -10,6 +10,7 @@ export interface MockTransactionsRepository {
   findById: jest.Mock;
   count: jest.Mock;
   create: jest.Mock;
+  createMany: jest.Mock;
   update: jest.Mock;
   delete: jest.Mock;
   createTransferWithLimit: jest.Mock;
@@ -21,6 +22,7 @@ export function createMockTransactionsRepository(): MockTransactionsRepository {
     findById: jest.fn(),
     count: jest.fn(),
     create: jest.fn(),
+    createMany: jest.fn().mockResolvedValue([]),
     update: jest.fn(),
     delete: jest.fn(),
     createTransferWithLimit: jest.fn(),
@@ -50,6 +52,6 @@ export const mockTransactionRow: TransactionRow = {
   user_id: "test-user-id",
   household_id: "test-household-id",
   deleted_at: null,
-
+  competency_month: null,
 };
 

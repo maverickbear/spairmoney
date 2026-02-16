@@ -29,8 +29,13 @@ export async function GET(request: NextRequest) {
       isRecurring?: boolean;
       page?: number;
       limit?: number;
+      forEffectiveMonth?: string;
     } = {};
     
+    const forEffectiveMonth = searchParams.get("forEffectiveMonth");
+    if (forEffectiveMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(forEffectiveMonth)) {
+      filters.forEffectiveMonth = forEffectiveMonth;
+    }
     if (searchParams.get("startDate")) {
       filters.startDate = new Date(searchParams.get("startDate")!);
     }

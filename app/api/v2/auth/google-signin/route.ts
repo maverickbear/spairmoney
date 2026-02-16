@@ -15,15 +15,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { redirectTo, flow } = body; // flow: "signin" | "signup"
 
-    // Build callback URL with flow context
+    // Build callback URL with flow context. Default redirect after login is /dashboard (never landing).
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
     const callbackUrl = new URL("/auth/callback", appUrl);
     if (flow) {
       callbackUrl.searchParams.set("flow", flow); // Add flow parameter to callback
     }
-    if (redirectTo) {
-      callbackUrl.searchParams.set("redirectTo", redirectTo);
-    }
+    const finalRedirectTo = redirectTo || "/dashboard";
+    callbackUrl.searchParams.set("redirectTo", finalRedirectTo);
 
     const service = makeAuthService();
     const result = await service.signInWithGoogle(callbackUrl.toString(), flow);

@@ -1,6 +1,6 @@
 "use server";
 import { cookies } from "next/headers";
-import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { makeTransactionsService } from "@/src/application/transactions/transactions.factory";
@@ -87,8 +87,7 @@ async function calculateFinancialHealthInternal(
     const transactionsService = makeTransactionsService();
     const transactionsResult = await transactionsService.getTransactions(
       {
-        startDate: selectedMonth,
-        endDate: selectedMonthEnd,
+        forEffectiveMonth: format(selectedMonth, "yyyy-MM"),
       },
       accessToken,
       refreshToken
@@ -369,9 +368,8 @@ async function calculateFinancialHealthInternal(
       lastMonthTransactions = preFetchedPreviousTransactions;
     } else {
       const transactionsService = makeTransactionsService();
-      const lastMonthEnd = endOfMonth(lastMonth);
       const lastMonthResult = await transactionsService.getTransactions(
-        { startDate: lastMonth, endDate: lastMonthEnd },
+        { forEffectiveMonth: format(lastMonth, "yyyy-MM") },
         accessToken,
         refreshToken
       );

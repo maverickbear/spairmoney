@@ -10,7 +10,7 @@ import { makeGoalsService } from "../goals/goals.factory";
 // CRITICAL: Use static import to ensure React cache() works correctly
 import { getAccountsForDashboard } from "../accounts/get-dashboard-accounts";
 import { calculateFinancialHealth } from "../shared/financial-health";
-import { startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, format } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, format, subDays } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { cacheLife, cacheTag } from 'next/cache';
@@ -25,6 +25,7 @@ import type {
   TrendData,
 } from "@/src/domain/reports/reports.types";
 import type { Transaction, TransactionWithRelations } from "@/src/domain/transactions/transactions.types";
+import { getEffectiveMonth } from "@/src/application/shared/effective-month";
 import type { Budget } from "@/src/domain/budgets/budgets.types";
 import type { DebtWithCalculations } from "@/src/domain/debts/debts.types";
 import type { GoalWithCalculations } from "@/src/domain/goals/goals.types";
@@ -174,12 +175,8 @@ function calculateCashFlowStandalone(
   });
 
   const monthly: CashFlowMonthlyData[] = months.map((month) => {
-    const monthStart = startOfMonth(month);
-    const monthEnd = endOfMonth(month);
-    const monthTransactions = transactions.filter((tx) => {
-      const txDate = new Date(tx.date);
-      return txDate >= monthStart && txDate <= monthEnd;
-    });
+    const monthKey = format(month, "yyyy-MM");
+    const monthTransactions = transactions.filter((tx) => getEffectiveMonth(tx) === monthKey);
 
     const income = monthTransactions
       .filter((t) => t.type === "income")
@@ -214,13 +211,8 @@ function calculateTrendsStandalone(
   currentMonth: Date
 ): TrendData[] {
   const lastMonth = subMonths(currentMonth, 1);
-  const lastMonthStart = startOfMonth(lastMonth);
-  const lastMonthEnd = endOfMonth(lastMonth);
-
-  const lastMonthTransactions = historicalTransactions.filter((tx) => {
-    const txDate = new Date(tx.date);
-    return txDate >= lastMonthStart && txDate <= lastMonthEnd;
-  });
+  const lastMonthKey = format(lastMonth, "yyyy-MM");
+  const lastMonthTransactions = historicalTransactions.filter((tx) => getEffectiveMonth(tx) === lastMonthKey);
 
   const currentIncome = currentMonthTransactions
     .filter((t) => t.type === "income")
@@ -316,7 +308,7 @@ async function getReportsDataCached(
     ] = await Promise.all([
       transactionsService
         .getTransactions(
-          { startDate: currentMonth, endDate: currentMonthEnd },
+          { forEffectiveMonth: format(currentMonth, "yyyy-MM") },
           accessToken,
           refreshToken
         )
@@ -326,7 +318,7 @@ async function getReportsDataCached(
         }),
       transactionsService
         .getTransactions(
-          { startDate: dateRange.startDate, endDate: dateRange.endDate },
+          { startDate: subDays(dateRange.startDate, 5), endDate: dateRange.endDate },
           accessToken,
           refreshToken
         )

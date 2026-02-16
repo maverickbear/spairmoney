@@ -450,13 +450,13 @@ export class AccountsRepository implements IAccountsRepository {
   }
 
   /**
-   * Get user names by IDs
+   * Get user names and avatar URLs by IDs
    */
   async getUserNamesByIds(
     userIds: string[],
     accessToken?: string,
     refreshToken?: string
-  ): Promise<Array<{ id: string; name: string | null }>> {
+  ): Promise<Array<{ id: string; name: string | null; avatarUrl: string | null }>> {
     if (userIds.length === 0) {
       return [];
     }
@@ -465,7 +465,7 @@ export class AccountsRepository implements IAccountsRepository {
 
     const { data: users, error } = await supabase
       .from("users")
-      .select("id, name")
+      .select("id, name, avatar_url")
       .in("id", userIds);
 
     if (error) {
@@ -473,7 +473,11 @@ export class AccountsRepository implements IAccountsRepository {
       return [];
     }
 
-    return (users || []) as Array<{ id: string; name: string | null }>;
+    return (users || []).map((u: { id: string; name: string | null; avatar_url: string | null }) => ({
+      id: u.id,
+      name: u.name,
+      avatarUrl: u.avatar_url ?? null,
+    }));
   }
   /**
    * Set default account for a user

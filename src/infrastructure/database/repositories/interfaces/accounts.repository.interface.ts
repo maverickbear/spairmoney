@@ -69,7 +69,7 @@ export interface IAccountsRepository {
     userIds: string[],
     accessToken?: string,
     refreshToken?: string
-  ): Promise<Array<{ id: string; name: string | null }>>;
+  ): Promise<Array<{ id: string; name: string | null; avatarUrl: string | null }>>;
   transferTransactions(fromAccountId: string, toAccountId: string): Promise<number>;
   setDefaultAccount(accountId: string, userId: string): Promise<void>;
 }

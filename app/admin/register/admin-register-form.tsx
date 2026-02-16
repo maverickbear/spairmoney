@@ -134,7 +134,7 @@ export function AdminRegisterForm() {
           id="password"
           type="password"
           {...form.register("password")}
-          placeholder="Create a password (12+ chars, upper, lower, number, special)"
+          placeholder="Create a password (8+ chars, upper, lower, number, special)"
           autoComplete="new-password"
         />
         {form.formState.errors.password && (

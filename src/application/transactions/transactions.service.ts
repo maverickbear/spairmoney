@@ -330,6 +330,7 @@ export class TransactionsService {
           tags: '',
           receipt_url: null,
           deleted_at: null,
+          competency_month: null,
         } as TransactionRow;
       }
       
@@ -356,6 +357,7 @@ export class TransactionsService {
         date: transactionDate,
         type: data.type,
         description: encryptedDescription,
+        descriptionSearch: descriptionSearch,
         categoryId: finalCategoryId,
         subcategoryId: finalSubcategoryId,
         isRecurring: data.recurring ?? false,
@@ -363,6 +365,7 @@ export class TransactionsService {
         transferToId: data.type === "transfer" && data.toAccountId ? data.toAccountId : null,
         transferFromId: null, // Will be set below if needed
         householdId,
+        competencyMonth: data.competencyMonth ?? null,
         createdAt: now,
         updatedAt: now,
       });
@@ -474,6 +477,7 @@ export class TransactionsService {
     if (data.toAccountId !== undefined) updateData.transferToId = data.toAccountId || null;
     if (data.transferFromId !== undefined) updateData.transferFromId = data.transferFromId || null;
     if (data.receiptUrl !== undefined) updateData.receiptUrl = data.receiptUrl || null;
+    if (data.competencyMonth !== undefined) updateData.competencyMonth = data.competencyMonth ?? null;
 
     // Merchant information is now stored directly in description or handled separately
     // Use description only
@@ -783,6 +787,7 @@ export class TransactionsService {
       description?: string | null;
       recurring?: boolean;
       expenseType?: "fixed" | "variable" | null;
+      competencyMonth?: string | null;
     }>,
     jobId?: string
   ): Promise<{
@@ -831,62 +836,139 @@ export class TransactionsService {
     let errorCount = 0;
     const errors: Array<{ rowIndex: number; fileName?: string; error: string }> = [];
 
-    // Process transactions in batches to avoid rate limiting
+    // Resolve household and timestamp once for bulk insert
+    const householdId = await getActiveHouseholdId(userId);
+    const now = formatTimestamp(new Date());
+
+    type CreateManyItem = {
+      id: string;
+      date: string;
+      type: 'income' | 'expense' | 'transfer';
+      amount: number;
+      accountId: string;
+      categoryId?: string | null;
+      subcategoryId?: string | null;
+      description?: string | null;
+      descriptionSearch?: string | null;
+      tags?: string | null;
+      isRecurring?: boolean;
+      expenseType?: string | null;
+      transferToId?: string | null;
+      transferFromId?: string | null;
+      userId: string;
+      householdId: string | null;
+      suggestedCategoryId?: string | null;
+      suggestedSubcategoryId?: string | null;
+      receiptUrl?: string | null;
+      competencyMonth?: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+
     for (let i = 0; i < transactions.length; i += TRANSACTION_IMPORT_BATCH_SIZE) {
       const batch = transactions.slice(i, i + TRANSACTION_IMPORT_BATCH_SIZE);
-      
-      // Process batch with a small delay between batches to avoid rate limiting
-      await Promise.allSettled(
-        batch.map(async (tx, index) => {
-          try {
-            // Validate accountId exists before attempting to create transaction
-            if (!tx.accountId) {
-              throw new AppError("Account ID is required", 400);
-            }
+      const createManyPayloads: CreateManyItem[] = [];
+      const transferRows: Array<{ tx: (typeof batch)[0]; globalIndex: number }> = [];
 
-            // Convert date string to Date object if needed
-            const data: TransactionFormData = {
-              date: tx.date instanceof Date ? tx.date : new Date(tx.date),
-              type: tx.type,
-              amount: tx.amount,
-              accountId: tx.accountId,
-              toAccountId: tx.toAccountId,
-              categoryId: tx.categoryId || undefined,
-              subcategoryId: tx.subcategoryId || undefined,
-              description: tx.description || undefined,
-              recurring: tx.recurring ?? false,
-              expenseType: tx.expenseType || undefined,
-            };
-            
-            await this.createTransaction(data, userId);
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            let errorMessage = "Unknown error";
-            
-            if (error instanceof AppError) {
-              errorMessage = error.message;
-            } else if (error instanceof Error) {
-              errorMessage = error.message;
+      for (let j = 0; j < batch.length; j++) {
+        const tx = batch[j];
+        const globalIndex = i + j;
+        if (!tx.accountId) {
+          errorCount++;
+          errors.push({
+            rowIndex: (tx as { rowIndex?: number }).rowIndex ?? globalIndex + 1,
+            fileName: (tx as { fileName?: string }).fileName,
+            error: "Account ID is required",
+          });
+          continue;
+        }
+        const isTransfer = tx.type === "transfer" && !!tx.toAccountId;
+        const date = tx.date instanceof Date ? tx.date : new Date(tx.date);
+        const dateStr = formatDateOnly(date);
+
+        if (isTransfer) {
+          transferRows.push({ tx, globalIndex });
+          continue;
+        }
+
+        createManyPayloads.push({
+          id: crypto.randomUUID(),
+          date: dateStr,
+          type: tx.type,
+          amount: tx.amount,
+          accountId: tx.accountId,
+          categoryId: tx.categoryId ?? null,
+          subcategoryId: tx.subcategoryId ?? null,
+          description: encryptDescription(tx.description ?? null),
+          descriptionSearch: normalizeDescription(tx.description ?? null),
+          tags: "",
+          isRecurring: tx.recurring ?? false,
+          expenseType: tx.type === "expense" ? (tx.expenseType ?? null) : null,
+          transferToId: null,
+          transferFromId: null,
+          userId,
+          householdId,
+          suggestedCategoryId: null,
+          suggestedSubcategoryId: null,
+          receiptUrl: null,
+          competencyMonth: tx.competencyMonth ?? null,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      if (createManyPayloads.length > 0) {
+        try {
+          await this.repository.createMany(createManyPayloads);
+          successCount += createManyPayloads.length;
+        } catch (bulkError) {
+          logger.warn("[TransactionsService] Bulk insert failed, falling back to single creates:", bulkError);
+          for (const payload of createManyPayloads) {
+            try {
+              await this.repository.create({ ...payload, competencyMonth: payload.competencyMonth ?? null });
+              successCount++;
+            } catch (err) {
+              errorCount++;
+              errors.push({
+                rowIndex: i + createManyPayloads.indexOf(payload) + 1,
+                error: err instanceof Error ? err.message : "Unknown error",
+              });
             }
-            
-            const globalIndex = i + index;
-            errors.push({
-              rowIndex: (tx as any).rowIndex || globalIndex + 1,
-              fileName: (tx as any).fileName,
-              error: errorMessage,
-            });
-            logger.error("[TransactionsService] Error importing transaction:", {
-              error,
-              accountId: tx.accountId,
-              rowIndex: (tx as any).rowIndex || globalIndex + 1,
-              fileName: (tx as any).fileName,
-            });
           }
-        })
-      );
+        }
+      }
 
-      // Update progress if jobId provided (simplified: update every N transactions, not every batch)
+      for (const { tx, globalIndex } of transferRows) {
+        try {
+          const data: TransactionFormData = {
+            date: tx.date instanceof Date ? tx.date : new Date(tx.date),
+            type: tx.type,
+            amount: tx.amount,
+            accountId: tx.accountId,
+            toAccountId: tx.toAccountId,
+            categoryId: tx.categoryId || undefined,
+            subcategoryId: tx.subcategoryId || undefined,
+            description: tx.description || undefined,
+            recurring: tx.recurring ?? false,
+            expenseType: tx.expenseType ?? undefined,
+            competencyMonth: tx.competencyMonth ?? undefined,
+          };
+          await this.createTransaction(data, userId);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          const errorMessage =
+            error instanceof AppError ? error.message : error instanceof Error ? error.message : "Unknown error";
+          errors.push({
+            rowIndex: (tx as { rowIndex?: number }).rowIndex ?? globalIndex + 1,
+            fileName: (tx as { fileName?: string }).fileName,
+            error: errorMessage,
+          });
+          logger.error("[TransactionsService] Error importing transfer:", { error, accountId: tx.accountId });
+        }
+      }
+
+      // Update progress if jobId provided
       if (jobId && (i + TRANSACTION_IMPORT_BATCH_SIZE) % TRANSACTION_IMPORT_PROGRESS_INTERVAL === 0) {
         const { progressTracker } = await import("@/src/infrastructure/utils/progress-tracker");
         const processed = Math.min(i + TRANSACTION_IMPORT_BATCH_SIZE, transactions.length);

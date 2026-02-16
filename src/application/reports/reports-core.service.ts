@@ -15,7 +15,7 @@ import { makeTransactionsService } from "../transactions/transactions.factory";
 import { makeBudgetsService } from "../budgets/budgets.factory";
 // CRITICAL: Use static import to ensure React cache() works correctly
 import { getAccountsForDashboard } from "../accounts/get-dashboard-accounts";
-import { startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, format } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, format, subDays } from "date-fns";
 import { logger } from "@/src/infrastructure/utils/logger";
 import type {
   ReportPeriod,
@@ -25,6 +25,7 @@ import type {
   CashFlowMonthlyData,
 } from "@/src/domain/reports/reports.types";
 import type { Transaction, TransactionWithRelations } from "@/src/domain/transactions/transactions.types";
+import { getEffectiveMonth } from "@/src/application/shared/effective-month";
 import type { Account } from "@/src/domain/accounts/accounts.types";
 import type { DebtWithCalculations } from "@/src/domain/debts/debts.types";
 
@@ -161,12 +162,8 @@ function calculateCashFlow(
   });
 
   const monthly: CashFlowMonthlyData[] = months.map((month) => {
-    const monthStart = startOfMonth(month);
-    const monthEnd = endOfMonth(month);
-    const monthTransactions = transactions.filter((tx) => {
-      const txDate = new Date(tx.date);
-      return txDate >= monthStart && txDate <= monthEnd;
-    });
+    const monthKey = format(month, "yyyy-MM");
+    const monthTransactions = transactions.filter((tx) => getEffectiveMonth(tx) === monthKey);
 
     const income = monthTransactions
       .filter((t) => t.type === "income")
@@ -203,9 +200,13 @@ function calculateSpendingByCategory(
   transactions: (Transaction | TransactionWithRelations)[],
   dateRange: { startDate: Date; endDate: Date }
 ): Array<{ category: string; amount: number; count: number; percentage: number }> {
+  const monthsInRange = eachMonthOfInterval({
+    start: startOfMonth(dateRange.startDate),
+    end: endOfMonth(dateRange.endDate),
+  });
+  const monthKeys = new Set(monthsInRange.map((m) => format(m, "yyyy-MM")));
   const filteredTransactions = transactions.filter((tx) => {
-    const txDate = new Date(tx.date);
-    return txDate >= dateRange.startDate && txDate <= dateRange.endDate && tx.type === "expense";
+    return tx.type === "expense" && monthKeys.has(getEffectiveMonth(tx));
   });
 
   // Group by category
@@ -254,10 +255,17 @@ async function calculateBudgetPerformance(
 
     const transactionsService = makeTransactionsService();
     const dateRange = getDateRangeForPeriod(period, new Date());
+    const fetchStart = subDays(dateRange.startDate, 5);
     const result = await transactionsService.getTransactions(
-      { startDate: dateRange.startDate, endDate: dateRange.endDate }
+      { startDate: fetchStart, endDate: dateRange.endDate }
     );
-    const transactions = Array.isArray(result) ? result : (result.transactions || []) as TransactionWithRelations[];
+    const allTransactions = Array.isArray(result) ? result : (result.transactions || []) as TransactionWithRelations[];
+    const monthsInRange = eachMonthOfInterval({
+      start: startOfMonth(dateRange.startDate),
+      end: endOfMonth(dateRange.endDate),
+    });
+    const monthKeys = new Set(monthsInRange.map((m) => format(m, "yyyy-MM")));
+    const transactions = allTransactions.filter((tx) => monthKeys.has(getEffectiveMonth(tx)));
 
     // Calculate actual spending per budget
     const budgetPerformance = budgets.map((budget) => {
@@ -306,6 +314,7 @@ export class ReportsCoreService {
 
   /**
    * Get Cash Flow Report
+   * Fetches with a slightly earlier start so end-of-month salary (e.g. Dec 30) with competency_month in range is included.
    */
   async getCashFlow(
     userId: string,
@@ -313,8 +322,9 @@ export class ReportsCoreService {
   ): Promise<CashFlowData> {
     const transactionsService = makeTransactionsService();
     const dateRange = getDateRangeForPeriod(period, new Date());
+    const fetchStart = subDays(dateRange.startDate, 5);
     const result = await transactionsService.getTransactions(
-      { startDate: dateRange.startDate, endDate: dateRange.endDate }
+      { startDate: fetchStart, endDate: dateRange.endDate }
     );
     const transactions = Array.isArray(result) ? result : (result.transactions || []);
     return calculateCashFlow(transactions as TransactionWithRelations[], dateRange);
@@ -322,6 +332,7 @@ export class ReportsCoreService {
 
   /**
    * Get Spending by Category Report
+   * Fetches with a slightly earlier start so transactions with competency_month in range are included.
    */
   async getSpendingByCategory(
     userId: string,
@@ -329,8 +340,9 @@ export class ReportsCoreService {
   ): Promise<Array<{ category: string; amount: number; count: number; percentage: number }>> {
     const transactionsService = makeTransactionsService();
     const dateRange = getDateRangeForPeriod(period, new Date());
+    const fetchStart = subDays(dateRange.startDate, 5);
     const result = await transactionsService.getTransactions(
-      { startDate: dateRange.startDate, endDate: dateRange.endDate }
+      { startDate: fetchStart, endDate: dateRange.endDate }
     );
     const transactions = Array.isArray(result) ? result : (result.transactions || []);
     return calculateSpendingByCategory(transactions as TransactionWithRelations[], dateRange);

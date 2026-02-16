@@ -22,6 +22,7 @@ import {
   parseCSV, 
   parseCSVs, 
   mapCSVToTransactions, 
+  suggestCompetencyMonthForEndOfMonthIncome,
   ColumnMapping, 
   CSVRow, 
   extractUniqueAccountNames, 
@@ -128,6 +129,13 @@ const TRANSACTION_FIELDS: FieldDefinition[] = [
     description: "Destination account for transfer transactions (optional)",
     icon: "➡️",
   },
+  {
+    key: "competencyMonth",
+    label: "Count in month",
+    required: false,
+    description: "Optional YYYY-MM for which month this transaction counts (e.g. salary on Dec 30 → 2025-01)",
+    icon: "📆",
+  },
 ];
 
 export function CsvImportDialog({
@@ -152,6 +160,7 @@ export function CsvImportDialog({
   const [previewRows, setPreviewRows] = useState<any[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isAILoading, setIsAILoading] = useState(false);
+  const [competencyMonthOverrides, setCompetencyMonthOverrides] = useState<Map<string, string>>(new Map());
   const { limits, checking: limitsLoading } = useSubscription();
   const { toast } = useToast();
 
@@ -476,6 +485,40 @@ export function CsvImportDialog({
     saveLearnedMapping(csvValue, type);
   };
 
+  // Suggest competency month for income at end of month (e.g. salary on Dec 30 → count in January)
+  const handleSuggestCompetencyMonth = () => {
+    if (filesData.size === 0 || !mapping.date || !mapping.amount) return;
+    const newOverrides = new Map<string, string>();
+    filesData.forEach((fileData, fileIndex) => {
+      const mapResults = mapCSVToTransactions(
+        fileData.rows,
+        mapping,
+        accounts,
+        categories,
+        accountMapping,
+        defaultAccountId && defaultAccountId !== "__none__" ? defaultAccountId : undefined,
+        Object.keys(transactionTypeMapping).length > 0 ? transactionTypeMapping : undefined
+      );
+      const suggested = suggestCompetencyMonthForEndOfMonthIncome(mapResults);
+      suggested.forEach((r) => {
+        if (r.transaction?.competencyMonth)
+          newOverrides.set(`${fileIndex}-${r.rowIndex}`, r.transaction.competencyMonth);
+      });
+    });
+    setCompetencyMonthOverrides(newOverrides);
+    if (newOverrides.size > 0) {
+      toast({
+        title: "Competency month suggested",
+        description: `Set "Count in month" for ${newOverrides.size} end-of-month income row(s). Review and import when ready.`,
+      });
+    } else {
+      toast({
+        title: "No suggestions",
+        description: "No income in the last 5 days of the month found. You can still map a competency month column if your CSV has one.",
+      });
+    }
+  };
+
   // Auto-fill with AI
   const handleAIAutoFill = async () => {
     if (uniqueTransactionTypes.length === 0) return;
@@ -577,8 +620,11 @@ export function CsvImportDialog({
               }
             }
             
+            const key = `${fileIndex}-${result.rowIndex}`;
+            const competencyMonth = competencyMonthOverrides.get(key) ?? result.transaction.competencyMonth;
             allTransactions.push({
               ...result.transaction,
+              competencyMonth: competencyMonth ?? undefined,
               rowIndex: result.rowIndex,
               fileName: fileData.file.name,
             });
@@ -975,8 +1021,22 @@ export function CsvImportDialog({
                   {/* Step 3: Map Columns */}
                   <section className="space-y-4">
                     <div className="space-y-1">
-                      <h3 className="text-lg font-semibold">3. Map CSV Columns</h3>
-                      <p className="text-sm text-muted-foreground">Match CSV columns to transaction fields. Fields marked with * are required.</p>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">3. Map CSV Columns</h3>
+                          <p className="text-sm text-muted-foreground">Match CSV columns to transaction fields. Fields marked with * are required.</p>
+                        </div>
+                        {mapping.date && mapping.amount && filesData.size > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="small"
+                            onClick={handleSuggestCompetencyMonth}
+                          >
+                            Suggest &quot;Count in month&quot; for end-of-month income
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="space-y-5">

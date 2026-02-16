@@ -49,6 +49,14 @@ const SPAIR_SCORE_ARC = {
   ],
 };
 
+/** Gray arc for disabled / no-data state */
+const GRAY_ARC = {
+  width: 0.12,
+  padding: 0.01,
+  cornerRadius: 8,
+  subArcs: [{ limit: 100, color: "#d1d5db" }],
+};
+
 interface SpairScoreFullWidthWidgetProps {
   data: SpairScoreWidgetData | null;
   onOpenDetails: () => void;
@@ -63,6 +71,8 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
   const score = data?.score ?? 0;
   const classification = data?.classification ?? "—";
   const hasData = data != null;
+  /** True when we have real score data to show; false = show gray gauge, "—", no marker */
+  const hasScoreData = hasData && !empty;
 
   const handleViewDetails = () => {
     setInfoOpen(false);
@@ -164,21 +174,21 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                 {mounted ? (
                   <GaugeComponent
                     type="semicircle"
-                    arc={SPAIR_SCORE_ARC}
-                    value={hasData ? score : 0}
+                    arc={hasScoreData ? SPAIR_SCORE_ARC : GRAY_ARC}
+                    value={hasScoreData ? score : 0}
                     minValue={0}
                     maxValue={100}
-                    pointer={{
-                      type: "blob",
-                      elastic: true,
-                      blobOffset: 0.5,
-                      strokeWidth: 2,
-                      strokeColor: "#000",
-                    }}
+                    pointer={{ hide: true }}
                     labels={{
                       valueLabel: {
-                        formatTextValue: (val: number) => (hasData ? String(Math.round(val)) : "—"),
-                        style: { color: "#000", fill: "#000", fontWeight: 800, textShadow: "none", fontSize: "48px" },
+                        formatTextValue: (val: number) => (hasScoreData ? String(Math.round(val)) : "—"),
+                        style: {
+                          color: hasScoreData ? "#000" : "var(--muted-foreground)",
+                          fill: hasScoreData ? "#000" : "var(--muted-foreground)",
+                          fontWeight: 800,
+                          textShadow: "none",
+                          fontSize: "48px",
+                        },
                         effects: { glow: false, textShadow: "none" },
                       },
                       tickLabels: { hideMinMax: true },
@@ -198,8 +208,8 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                     <span className="text-base text-muted-foreground">/ 100</span>
                   </div>
                 )}
-                <p className={cn("text-sm font-medium mt-0.5", !hasData ? "text-muted-foreground" : "text-foreground")}>
-                  {!hasData ? "No data" : classification}
+                <p className={cn("text-sm font-medium mt-0.5", !hasScoreData ? "text-muted-foreground" : "text-foreground")}>
+                  {!hasScoreData ? "No data" : classification}
                 </p>
               </div>
             </div>

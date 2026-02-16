@@ -33,10 +33,10 @@ export function WidgetEmptyState({
         </div>
       )}
       <h3 className="text-sm font-semibold mb-1">{title}</h3>
-      <p className="text-xs text-muted-foreground mb-4 max-w-sm">{description}</p>
-      <div className="flex flex-col gap-2 w-full">
+      <p className="text-sm text-muted-foreground mb-4 max-w-sm">{description}</p>
+      <div className="flex flex-col gap-2 w-full justify-start items-center">
         {primaryAction && (
-          <Button asChild size="small" variant="outline" className="w-full">
+          <Button asChild size="small" variant="outline" className="w-fit">
             <Link href={primaryAction.href}>{primaryAction.label}</Link>
           </Button>
         )}

@@ -284,6 +284,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
           description: transaction.description || "",
           recurring: transaction.isRecurring ?? false,
           recurringFrequency: extendedTransaction.recurringFrequency as TransactionFormData['recurringFrequency'] | undefined || (transaction.isRecurring ? "monthly" : undefined),
+          competencyMonth: (transaction as Transaction & { competencyMonth?: string | null }).competencyMonth ?? undefined,
         };
         
         // Only include expenseType if type is expense and it has a value
@@ -812,6 +813,9 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
         // If expense but expenseType is null/undefined, remove it
         delete payload.expenseType;
       }
+      if (payload.competencyMonth === "" || payload.competencyMonth === null) {
+        delete payload.competencyMonth;
+      }
 
       console.log("[TransactionForm] Sending request", { url, method, payload, selectedCategoryId });
 
@@ -1080,6 +1084,29 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                 required
               />
             </div>
+
+            {/* Count in month (competency month) - for income/expense only */}
+            {form.watch("type") !== "transfer" && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Count in month <span className="text-xs">(optional)</span>
+                </label>
+                <Input
+                  size="medium"
+                  placeholder="YYYY-MM (e.g. 2025-01)"
+                  {...form.register("competencyMonth")}
+                  className="font-mono"
+                />
+                {form.formState.errors.competencyMonth && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.competencyMonth.message}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Use when the transaction date and the month it should count for differ (e.g. salary on Dec 30 → 2025-01).
+                </p>
+              </div>
+            )}
 
             {/* Transfer Account Fields */}
             {form.watch("type") === "transfer" && (() => {

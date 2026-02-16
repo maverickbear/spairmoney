@@ -36,15 +36,43 @@ export interface ITransactionsRepository {
     categoryId: string | null;
     subcategoryId: string | null;
     description: string | null;
+    descriptionSearch?: string | null;
     isRecurring: boolean;
     expenseType: string | null;
     transferToId: string | null;
     transferFromId: string | null;
     userId: string;
     householdId: string | null;
+    competencyMonth?: string | null;
     createdAt: string;
     updatedAt: string;
   }): Promise<TransactionRow>;
+  createMany(
+    items: Array<{
+      id: string;
+      date: string;
+      type: 'income' | 'expense' | 'transfer';
+      amount: number;
+      accountId: string;
+      categoryId?: string | null;
+      subcategoryId?: string | null;
+      description?: string | null;
+      descriptionSearch?: string | null;
+      tags?: string | null;
+      isRecurring?: boolean;
+      expenseType?: string | null;
+      transferToId?: string | null;
+      transferFromId?: string | null;
+      userId: string;
+      householdId: string | null;
+      suggestedCategoryId?: string | null;
+      suggestedSubcategoryId?: string | null;
+      receiptUrl?: string | null;
+      competencyMonth?: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>
+  ): Promise<TransactionRow[]>;
   update(
     id: string,
     data: Partial<{
@@ -61,6 +89,7 @@ export interface ITransactionsRepository {
       transferFromId: string | null;
       updatedAt: string;
       receiptUrl: string | null;
+      competencyMonth: string | null;
     }>
   ): Promise<TransactionRow>;
   delete(id: string): Promise<void>;

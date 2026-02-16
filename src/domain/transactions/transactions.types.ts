@@ -30,6 +30,8 @@ export interface BaseTransaction {
   receiptUrl?: string | null;
   userId?: string | null;
   householdId?: string | null;
+  /** Optional YYYY-MM: month this transaction counts toward for analytics (e.g. salary on Dec 30 → "2025-01"). */
+  competencyMonth?: string | null;
 }
 
 export interface TransactionWithRelations extends BaseTransaction {
@@ -71,6 +73,8 @@ export interface TransactionFilters {
   isRecurring?: boolean;
   page?: number;
   limit?: number;
+  /** When set (YYYY-MM), return all transactions that count in this month (date in range or competencyMonth = this). */
+  forEffectiveMonth?: string;
 }
 
 export interface TransactionQueryResult {
@@ -105,6 +109,7 @@ export interface Transaction extends Omit<BaseTransaction, 'date' | 'type'> {
   date: string; // Override to match client-side (string instead of Date)
   type: string; // Override to match client-side (string instead of union)
   expenseType?: "fixed" | "variable" | null;
+  competencyMonth?: string | null;
   account?: { id: string; name: string } | null;
   category?: { id: string; name: string } | null;
   subcategory?: { id: string; name: string } | null;

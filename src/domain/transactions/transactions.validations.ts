@@ -14,6 +14,17 @@ export const recurringFrequencyEnum = z.enum([
 
 export type RecurringFrequency = z.infer<typeof recurringFrequencyEnum>;
 
+/** YYYY-MM format for competency month (e.g. "2025-01") */
+export const competencyMonthSchema = z
+  .union([
+    z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Competency month must be YYYY-MM (e.g. 2025-01)"),
+    z.literal("").transform(() => undefined),
+    z.undefined(),
+    z.null(),
+  ])
+  .optional()
+  .nullable();
+
 // Base schema object (without refinements)
 const transactionSchemaBase = z.object({
   date: z.date(),
@@ -30,6 +41,7 @@ const transactionSchemaBase = z.object({
   recurringFrequency: recurringFrequencyEnum.optional(), // Only required when recurring is true
   expenseType: z.union([z.enum(["fixed", "variable"]), z.null()]).optional().transform((val) => val === null ? undefined : val), // Only for expense transactions, transform null to undefined
   receiptUrl: z.string().url().optional().or(z.literal("").transform(() => undefined)), // Optional receipt URL
+  competencyMonth: competencyMonthSchema,
 });
 
 // Full schema with refinements for creating transactions

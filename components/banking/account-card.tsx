@@ -10,6 +10,12 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getInitials, isValidAvatarUrl } from "@/lib/utils/avatar";
 
+interface AccountOwnerInfo {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
 export interface AccountCardProps {
   account: {
     id: string;
@@ -18,6 +24,7 @@ export interface AccountCardProps {
     balance: number;
     creditLimit?: number | null;
     householdName?: string | null;
+    owners?: AccountOwnerInfo[];
     ownerName?: string | null;
     ownerAvatarUrl?: string | null;
     institutionName?: string | null;
@@ -123,31 +130,42 @@ export function AccountCard({
           </Badge>
           {account.householdName && (
             <div className="flex items-center">
-              <div className="relative flex-shrink-0">
-                {isValidAvatarUrl(account.ownerAvatarUrl) ? (
-                  <>
-                    <img
-                      src={account.ownerAvatarUrl!}
-                      alt={account.ownerName || account.householdName || "Owner"}
-                      className="h-8 w-8 rounded-full object-cover border"
-                      onError={(e) => {
-                        const img = e.currentTarget;
-                        img.style.display = "none";
-                        const initialsContainer = img.nextElementSibling as HTMLElement;
-                        if (initialsContainer) {
-                          initialsContainer.style.display = "flex";
-                        }
-                      }}
-                    />
-                    <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border absolute top-0 left-0">
-                      {getInitials(account.ownerName || account.householdName)}
-                    </div>
-                  </>
-                ) : (
-                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border">
-                    {getInitials(account.ownerName || account.householdName)}
+              <div className="flex items-center -space-x-2 flex-shrink-0">
+                {(account.owners && account.owners.length > 0
+                  ? account.owners
+                  : [
+                      {
+                        id: "",
+                        name: account.ownerName ?? account.householdName,
+                        avatarUrl: account.ownerAvatarUrl ?? null,
+                      },
+                    ]
+                ).map((owner, idx) => (
+                  <div key={owner.id || `owner-${idx}`} className="relative flex-shrink-0">
+                    {isValidAvatarUrl(owner.avatarUrl) ? (
+                      <>
+                        <img
+                          src={owner.avatarUrl!}
+                          alt={owner.name || "Owner"}
+                          className="h-8 w-8 rounded-full object-cover border-2 border-background"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            img.style.display = "none";
+                            const fallback = img.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = "flex";
+                          }}
+                        />
+                        <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border-2 border-background absolute top-0 left-0">
+                          {getInitials(owner.name)}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border-2 border-background">
+                        {getInitials(owner.name)}
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
             </div>
           )}

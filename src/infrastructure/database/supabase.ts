@@ -131,6 +131,7 @@ export interface Database {
           amount: number;
           receipt_url: string | null;
           deleted_at: string | null;
+          competency_month: string | null;
         };
         Insert: Omit<Database['public']['Tables']['transactions']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['transactions']['Insert']>;

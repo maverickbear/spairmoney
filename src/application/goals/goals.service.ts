@@ -15,13 +15,15 @@ import { getActiveHouseholdId } from "@/lib/utils/household";
 import { requireGoalOwnership } from "@/lib/utils/security";
 import { logger } from "@/lib/utils/logger";
 import { calculateProgress } from "@/lib/utils/goals";
-import { startOfMonth, subMonths, eachMonthOfInterval } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, subDays, eachMonthOfInterval, format } from "date-fns";
 import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
 import { AppError } from "../shared/app-error";
 import { GoalPlannedPaymentsService } from "../planned-payments/goal-planned-payments.service";
 // CRITICAL: Use static import to ensure React cache() works correctly
 import { getAccountsForDashboard } from "../accounts/get-dashboard-accounts";
 import { getIncomeBasisForGoals } from "./get-income-basis";
+import { makeTransactionsService } from "../transactions/transactions.factory";
+import { getEffectiveMonth } from "../shared/effective-month";
 
 export class GoalsService {
   private goalPlannedPaymentsService: GoalPlannedPaymentsService;
@@ -56,58 +58,42 @@ export class GoalsService {
       return expectedIncome;
     }
 
-    const supabase = await createServerClient(accessToken, refreshToken);
     const now = new Date();
     const currentMonth = startOfMonth(now);
-    
-    // Get last 3 months plus current month
-    // Note: eachMonthOfInterval includes both start and end, so this gives us 4 months total
-    // (3 months before + current month). We calculate the average of all months with transactions.
     const months = eachMonthOfInterval({
       start: subMonths(currentMonth, 3),
       end: currentMonth,
     });
+    const monthKeys = new Set(months.map((m) => format(m, "yyyy-MM")));
 
     logger.log(
       `[GoalsService] Calculating income basis: analyzing ${months.length} months ` +
       `(from ${months[0]?.toISOString().substring(0, 7)} to ${months[months.length - 1]?.toISOString().substring(0, 7)}) ` +
-      `and averaging monthly income`
+      `and averaging monthly income (by effective month)`
     );
 
-    const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
-
-    const monthlyIncomes = await Promise.all(
-      months.map(async (month) => {
-        const monthStart = startOfMonth(month);
-        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0, 23, 59, 59);
-
-        const { data: transactions } = await supabase
-          .from("transactions")
-          .select("amount")
-          .eq("type", "income")
-          .gte("date", formatDateStart(monthStart))
-          .lte("date", formatDateEnd(monthEnd));
-
-        if (!transactions) return 0;
-
-        const decryptedTransactions = decryptTransactionsBatch(transactions);
-        const monthIncome = decryptedTransactions.reduce((sum: number, tx: { amount: number | string | null }) => {
-          const amount = getTransactionAmount(tx.amount) || 0;
-          return sum + amount;
-        }, 0);
-        
-        logger.debug(
-          `[GoalsService] Month ${monthStart.toISOString().substring(0, 7)}: ` +
-          `${transactions.length} transaction(s), total income: ${monthIncome}`
-        );
-        
-        return monthIncome;
-      })
+    const transactionsService = makeTransactionsService();
+    const fetchStart = subDays(months[0]!, 5);
+    const fetchEnd = endOfMonth(currentMonth);
+    const result = await transactionsService.getTransactions(
+      { startDate: fetchStart, endDate: fetchEnd, type: "income" },
+      accessToken,
+      refreshToken
     );
+    const transactions = Array.isArray(result) ? result : result.transactions || [];
+
+    const incomeByMonth = new Map<string, number>();
+    for (const tx of transactions) {
+      const monthKey = getEffectiveMonth(tx);
+      if (!monthKeys.has(monthKey)) continue;
+      const amount = Math.abs(Number(tx.amount) || 0);
+      incomeByMonth.set(monthKey, (incomeByMonth.get(monthKey) ?? 0) + amount);
+    }
+    const monthlyIncomes = months.map((m) => incomeByMonth.get(format(m, "yyyy-MM")) ?? 0);
 
     // Calculate average of all months with transactions
     const totalIncome = monthlyIncomes.reduce((sum, income) => sum + income, 0);
-    const monthsWithData = monthlyIncomes.filter(income => income > 0).length;
+    const monthsWithData = monthlyIncomes.filter((income) => income > 0).length;
     const averageIncome = monthlyIncomes.length > 0 ? totalIncome / monthlyIncomes.length : 0;
 
     logger.log(
@@ -573,50 +559,39 @@ export class GoalsService {
   }
 
   /**
-   * Calculate monthly expenses from last 3 months of expense transactions
+   * Calculate monthly expenses from last 3 months of expense transactions (by effective month).
    */
   async calculateMonthlyExpenses(
     accessToken?: string,
     refreshToken?: string
   ): Promise<number> {
-    const supabase = await createServerClient(accessToken, refreshToken);
     const now = new Date();
     const currentMonth = startOfMonth(now);
-    
-    // Get last 3 months
     const months = eachMonthOfInterval({
       start: subMonths(currentMonth, 3),
       end: currentMonth,
     });
+    const monthKeys = new Set(months.map((m) => format(m, "yyyy-MM")));
 
-    const { decryptTransactionsBatch } = await import("@/lib/utils/transaction-encryption");
-
-    const monthlyExpenses = await Promise.all(
-      months.map(async (month) => {
-        const monthStart = startOfMonth(month);
-        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0, 23, 59, 59);
-
-        const { data: transactions } = await supabase
-          .from("transactions")
-          .select("amount")
-          .eq("type", "expense")
-          .gte("date", formatDateStart(monthStart))
-          .lte("date", formatDateEnd(monthEnd));
-
-        if (!transactions) return 0;
-
-        const decryptedTransactions = decryptTransactionsBatch(transactions);
-        const monthExpenses = decryptedTransactions.reduce((sum: number, tx: { amount: number | string | null }) => {
-          const amount = getTransactionAmount(tx.amount) || 0;
-          return sum + Math.abs(amount); // Ensure expenses are positive
-        }, 0);
-        
-        return monthExpenses;
-      })
+    const transactionsService = makeTransactionsService();
+    const fetchStart = subDays(months[0]!, 5);
+    const fetchEnd = endOfMonth(currentMonth);
+    const result = await transactionsService.getTransactions(
+      { startDate: fetchStart, endDate: fetchEnd, type: "expense" },
+      accessToken,
+      refreshToken
     );
+    const transactions = Array.isArray(result) ? result : result.transactions || [];
 
-    // Calculate average
-    const totalExpenses = monthlyExpenses.reduce((sum, expenses) => sum + expenses, 0);
+    const expensesByMonth = new Map<string, number>();
+    for (const tx of transactions) {
+      const monthKey = getEffectiveMonth(tx);
+      if (!monthKeys.has(monthKey)) continue;
+      const amount = Math.abs(Number(tx.amount) || 0);
+      expensesByMonth.set(monthKey, (expensesByMonth.get(monthKey) ?? 0) + amount);
+    }
+    const monthlyExpenses = months.map((m) => expensesByMonth.get(format(m, "yyyy-MM")) ?? 0);
+    const totalExpenses = monthlyExpenses.reduce((sum, e) => sum + e, 0);
     return monthlyExpenses.length > 0 ? totalExpenses / monthlyExpenses.length : 0;
   }
 

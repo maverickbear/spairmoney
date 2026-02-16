@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Save } from "lucide-react";
@@ -264,16 +265,16 @@ export function ExpectedIncomeEditDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Income</DialogTitle>
-        </DialogHeader>
-        <div className="px-6 pt-4 pb-4 space-y-4">
-          <p className="text-sm text-muted-foreground">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-[483px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0 text-left">
+          <SheetTitle className="text-xl font-semibold">Income</SheetTitle>
+          <SheetDescription className="mt-1.5 text-sm text-muted-foreground">
             Used to compare your spending with what you expect to earn this month. Enter each
             member&apos;s annual income; the total is used for the household.
-          </p>
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -369,6 +370,9 @@ export function ExpectedIncomeEditDialog({
                     </div>
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground pt-1">
+                  This is an approximate calculation and does not include other deductions (e.g. benefits, pension, other withholdings).
+                </p>
               </div>
 
               {taxDetail && (
@@ -401,7 +405,7 @@ export function ExpectedIncomeEditDialog({
             </div>
           )}
         </div>
-        <DialogFooter>
+        <SheetFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
@@ -426,8 +430,8 @@ export function ExpectedIncomeEditDialog({
               </>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -2,7 +2,8 @@
 
 import { SubscriptionsWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
-import { ChevronRight, RefreshCw, Music, MonitorPlay, MessageSquare, Zap } from "lucide-react";
+import { WidgetEmptyState } from "./widget-empty-state";
+import { ChevronRight, RefreshCw, Music, MonitorPlay, MessageSquare, Zap, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/common/money";
@@ -14,6 +15,22 @@ interface SubscriptionsWidgetProps {
 
 export function SubscriptionsWidget({ data, className }: SubscriptionsWidgetProps) {
   if (!data) return null;
+
+  if (data.items.length === 0) {
+    return (
+      <WidgetCard title="Subscriptions" className={className}>
+        <WidgetEmptyState
+          title="Track subscriptions"
+          description="See your recurring costs in one place"
+          primaryAction={{
+            label: "Go to Subscriptions",
+            href: "/subscriptions",
+          }}
+          icon={CreditCard}
+        />
+      </WidgetCard>
+    );
+  }
 
   const SeeAllLink = () => (
     <Link 
@@ -36,12 +53,7 @@ export function SubscriptionsWidget({ data, className }: SubscriptionsWidgetProp
              <span className="text-2xl font-bold">{formatMoney(data.totalMonthly)}</span>
         </div>
 
-        {data.items.length === 0 ? (
-          <div className="py-4 text-center text-sm text-muted-foreground">
-            No active subscriptions found.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
             {data.items.map((item) => (
               <Link
                 key={item.id}
@@ -62,8 +74,7 @@ export function SubscriptionsWidget({ data, className }: SubscriptionsWidgetProp
                 <span className="text-sm font-semibold">{formatMoney(item.amount)}</span>
               </Link>
             ))}
-          </div>
-        )}
+        </div>
       </div>
     </WidgetCard>
   );

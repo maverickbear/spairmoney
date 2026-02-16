@@ -16,6 +16,7 @@ interface ImportRequest {
     description?: string | null;
     recurring?: boolean;
     expenseType?: "fixed" | "variable" | null;
+    competencyMonth?: string | null;
     rowIndex?: number;
     fileName?: string;
   }>;

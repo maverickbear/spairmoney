@@ -32,6 +32,7 @@ export interface TransactionRow {
   tags: string | null;
   receipt_url: string | null;
   deleted_at: string | null;
+  competency_month: string | null;
 }
 
 export interface TransactionFilters {
@@ -44,6 +45,8 @@ export interface TransactionFilters {
   isRecurring?: boolean;
   page?: number;
   limit?: number;
+  /** When set (YYYY-MM), return transactions that count in this month (date in month or competency_month = this). */
+  forEffectiveMonth?: string;
 }
 
 export class TransactionsRepository implements ITransactionsRepository {
@@ -59,19 +62,29 @@ export class TransactionsRepository implements ITransactionsRepository {
 
     let query = supabase
       .from("transactions")
-      .select("id, date, amount, type, description, category_id, subcategory_id, account_id, is_recurring, created_at, updated_at, transfer_to_id, transfer_from_id, tags, suggested_category_id, suggested_subcategory_id, expense_type, user_id, household_id, receipt_url, deleted_at, description_search")
+      .select("id, date, amount, type, description, category_id, subcategory_id, account_id, is_recurring, created_at, updated_at, transfer_to_id, transfer_from_id, tags, suggested_category_id, suggested_subcategory_id, expense_type, user_id, household_id, receipt_url, deleted_at, description_search, competency_month")
       .is("deleted_at", null) // Exclude soft-deleted records
       .order("date", { ascending: false });
 
-    // Apply filters
-    if (filters?.startDate) {
-      const startDateStr = filters.startDate.toISOString().split('T')[0];
-      query = query.gte("date", startDateStr);
-    }
-
-    if (filters?.endDate) {
-      const endDateStr = filters.endDate.toISOString().split('T')[0];
-      query = query.lte("date", endDateStr);
+    // Apply filters: forEffectiveMonth takes precedence over startDate/endDate for "month" semantics
+    if (filters?.forEffectiveMonth) {
+      const [y, m] = filters.forEffectiveMonth.split("-").map(Number);
+      const monthStart = new Date(y, m - 1, 1);
+      const monthEnd = new Date(y, m, 0);
+      const monthStartStr = monthStart.toISOString().split("T")[0];
+      const monthEndStr = monthEnd.toISOString().split("T")[0];
+      query = query.or(
+        `and(date.gte.${monthStartStr},date.lte.${monthEndStr},competency_month.is.null),competency_month.eq.${filters.forEffectiveMonth}`
+      );
+    } else {
+      if (filters?.startDate) {
+        const startDateStr = filters.startDate.toISOString().split("T")[0];
+        query = query.gte("date", startDateStr);
+      }
+      if (filters?.endDate) {
+        const endDateStr = filters.endDate.toISOString().split("T")[0];
+        query = query.lte("date", endDateStr);
+      }
     }
 
     if (filters?.categoryId) {
@@ -135,18 +148,28 @@ export class TransactionsRepository implements ITransactionsRepository {
 
     let query = supabase
       .from("transactions")
-      .select("*", { count: 'exact', head: true })
+      .select("*", { count: "exact", head: true })
       .is("deleted_at", null); // Exclude soft-deleted records
 
     // Apply same filters as findAll
-    if (filters?.startDate) {
-      const startDateStr = filters.startDate.toISOString().split('T')[0];
-      query = query.gte("date", startDateStr);
-    }
-
-    if (filters?.endDate) {
-      const endDateStr = filters.endDate.toISOString().split('T')[0];
-      query = query.lte("date", endDateStr);
+    if (filters?.forEffectiveMonth) {
+      const [y, m] = filters.forEffectiveMonth.split("-").map(Number);
+      const monthStart = new Date(y, m - 1, 1);
+      const monthEnd = new Date(y, m, 0);
+      const monthStartStr = monthStart.toISOString().split("T")[0];
+      const monthEndStr = monthEnd.toISOString().split("T")[0];
+      query = query.or(
+        `and(date.gte.${monthStartStr},date.lte.${monthEndStr},competency_month.is.null),competency_month.eq.${filters.forEffectiveMonth}`
+      );
+    } else {
+      if (filters?.startDate) {
+        const startDateStr = filters.startDate.toISOString().split("T")[0];
+        query = query.gte("date", startDateStr);
+      }
+      if (filters?.endDate) {
+        const endDateStr = filters.endDate.toISOString().split("T")[0];
+        query = query.lte("date", endDateStr);
+      }
     }
 
     if (filters?.categoryId) {
@@ -270,6 +293,7 @@ export class TransactionsRepository implements ITransactionsRepository {
     suggestedCategoryId?: string | null;
     suggestedSubcategoryId?: string | null;
     receiptUrl?: string | null;
+    competencyMonth?: string | null;
     createdAt: string;
     updatedAt: string;
   }): Promise<TransactionRow> {
@@ -297,6 +321,7 @@ export class TransactionsRepository implements ITransactionsRepository {
         suggested_category_id: data.suggestedCategoryId ?? null,
         suggested_subcategory_id: data.suggestedSubcategoryId ?? null,
         receipt_url: data.receiptUrl ?? null,
+        competency_month: data.competencyMonth ?? null,
         created_at: data.createdAt,
         updated_at: data.updatedAt,
       })
@@ -309,6 +334,79 @@ export class TransactionsRepository implements ITransactionsRepository {
     }
 
     return transaction as TransactionRow;
+  }
+
+  /**
+   * Create multiple transactions in a single round-trip (bulk insert).
+   * Used by CSV import to reduce DB round-trips.
+   */
+  async createMany(
+    items: Array<{
+      id: string;
+      date: string;
+      type: 'income' | 'expense' | 'transfer';
+      amount: number;
+      accountId: string;
+      categoryId?: string | null;
+      subcategoryId?: string | null;
+      description?: string | null;
+      descriptionSearch?: string | null;
+      tags?: string | null;
+      isRecurring?: boolean;
+      expenseType?: string | null;
+      transferToId?: string | null;
+      transferFromId?: string | null;
+      userId: string;
+      householdId: string | null;
+      suggestedCategoryId?: string | null;
+      suggestedSubcategoryId?: string | null;
+      receiptUrl?: string | null;
+      competencyMonth?: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>
+  ): Promise<TransactionRow[]> {
+    if (items.length === 0) {
+      return [];
+    }
+
+    const supabase = await createServerClient();
+    const rows = items.map(data => ({
+      id: data.id,
+      date: data.date,
+      type: data.type,
+      amount: data.amount,
+      account_id: data.accountId,
+      category_id: data.categoryId ?? null,
+      subcategory_id: data.subcategoryId ?? null,
+      description: data.description ?? null,
+      description_search: data.descriptionSearch ?? null,
+      tags: data.tags ?? '',
+      is_recurring: data.isRecurring ?? false,
+      expense_type: data.expenseType ?? null,
+      transfer_to_id: data.transferToId ?? null,
+      transfer_from_id: data.transferFromId ?? null,
+      user_id: data.userId,
+      household_id: data.householdId,
+      suggested_category_id: data.suggestedCategoryId ?? null,
+      suggested_subcategory_id: data.suggestedSubcategoryId ?? null,
+      receipt_url: data.receiptUrl ?? null,
+      competency_month: data.competencyMonth ?? null,
+      created_at: data.createdAt,
+      updated_at: data.updatedAt,
+    }));
+
+    const { data: transactions, error } = await supabase
+      .from("transactions")
+      .insert(rows)
+      .select();
+
+    if (error) {
+      logger.error("[TransactionsRepository] Error bulk creating transactions:", error);
+      throw new Error(`Failed to bulk create transactions: ${error.message}`);
+    }
+
+    return (transactions || []) as TransactionRow[];
   }
 
   /**
@@ -332,6 +430,7 @@ export class TransactionsRepository implements ITransactionsRepository {
       transferFromId: string | null;
       updatedAt: string;
       receiptUrl: string | null;
+      competencyMonth: string | null;
     }>
   ): Promise<TransactionRow> {
     const supabase = await createServerClient();
@@ -353,6 +452,7 @@ export class TransactionsRepository implements ITransactionsRepository {
     if (data.transferFromId !== undefined) updateData.transfer_from_id = data.transferFromId;
     if (data.updatedAt !== undefined) updateData.updated_at = data.updatedAt;
     if (data.receiptUrl !== undefined) updateData.receipt_url = data.receiptUrl;
+    if (data.competencyMonth !== undefined) updateData.competency_month = data.competencyMonth;
     
     const { data: transaction, error } = await supabase
       .from("transactions")
@@ -857,10 +957,10 @@ export class TransactionsRepository implements ITransactionsRepository {
     startDateStr: string,
     endDateStr: string
   ): Promise<Array<{ month: string; income: number; expenses: number }>> {
-    // Load transactions for the date range (only date, amount, type - minimal data)
+    // Load transactions for the date range (date, amount, type, competency_month for effective month)
     const { data: transactions, error } = await supabase
       .from("transactions")
-      .select("date, amount, type")
+      .select("date, amount, type, competency_month")
       .eq("user_id", userId)
       .gte("date", startDateStr)
       .lte("date", endDateStr)
@@ -877,13 +977,17 @@ export class TransactionsRepository implements ITransactionsRepository {
       return [];
     }
 
-    // Group by month and calculate totals
+    // Group by effective month (competency_month ?? month from date)
     const monthlyMap = new Map<string, { income: number; expenses: number }>();
 
     transactions.forEach((tx: any) => {
       const date = new Date(tx.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
+      const dateMonthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const monthKey =
+        tx.competency_month && /^\d{4}-(0[1-9]|1[0-2])$/.test(tx.competency_month)
+          ? tx.competency_month
+          : dateMonthKey;
+
       if (!monthlyMap.has(monthKey)) {
         monthlyMap.set(monthKey, { income: 0, expenses: 0 });
       }
@@ -891,9 +995,9 @@ export class TransactionsRepository implements ITransactionsRepository {
       const monthData = monthlyMap.get(monthKey)!;
       const amount = Number(tx.amount || 0);
 
-      if (tx.type === 'income' && amount > 0) {
+      if (tx.type === "income" && amount > 0) {
         monthData.income += amount;
-      } else if (tx.type === 'expense' && amount < 0) {
+      } else if (tx.type === "expense" && amount < 0) {
         monthData.expenses += Math.abs(amount); // Make positive
       }
     });

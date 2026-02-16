@@ -186,11 +186,11 @@ function getLogoUrl(appUrl?: string): string {
   
   if (!supabaseUrl) {
     // Fallback to hardcoded URL if env var is not set
-    return "https://app.spair.co/storage/v1/object/public/images/logo-primary-lightbg-email.png";
+    return "https://app.spair.co/storage/v1/object/public/images/logo-email.png";
   }
   
   // Construct the public URL for the logo in the images bucket
-  return `${supabaseUrl}/storage/v1/object/public/images/logo-primary-lightbg-email.png`;
+  return `${supabaseUrl}/storage/v1/object/public/images/logo-email.png`;
 }
 
 function getInvitationEmailTemplate(data: {

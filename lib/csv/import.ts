@@ -15,6 +15,8 @@ export interface ColumnMapping {
   type?: string;
   recurring?: string; // "true"/"false" or "yes"/"no"
   expenseType?: string; // "fixed" | "variable"
+  /** Optional: column with YYYY-MM for "count in month" (competency month) */
+  competencyMonth?: string;
 }
 
 export interface AccountMapping {
@@ -97,6 +99,8 @@ interface TransactionInput {
   subcategoryId?: string;
   description?: string;
   recurring?: boolean;
+  /** Optional YYYY-MM: month this transaction counts toward (e.g. salary on Dec 30 → "2025-01") */
+  competencyMonth?: string;
 }
 
 export interface MapResult {
@@ -295,6 +299,13 @@ export function mapCSVToTransactions(
         }
       }
 
+      // Parse optional competency month (YYYY-MM)
+      let competencyMonth: string | undefined;
+      if (mapping.competencyMonth && row[mapping.competencyMonth]) {
+        const val = String(row[mapping.competencyMonth] ?? "").trim();
+        if (/^\d{4}-(0[1-9]|1[0-2])$/.test(val)) competencyMonth = val;
+      }
+
       return {
         rowIndex: index + 1,
         transaction: {
@@ -307,6 +318,7 @@ export function mapCSVToTransactions(
           subcategoryId: subcategory?.id,
           description: description || "",
           recurring: recurring,
+          competencyMonth,
         },
       };
     } catch (error) {
@@ -315,6 +327,37 @@ export function mapCSVToTransactions(
         error: error instanceof Error ? error.message : `Error processing row ${index + 1}`,
       };
     }
+  });
+}
+
+const COMPETENCY_MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/**
+ * Suggest competency month for income transactions at end of month (e.g. 28–31).
+ * Sets competencyMonth to the following month (YYYY-MM) so salary deposited Dec 30 counts in January.
+ * Returns a new array; does not mutate. Only suggests for rows that have a valid transaction and no competencyMonth yet.
+ */
+export function suggestCompetencyMonthForEndOfMonthIncome(
+  results: MapResult[],
+  lastDaysOfMonth = 5
+): MapResult[] {
+  return results.map((r) => {
+    if (r.error || !r.transaction || r.transaction.type !== "income") return r;
+    if (r.transaction.competencyMonth && COMPETENCY_MONTH_REGEX.test(r.transaction.competencyMonth))
+      return r;
+    const d = r.transaction.date instanceof Date ? r.transaction.date : new Date(r.transaction.date);
+    const day = d.getDate();
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const fromDay = Math.max(1, lastDay - lastDaysOfMonth + 1);
+    if (day < fromDay || day > lastDay) return r;
+    const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const y = next.getFullYear();
+    const m = next.getMonth() + 1;
+    const competencyMonth = `${y}-${String(m).padStart(2, "0")}`;
+    return {
+      ...r,
+      transaction: { ...r.transaction, competencyMonth },
+    };
   });
 }
 

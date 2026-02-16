@@ -217,16 +217,16 @@ export class DashboardService {
       goals,
       expectedIncomeResult,
     ] = await Promise.all([
-      // 1. Current Month Transactions
+      // 1. Current Month Transactions (by effective month for competency)
       transactionsService.getTransactions(
-        { startDate: selectedMonth, endDate: selectedMonthEnd, ...transactionFilterBase },
+        { forEffectiveMonth: format(selectedMonth, "yyyy-MM"), ...transactionFilterBase },
         accessToken,
         refreshToken
       ).catch(e => { logger.error("Error pre-fetching current transactions:", e); return { transactions: [], total: 0 }; }),
 
-      // 2. Previous Month Transactions
+      // 2. Previous Month Transactions (by effective month)
       transactionsService.getTransactions(
-        { startDate: previousMonth, endDate: previousMonthEnd, ...transactionFilterBase },
+        { forEffectiveMonth: format(previousMonth, "yyyy-MM"), ...transactionFilterBase },
         accessToken,
         refreshToken
       ).catch(e => { logger.error("Error pre-fetching previous transactions:", e); return { transactions: [], total: 0 }; }),

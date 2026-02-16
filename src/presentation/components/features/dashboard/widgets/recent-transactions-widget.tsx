@@ -2,7 +2,8 @@
 
 import { RecentTransactionsWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
-import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight } from "lucide-react";
+import { WidgetEmptyState } from "./widget-empty-state";
+import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, Receipt } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/common/money";
@@ -14,6 +15,22 @@ interface RecentTransactionsWidgetProps {
 
 export function RecentTransactionsWidget({ data, className }: RecentTransactionsWidgetProps) {
   if (!data) return null;
+
+  if (data.transactions.length === 0) {
+    return (
+      <WidgetCard title="Transactions" className={className}>
+        <WidgetEmptyState
+          title="Add transactions"
+          description="Record income and expenses to track your spending"
+          primaryAction={{
+            label: "Add Transaction",
+            href: "/transactions/new",
+          }}
+          icon={Receipt}
+        />
+      </WidgetCard>
+    );
+  }
 
   const SeeAllLink = () => (
     <Link 

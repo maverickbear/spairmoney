@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, User, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Loader2, AlertCircle, Eye, EyeOff, Check, Circle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
 
@@ -114,6 +114,16 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       name: "",
     },
   });
+
+  const password = form.watch("password") ?? "";
+
+  const passwordRequirements = [
+    { label: "At least 8 characters", met: password.length >= 8 },
+    { label: "One uppercase letter", met: /[A-Z]/.test(password) },
+    { label: "One lowercase letter", met: /[a-z]/.test(password) },
+    { label: "One number", met: /[0-9]/.test(password) },
+    { label: "One special character", met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) },
+  ];
 
   async function onSubmit(data: SignUpFormData) {
     try {
@@ -276,12 +286,17 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
           </div>
           <div className="text-xs text-muted-foreground space-y-1 pt-1">
             <p className="font-medium">Password requirements:</p>
-            <ul className="list-disc list-inside space-y-0.5 ml-2">
-              <li>At least 12 characters</li>
-              <li>One uppercase letter</li>
-              <li>One lowercase letter</li>
-              <li>One number</li>
-              <li>One special character</li>
+            <ul className="space-y-1">
+              {passwordRequirements.map(({ label, met }) => (
+                <li key={label} className="flex items-center gap-2">
+                  {met ? (
+                    <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  ) : (
+                    <Circle className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
+                  )}
+                  <span className={met ? "text-foreground/90" : undefined}>{label}</span>
+                </li>
+              ))}
             </ul>
           </div>
           {form.formState.errors.password && (

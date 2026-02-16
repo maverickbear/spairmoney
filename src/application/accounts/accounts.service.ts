@@ -112,23 +112,28 @@ export class AccountsService {
       if (row.user_id) allOwnerIds.add(row.user_id);
     });
 
-    // Get owner names from repository
+    // Get owner names and avatar URLs from repository
     const owners = await this.repository.getUserNamesByIds(Array.from(allOwnerIds), accessToken, refreshToken);
 
     const householdNamesMap = new Map<string, string>();
+    const ownerDetailsMap = new Map<string, { name: string | null; avatarUrl: string | null }>();
     owners.forEach((owner) => {
       if (owner.id && owner.name) {
         const firstName = owner.name.split(' ')[0];
         householdNamesMap.set(owner.id, firstName);
       }
+      if (owner.id) {
+        ownerDetailsMap.set(owner.id, { name: owner.name ?? null, avatarUrl: owner.avatarUrl ?? null });
+      }
     });
 
-    // Map to domain entities with balances
+    // Map to domain entities with balances (includes owners[] for UI avatars)
     const accountsWithBalance = AccountsMapper.toDomainWithBalance(
       accountRows,
       balances,
       accountOwnersMap,
-      householdNamesMap
+      householdNamesMap,
+      ownerDetailsMap
     );
     
     return accountsWithBalance;

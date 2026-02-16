@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
-  const flow = requestUrl.searchParams.get("flow") as "signin" | "signup" | null; // Get flow from URL params
+  const flow = requestUrl.searchParams.get("flow") as "signin" | "signup" | null;
+  const redirectTo = requestUrl.searchParams.get("redirectTo") || null; // e.g. /dashboard (never land on /)
 
   // Handle OAuth errors (user cancelled, etc.)
   if (error) {
@@ -206,11 +207,13 @@ export async function GET(request: NextRequest) {
         console.warn("[OAUTH-CALLBACK] Failed to sync session:", syncError);
       }
       
-      // Redirect portal admins (admin table or users.role super_admin) → /admin, others → /dashboard
+      // Redirect to dashboard (or admin for super_admin). Use redirectTo from URL only if safe.
+      const allowedPaths = ["/dashboard", "/admin"];
+      const safeRedirectTo = redirectTo && allowedPaths.includes(redirectTo) ? redirectTo : null;
       const { makeAdminService } = await import("@/src/application/admin/admin.factory");
       const adminService = makeAdminService();
       const isPortalAdmin = await adminService.isSuperAdmin(authUser.id);
-      const redirectPath = isPortalAdmin ? "/admin" : "/dashboard";
+      const redirectPath = safeRedirectTo ?? (isPortalAdmin ? "/admin" : "/dashboard");
       const redirectUrl = new URL(redirectPath, requestUrl.origin);
       return NextResponse.redirect(redirectUrl);
     }
@@ -289,15 +292,15 @@ export async function GET(request: NextRequest) {
     console.log(`[OAUTH-CALLBACK] OTP sent successfully to ${userEmail}. Redirecting to OTP verification.`);
 
     // Redirect to OTP verification page with OAuth data
-    // Using unified verify-otp route that detects Google OAuth via oauth_data param
     const otpUrl = new URL("/auth/verify-otp", requestUrl.origin);
     otpUrl.searchParams.set("email", userEmail);
     otpUrl.searchParams.set("oauth_data", encodeURIComponent(JSON.stringify(oauthData)));
-    // Pass isSignup flag so the component knows which OTP type to use
     if (isSignup) {
       otpUrl.searchParams.set("is_signup", "true");
     }
-    
+    if (redirectTo && (redirectTo === "/dashboard" || redirectTo === "/admin")) {
+      otpUrl.searchParams.set("redirectTo", redirectTo);
+    }
     return NextResponse.redirect(otpUrl);
   } catch (error) {
     console.error("[OAUTH-CALLBACK] Unexpected error:", error);

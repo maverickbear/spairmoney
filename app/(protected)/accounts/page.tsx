@@ -35,6 +35,12 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getInitials, isValidAvatarUrl } from "@/lib/utils/avatar";
 
+interface AccountOwnerInfo {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
 interface Account {
   id: string;
   name: string;
@@ -43,7 +49,11 @@ interface Account {
   creditLimit?: number | null;
   householdName?: string | null;
   ownerIds?: string[];
+  /** Per-owner details for avatars (photo or initials); when multiple, show side-by-side */
+  owners?: AccountOwnerInfo[];
+  /** @deprecated Prefer owners[].avatarUrl and owners[].name */
   ownerAvatarUrl?: string | null;
+  /** @deprecated Prefer owners[].name / householdName */
   ownerName?: string | null;
   institutionName?: string | null;
   institutionLogo?: string | null;
@@ -499,33 +509,44 @@ export default function AccountsPage() {
                         <TableCell>
                           {account.householdName ? (
                             <div className="flex items-center gap-2">
-                              <div className="relative flex-shrink-0">
-                                {isValidAvatarUrl(account.ownerAvatarUrl) ? (
-                                  <>
-                                    <img
-                                      src={account.ownerAvatarUrl!}
-                                      alt={account.ownerName || account.householdName || "Owner"}
-                                      className="h-8 w-8 rounded-full object-cover border"
-                                      loading="eager"
-                                      decoding="async"
-                                      onError={(e) => {
-                                        const img = e.currentTarget;
-                                        img.style.display = "none";
-                                        const initialsContainer = img.nextElementSibling as HTMLElement;
-                                        if (initialsContainer) {
-                                          initialsContainer.style.display = "flex";
-                                        }
-                                      }}
-                                    />
-                                    <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border absolute top-0 left-0">
-                                      {getInitials(account.ownerName || account.householdName)}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border">
-                                    {getInitials(account.ownerName || account.householdName)}
+                              <div className="flex items-center -space-x-2 flex-shrink-0">
+                                {(account.owners && account.owners.length > 0
+                                  ? account.owners
+                                  : [
+                                      {
+                                        id: "",
+                                        name: account.ownerName ?? account.householdName,
+                                        avatarUrl: account.ownerAvatarUrl ?? null,
+                                      },
+                                    ]
+                                ).map((owner, idx) => (
+                                  <div key={owner.id || `owner-${idx}`} className="relative flex-shrink-0">
+                                    {isValidAvatarUrl(owner.avatarUrl) ? (
+                                      <>
+                                        <img
+                                          src={owner.avatarUrl!}
+                                          alt={owner.name || "Owner"}
+                                          className="h-8 w-8 rounded-full object-cover border-2 border-background"
+                                          loading="eager"
+                                          decoding="async"
+                                          onError={(e) => {
+                                            const img = e.currentTarget;
+                                            img.style.display = "none";
+                                            const fallback = img.nextElementSibling as HTMLElement;
+                                            if (fallback) fallback.style.display = "flex";
+                                          }}
+                                        />
+                                        <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-xs font-semibold border-2 border-background absolute top-0 left-0">
+                                          {getInitials(owner.name)}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold border-2 border-background">
+                                        {getInitials(owner.name)}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                ))}
                               </div>
                               <span className="text-sm">{account.householdName}</span>
                             </div>

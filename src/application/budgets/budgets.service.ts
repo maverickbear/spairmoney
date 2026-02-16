@@ -18,6 +18,7 @@ import { AppError } from "../shared/app-error";
 import { getCurrentUserId } from "../shared/feature-guard";
 import { makeMembersService } from "../members/members.factory";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { format } from "date-fns";
 
 export class BudgetsService {
   constructor(
@@ -215,46 +216,28 @@ export class BudgetsService {
   }
 
   /**
-   * Fetch transactions optimized for budget calculations
-   * Only selects necessary fields and filters by categoryId IS NOT NULL at DB level
-   * OPTIMIZATION: Uses minimal fields to reduce data transfer
+   * Fetch transactions for budget calculations by effective month.
+   * Uses forEffectiveMonth so end-of-month salary/expenses count in the correct month.
    */
   private async fetchTransactionsForBudgets(
     periodStart: Date,
-    periodEnd: Date,
+    _periodEnd: Date,
     accessToken?: string,
     refreshToken?: string
   ): Promise<Array<{ categoryId: string; subcategoryId: string | null; amount: number }>> {
-    const supabase = await createServerClient(accessToken, refreshToken);
-    
-    const startDateStr = periodStart.toISOString().split('T')[0];
-    const endDateStr = periodEnd.toISOString().split('T')[0];
-
-    // OPTIMIZATION: Only select necessary fields, filter at DB level, and order by date ascending for better index usage
-    const { data: transactionRows, error } = await supabase
-      .from("transactions")
-      .select("category_id, subcategory_id, amount")
-      .eq("type", "expense")
-      .not("category_id", "is", null)
-      .gte("date", startDateStr)
-      .lte("date", endDateStr)
-      .order("date", { ascending: true }); // Use index-friendly ordering
-
-    if (error) {
-      logger.warn("[BudgetsService] Error fetching transactions for budgets:", error);
-      return [];
-    }
-
-    if (!transactionRows || transactionRows.length === 0) {
-      return [];
-    }
-
-    // Map to simplified format (amounts are always numbers now)
-    return transactionRows.map(tx => ({
-      categoryId: tx.category_id as string,
-      subcategoryId: (tx.subcategory_id as string | null) || null,
-      amount: typeof tx.amount === 'number' ? tx.amount : Number(tx.amount) || 0,
-    }));
+    const forEffectiveMonth = format(periodStart, "yyyy-MM");
+    const rows = await this.transactionsRepository.findAll(
+      { forEffectiveMonth, type: "expense" },
+      accessToken,
+      refreshToken
+    );
+    return rows
+      .filter((tx) => tx.category_id != null)
+      .map((tx) => ({
+        categoryId: tx.category_id as string,
+        subcategoryId: (tx.subcategory_id as string | null) || null,
+        amount: typeof tx.amount === "number" ? tx.amount : Number(tx.amount) || 0,
+      }));
   }
 
   /**

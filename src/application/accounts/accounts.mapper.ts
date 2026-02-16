@@ -3,7 +3,7 @@
  * Maps between domain entities and infrastructure DTOs
  */
 
-import { BaseAccount, AccountWithBalance } from "../../domain/accounts/accounts.types";
+import { BaseAccount, AccountWithBalance, AccountOwnerInfo } from "../../domain/accounts/accounts.types";
 import { AccountRow, AccountOwnerRow } from "@/src/infrastructure/database/repositories/accounts.repository";
 
 export class AccountsMapper {
@@ -47,12 +47,14 @@ export class AccountsMapper {
 
   /**
    * Map repository rows to domain entities with balance
+   * @param ownerDetailsMap - optional map of ownerId -> { name, avatarUrl } for building owners[]
    */
   static toDomainWithBalance(
     rows: AccountRow[],
     balances: Map<string, number>,
     ownerIdsMap: Map<string, string[]>,
-    householdNamesMap: Map<string, string>
+    householdNamesMap: Map<string, string>,
+    ownerDetailsMap?: Map<string, { name: string | null; avatarUrl: string | null }>
   ): AccountWithBalance[] {
     return rows.map(row => {
       const ownerIds = ownerIdsMap.get(row.id) || (row.user_id ? [row.user_id] : []);
@@ -61,11 +63,23 @@ export class AccountsMapper {
         .filter(Boolean)
         .join(", ") || null;
 
+      const owners: AccountOwnerInfo[] | undefined = ownerDetailsMap && ownerIds.length > 0
+        ? ownerIds.map(ownerId => {
+            const details = ownerDetailsMap.get(ownerId);
+            return {
+              id: ownerId,
+              name: details?.name ?? null,
+              avatarUrl: details?.avatarUrl ?? null,
+            };
+          })
+        : undefined;
+
       return {
         ...this.toDomain(row),
         balance: balances.get(row.id) || 0,
         householdName,
         ownerIds,
+        ...(owners && owners.length > 0 ? { owners } : {}),
       };
     });
   }

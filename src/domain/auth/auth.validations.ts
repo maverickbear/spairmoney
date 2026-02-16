@@ -2,15 +2,15 @@ import { z } from "zod";
 
 /**
  * Password validation helper
- * Validates password complexity: 12+ characters, uppercase, lowercase, number, special character
+ * Validates password complexity: 8+ characters, uppercase, lowercase, number, special character
  */
 export const passwordValidation = z
   .string()
-  .min(12, "Password must be at least 12 characters")
+  .min(8, "Password must be at least 8 characters")
   .refine(
     (password) => {
       // Check length
-      if (password.length < 12) return false;
+      if (password.length < 8) return false;
       // Check for uppercase letter
       if (!/[A-Z]/.test(password)) return false;
       // Check for lowercase letter
@@ -22,7 +22,7 @@ export const passwordValidation = z
       return true;
     },
     {
-      message: "Password must be at least 12 characters and include uppercase, lowercase, number, and special character",
+      message: "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
     }
   );
 
