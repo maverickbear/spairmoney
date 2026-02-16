@@ -925,7 +925,17 @@ export class TransactionsService {
           logger.warn("[TransactionsService] Bulk insert failed, falling back to single creates:", bulkError);
           for (const payload of createManyPayloads) {
             try {
-              await this.repository.create({ ...payload, competencyMonth: payload.competencyMonth ?? null });
+              await this.repository.create({
+                ...payload,
+                categoryId: payload.categoryId ?? null,
+                subcategoryId: payload.subcategoryId ?? null,
+                description: payload.description ?? null,
+                isRecurring: payload.isRecurring ?? false,
+                expenseType: payload.expenseType ?? null,
+                transferToId: payload.transferToId ?? null,
+                transferFromId: payload.transferFromId ?? null,
+                competencyMonth: payload.competencyMonth ?? null,
+              });
               successCount++;
             } catch (err) {
               errorCount++;

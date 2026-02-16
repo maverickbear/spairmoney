@@ -136,6 +136,8 @@ export function ProUpgradeDialog({
   const priceMonthly = plan?.priceMonthly ?? 8;
   const priceYearly = plan?.priceYearly ?? 72;
   const yearlyMonthly = priceYearly / 12;
+  const yearlySavingsPct =
+    priceMonthly > 0 ? Math.round((1 - priceYearly / 12 / priceMonthly) * 100) : 0;
 
   function handlePrimary() {
     if (needsReactivation && (subscriptionStatus === "past_due" || subscriptionStatus === "unpaid") && onManageSubscription) {
@@ -248,9 +250,16 @@ export function ProUpgradeDialog({
                           : "border-border bg-muted/20 hover:border-muted-foreground/40"
                       )}
                     >
-                      <p className="text-lg font-bold text-gray-900 sm:text-xl">
-                        ${priceYearly.toFixed(2)} / year
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-lg font-bold text-gray-900 sm:text-xl">
+                          ${priceYearly.toFixed(2)} / year
+                        </span>
+                        {yearlySavingsPct > 0 && (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            Save {yearlySavingsPct}%
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-0.5 text-sm text-gray-900/90">
                         Monthly cost ${yearlyMonthly.toFixed(2)}
                       </p>
