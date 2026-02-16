@@ -218,75 +218,7 @@ async function loadDashboardDataInternal(
     return await debtsService.getDebts(accessToken, refreshToken);
   }
 
-  // Helper function to check onboarding status with tokens
-  // FIXED: Now uses onboardingService.getOnboardingStatus() which properly checks hasPlan
-  // This ensures the status includes all 3 steps: personal data, income, and plan
-  async function checkOnboardingStatusWithTokens(
-    accounts: AccountWithBalance[],
-    accessToken?: string, 
-    refreshToken?: string,
-    user?: { id: string } | null
-  ) {
-    try {
-      // Get user ID
-      const supabase = await createServerClient(accessToken, refreshToken);
-      let authUser = user;
-      if (!authUser) {
-        const { data: { user: fetchedUser }, error: userError } = await supabase.auth.getUser();
-        if (userError || !fetchedUser) {
-          logger.warn("Could not get user for onboarding status check:", userError?.message);
-          return {
-            hasAccount: false,
-            hasCompleteProfile: false,
-            hasPersonalData: false,
-            hasExpectedIncome: false,
-            hasPlan: false,
-            completedCount: 0,
-            totalCount: 3,
-          };
-        }
-        authUser = fetchedUser;
-      }
-
-      // Use the onboarding service which properly checks all steps including hasPlan
-      const status = await onboardingService.getOnboardingStatus(authUser.id, accessToken, refreshToken);
-      
-      // Calculate total balance from accounts
-      const totalBalance = accounts.length > 0
-        ? accounts.reduce((sum: number, acc: AccountWithBalance) => sum + (acc.balance || 0), 0)
-        : undefined;
-
-      logger.debug("Onboarding status check:", {
-        hasAccount: status.hasAccount,
-        hasCompleteProfile: status.hasCompleteProfile,
-        hasPersonalData: status.hasPersonalData,
-        hasExpectedIncome: status.hasExpectedIncome,
-        hasPlan: status.hasPlan,
-        expectedAnnualIncome: status.expectedAnnualIncome,
-        completedCount: status.completedCount,
-        totalCount: status.totalCount,
-      });
-
-      return {
-        ...status,
-        totalBalance: totalBalance ?? status.totalBalance,
-      };
-    } catch (error) {
-      logger.error("Error checking onboarding status:", error);
-      return {
-        hasAccount: false,
-        hasCompleteProfile: false,
-        hasPersonalData: false,
-        hasExpectedIncome: false,
-        hasPlan: false,
-        completedCount: 0,
-        totalCount: 3,
-        expectedIncome: null,
-      };
-    }
-  }
-
-  // CRITICAL OPTIMIZATION: Only fetch essential data for initial render
+  // Fetch essential data for initial render
   // This allows the page to render quickly while secondary data loads in background
   const [
     selectedMonthTransactionsResult,
@@ -437,17 +369,12 @@ async function loadDashboardDataInternal(
     logger.warn("[Dashboard] No accounts loaded - this will cause duplicate getAccounts() calls");
   }
   
-  // OPTIMIZED: Run goals, financial health, and onboarding status in parallel
-  // All three operations are independent and can execute concurrently
-  const [goals, financialHealth, onboardingStatus] = await Promise.all([
-    // CRITICAL: Always pass accounts if available (even if empty array)
-    // GoalsService will only fetch if accounts is undefined/null AND goals need accounts
+  // Run goals and financial health in parallel (onboarding removed)
+  const [goals, financialHealth] = await Promise.all([
     goalsService.getGoals(accessToken, refreshToken, accounts || undefined).catch((error) => {
       logger.error("Error fetching goals:", error);
       return [];
     }),
-    // CRITICAL: Always pass accounts if available (even if empty array)
-    // calculateFinancialHealth will only fetch if accounts is undefined/null
     calculateFinancialHealth(selectedMonth, userId, accessToken, refreshToken, accounts || undefined, projectedIncome).catch((error) => {
       logger.error("Error calculating financial health:", error);
       return {
@@ -465,25 +392,8 @@ async function loadDashboardDataInternal(
         suggestions: [],
       };
     }),
-    // OPTIMIZED: Check onboarding status in parallel with other operations
-    checkOnboardingStatusWithTokens(accounts, accessToken, refreshToken).catch((error) => {
-      logger.error("Error checking onboarding status:", error);
-      return {
-        hasAccount: false,
-        hasCompleteProfile: false,
-        hasPersonalData: false,
-        hasExpectedIncome: false,
-        hasPlan: false,
-        completedCount: 0,
-        totalCount: 3,
-      };
-    }),
   ]);
 
-  // CRITICAL: Don't load secondary data here - it will be loaded separately via Suspense
-  // Secondary data is now handled by loadSecondaryDashboardData() function
-  // Onboarding status is now calculated in parallel above
-  
   logger.debug("[Dashboard] Balance calculation:", {
     accountCount: accounts.length,
     totalBalance,
@@ -522,7 +432,7 @@ async function loadDashboardDataInternal(
     totalBalance,
     accounts,
     plannedPayments: uniquePlannedPayments,
-    onboardingStatus,
+    onboardingStatus: null,
     expectedAnnualIncome: expectedAnnualIncome ?? null,
   };
 
