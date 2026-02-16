@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signInSchema, SignInFormData } from "@/src/domain/auth/auth.validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, Info } from "lucide-react";
@@ -14,7 +14,6 @@ import { GoogleSignInButton } from "./google-signin-button";
 import { VerifyLoginOtpForm } from "./verify-login-otp-form";
 import { isTrustedBrowser } from "@/lib/utils/trusted-browser";
 import { supabase } from "@/lib/supabase";
-import { TurnstileWidget, TurnstileWidgetRef } from "@/src/presentation/components/common/turnstile-widget";
 
 /**
  * Preloads user, profile, and billing data into global caches
@@ -107,10 +106,6 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
   const [invitationInfo, setInvitationInfo] = useState<{ email: string; ownerName: string } | null>(null);
   const [showOtpForm, setShowOtpForm] = useState(false);
   const [loginEmail, setLoginEmail] = useState<string>("");
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileWidgetRef>(null);
-  
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   // Check for OAuth errors in URL params
   useEffect(() => {
@@ -175,13 +170,6 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
       setLoading(true);
       setError(null);
 
-      // Check if Turnstile token is required and available
-      if (turnstileSiteKey && !turnstileToken) {
-        setError("Please complete the security verification");
-        setLoading(false);
-        return;
-      }
-
       // Check if browser is trusted
       const isTrusted = isTrustedBrowser(data.email);
 
@@ -197,20 +185,13 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
           body: JSON.stringify({
             email: data.email,
             password: data.password,
-            turnstileToken: turnstileToken || undefined,
           }),
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-          const errorMessage = result.error || "Failed to sign in";
-          setError(errorMessage);
-          // Reset Turnstile widget on error
-          if (turnstileRef.current) {
-            turnstileRef.current.reset();
-            setTurnstileToken(null);
-          }
+          setError(result.error || "Failed to sign in");
           setLoading(false);
           return;
         }
@@ -315,31 +296,21 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         }
       } else {
         // Browser is not trusted - proceed with OTP flow
-        // Call send-login-otp API route
-        const requestBody: any = {
-          email: data.email,
-          password: data.password,
-          turnstileToken: turnstileToken || undefined,
-        };
-
         const response = await fetch("/api/auth/send-login-otp", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+          }),
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-          const errorMessage = result.error || "Failed to send verification code";
-          setError(errorMessage);
-          // Reset Turnstile widget on error
-          if (turnstileRef.current) {
-            turnstileRef.current.reset();
-            setTurnstileToken(null);
-          }
+          setError(result.error || "Failed to send verification code");
           setLoading(false);
           return;
         }
@@ -352,11 +323,6 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
     } catch (error) {
       console.error("Error during login:", error);
       setError("An unexpected error occurred");
-      // Reset Turnstile widget on error
-      if (turnstileRef.current) {
-        turnstileRef.current.reset();
-        setTurnstileToken(null);
-      }
       setLoading(false);
     }
   }
@@ -482,23 +448,11 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
           )}
         </div>
 
-        {turnstileSiteKey && (
-          <div className="py-2">
-            <TurnstileWidget
-              ref={turnstileRef}
-              siteKey={turnstileSiteKey}
-              onTokenChange={(token) => setTurnstileToken(token)}
-              theme="auto"
-              size="normal"
-            />
-          </div>
-        )}
-
         <Button 
           type="submit" 
           size="medium"
           className="w-full text-base font-medium" 
-          disabled={loading || (!!turnstileSiteKey && !turnstileToken)}
+          disabled={loading}
         >
           {loading ? (
             <>

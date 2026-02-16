@@ -5,13 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signUpSchema, SignUpFormData } from "@/src/domain/auth/auth.validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
-import { TurnstileWidget, TurnstileWidgetRef } from "@/src/presentation/components/common/turnstile-widget";
 
 /**
  * Preloads user, profile, and billing data into global caches
@@ -100,11 +99,6 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileWidgetRef>(null);
-  
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-
 
   // Get planId from props or search params
   const finalPlanId = planId || searchParams.get("planId") || undefined;
@@ -126,25 +120,12 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       setLoading(true);
       setError(null);
 
-      // Check if Turnstile token is required and available
-      if (turnstileSiteKey && !turnstileToken) {
-        setError("Please complete the security verification");
-        setLoading(false);
-        return;
-      }
-
-      // Call signup API route
-      const requestBody: any = { 
-        ...data,
-        turnstileToken: turnstileToken || undefined,
-      };
-      
       const response = await fetch("/api/v2/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(data),
       });
       
       const result = await response.json();
@@ -152,23 +133,12 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       if (!response.ok) {
         const errorMessage = result.error || "Failed to sign up";
         setError(errorMessage);
-        // Reset Turnstile widget on error
-        if (turnstileRef.current) {
-          turnstileRef.current.reset();
-          setTurnstileToken(null);
-        }
         setLoading(false);
         return;
       }
 
       if (result.error) {
-        const errorMessage = result.error;
-        setError(errorMessage);
-        // Reset Turnstile widget on error
-        if (turnstileRef.current) {
-          turnstileRef.current.reset();
-          setTurnstileToken(null);
-        }
+        setError(result.error);
         setLoading(false);
         return;
       }
@@ -186,11 +156,6 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       // If no user and no email confirmation flag, this is an error
       if (!result.user) {
         setError("Failed to sign up");
-        // Reset Turnstile widget on error
-        if (turnstileRef.current) {
-          turnstileRef.current.reset();
-          setTurnstileToken(null);
-        }
         setLoading(false);
         return;
       }
@@ -202,11 +167,6 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
     } catch (error) {
       console.error("Error during signup:", error);
       setError("An unexpected error occurred");
-      // Reset Turnstile widget on error
-      if (turnstileRef.current) {
-        turnstileRef.current.reset();
-        setTurnstileToken(null);
-      }
     } finally {
       setLoading(false);
     }
@@ -332,23 +292,11 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
           )}
         </div>
 
-        {turnstileSiteKey && (
-          <div className="py-2">
-            <TurnstileWidget
-              ref={turnstileRef}
-              siteKey={turnstileSiteKey}
-              onTokenChange={(token) => setTurnstileToken(token)}
-              theme="auto"
-              size="normal"
-            />
-          </div>
-        )}
-
         <Button 
           type="submit" 
           size="medium"
           className="w-full text-base font-medium" 
-          disabled={loading || (!!turnstileSiteKey && !turnstileToken)}
+          disabled={loading}
         >
           {loading ? (
             <>
