@@ -8,6 +8,10 @@ import { makeAuthService } from "@/src/application/auth/auth.factory";
 const envUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
 const baseUrl = envUrl.includes("=") ? envUrl.split("=")[1] : envUrl;
 
+/**
+ * Fallback SEO used only when Supabase SEO Settings are unavailable
+ * (e.g. prerender, build, or DB error). Source of truth: system_config_settings.seo_settings in Supabase (Admin → SEO Settings).
+ */
 const defaultSEOSettings = {
   title: "Spair Money - Personal Finance at Peace",
   titleTemplate: "%s | Spair Money",
@@ -49,6 +53,7 @@ const defaultSEOSettings = {
   },
 };
 
+/** Fetches SEO from Supabase (system_config_settings.seo_settings). Used by generateMetadata and StructuredData. */
 async function getSEOSettings() {
   try {
     const { makeAdminService } = await import("@/src/application/admin/admin.factory");
@@ -72,8 +77,9 @@ async function getSEOSettings() {
 
 export async function generateMetadata() {
   await headers();
+  // SEO comes from Supabase SEO Settings (Admin → SEO Settings); fallback to defaultSEOSettings only when DB is unavailable
   const seoSettings = await getSEOSettings();
-  const settings = seoSettings || defaultSEOSettings;
+  const settings = seoSettings ?? defaultSEOSettings;
 
   const canonicalUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   const ogImageUrl = settings.openGraph.image.startsWith("http") ? settings.openGraph.image : `${baseUrl}${settings.openGraph.image.replace(/^\//, "")}`;
@@ -143,6 +149,7 @@ async function AuthCheck() {
   return null;
 }
 
+/** Fetches SEO from Supabase for StructuredData (JSON-LD). Same source as generateMetadata. */
 async function SEOSettingsFetch() {
   await headers();
   try {
@@ -150,7 +157,7 @@ async function SEOSettingsFetch() {
     const adminService = makeAdminService();
     return await adminService.getPublicSeoSettings();
   } catch (error) {
-    console.error("Error fetching SEO settings:", error);
+    console.error("Error fetching SEO settings from Supabase:", error);
     return null;
   }
 }

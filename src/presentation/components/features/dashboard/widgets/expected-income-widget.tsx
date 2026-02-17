@@ -56,8 +56,8 @@ export function ExpectedIncomeWidget({
                   Set country & state in Adjust to see after-tax expected income.
                 </p>
               ) : data.expectedMonthlyIncome > 0 ? (
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  {Math.round((data.actualIncomeThisMonth / data.expectedMonthlyIncome) * 100)}% of expected (after tax)
+                <p className="text-xs sm:text-sm text-muted-foreground truncate" title={formatMoney(data.expectedMonthlyIncome)}>
+                  Expected (after tax): {formatMoney(data.expectedMonthlyIncome)}/month
                 </p>
               ) : null}
               {data.nextPaycheckDays != null && data.nextPaycheckAmount != null ? (

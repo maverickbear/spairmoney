@@ -43,6 +43,6 @@ export interface DebtWithCalculations extends BaseDebt {
   progressPct: number;
 }
 
-// Alias for backward compatibility (matches lib/api/debts.ts interface)
+// Alias for backward compatibility
 // Note: DebtWithCalculations is already defined above, this is just for reference
 

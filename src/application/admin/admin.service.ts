@@ -271,7 +271,7 @@ export class AdminService {
   }
 
   // NOTE: All group-related methods have been removed. Groups are no longer part of the system.
-  // Categories now have a direct type property ("income" | "expense") instead of being grouped.
+  // Categories now have a direct type property ("income" | "expense" | "transfer") instead of being grouped.
 
   /**
    * Get all system categories
@@ -283,7 +283,7 @@ export class AdminService {
   /**
    * Create a system category
    */
-  async createSystemCategory(data: { name: string; type: "income" | "expense" }): Promise<SystemCategory> {
+  async createSystemCategory(data: { name: string; type: "income" | "expense" | "transfer" }): Promise<SystemCategory> {
     // Check if system category with this name already exists for this type
     const existing = await this.repository.getAllSystemCategories();
     if (existing.some(c => c.name === data.name && c.type === data.type)) {
@@ -305,7 +305,7 @@ export class AdminService {
   /**
    * Update a system category
    */
-  async updateSystemCategory(id: string, data: { name?: string; type?: "income" | "expense" }): Promise<SystemCategory> {
+  async updateSystemCategory(id: string, data: { name?: string; type?: "income" | "expense" | "transfer" }): Promise<SystemCategory> {
     // Verify it's a system category
     const existing = await this.repository.getAllSystemCategories();
     const category = existing.find(c => c.id === id);

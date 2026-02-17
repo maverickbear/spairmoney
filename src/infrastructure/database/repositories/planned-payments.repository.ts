@@ -30,6 +30,7 @@ export interface PlannedPaymentRow {
   source: "recurring" | "debt" | "manual" | "subscription" | "goal";
   status: "scheduled" | "paid" | "skipped" | "cancelled";
   linked_transaction_id: string | null;
+  recurring_transaction_id: string | null;
   debt_id: string | null;
   subscription_id: string | null;
   goal_id: string | null;
@@ -70,7 +71,7 @@ export class PlannedPaymentsRepository {
 
     let query = supabase
       .from("planned_payments")
-      .select("id, date, type, amount, account_id, to_account_id, category_id, subcategory_id, description, source, status, linked_transaction_id, debt_id, subscription_id, goal_id, user_id, created_at, updated_at, household_id", { count: "exact" })
+      .select("id, date, type, amount, account_id, to_account_id, category_id, subcategory_id, description, source, status, linked_transaction_id, recurring_transaction_id, debt_id, subscription_id, goal_id, user_id, created_at, updated_at, household_id", { count: "exact" })
       .eq("user_id", userId)
       .order("date", { ascending: true });
 
@@ -204,6 +205,7 @@ export class PlannedPaymentsRepository {
     delete (insertData as any).categoryId;
     delete (insertData as any).subcategoryId;
     delete (insertData as any).linkedTransactionId;
+    delete (insertData as any).recurringTransactionId;
     delete (insertData as any).debtId;
     delete (insertData as any).subscriptionId;
     delete (insertData as any).goalId;
@@ -237,6 +239,7 @@ export class PlannedPaymentsRepository {
 
     const updateData: any = { ...data };
     if (data.linked_transaction_id !== undefined) { updateData.linked_transaction_id = data.linked_transaction_id; }
+    if (data.recurring_transaction_id !== undefined) { updateData.recurring_transaction_id = data.recurring_transaction_id; }
     if (data.debt_id !== undefined) { updateData.debt_id = data.debt_id; }
     if (data.subscription_id !== undefined) { updateData.subscription_id = data.subscription_id; }
     if (data.goal_id !== undefined) { updateData.goal_id = data.goal_id; }
@@ -359,6 +362,51 @@ export class PlannedPaymentsRepository {
     }
 
     logger.debug("[PlannedPaymentsRepository] Deleted planned payments for debt:", { debtId });
+  }
+
+  /**
+   * Delete all planned payments that reference the given goal.
+   * Used when deleting a goal so related planned payments are removed.
+   */
+  async deleteByGoalId(goalId: string): Promise<void> {
+    const supabase = await createServerClient();
+
+    const { error } = await supabase
+      .from("planned_payments")
+      .delete()
+      .eq("goal_id", goalId);
+
+    if (error) {
+      logger.error("[PlannedPaymentsRepository] Error deleting planned payments by goal ID:", error);
+      throw new Error(`Failed to delete planned payments: ${error.message}`);
+    }
+
+    logger.debug("[PlannedPaymentsRepository] Deleted planned payments for goal:", { goalId });
+  }
+
+  /**
+   * Delete all planned payments that reference the given recurring transaction IDs.
+   * Used when deleting or updating a recurring transaction so related planned payments are removed.
+   */
+  async deleteByRecurringTransactionIds(transactionIds: string[]): Promise<void> {
+    if (transactionIds.length === 0) {
+      return;
+    }
+    const supabase = await createServerClient();
+
+    const { error } = await supabase
+      .from("planned_payments")
+      .delete()
+      .in("recurring_transaction_id", transactionIds);
+
+    if (error) {
+      logger.error("[PlannedPaymentsRepository] Error deleting planned payments by recurring transaction IDs:", error);
+      throw new Error(`Failed to delete planned payments: ${error.message}`);
+    }
+
+    logger.debug("[PlannedPaymentsRepository] Deleted planned payments for recurring transaction IDs:", {
+      transactionIdCount: transactionIds.length,
+    });
   }
 
   /**

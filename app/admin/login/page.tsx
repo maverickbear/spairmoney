@@ -84,17 +84,17 @@ export default function AdminLoginPage() {
             </Button>
           </Link>
 
-          <div className="lg:hidden text-center space-y-2">
-            <div className="flex items-center justify-center gap-2 text-muted-foreground mb-2">
+          <div className="lg:hidden text-center space-y-2 rounded-lg bg-[#0d0d0d] p-6 -mx-2">
+            <div className="flex items-center justify-center gap-2 text-zinc-400 mb-2">
               <Shield className="h-5 w-5" />
               <span className="text-sm font-medium">Admin</span>
             </div>
             <div className="flex justify-center mb-4">
               <Link href="/" className="cursor-pointer hover:opacity-80 transition-opacity">
-                <Logo variant="wordmark" color="auto" width={180} priority />
+                <Logo variant="wordmark" color="white" width={180} priority />
               </Link>
             </div>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-zinc-400 text-sm">
               Sign in with your email and password
             </p>
           </div>

@@ -54,12 +54,12 @@ export interface PromoCode {
 }
 
 // NOTE: SystemGroup has been completely removed - groups are no longer part of the system
-// Categories now have a direct type property ("income" | "expense") instead of being grouped
+// Categories now have a direct type property ("income" | "expense" | "transfer") instead of being grouped
 
 export interface SystemCategory {
   id: string;
   name: string;
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   createdAt: Date | string; // Allow string for serialization from server to client
   updatedAt: Date | string; // Allow string for serialization from server to client
   userId: null;

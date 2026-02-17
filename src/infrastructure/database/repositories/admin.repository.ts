@@ -618,7 +618,7 @@ export class AdminRepository {
   }
 
   // NOTE: All group-related methods have been completely removed. Groups are no longer part of the system.
-  // Categories now have a direct type property ("income" | "expense") instead of being grouped.
+  // Categories now have a direct type property ("income" | "expense" | "transfer") instead of being grouped.
 
   /**
    * Get all system categories
@@ -644,7 +644,7 @@ export class AdminRepository {
     return (categories || []).map((cat) => ({
       id: cat.id,
       name: cat.name,
-      type: cat.type as "income" | "expense",
+      type: cat.type as "income" | "expense" | "transfer",
       createdAt: new Date(cat.created_at),
       updatedAt: new Date(cat.updated_at),
       userId: null,
@@ -667,7 +667,7 @@ export class AdminRepository {
   /**
    * Create a system category
    */
-  async createSystemCategory(data: { id: string; name: string; type: "income" | "expense" }): Promise<SystemCategory> {
+  async createSystemCategory(data: { id: string; name: string; type: "income" | "expense" | "transfer" }): Promise<SystemCategory> {
     const supabase = createServiceRoleClient();
 
     const now = new Date().toISOString();
@@ -696,7 +696,7 @@ export class AdminRepository {
     return {
       id: category.id,
       name: category.name,
-      type: category.type as "income" | "expense",
+      type: category.type as "income" | "expense" | "transfer",
       createdAt: new Date(category.created_at),
       updatedAt: new Date(category.updated_at),
       userId: null,
@@ -708,7 +708,7 @@ export class AdminRepository {
   /**
    * Update a system category
    */
-  async updateSystemCategory(id: string, data: { name?: string; type?: "income" | "expense" }): Promise<SystemCategory> {
+  async updateSystemCategory(id: string, data: { name?: string; type?: "income" | "expense" | "transfer" }): Promise<SystemCategory> {
     const supabase = createServiceRoleClient();
 
     const updateData: CategoryUpdateData = {
@@ -736,7 +736,7 @@ export class AdminRepository {
     return {
       id: category.id,
       name: category.name,
-      type: category.type as "income" | "expense",
+      type: category.type as "income" | "expense" | "transfer",
       createdAt: new Date(category.created_at),
       updatedAt: new Date(category.updated_at),
       userId: null,
@@ -1056,14 +1056,18 @@ export class AdminRepository {
 
     // If update failed because row doesn't exist, create it
     if (updateError && updateError.code === "PGRST116") {
+      const insertPayload: Record<string, unknown> = {
+        id: "default",
+        maintenance_mode: data.maintenanceMode ?? false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (data.seoSettings !== undefined) {
+        insertPayload.seo_settings = data.seoSettings;
+      }
       const { data: newSettings, error: insertError } = await supabase
         .from("system_config_settings")
-        .insert({
-          id: "default",
-          maintenance_mode: data.maintenanceMode,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -1074,6 +1078,7 @@ export class AdminRepository {
 
       return {
         maintenanceMode: newSettings.maintenance_mode,
+        seoSettings: newSettings.seo_settings ?? undefined,
       };
     }
 
@@ -1083,7 +1088,8 @@ export class AdminRepository {
     }
 
     return {
-      maintenanceMode: updatedSettings?.maintenance_mode || false,
+      maintenanceMode: updatedSettings?.maintenance_mode ?? false,
+      seoSettings: updatedSettings?.seo_settings ?? undefined,
     };
   }
 
@@ -1839,6 +1845,16 @@ export class AdminRepository {
       }
 
       updatedSubscription = updated;
+
+      try {
+        const { data: userRow } = await supabase.from("users").select("email").eq("id", subscription.user_id).single();
+        if (userRow?.email) {
+          const { moveContactToCancelledSegment } = await import("@/lib/utils/resend-segments");
+          await moveContactToCancelledSegment(userRow.email);
+        }
+      } catch (segmentErr) {
+        logger.error("[AdminRepository] Resend segment sync on cancel (non-critical):", segmentErr);
+      }
     }
 
     return {

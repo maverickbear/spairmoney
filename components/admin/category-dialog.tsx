@@ -28,9 +28,9 @@ import type { SystemCategory } from "@/src/domain/admin/admin.types";
 
 const categorySchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
-  type: z.enum(["income", "expense"], {
+  type: z.enum(["income", "expense", "transfer"], {
     required_error: "Type is required",
-    invalid_type_error: "Type must be either 'income' or 'expense'",
+    invalid_type_error: "Type must be 'income', 'expense', or 'transfer'",
   }),
 });
 
@@ -69,13 +69,14 @@ export function CategoryDialog({
           type: "expense" as const,
         },
   });
+  type CategoryType = "income" | "expense" | "transfer";
 
   // Update form when category changes
   useEffect(() => {
     if (currentCategory) {
       form.reset({
         name: currentCategory.name,
-        type: currentCategory.type || "expense",
+        type: (currentCategory.type || "expense") as CategoryType,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,7 +154,7 @@ export function CategoryDialog({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: name.trim(),
-              type: form.watch("type") || "expense",
+              type: (form.watch("type") || "expense") as CategoryType,
             }),
           })
         )
@@ -275,7 +276,7 @@ export function CategoryDialog({
                   <Label htmlFor="type">Type</Label>
                   <Select
                     value={form.watch("type")}
-                    onValueChange={(value) => form.setValue("type", value as "income" | "expense")}
+                    onValueChange={(value) => form.setValue("type", value as CategoryType)}
                   >
                     <SelectTrigger size="medium">
                       <SelectValue placeholder="Select type" />
@@ -283,6 +284,7 @@ export function CategoryDialog({
                     <SelectContent>
                       <SelectItem value="expense">Expense (Despesa)</SelectItem>
                       <SelectItem value="income">Income (Receita)</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
                     </SelectContent>
                   </Select>
                   {form.formState.errors.type && (
@@ -300,7 +302,7 @@ export function CategoryDialog({
                   <Label htmlFor="type">Type</Label>
                   <Select
                     value={form.watch("type")}
-                    onValueChange={(value) => form.setValue("type", value as "income" | "expense")}
+                    onValueChange={(value) => form.setValue("type", value as CategoryType)}
                   >
                     <SelectTrigger size="medium">
                       <SelectValue placeholder="Select type" />
@@ -308,6 +310,7 @@ export function CategoryDialog({
                     <SelectContent>
                       <SelectItem value="expense">Expense</SelectItem>
                       <SelectItem value="income">Income</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
                     </SelectContent>
                   </Select>
                   {form.formState.errors.type && (

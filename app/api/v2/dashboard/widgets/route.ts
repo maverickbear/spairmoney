@@ -3,7 +3,7 @@ import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
 import { makeDashboardService } from "@/src/application/dashboard/dashboard.factory";
 import { getCacheHeaders } from "@/src/infrastructure/utils/cache-headers";
-import { startOfMonth } from "date-fns";
+import { getActiveHouseholdId } from "@/lib/utils/household";
 
 /**
  * GET /api/v2/dashboard/widgets
@@ -41,12 +41,17 @@ export async function GET(request: NextRequest) {
       // Continue without tokens - service will try to get them itself
     }
 
+    // Resolve active household so expected income uses after-tax (country/state) for this household
+    const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+
     const service = makeDashboardService();
     const widgetsData = await service.getDashboardWidgets(
       userId,
       selectedDate,
       accessToken,
-      refreshToken
+      refreshToken,
+      undefined,
+      householdId ?? undefined
     );
 
     // Dashboard widgets are aggregated data that changes frequently, use dynamic cache

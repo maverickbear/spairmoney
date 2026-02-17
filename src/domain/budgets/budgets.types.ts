@@ -45,7 +45,7 @@ export interface BudgetWithRelations extends BaseBudget {
   }>;
 }
 
-// Alias for backward compatibility (matches lib/api/budgets.ts interface)
+// Alias for backward compatibility
 export interface Budget extends Omit<BaseBudget, 'userId' | 'isRecurring'> {
   userId?: string | null;
   isRecurring?: boolean;

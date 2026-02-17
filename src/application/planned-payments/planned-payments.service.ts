@@ -202,6 +202,7 @@ export class PlannedPaymentsService {
       source: data.source || "manual",
       status: "scheduled",
       linkedTransactionId: null,
+      recurringTransactionId: data.recurringTransactionId ?? null,
       debtId: data.debtId || null,
       subscriptionId: data.subscriptionId || null,
       goalId: data.goalId || null,
@@ -425,6 +426,22 @@ export class PlannedPaymentsService {
    */
   async deleteByDebtId(debtId: string): Promise<void> {
     await this.repository.deleteByDebtId(debtId);
+  }
+
+  /**
+   * Delete all planned payments that reference the given goal.
+   * Call this before deleting a goal so related planned payments are removed.
+   */
+  async deleteByGoalId(goalId: string): Promise<void> {
+    await this.repository.deleteByGoalId(goalId);
+  }
+
+  /**
+   * Delete all planned payments that reference the given recurring transaction IDs.
+   * Call this before deleting or after updating a recurring transaction so related planned payments are removed and can be regenerated.
+   */
+  async deleteByRecurringTransactionIds(transactionIds: string[]): Promise<void> {
+    await this.repository.deleteByRecurringTransactionIds(transactionIds);
   }
 
   /**

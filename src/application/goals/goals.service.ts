@@ -19,6 +19,7 @@ import { startOfMonth, endOfMonth, subMonths, subDays, eachMonthOfInterval, form
 import { getTransactionAmount } from "@/lib/utils/transaction-encryption";
 import { AppError } from "../shared/app-error";
 import { GoalPlannedPaymentsService } from "../planned-payments/goal-planned-payments.service";
+import { makePlannedPaymentsService } from "../planned-payments/planned-payments.factory";
 // CRITICAL: Use static import to ensure React cache() works correctly
 import { getAccountsForDashboard } from "../accounts/get-dashboard-accounts";
 import { getIncomeBasisForGoals } from "./get-income-basis";
@@ -493,13 +494,16 @@ export class GoalsService {
 
   /**
    * Delete a goal
+   * Deletes all planned payments linked to this goal before deleting the goal.
    */
   async deleteGoal(id: string): Promise<void> {
     // Verify ownership
     await requireGoalOwnership(id);
 
-    await this.repository.delete(id);
+    const plannedPaymentsService = makePlannedPaymentsService();
+    await plannedPaymentsService.deleteByGoalId(id);
 
+    await this.repository.delete(id);
   }
 
   /**

@@ -200,7 +200,7 @@ export function DocsClient() {
                       href={href}
                       target={href?.startsWith("http") ? "_blank" : undefined}
                       rel={href?.startsWith("http") ? "noopener noreferrer" : undefined}
-                      className="text-primary underline hover:no-underline"
+                      className="text-content-link underline hover:no-underline"
                       {...props}
                     >
                       {children}

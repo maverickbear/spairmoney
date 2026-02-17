@@ -211,7 +211,7 @@ spairmoney/
 │   ├── (protected)/             # Main dashboard and features
 │   ├── api/                     # API routes
 │   │   ├── v2/                  # API routes (Clean Architecture) ✅
-│   │   └── ...                  # Legacy routes (deprecated, use v2)
+│   │   └── ...                  # Other routes (Stripe, auth, etc.)
 │   ├── auth/                    # Login/Signup pages
 │   └── page.tsx                 # Landing page
 │
@@ -255,7 +255,7 @@ spairmoney/
 ├── supabase/                    # Database migrations
 ├── scripts/                     # Utility scripts
 ├── tests/                       # Test files
-└── docs/                        # Documentation
+└── docs/                        # Documentation (APP_OVERVIEW.md + features/; viewable at /admin/docs)
 ```
 
 ---
@@ -578,15 +578,10 @@ Ensure all environment variables are set:
 
 ### Available Documentation
 
-- 📖 **[App Overview](docs/APP_OVERVIEW.md)** - What the app is, tech stack, architecture, and links to all feature docs
-- 📁 **[Feature documentation](docs/features/)** - One document per feature (Auth, Dashboard, Accounts, Transactions, Billing, etc.)
-- 📊 **[Complete Project Analysis](docs/ANALISE_PROJETO_COMPLETA.md)** - Comprehensive analysis of architecture, issues, and recommendations
-- 🏗️ **[Architecture Rules](.cursorrules)** - Source of truth for all architectural patterns and rules
-- ✅ **[Migration Complete Report](docs/MIGRATION_COMPLETE_REPORT.md)** - Full report on the completed migration to Clean Architecture
-- 📋 **[Architecture Migration Status](docs/ARCHITECTURE_MIGRATION_STATUS.md)** - Detailed status of all migrated features
-- 🗄️ **[Database Schema](docs/ANALISE_BANCO.md)** - Database structure
-- 🐳 **[Docker Setup](README_DOCKER.md)** - Docker configuration
-- 🧪 **[Testing Guide](README_TESTS.md)** - Testing documentation
+- 📖 **[App Overview](docs/APP_OVERVIEW.md)** – What the app is, tech stack, architecture, codebase state, and links to all feature docs
+- 📁 **[Feature documentation](docs/features/)** – One document per feature (Auth, Dashboard, Accounts, Transactions, Billing, Admin, etc.)
+- 🔐 **In-app docs (admin only)** – At `/admin/docs`: sidebar viewer for all docs (super_admin). Served by `GET /api/v2/admin/docs?path=...`
+- 🏗️ **[Architecture Rules](.cursorrules)** – Source of truth for all architectural patterns and rules
 
 ### API Documentation
 
@@ -705,7 +700,7 @@ The project has been fully migrated to **Clean Architecture + Domain-Driven Desi
 - ✅ **100% compliance** with Clean Architecture principles
 - ✅ **Zero legacy dependencies** remaining
 
-All new development follows the established Clean Architecture patterns. See [Migration Complete Report](docs/MIGRATION_COMPLETE_REPORT.md) for details.
+All new development follows the established Clean Architecture patterns. See [App Overview](docs/APP_OVERVIEW.md) and [.cursorrules](.cursorrules) for details.
 
 ---
 

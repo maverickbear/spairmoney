@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/components/common/money";
 import { formatTransactionDate, formatShortDate } from "@/src/infrastructure/utils/timestamp";
+import { formatTransferLabel } from "@/src/presentation/utils/format-transfer-label";
 import { Loader2, Repeat, Clock, Check, X, Wallet, ShoppingCart, UtensilsCrossed, Car, Home, Heart, GraduationCap, Gamepad2, Plane, Dumbbell, Shirt, Laptop, Music, BookOpen, Gift, CreditCard, Building2, Briefcase, PiggyBank, TrendingUp, Coffee, Receipt as ReceiptIcon, Tag, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/src/domain/transactions/transactions.types";
@@ -180,7 +181,10 @@ export function TransactionsMobileCard({
   processingSuggestion,
 }: TransactionsMobileCardProps) {
   const description = transaction.description || "Transaction";
-  const displayName = transaction.description || transaction.category?.name || "Transaction";
+  const displayName =
+    transaction.type === "transfer" && transaction.transferToId && transaction.account?.name && transaction.toAccount?.name
+      ? formatTransferLabel(transaction.account.name, transaction.toAccount.name)
+      : (transaction.description || transaction.category?.name || "Transaction");
   const date = formatTransactionDate(transaction.date);
   const isIncome = transaction.type === "income";
   const isExpense = transaction.type === "expense";

@@ -190,6 +190,7 @@ export interface Database {
           source: string;
           status: string;
           linked_transaction_id: string | null;
+          recurring_transaction_id: string | null;
           debt_id: string | null;
           user_id: string;
           created_at: string;
@@ -198,6 +199,7 @@ export interface Database {
           subscription_id: string | null;
           household_id: string | null;
           deleted_at: string | null;
+          goal_id: string | null;
         };
         Insert: Omit<Database['public']['Tables']['planned_payments']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['planned_payments']['Insert']>;

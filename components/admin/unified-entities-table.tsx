@@ -328,10 +328,12 @@ export function UnifiedEntitiesTable({
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                           category.type === "income"
                             ? "bg-sentiment-positive/10 text-sentiment-positive"
-                            : "bg-sentiment-negative/10 text-sentiment-negative"
+                            : category.type === "transfer"
+                              ? "bg-muted text-muted-foreground"
+                              : "bg-sentiment-negative/10 text-sentiment-negative"
                         }`}
                       >
-                        {category.type === "income" ? "Income" : "Expense"}
+                        {category.type === "income" ? "Income" : category.type === "transfer" ? "Transfer" : "Expense"}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground">—</TableCell>

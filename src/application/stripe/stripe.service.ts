@@ -751,6 +751,11 @@ export class StripeService {
     if (event.type === "customer.subscription.deleted") {
       const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
       const serviceRoleClient = createServiceRoleClient();
+      const { data: existingRow } = await serviceRoleClient
+        .from("app_subscriptions")
+        .select("user_id")
+        .eq("stripe_subscription_id", subscription.id)
+        .maybeSingle();
       const { error: updateError } = await serviceRoleClient
         .from("app_subscriptions")
         .update({
@@ -760,6 +765,21 @@ export class StripeService {
         .eq("stripe_subscription_id", subscription.id);
       if (updateError) {
         logger.error("[StripeService] Failed to mark subscription as cancelled", { error: updateError.message });
+      }
+      if (existingRow?.user_id) {
+        try {
+          const { data: userRow } = await serviceRoleClient
+            .from("users")
+            .select("email")
+            .eq("id", existingRow.user_id)
+            .single();
+          if (userRow?.email) {
+            const { moveContactToCancelledSegment } = await import("@/lib/utils/resend-segments");
+            await moveContactToCancelledSegment(userRow.email);
+          }
+        } catch (segmentErr) {
+          logger.error("[StripeService] Resend segment sync on subscription.deleted (non-critical):", segmentErr);
+        }
       }
       return;
     }
@@ -843,6 +863,24 @@ export class StripeService {
       throw new Error(upsertError.message);
     }
     logger.info("[StripeService] Subscription synced from subscription event", { appSubscriptionId, status });
+
+    try {
+      const { data: userRow } = await serviceRoleClient
+        .from("users")
+        .select("email, name")
+        .eq("id", userId)
+        .single();
+      if (userRow?.email) {
+        const { ensureContactInActiveSegment, moveContactToCancelledSegment } = await import("@/lib/utils/resend-segments");
+        if (status === "active" || status === "trialing") {
+          await ensureContactInActiveSegment(userRow.email, userRow.name ?? undefined);
+        } else if (status === "cancelled") {
+          await moveContactToCancelledSegment(userRow.email);
+        }
+      }
+    } catch (segmentErr) {
+      logger.error("[StripeService] Resend segment sync after subscription event (non-critical):", segmentErr);
+    }
   }
 
   /**

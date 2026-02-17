@@ -163,7 +163,7 @@ export function DashboardOverview({
   return (
     <div className="space-y-4">
       {/* Maintenance Mode Toggle */}
-      <Card className="border-primary/20">
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -190,7 +190,7 @@ export function DashboardOverview({
       </Card>
 
       {/* Health Score Card */}
-      <Card className="border-primary/20 bg-gradient-to-br from-background to-muted/20">
+      <Card className="bg-gradient-to-br from-background to-muted/20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>

@@ -362,6 +362,20 @@ export async function POST(request: NextRequest) {
 
     console.log("[SYNC] Subscription synced successfully:", upsertedSub);
 
+    try {
+      if (authUser.email) {
+        const { ensureContactInActiveSegment, moveContactToCancelledSegment } = await import("@/lib/utils/resend-segments");
+        if (status === "active" || status === "trialing") {
+          const { data: userRow } = await serviceSupabase.from("users").select("name").eq("id", authUser.id).single();
+          await ensureContactInActiveSegment(authUser.email, userRow?.name ?? undefined);
+        } else if (status === "cancelled") {
+          await moveContactToCancelledSegment(authUser.email);
+        }
+      }
+    } catch (segmentErr) {
+      console.error("[SYNC] Resend segment sync (non-critical):", segmentErr);
+    }
+
     // Invalidate subscription cache so layout/dashboard get fresh data when user navigates
     const { clearSubscriptionRequestCache } = await import("@/src/application/subscriptions/get-dashboard-subscription");
     const { invalidateUserCaches } = await import("@/src/infrastructure/utils/cache-utils");

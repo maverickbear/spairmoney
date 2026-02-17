@@ -41,6 +41,11 @@ export interface TransactionWithRelations extends BaseTransaction {
     type: string;
     balance?: number;
   } | null;
+  /** For transfers: the destination account (when transferToId is set). */
+  toAccount?: {
+    id: string;
+    name: string;
+  } | null;
   category?: {
     id: string;
     name: string;
@@ -75,6 +80,8 @@ export interface TransactionFilters {
   limit?: number;
   /** When set (YYYY-MM), return all transactions that count in this month (date in range or competencyMonth = this). */
   forEffectiveMonth?: string;
+  /** When true, exclude the incoming leg of transfers so the list shows one row per transfer (From → To). */
+  excludeIncomingTransferLegs?: boolean;
 }
 
 export interface TransactionQueryResult {
@@ -111,6 +118,7 @@ export interface Transaction extends Omit<BaseTransaction, 'date' | 'type'> {
   expenseType?: "fixed" | "variable" | null;
   competencyMonth?: string | null;
   account?: { id: string; name: string } | null;
+  toAccount?: { id: string; name: string } | null;
   category?: { id: string; name: string } | null;
   subcategory?: { id: string; name: string } | null;
   suggestedCategory?: { id: string; name: string } | null;

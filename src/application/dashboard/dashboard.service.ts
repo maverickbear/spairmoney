@@ -264,12 +264,13 @@ export class DashboardService {
       .filter((t) => t.type === "expense" && !t.transferFromId && !t.transferToId)
       .reduce((sum, t) => sum + Math.abs(getTransactionAmount(t.amount) || 0), 0);
     const expectedAnnualIncome = typeof expectedIncomeResult === "number" ? expectedIncomeResult : null;
-    let expectedMonthlyIncome = onboardingService.getMonthlyIncomeFromAnnual(expectedAnnualIncome);
+    // Never show gross monthly as "after tax". Start at 0; only set when we compute after-tax from location.
+    let expectedMonthlyIncome = 0;
     let expectedIncomeIsAfterTax = false;
 
     // Always use after-tax for expected income so the user has a real picture. When household has
     // location (country + state/province), compute monthly after-tax; otherwise do not show a
-    // before-tax comparison (set expectedMonthlyIncome to 0 until location is set).
+    // before-tax comparison (expectedMonthlyIncome stays 0 until location is set).
     if (
       expectedAnnualIncome != null &&
       expectedAnnualIncome > 0 &&
@@ -294,13 +295,10 @@ export class DashboardService {
             "[DashboardService] Using after-tax expected income for Income card",
             { annualGross: expectedAnnualIncome, monthlyAfterTax: expectedMonthlyIncome }
           );
-        } else {
-          // No location: do not use gross for comparison; user must set country & state for after-tax
-          expectedMonthlyIncome = 0;
         }
+        // No location: expectedMonthlyIncome stays 0; UI will show "Set country & state in Adjust..."
       } catch (error) {
         logger.warn("[DashboardService] Could not compute after-tax expected income:", error);
-        expectedMonthlyIncome = 0;
       }
     }
 

@@ -734,6 +734,18 @@ export class SubscriptionsService {
         updatedAt: new Date().toISOString(),
       });
 
+      try {
+        const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
+        const supabase = createServiceRoleClient();
+        const { data: userRow } = await supabase.from("users").select("email").eq("id", userId).single();
+        if (userRow?.email) {
+          const { moveContactToCancelledSegment } = await import("@/lib/utils/resend-segments");
+          await moveContactToCancelledSegment(userRow.email);
+        }
+      } catch (segmentErr) {
+        logger.error("[SubscriptionsService] Resend segment sync on cancel (non-critical):", segmentErr);
+      }
+
       return { cancelled: true };
     } catch (error) {
       logger.error("[SubscriptionsService] Error in cancelUserSubscription:", error);

@@ -44,26 +44,3 @@ export function formatExpectedIncomeWithMonthly(
   const monthly = formatMonthlyFromAnnual(annualIncome);
   return `${annual} (${monthly})`;
 }
-
-/** @deprecated Use formatExpectedAnnualIncome or formatExpectedIncomeWithMonthly */
-export function formatExpectedIncomeRange(_incomeRange: unknown): string {
-  return "";
-}
-
-/** @deprecated Use formatMonthlyFromAnnual */
-export function formatExpectedIncomeRangeShort(_incomeRange: unknown): string {
-  return "";
-}
-
-/** @deprecated Use formatMonthlyFromAnnual */
-export function formatMonthlyIncomeFromRange(_incomeRange: unknown): string {
-  return "";
-}
-
-/** @deprecated Use formatExpectedIncomeWithMonthly */
-export function formatExpectedIncomeRangeWithMonthly(
-  _incomeRange: unknown,
-  _showMonthly?: boolean
-): string {
-  return "";
-}

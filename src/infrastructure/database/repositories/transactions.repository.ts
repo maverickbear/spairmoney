@@ -47,6 +47,8 @@ export interface TransactionFilters {
   limit?: number;
   /** When set (YYYY-MM), return transactions that count in this month (date in month or competency_month = this). */
   forEffectiveMonth?: string;
+  /** When true, exclude incoming transfer legs so list shows one row per transfer. */
+  excludeIncomingTransferLegs?: boolean;
 }
 
 export class TransactionsRepository implements ITransactionsRepository {
@@ -103,6 +105,11 @@ export class TransactionsRepository implements ITransactionsRepository {
       } else {
         query = query.eq("type", filters.type);
       }
+    }
+
+    // When listing for UI: show one row per transfer (exclude incoming leg)
+    if (filters?.excludeIncomingTransferLegs) {
+      query = query.is("transfer_from_id", null);
     }
 
     if (filters?.isRecurring !== undefined) {
@@ -188,6 +195,10 @@ export class TransactionsRepository implements ITransactionsRepository {
       } else {
         query = query.eq("type", filters.type);
       }
+    }
+
+    if (filters?.excludeIncomingTransferLegs) {
+      query = query.is("transfer_from_id", null);
     }
 
     if (filters?.isRecurring !== undefined) {

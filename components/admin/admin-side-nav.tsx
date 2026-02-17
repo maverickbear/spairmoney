@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
+import { Logo } from "@/components/common/logo";
 
 const adminNavItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -41,9 +42,10 @@ export function AdminSideNav() {
     <nav className="fixed left-0 top-0 z-30 flex h-screen w-56 flex-col gap-1 border-r bg-muted/30 p-3">
       <Link
         href="/admin"
-        className="text-xs font-medium text-muted-foreground px-3 py-2 hover:text-foreground shrink-0"
+        className="flex items-center justify-center py-3 shrink-0 hover:opacity-90 transition-opacity"
+        aria-label="Admin home"
       >
-        Admin
+        <Logo variant="full" color="auto" width={140} className="shrink-0" />
       </Link>
       <div className="flex-1 min-h-0 overflow-y-auto">
         {adminNavItems.map((item) => {

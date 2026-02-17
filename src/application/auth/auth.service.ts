@@ -209,6 +209,12 @@ export class AuthService {
             } catch (welcomeError) {
               logger.error("[AuthService] Error sending welcome email (non-critical):", welcomeError);
             }
+            try {
+              const { ensureContactInActiveSegment } = await import("@/lib/utils/resend-segments");
+              await ensureContactInActiveSegment(authData.user.email, data.name);
+            } catch (segmentError) {
+              logger.error("[AuthService] Error syncing Resend segment (non-critical):", segmentError);
+            }
           }
         } catch (householdError) {
           logger.error("Error processing UserCreated event during signup:", householdError);
@@ -830,6 +836,13 @@ export class AuthService {
         logger.error("Error creating personal household during profile creation:", householdError);
         // For profile creation, we allow it to continue - household can be created later
         // This is less critical than signup since profile creation happens in various contexts
+      }
+
+      try {
+        const { ensureContactInActiveSegment } = await import("@/lib/utils/resend-segments");
+        await ensureContactInActiveSegment(data.email, data.name);
+      } catch (segmentError) {
+        logger.error("[AuthService] Error syncing Resend segment (non-critical):", segmentError);
       }
 
       return {

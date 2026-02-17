@@ -74,23 +74,24 @@ export function Logo({
 
     if (variant === "wordmark") {
       // Wordmark variant - uses full logo (icon + text)
+      // For dark/black background use official dark mode PNG (green icon + white text)
       return effectiveColor === "white"
-        ? "/assets/logos/logo-primary-darkbg.svg" // Full logo with white text for dark backgrounds
+        ? "/assets/spair-money-logo-dark-mode.png" // Official dark mode logo for black background
         : "/assets/logos/logo-primary-lightbg.svg"; // Full logo with black text for light backgrounds
     }
 
     // Full variant - use new official full logo SVGs
     if (variant === "full") {
       // For light backgrounds (purple/auto in light mode), use logo with black text
-      // For dark backgrounds (white/auto in dark mode), use logo with white text
+      // For dark/black backgrounds (white/auto in dark mode), use official dark mode PNG
       return effectiveColor === "white"
-        ? "/assets/logos/logo-primary-darkbg.svg" // Full logo with white text for dark backgrounds
+        ? "/assets/spair-money-logo-dark-mode.png" // Official dark mode logo for black background
         : "/assets/logos/logo-primary-lightbg.svg"; // Full logo with black text for light backgrounds
     }
 
     // Fallback (should not reach here, but just in case)
     return effectiveColor === "white"
-      ? "/assets/logos/logo-primary-darkbg.svg"
+      ? "/assets/spair-money-logo-dark-mode.png"
       : "/assets/logos/logo-primary-lightbg.svg";
   };
 

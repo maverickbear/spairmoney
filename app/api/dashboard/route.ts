@@ -4,6 +4,7 @@ import { AppError } from "@/src/application/shared/app-error";
 import { makeDashboardService } from "@/src/application/dashboard/dashboard.factory";
 import { makeMembersService } from "@/src/application/members/members.factory";
 import { getCacheHeaders } from "@/src/infrastructure/utils/cache-headers";
+import { getActiveHouseholdId } from "@/lib/utils/household";
 
 /**
  * GET /api/dashboard
@@ -71,6 +72,11 @@ export async function GET(request: NextRequest) {
       }
     } catch (e) {
       console.warn("[Dashboard API] Could not get session tokens:", (e as Error)?.message);
+    }
+
+    // When no householdId in query, use active household so expected income uses after-tax (country/state)
+    if (householdId == null || householdId === "") {
+      householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
     }
 
     const service = makeDashboardService();

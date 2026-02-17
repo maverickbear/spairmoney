@@ -339,6 +339,12 @@ export class TrialService {
           logger.error("[TrialService] ❌ Error sending welcome email:", welcomeEmailError);
           // Don't fail subscription creation if welcome email fails
         }
+        try {
+          const { ensureContactInActiveSegment } = await import("@/lib/utils/resend-segments");
+          await ensureContactInActiveSegment(authUser.email, userData?.name ?? undefined);
+        } catch (segmentError) {
+          logger.error("[TrialService] Resend segment sync (non-critical):", segmentError);
+        }
       }
 
       logger.info("[TrialService] Trial started successfully:", {

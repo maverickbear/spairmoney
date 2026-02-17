@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       page?: number;
       limit?: number;
       forEffectiveMonth?: string;
+      excludeIncomingTransferLegs?: boolean;
     } = {};
     
     const forEffectiveMonth = searchParams.get("forEffectiveMonth");
@@ -50,6 +51,9 @@ export async function GET(request: NextRequest) {
     }
     if (searchParams.get("type")) {
       filters.type = searchParams.get("type")! as 'income' | 'expense' | 'transfer';
+    }
+    if (searchParams.get("excludeIncomingTransferLegs") === "true") {
+      filters.excludeIncomingTransferLegs = true;
     }
     if (searchParams.get("search")) {
       filters.search = searchParams.get("search")!;

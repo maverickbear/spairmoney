@@ -150,16 +150,7 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
 
   return (
     <div>
-      {/* Show only title when blocked, full header when not blocked */}
-      {!hasAdvancedReports && !isSuperAdmin ? (
-        <PageHeader title="Reports" />
-      ) : (
-      <PageHeader
-        title="Reports"
-      >
-        <ReportFilters period={period} />
-      </PageHeader>
-      )}
+      <PageHeader title="Reports" />
 
       {/* If user doesn't have access and is not super_admin, show blocked screen with promotion */}
       {!hasAdvancedReports && !isSuperAdmin ? (
@@ -215,6 +206,10 @@ export default async function ReportsPage({ searchParams }: ReportsProps) {
               </SimpleTabsTrigger>
             </SimpleTabsList>
           </div>
+        </div>
+
+        <div className="px-4 lg:px-8 pt-4">
+          <ReportFilters period={period} />
         </div>
 
         <div className="w-full p-4 lg:p-8">

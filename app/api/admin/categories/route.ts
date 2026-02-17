@@ -53,15 +53,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!type || (type !== "income" && type !== "expense")) {
+    if (!type || (type !== "income" && type !== "expense" && type !== "transfer")) {
       return NextResponse.json(
-        { error: "Type is required and must be either 'income' or 'expense'" },
+        { error: "Type is required and must be 'income', 'expense', or 'transfer'" },
         { status: 400 }
       );
     }
     const category = await service.createSystemCategory({ 
       name: name.trim(), 
-      type: type as "income" | "expense"
+      type: type as "income" | "expense" | "transfer"
     });
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
@@ -115,7 +115,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updateData: { name?: string; type?: "income" | "expense" } = {};
+    const updateData: { name?: string; type?: "income" | "expense" | "transfer" } = {};
     if (name !== undefined) {
       if (typeof name !== "string" || name.trim() === "") {
         return NextResponse.json(
@@ -126,13 +126,13 @@ export async function PUT(request: NextRequest) {
       updateData.name = name.trim();
     }
     if (type !== undefined) {
-      if (type !== "income" && type !== "expense") {
+      if (type !== "income" && type !== "expense" && type !== "transfer") {
         return NextResponse.json(
-          { error: "Type must be either 'income' or 'expense'" },
+          { error: "Type must be 'income', 'expense', or 'transfer'" },
           { status: 400 }
         );
       }
-      updateData.type = type as "income" | "expense";
+      updateData.type = type as "income" | "expense" | "transfer";
     }
     const category = await service.updateSystemCategory(id, updateData);
     return NextResponse.json(category, { status: 200 });

@@ -148,6 +148,7 @@ export class RecurringPlannedPaymentsService {
             subcategoryId: subcategory?.id || null,
             description,
             source: "recurring",
+            recurringTransactionId: tx.id,
           };
 
           await plannedPaymentsService.createPlannedPayment(plannedPaymentData);

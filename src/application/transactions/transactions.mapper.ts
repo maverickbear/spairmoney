@@ -75,6 +75,7 @@ export class TransactionsMapper {
     row: TransactionRow,
     relations?: {
       account?: { id: string; name: string; type: string; balance?: number } | null;
+      toAccount?: { id: string; name: string } | null;
       category?: { id: string; name: string } | null;
       subcategory?: { id: string; name: string; logo?: string | null } | null;
       suggestedCategory?: { id: string; name: string } | null;
@@ -84,6 +85,7 @@ export class TransactionsMapper {
     return {
       ...this.toDomain(row),
       account: relations?.account ?? null,
+      toAccount: relations?.toAccount ?? null,
       category: relations?.category ?? null,
       subcategory: relations?.subcategory ?? null,
       suggestedCategory: relations?.suggestedCategory ?? null,

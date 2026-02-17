@@ -21,37 +21,14 @@ const workspaceRoot = process.cwd();
 const violations: ObsoleteFile[] = [];
 const checkedFiles: string[] = [];
 
-// Lista de arquivos obsoletos para verificar
+// Legacy API routes and lib/api were removed (migration complete). Add here any new obsolete paths to check.
 const obsoleteFiles: Array<{
   path: string;
   reason: string;
   v2Alternative?: string;
-}> = [
-  // Rotas API antigas
-  // Legacy API routes still present (use v2 instead)
-  { path: 'app/api/accounts/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/accounts' },
-  { path: 'app/api/accounts/[id]/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/accounts/[id]' },
-  { path: 'app/api/debts/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/debts' },
-  { path: 'app/api/debts/[id]/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/debts/[id]' },
-  { path: 'app/api/categories/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/categories' },
-  { path: 'app/api/budgets/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/budgets' },
-  { path: 'app/api/budgets/[id]/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/budgets/[id]' },
-  { path: 'app/api/goals/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/goals' },
-  { path: 'app/api/goals/[id]/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/goals/[id]' },
-  { path: 'app/api/goals/income-basis/route.ts', reason: 'Tem versão v2', v2Alternative: '/api/v2/goals/income-basis' },
-  // Already removed: app/api/transactions/*, app/api/user-subscriptions/route.ts, app/api/categories/[id]/route.ts
-];
+}> = [];
 
-// Arquivos em lib/api que violam arquitetura
-const libApiFiles: Array<{
-  path: string;
-  reason: string;
-}> = [
-  { path: 'lib/api/accounts.ts', reason: 'Deve usar Application Services' },
-  { path: 'lib/api/debts.ts', reason: 'Deve usar Application Services' },
-  { path: 'lib/api/transactions.ts', reason: 'Deve usar Application Services' },
-  { path: 'lib/api/categories.ts', reason: 'Deve usar Application Services' },
-];
+const libApiFiles: Array<{ path: string; reason: string }> = [];
 
 function findUsages(filePath: string): string[] {
   const usages: string[] = [];
@@ -151,11 +128,9 @@ function checkFile(file: { path: string; reason: string; v2Alternative?: string 
 
 console.log('🔍 Verificando arquivos obsoletos...\n');
 
-// Verificar rotas API antigas
 console.log('📁 Verificando rotas API antigas...');
 obsoleteFiles.forEach(file => checkFile(file));
 
-// Verificar arquivos em lib/api
 console.log('📦 Verificando arquivos em lib/api...');
 libApiFiles.forEach(file => checkFile(file));
 

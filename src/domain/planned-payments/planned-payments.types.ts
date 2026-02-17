@@ -18,6 +18,7 @@ export interface BasePlannedPayment {
   source: "recurring" | "debt" | "manual" | "subscription" | "goal";
   status: "scheduled" | "paid" | "skipped" | "cancelled";
   linkedTransactionId: string | null;
+  recurringTransactionId: string | null;
   debtId: string | null;
   subscriptionId: string | null;
   goalId: string | null;
@@ -43,6 +44,7 @@ export interface PlannedPaymentFormData {
   subcategoryId?: string | null;
   description?: string | null;
   source?: "recurring" | "debt" | "manual" | "subscription" | "goal";
+  recurringTransactionId?: string | null;
   debtId?: string | null;
   subscriptionId?: string | null;
   goalId?: string | null;

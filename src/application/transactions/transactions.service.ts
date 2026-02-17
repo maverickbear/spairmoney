@@ -61,7 +61,12 @@ export class TransactionsService {
 
     // Fetch related data separately to avoid RLS issues
     // Note: rows are still in snake_case format from repository
-    const accountIds = [...new Set(decryptedRows.map(t => t.account_id))];
+    const accountIds = [
+      ...new Set([
+        ...decryptedRows.map(t => t.account_id),
+        ...decryptedRows.map(t => t.transfer_to_id).filter(Boolean) as string[],
+      ]),
+    ];
     const categoryIds = [...new Set(decryptedRows.map(t => t.category_id).filter(Boolean) as string[])];
     const subcategoryIds = [...new Set(decryptedRows.map(t => t.subcategory_id).filter(Boolean) as string[])];
     const suggestedCategoryIds = [...new Set(decryptedRows.map(t => t.suggested_category_id).filter(Boolean) as string[])];
@@ -120,6 +125,7 @@ export class TransactionsService {
     // Map to domain entities with relations
     const transactions: TransactionWithRelations[] = decryptedRows.map(row => {
       const account = accountsMap.get(row.account_id);
+      const toAccount = row.transfer_to_id ? accountsMap.get(row.transfer_to_id) : null;
       const category = row.category_id ? categoriesMap.get(row.category_id) : null;
       const subcategory = row.subcategory_id ? subcategoriesMap.get(row.subcategory_id) : null;
       const suggestedCategory = row.suggested_category_id ? suggestedCategoriesMap.get(row.suggested_category_id) : null;
@@ -127,6 +133,7 @@ export class TransactionsService {
 
       return TransactionsMapper.toDomainWithRelations(row, {
         account: account ? { ...account, balance: undefined } : null,
+        toAccount: toAccount ? { id: toAccount.id, name: toAccount.name } : null,
         category: category ? { id: category.id, name: category.name } : null,
         subcategory: subcategory || null,
         suggestedCategory: suggestedCategory || null,
@@ -505,6 +512,10 @@ export class TransactionsService {
 
     const row = await this.repository.update(id, updateData);
 
+    // Remove any planned payments generated from this transaction (recurring or no longer recurring) so the view stays consistent
+    const plannedPaymentsService = makePlannedPaymentsService();
+    await plannedPaymentsService.deleteByRecurringTransactionIds([id]);
+
     // Sync credit-card debt for affected accounts
     const creditAccountIdsToSync = new Set<string>([row.account_id]);
     if (row.type === "transfer" && row.transfer_to_id) {
@@ -597,6 +608,7 @@ export class TransactionsService {
 
     const plannedPaymentsService = makePlannedPaymentsService();
     await plannedPaymentsService.deleteByLinkedTransactionIds([id]);
+    await plannedPaymentsService.deleteByRecurringTransactionIds([id]);
 
     await this.repository.delete(id);
 
@@ -658,6 +670,7 @@ export class TransactionsService {
 
     const plannedPaymentsService = makePlannedPaymentsService();
     await plannedPaymentsService.deleteByLinkedTransactionIds(ids);
+    await plannedPaymentsService.deleteByRecurringTransactionIds(ids);
 
     await this.repository.deleteMultiple(ids);
 

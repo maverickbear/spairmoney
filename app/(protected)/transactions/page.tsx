@@ -65,6 +65,7 @@ import {
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Input } from "@/components/ui/input";
 import { formatTransactionDate, formatShortDate, parseDateWithoutTimezone, parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
+import { formatTransferLabel } from "@/src/presentation/utils/format-transfer-label";
 import { format } from "date-fns";
 import { exportTransactionsToCSV, downloadCSV } from "@/lib/csv/export";
 import { useToast } from "@/components/toast-provider";
@@ -688,6 +689,7 @@ export default function TransactionsPage() {
       const limit = isActuallyMobile ? 10 : itemsPerPage;
       params.append("page", currentPage.toString());
       params.append("limit", limit.toString());
+      params.append("excludeIncomingTransferLegs", "true");
 
       // Use API v2 route to get transactions (descriptions are decrypted on server)
       // Add cache busting timestamp to force fresh data after deletions
@@ -2055,6 +2057,7 @@ export default function TransactionsPage() {
                     <span className={`rounded-lg px-1.5 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs ${
                       tx.type === "income" ? "bg-sentiment-positive/10 text-sentiment-positive" :
                       tx.type === "expense" ? "bg-sentiment-negative/10 text-sentiment-negative" :
+                      tx.type === "transfer" ? "bg-white dark:bg-card border border-border text-muted-foreground" :
                       "bg-interactive-primary/10 text-interactive-primary"
                     }`}>
                       {tx.type}
@@ -2066,7 +2069,11 @@ export default function TransactionsPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-xs md:text-sm hidden md:table-cell">{tx.account?.name}</TableCell>
+                <TableCell className="text-xs md:text-sm hidden md:table-cell">
+                  {tx.type === "transfer" && tx.transferToId && tx.account?.name && tx.toAccount?.name
+                    ? `${tx.account.name} → ${tx.toAccount.name}`
+                    : tx.account?.name}
+                </TableCell>
                 <TableCell 
                   className="text-xs md:text-sm hidden sm:table-cell"
                 >
@@ -2190,13 +2197,16 @@ export default function TransactionsPage() {
                       }}
                       title="Click to edit description"
                     >
-                      {tx.description || "-"}
+                      {tx.type === "transfer" && tx.transferToId && tx.account?.name && tx.toAccount?.name
+                        ? formatTransferLabel(tx.account.name, tx.toAccount.name)
+                        : (tx.description || "-")}
                     </span>
                   )}
                 </TableCell>
                 <TableCell className={`text-right font-medium text-xs md:text-sm ${
                   tx.type === "income" ? "text-green-600 dark:text-green-400" :
-                  tx.type === "expense" ? "text-red-600 dark:text-red-400" : ""
+                  tx.type === "expense" ? "text-red-600 dark:text-red-400" :
+                  tx.type === "transfer" ? "text-foreground" : ""
                 }`}>
                   <div className="flex flex-col items-end gap-0.5">
                     <span>{tx.type === "expense" ? "-" : ""}{formatMoney(tx.amount)}</span>
@@ -2333,7 +2343,11 @@ export default function TransactionsPage() {
                   <span className="text-muted-foreground">Type</span>
                   <span className="capitalize">{transactionSummaryModal.type}</span>
                   <span className="text-muted-foreground">Account</span>
-                  <span>{transactionSummaryModal.account?.name ?? "—"}</span>
+                  <span>
+                    {transactionSummaryModal.type === "transfer" && transactionSummaryModal.transferToId && transactionSummaryModal.account?.name && transactionSummaryModal.toAccount?.name
+                      ? formatTransferLabel(transactionSummaryModal.account.name, transactionSummaryModal.toAccount.name)
+                      : (transactionSummaryModal.account?.name ?? "—")}
+                  </span>
                   <span className="text-muted-foreground">Category</span>
                   <span>
                     {transactionSummaryModal.category?.name
@@ -2341,9 +2355,11 @@ export default function TransactionsPage() {
                       : "—"}
                   </span>
                   <span className="text-muted-foreground">Description</span>
-                  <span className="break-words">{transactionSummaryModal.description || "—"}</span>
+                  <span className="break-words">
+                    {transactionSummaryModal.type === "transfer" && transactionSummaryModal.transferToId ? "—" : (transactionSummaryModal.description || "—")}
+                  </span>
                   <span className="text-muted-foreground">Amount</span>
-                  <span className={`font-medium ${transactionSummaryModal.type === "income" ? "text-green-600 dark:text-green-400" : transactionSummaryModal.type === "expense" ? "text-red-600 dark:text-red-400" : ""}`}>
+                  <span className={`font-medium ${transactionSummaryModal.type === "income" ? "text-green-600 dark:text-green-400" : transactionSummaryModal.type === "expense" ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
                     {transactionSummaryModal.type === "expense" ? "-" : ""}{formatMoney(transactionSummaryModal.amount)}
                   </span>
                 </div>
