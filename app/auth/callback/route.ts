@@ -165,39 +165,37 @@ export async function GET(request: NextRequest) {
       console.log(`[OAUTH-CALLBACK] No pending invitation found for ${userEmail} - proceeding with signup`);
     }
 
-    // Check if email is already confirmed by Google
-    // If confirmed and it's a signup, we can skip OTP and proceed directly to profile creation
-    // For signin, we still require OTP for security (even if email is confirmed)
-    const emailConfirmed = !!authUser.email_confirmed_at;
-    
-    if (emailConfirmed && isSignup) {
-      // Email is confirmed and this is a signup - create profile and redirect to dashboard
-      console.log("[OAUTH-CALLBACK] Email already confirmed by Google for signup, creating profile directly");
-      
-      // Create user profile and household
+    // For every new signup, create user profile and household immediately (before OTP or redirect).
+    // This ensures the user has a profile even if they drop off before OTP or email_confirmed_at is not set yet.
+    if (isSignup) {
       try {
         const { makeAuthService } = await import("@/src/application/auth/auth.factory");
         const authService = makeAuthService();
-        
+
         const profileResult = await authService.createUserProfile({
           userId: authUser.id,
           email: userEmail,
           name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || null,
           avatarUrl: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
         });
-        
+
         if (!profileResult.success) {
           console.error("[OAUTH-CALLBACK] Failed to create user profile:", profileResult.message);
-          // Continue anyway - profile might already exist
         } else {
-          console.log("[OAUTH-CALLBACK] ✅ User profile created successfully");
+          console.log("[OAUTH-CALLBACK] ✅ User profile created for signup");
         }
       } catch (profileError) {
         console.error("[OAUTH-CALLBACK] Error creating user profile:", profileError);
-        // Continue anyway - profile might already exist
       }
-      
-      // Sync session with server
+    }
+
+    // Check if email is already confirmed by Google
+    // If confirmed and it's a signup, skip OTP and redirect to app
+    // For signin, we still require OTP for security (even if email is confirmed)
+    const emailConfirmed = !!authUser.email_confirmed_at;
+
+    if (emailConfirmed && isSignup) {
+      // Profile already created above; sync session and redirect to dashboard
       try {
         await fetch(`${requestUrl.origin}/api/auth/sync-session`, {
           method: "POST",

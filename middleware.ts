@@ -263,7 +263,7 @@ export async function middleware(request: NextRequest) {
         if (adminRow) {
           // Portal admin (only in admin table) — allow
         } else {
-          const { data: userData } = await supabase.from("core.users").select("role").eq("id", user.id).single();
+          const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).single();
           if (userData?.role !== "super_admin") {
             // Not a portal admin: send to admin login so they can sign in with an admin account (separate environment)
             const redirectUrl = new URL("/admin/login", request.url);
@@ -364,7 +364,7 @@ export async function middleware(request: NextRequest) {
             if (adminRow) {
               redirectPath = "/admin";
             } else {
-              const { data: userData } = await supabase.from("core.users").select("role").eq("id", user.id).single();
+              const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).single();
               if (userData?.role === "super_admin") redirectPath = "/admin";
             }
             return NextResponse.redirect(new URL(redirectPath, request.url));
@@ -420,7 +420,7 @@ export async function middleware(request: NextRequest) {
               // Portal admin (admin table only) — allow access during maintenance
             } else {
               const { data: userData } = await supabase
-                .from("core.users")
+                .from("users")
                 .select("role, is_blocked")
                 .eq("id", user.id)
                 .single();

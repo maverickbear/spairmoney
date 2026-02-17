@@ -512,7 +512,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           // If it doesn't exist, create it (edge case: user was created via OAuth but profile wasn't)
           try {
             const { data: userData, error: userError } = await supabase
-              .from("core.users")
+              .from("users")
               .select("id")
               .eq("id", currentUser.id)
               .maybeSingle();
@@ -552,12 +552,12 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         // Check if user is blocked
         try {
           const { data: userData, error: userError } = await supabase
-            .from("core.users")
-            .select("isBlocked, role")
+            .from("users")
+            .select("is_blocked, role")
             .eq("id", currentUser.id)
             .single();
 
-          if (!userError && userData?.isBlocked && userData?.role !== "super_admin") {
+          if (!userError && userData?.is_blocked && userData?.role !== "super_admin") {
             await supabase.auth.signOut();
             router.push("/account-blocked");
             return;
