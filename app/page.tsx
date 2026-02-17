@@ -181,7 +181,29 @@ async function LandingOrMaintenance(): Promise<ReactNode> {
   return <LandingView />;
 }
 
-export default function HomePage() {
+/**
+ * If OAuth redirect landed on the root (e.g. www.spair.co/?code=...) instead of
+ * /auth/callback, redirect to the callback so the code can be exchanged and
+ * the user/household created.
+ */
+async function OAuthCodeRedirect({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const code = typeof params?.code === "string" ? params.code : Array.isArray(params?.code) ? params.code[0] : null;
+  if (!code) return null;
+  const callbackUrl = new URL("/auth/callback", process.env.NEXT_PUBLIC_APP_URL || "https://spair.co");
+  callbackUrl.searchParams.set("code", code);
+  const state = typeof params?.state === "string" ? params.state : Array.isArray(params?.state) ? params.state[0] : null;
+  if (state) callbackUrl.searchParams.set("state", state);
+  redirect(callbackUrl.pathname + callbackUrl.search);
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  await OAuthCodeRedirect({ searchParams });
+
   return (
     <>
       <Suspense fallback={null}>

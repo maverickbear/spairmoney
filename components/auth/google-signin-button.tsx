@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { supabase } from "@/src/infrastructure/database/supabase-client";
 
 interface GoogleSignInButtonProps {
   variant?: "signin" | "signup";
@@ -11,7 +12,12 @@ interface GoogleSignInButtonProps {
 
 /**
  * Google Sign In Button Component
- * Handles Google OAuth authentication flow
+ * Handles Google OAuth authentication flow.
+ *
+ * IMPORTANT: OAuth must be initiated from the client (browser) so the Supabase
+ * PKCE code_verifier is stored in a cookie. If initiated from the server (API route),
+ * the code_verifier never reaches the browser, so when the user returns to /auth/callback
+ * the exchange fails and we never create public.users or households (only auth.users exists).
  */
 export function GoogleSignInButton({ variant = "signin", className }: GoogleSignInButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -28,31 +34,36 @@ export function GoogleSignInButton({ variant = "signin", className }: GoogleSign
   async function handleGoogleSignIn() {
     try {
       setLoading(true);
-      // Store that Google is being used before redirect
       if (typeof window !== "undefined") {
         localStorage.setItem("lastAuthMethod", "google");
       }
-      const response = await fetch("/api/v2/auth/google-signin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+
+      // Build callback URL on the same origin so the code_verifier cookie is sent when user returns.
+      // Use canonical app URL so redirect lands where the app is deployed (e.g. spair.co).
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "https://spair.co")).replace(/\/?$/, "");
+      const callbackUrl = new URL("/auth/callback", `${appUrl}/`);
+      callbackUrl.searchParams.set("flow", variant);
+      callbackUrl.searchParams.set("redirectTo", "/dashboard");
+
+      const prompt = variant === "signup" ? "select_account consent" : "consent";
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl.toString(),
+          queryParams: {
+            access_type: "offline",
+            prompt,
+          },
         },
-        body: JSON.stringify({
-          flow: variant, // Pass "signin" or "signup" to distinguish the flow
-        }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        console.error("Error signing in with Google:", result.error);
+      if (error) {
+        console.error("Error signing in with Google:", error.message);
         setLoading(false);
         return;
       }
-
-      // Redirect to the OAuth URL
-      if (result.url) {
-        window.location.href = result.url;
+      if (data?.url) {
+        window.location.href = data.url;
       }
     } catch (error) {
       console.error("Unexpected error:", error);

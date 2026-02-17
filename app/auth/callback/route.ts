@@ -59,10 +59,10 @@ export async function GET(request: NextRequest) {
       console.log("[OAUTH-CALLBACK] Available cookies:", allCookies.map(c => c.name).join(", "));
     }
 
-    // Exchange the code for a session temporarily to get user info
-    // We'll sign out and require OTP verification before final login
-    // Note: exchangeCodeForSession requires the code verifier from cookies for PKCE flow
-    // The @supabase/ssr package should automatically read the code verifier from cookies
+    // Exchange the code for a session (requires PKCE code_verifier in cookies).
+    // The code_verifier is only present if OAuth was initiated from the client (browser);
+    // if it was initiated from an API route, the verifier never reaches the browser and
+    // this exchange fails, so we never create public.users or households.
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError || !data.session || !data.user) {

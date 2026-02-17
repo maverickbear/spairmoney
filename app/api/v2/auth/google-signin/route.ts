@@ -4,10 +4,13 @@ import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * POST /api/v2/auth/google-signin
- * Initiates Google OAuth sign-in flow
- * 
- * Note: OAuth flows typically need to happen client-side due to redirects.
- * This endpoint returns the OAuth URL for the client to redirect to.
+ * Returns the Google OAuth URL for the client to redirect to.
+ *
+ * NOTE: The main Google sign-in flow is initiated from the client (GoogleSignInButton
+ * using supabase.auth.signInWithOAuth) so the PKCE code_verifier is stored in the
+ * browser. If OAuth is initiated from this API route, the code_verifier never reaches
+ * the browser, so /auth/callback exchangeCodeForSession fails and public.users +
+ * households are never created. This endpoint is kept for server-side redirect use cases.
  */
 
 export async function POST(request: NextRequest) {
