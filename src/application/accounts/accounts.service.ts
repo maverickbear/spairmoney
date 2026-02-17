@@ -298,22 +298,23 @@ export class AccountsService {
   }
 
   /**
-   * Get account by ID with institution information
+   * Get account by ID with owner IDs (for edit form).
+   * Loads directly from the accounts table and account_owners.
    */
-  async getAccountById(id: string): Promise<BaseAccount & { institutionName?: string | null; institutionLogo?: string | null }> {
+  async getAccountById(id: string): Promise<BaseAccount & { ownerIds?: string[] }> {
     // Verify account ownership
     await requireAccountOwnership(id);
-    
-    // Get account from repository
+
     const accountRow = await this.repository.findById(id);
-    
     if (!accountRow) {
       throw new AppError("Account not found", 404);
     }
-    
+
     const account = AccountsMapper.toDomain(accountRow);
-    
-    return account;
+    const owners = await this.repository.getAccountOwners(id);
+    const ownerIds = owners.map((o) => o.owner_id);
+
+    return { ...account, ownerIds };
   }
 
   /**

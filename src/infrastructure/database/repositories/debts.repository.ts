@@ -134,6 +134,34 @@ export class DebtsRepository {
   }
 
   /**
+   * Find debt by account ID and loan type (e.g. single credit_card debt per account)
+   */
+  async findByAccountIdAndLoanType(
+    accountId: string,
+    loanType: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<DebtRow | null> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: debt, error } = await supabase
+      .from("debts")
+      .select("id, name, loan_type, initial_amount, down_payment, current_balance, interest_rate, total_months, first_payment_date, monthly_payment, payment_frequency, payment_amount, principal_paid, interest_paid, additional_contributions, additional_contribution_amount, priority, description, account_id, is_paid_off, is_paused, paid_off_at, status, next_due_date, created_at, updated_at, user_id, household_id, deleted_at")
+      .eq("account_id", accountId)
+      .eq("loan_type", loanType)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      logger.error("[DebtsRepository] Error fetching debt by account and loan type:", error);
+      throw new Error(`Failed to fetch debt: ${error.message}`);
+    }
+
+    return debt as DebtRow | null;
+  }
+
+  /**
    * Create a new debt
    */
   async create(data: {

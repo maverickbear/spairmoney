@@ -1,17 +1,23 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Image from "next/image";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Edit, Trash2, Loader2, Star } from "lucide-react";
 import { AccountForm } from "@/components/forms/account-form";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useToast } from "@/components/toast-provider";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { PageHeader } from "@/components/common/page-header";
 import { useWriteGuard } from "@/hooks/use-write-guard";
 import { MobileAddBar } from "@/components/common/mobile-add-bar";
 import { AddAccountDropdown } from "@/src/presentation/components/features/accounts/add-account-dropdown";
-import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { AccountCard } from "@/components/banking/account-card";
 import { DeleteAccountWithTransferDialog } from "@/src/presentation/components/features/accounts/delete-account-with-transfer-dialog";
 import {
@@ -31,7 +37,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/components/common/money";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getInitials, isValidAvatarUrl } from "@/lib/utils/avatar";
 
@@ -47,6 +52,8 @@ interface Account {
   type: string;
   balance: number;
   creditLimit?: number | null;
+  initialBalance?: number | null;
+  dueDayOfMonth?: number | null;
   householdName?: string | null;
   ownerIds?: string[];
   /** Per-owner details for avatars (photo or initials); when multiple, show side-by-side */
@@ -67,21 +74,20 @@ export default function AccountsPage() {
   const { toast } = useToast();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess, canWrite } = useWriteGuard();
-  const breakpoint = useBreakpoint();
-  const isDesktop = breakpoint === "lg" || breakpoint === "xl" || breakpoint === "2xl";
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [, setHasLoaded] = useState(false);
   const [accountLimit, setAccountLimit] = useState<{ current: number; limit: number } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteAccountDialogOpen, setDeleteAccountDialogOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
   const [transferToAccountId, setTransferToAccountId] = useState<string>("");
-  const [checkingTransactions, setCheckingTransactions] = useState(false);
+  const [, setCheckingTransactions] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [, setLoadingEditAccount] = useState(false);
 
   // Update ref when perf changes (but don't trigger re-renders)
   useEffect(() => {
@@ -198,8 +204,6 @@ export default function AccountsPage() {
   }
 
   async function performDelete(id: string, transferToId?: string) {
-    const accountToDelete = accounts.find(a => a.id === id);
-    
     // Set loading state - account stays visible in table with loading indicator
     setDeletingId(id);
 
@@ -409,7 +413,6 @@ export default function AccountsPage() {
                 <TableRow>
                   <TableHead>Account Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Bank</TableHead>
                   <TableHead>Owner</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
                   <TableHead className="text-right">Credit Limit</TableHead>
@@ -467,44 +470,17 @@ export default function AccountsPage() {
                               <span className="text-xs text-muted-foreground">Deleting...</span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
-                            {account.institutionLogo && (
-                              <img 
-                                src={account.institutionLogo} 
-                                alt={account.institutionName || 'Bank logo'} 
-                                className="h-5 w-5 rounded object-contain"
-                              />
+                          <div className="font-medium flex items-center gap-1.5">
+                            {account.name}
+                            {account.isDefault && (
+                              <Star className="h-3 w-3 text-yellow-500 fill-current" />
                             )}
-                            <div>
-                              <div className="font-medium flex items-center gap-1.5">
-                                {account.name}
-                                {account.isDefault && (
-                                  <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                                )}
-                              </div>
-                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize">
                             {typeDisplayNames[account.type] || account.type}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {account.institutionName ? (
-                            <div className="flex items-center gap-2">
-                              {account.institutionLogo && (
-                                <img 
-                                  src={account.institutionLogo} 
-                                  alt={account.institutionName} 
-                                  className="h-4 w-4 rounded object-contain"
-                                />
-                              )}
-                              <span className="text-sm">{account.institutionName}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
                         </TableCell>
                         <TableCell>
                           {account.householdName ? (
@@ -523,12 +499,13 @@ export default function AccountsPage() {
                                   <div key={owner.id || `owner-${idx}`} className="relative flex-shrink-0">
                                     {isValidAvatarUrl(owner.avatarUrl) ? (
                                       <>
-                                        <img
+                                        <Image
                                           src={owner.avatarUrl!}
                                           alt={owner.name || "Owner"}
+                                          width={32}
+                                          height={32}
+                                          unoptimized
                                           className="h-8 w-8 rounded-full object-cover border-2 border-background"
-                                          loading="eager"
-                                          decoding="async"
                                           onError={(e) => {
                                             const img = e.currentTarget;
                                             img.style.display = "none";
@@ -680,12 +657,26 @@ export default function AccountsPage() {
                     )}
                     <AccountCard
                       account={account}
-                      onEdit={(id) => {
+                      onEdit={async (id) => {
                         if (!checkWriteAccess()) return;
-                        const accountToEdit = accounts.find(a => a.id === id);
-                        if (accountToEdit) {
-                          setSelectedAccount(accountToEdit);
+                        setLoadingEditAccount(true);
+                        try {
+                          const res = await fetch(`/api/v2/accounts/${id}`);
+                          if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            throw new Error(err.error || "Failed to load account");
+                          }
+                          const data = await res.json();
+                          setSelectedAccount(data as Account);
                           setIsFormOpen(true);
+                        } catch (e) {
+                          toast({
+                            title: "Error",
+                            description: e instanceof Error ? e.message : "Failed to load account",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setLoadingEditAccount(false);
                         }
                       }}
                       onDelete={handleDelete}
@@ -702,21 +693,39 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <AccountForm
-        open={isFormOpen}
-        onOpenChange={(open) => {
-          setIsFormOpen(open);
-          if (!open) {
-            setAccountLimit(null);
-          }
-        }}
-        account={selectedAccount || undefined}
-        onSuccess={() => {
-          loadAccounts(true); // Force refresh to bypass cache
-          loadAccountLimit();
-        }}
-        initialAccountLimit={accountLimit}
-      />
+      <Sheet open={isFormOpen} onOpenChange={(open) => {
+        setIsFormOpen(open);
+        if (!open) {
+          setSelectedAccount(null);
+          setAccountLimit(null);
+        }
+      }}>
+        <SheetContent
+          side="right"
+          className="flex flex-col w-full sm:max-w-[32.2rem] !p-0 h-full"
+        >
+          <SheetHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border text-left">
+            <SheetTitle>{selectedAccount ? "Edit Account" : "Add Account"}</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <AccountForm
+              key={selectedAccount?.id ?? "new"}
+              open={isFormOpen}
+              onOpenChange={(open) => {
+                setIsFormOpen(open);
+                if (!open) setAccountLimit(null);
+              }}
+              account={selectedAccount || undefined}
+              onSuccess={() => {
+                loadAccounts(true);
+                loadAccountLimit();
+              }}
+              initialAccountLimit={accountLimit}
+              variant="embedded"
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <DeleteAccountWithTransferDialog
         open={deleteAccountDialogOpen}

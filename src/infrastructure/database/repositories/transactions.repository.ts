@@ -618,6 +618,63 @@ export class TransactionsRepository implements ITransactionsRepository {
   }
 
   /**
+   * Get minimal transaction rows for credit card debt balance calculation.
+   * Returns type, amount, transfer_to_id, transfer_from_id for all transactions on the account.
+   */
+  async findRowsForCreditCardDebtBalance(
+    accountId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<{ type: string; amount: number; transfer_to_id: string | null; transfer_from_id: string | null }>> {
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: transactions, error } = await supabase
+      .from("transactions")
+      .select("type, amount, transfer_to_id, transfer_from_id")
+      .eq("account_id", accountId)
+      .is("deleted_at", null);
+
+    if (error) {
+      logger.error("[TransactionsRepository] Error fetching transactions for credit card debt balance:", error);
+      return [];
+    }
+
+    return (transactions || []).map(tx => ({
+      type: tx.type,
+      amount: Number(tx.amount) || 0,
+      transfer_to_id: tx.transfer_to_id ?? null,
+      transfer_from_id: tx.transfer_from_id ?? null,
+    }));
+  }
+
+  /**
+   * Compute credit-card debt balance for an account from transactions.
+   * Balance = sum(expense amounts) − sum(incoming transfer amounts).
+   */
+  async computeCreditCardDebtBalance(
+    accountId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<number> {
+    const rows = await this.findRowsForCreditCardDebtBalance(
+      accountId,
+      accessToken,
+      refreshToken
+    );
+    let expenseTotal = 0;
+    let paymentTotal = 0;
+    for (const row of rows) {
+      const amount = Math.abs(Number(row.amount)) || 0;
+      if (row.type === "expense") {
+        expenseTotal += amount;
+      } else if (row.type === "transfer" && row.transfer_from_id) {
+        paymentTotal += amount;
+      }
+    }
+    return Math.max(0, Math.round((expenseTotal - paymentTotal) * 100) / 100);
+  }
+
+  /**
    * Call SQL function for transfer creation
    */
   async createTransferWithLimit(params: {
@@ -685,11 +742,13 @@ export class TransactionsRepository implements ITransactionsRepository {
       parsedData = parsedData[0];
     }
 
-    // Extract outgoing_id
+    // Extract outgoing transaction id (SQL may return outgoing_id, outgoing_transaction_id, etc.)
     if (parsedData && typeof parsedData === 'object') {
-      // Try different possible property names
-      const outgoingId = parsedData.outgoing_id || parsedData.outgoingId || parsedData.id;
-      
+      const outgoingId =
+        parsedData.outgoing_transaction_id ??
+        parsedData.outgoing_id ??
+        parsedData.outgoingId ??
+        parsedData.id;
       if (outgoingId && typeof outgoingId === 'string') {
         return { id: outgoingId };
       }

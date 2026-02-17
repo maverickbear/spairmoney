@@ -114,6 +114,16 @@ export interface ITransactionsRepository {
     amount: number;
     date: string;
   }>>;
+  findRowsForCreditCardDebtBalance(
+    accountId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<Array<{ type: string; amount: number; transfer_to_id: string | null; transfer_from_id: string | null }>>;
+  computeCreditCardDebtBalance(
+    accountId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<number>;
   findByIdWithSuggestions(id: string): Promise<TransactionRow | null>;
   clearSuggestions(id: string): Promise<TransactionRow>;
   findUncategorizedForSuggestions(

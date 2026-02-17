@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { TotalBudgetsWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
+import { WidgetEmptyState } from "./widget-empty-state";
 import { ShoppingCart, UtensilsCrossed, Home, Car, Ticket, Heart, Wallet, LucideIcon, ChevronRight } from "lucide-react";
 
 interface TotalBudgetsWidgetProps {
@@ -12,6 +13,24 @@ interface TotalBudgetsWidgetProps {
 
 export function TotalBudgetsWidget({ data, className }: TotalBudgetsWidgetProps) {
   if (!data) return null;
+
+  const hasBudgets = data.categories.length > 0 && data.totalAmount > 0;
+
+  if (!hasBudgets) {
+    return (
+      <WidgetCard title="Total budgets" className={className}>
+        <WidgetEmptyState
+          title="Set budgets"
+          description="Track your spending limits."
+          primaryAction={{
+            label: "Create Budget",
+            href: "/planning/budgets",
+          }}
+          icon={Wallet}
+        />
+      </WidgetCard>
+    );
+  }
 
   const totalSpent = data.categories.reduce((sum, cat) => sum + cat.spent, 0);
   const totalRemaining = data.totalAmount - totalSpent;
@@ -46,7 +65,7 @@ export function TotalBudgetsWidget({ data, className }: TotalBudgetsWidgetProps)
 
         {/* Allocation Bar */}
         <div className="h-4 w-full flex rounded-full overflow-hidden bg-muted">
-          {data.categories.map((cat, i) => (
+          {data.categories.map((cat) => (
             <div
               key={cat.id}
               style={{ 

@@ -2,10 +2,10 @@
 
 import { RecurringWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
+import { WidgetEmptyState } from "./widget-empty-state";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight } from "lucide-react";
+import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, CalendarClock } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/common/money";
 import { differenceInCalendarDays, isToday, isTomorrow, parse } from "date-fns";
 
@@ -14,8 +14,23 @@ interface RecurringWidgetProps {
   className?: string;
 }
 
+const PLANNED_PAYMENTS_EMPTY_DESCRIPTION =
+  "A planned payment is a future expense or income you schedule—for example a bill, a transfer, or a one-off payment—so you can see what's coming up.";
+
 export function RecurringWidget({ data, className }: RecurringWidgetProps) {
   if (!data) return null;
+
+  if (data.items.length === 0) {
+    return (
+      <WidgetCard title="Planned Payments" className={className}>
+        <WidgetEmptyState
+          title="No planned payments"
+          description={PLANNED_PAYMENTS_EMPTY_DESCRIPTION}
+          icon={CalendarClock}
+        />
+      </WidgetCard>
+    );
+  }
 
   const SeeAllLink = () => (
     <Link 

@@ -578,6 +578,8 @@ Ensure all environment variables are set:
 
 ### Available Documentation
 
+- 📖 **[App Overview](docs/APP_OVERVIEW.md)** - What the app is, tech stack, architecture, and links to all feature docs
+- 📁 **[Feature documentation](docs/features/)** - One document per feature (Auth, Dashboard, Accounts, Transactions, Billing, etc.)
 - 📊 **[Complete Project Analysis](docs/ANALISE_PROJETO_COMPLETA.md)** - Comprehensive analysis of architecture, issues, and recommendations
 - 🏗️ **[Architecture Rules](.cursorrules)** - Source of truth for all architectural patterns and rules
 - ✅ **[Migration Complete Report](docs/MIGRATION_COMPLETE_REPORT.md)** - Full report on the completed migration to Clean Architecture

@@ -4,6 +4,7 @@
  */
 
 import { DebtsRepository } from "@/src/infrastructure/database/repositories/debts.repository";
+import { ITransactionsRepository } from "@/src/infrastructure/database/repositories/interfaces/transactions.repository.interface";
 import { DebtsMapper } from "./debts.mapper";
 import { DebtFormData } from "../../domain/debts/debts.validations";
 import { BaseDebt, DebtWithCalculations } from "../../domain/debts/debts.types";
@@ -24,7 +25,10 @@ import { makePlannedPaymentsService } from "../planned-payments/planned-payments
 export class DebtsService {
   private debtPlannedPaymentsService: DebtPlannedPaymentsService;
 
-  constructor(private repository: DebtsRepository) {
+  constructor(
+    private repository: DebtsRepository,
+    private transactionsRepository?: ITransactionsRepository
+  ) {
     this.debtPlannedPaymentsService = new DebtPlannedPaymentsService();
   }
 
@@ -39,6 +43,49 @@ export class DebtsService {
 
     if (rows.length === 0) {
       return [];
+    }
+
+    // Reconcile credit-card debts: current_balance must match sum of expenses − payments for account_id
+    if (this.transactionsRepository) {
+      await Promise.all(
+        rows
+          .filter(
+            (d) =>
+              d.loan_type === "credit_card" &&
+              d.account_id != null &&
+              d.account_id !== ""
+          )
+          .map(async (debt) => {
+            try {
+              const computedBalance =
+                await this.transactionsRepository!.computeCreditCardDebtBalance(
+                  debt.account_id!,
+                  accessToken,
+                  refreshToken
+                );
+              if (
+                Math.abs(computedBalance - debt.current_balance) > 0.01
+              ) {
+                const now = formatTimestamp(new Date());
+                const isPaidOff = computedBalance <= 0;
+                await this.repository.update(debt.id, {
+                  currentBalance: computedBalance,
+                  isPaidOff,
+                  paidOffAt: isPaidOff ? now : debt.paid_off_at,
+                  status: isPaidOff ? "closed" : "active",
+                  updatedAt: now,
+                });
+                debt.current_balance = computedBalance;
+                debt.is_paid_off = isPaidOff;
+              }
+            } catch (err) {
+              logger.error(
+                `[DebtsService] Failed to reconcile credit-card debt ${debt.id}:`,
+                err
+              );
+            }
+          })
+      );
     }
 
     // Calculate metrics for each debt and update if needed
@@ -66,14 +113,21 @@ export class DebtsService {
           description: debt.description,
         };
 
-        // Calculate payments based on date
-        const calculatedPayments = calculatePaymentsFromDate(debtForCalculation);
-        
-        // Update debt in database if calculated values are different
-        const needsUpdate = 
-          Math.abs(calculatedPayments.principalPaid - debt.principal_paid) > 0.01 ||
-          Math.abs(calculatedPayments.interestPaid - debt.interest_paid) > 0.01 ||
-          Math.abs(calculatedPayments.currentBalance - debt.current_balance) > 0.01;
+        // Calculate payments based on date (skip for credit_card; balance is driven by transactions)
+        const calculatedPayments =
+          debt.loan_type === "credit_card"
+            ? { ...debtForCalculation, currentBalance: debt.current_balance, principalPaid: debt.principal_paid, interestPaid: debt.interest_paid }
+            : calculatePaymentsFromDate(debtForCalculation);
+
+        // Update debt in database if calculated values are different (non–credit-card only)
+        const needsUpdate =
+          debt.loan_type !== "credit_card" &&
+          (Math.abs(calculatedPayments.principalPaid - debt.principal_paid) >
+            0.01 ||
+            Math.abs(calculatedPayments.interestPaid - debt.interest_paid) >
+              0.01 ||
+            Math.abs(calculatedPayments.currentBalance - debt.current_balance) >
+              0.01);
 
         if (needsUpdate && !debt.is_paused && !debt.is_paid_off) {
           const newBalance = Math.max(0, calculatedPayments.currentBalance);
@@ -246,6 +300,57 @@ export class DebtsService {
     }
 
     return debt;
+  }
+
+  /**
+   * Create a minimal credit-card debt row from a credit account (used by credit-card-debt sync).
+   * Does not trigger planned payments generation.
+   */
+  async createCreditCardDebtFromAccount(params: {
+    accountId: string;
+    accountName: string;
+    currentBalance: number;
+    userId: string;
+    householdId: string | null;
+  }): Promise<BaseDebt> {
+    const id = crypto.randomUUID();
+    const now = formatTimestamp(new Date());
+    const firstPaymentDate = formatDateOnly(new Date());
+
+    // Credit card is revolving: initial_amount may be 0 (Supabase allows it for loan_type = 'credit_card')
+    const debtRow = await this.repository.create({
+      id,
+      name: `Credit: ${params.accountName}`,
+      loanType: "credit_card",
+      initialAmount: params.currentBalance,
+      downPayment: 0,
+      currentBalance: params.currentBalance,
+      interestRate: 0,
+      totalMonths: null,
+      firstPaymentDate,
+      startDate: firstPaymentDate,
+      monthlyPayment: 0,
+      paymentFrequency: "monthly",
+      paymentAmount: null,
+      principalPaid: 0,
+      interestPaid: 0,
+      additionalContributions: false,
+      additionalContributionAmount: null,
+      priority: "Medium",
+      description: null,
+      accountId: params.accountId,
+      isPaidOff: false,
+      isPaused: false,
+      paidOffAt: null,
+      status: "active",
+      nextDueDate: null,
+      userId: params.userId,
+      householdId: params.householdId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return DebtsMapper.toDomain(debtRow);
   }
 
   /**

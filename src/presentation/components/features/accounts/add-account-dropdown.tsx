@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, cloneElement, isValidElement } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { AccountForm } from "@/components/forms/account-form";
-import { Wallet } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Plus } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 
 interface AddAccountDropdownProps {
@@ -24,10 +24,10 @@ export function AddAccountDropdown({
   trigger,
 }: AddAccountDropdownProps) {
   const { toast } = useToast();
-  const [showManualForm, setShowManualForm] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const handleManualAccountSuccess = () => {
-    setShowManualForm(false);
+  const handleSuccess = () => {
+    setOpen(false);
     window.dispatchEvent(new CustomEvent("account-created"));
     onSuccess?.();
     toast({
@@ -38,41 +38,38 @@ export function AddAccountDropdown({
   };
 
   const defaultTrigger = (
-    <Button size="medium" disabled={!canWrite}>
+    <Button size="medium" disabled={!canWrite} onClick={() => setOpen(true)}>
+      <Plus className="h-4 w-4 mr-1.5" />
       Add Account
-      <Wallet className="h-4 w-4 ml-1.5" />
     </Button>
   );
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          {trigger || defaultTrigger}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem
-            onClick={() => setShowManualForm(true)}
-            disabled={!canWrite}
-          >
-            <Wallet className="h-4 w-4 mr-2" />
-            Add Manually
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {trigger && isValidElement(trigger)
+        ? cloneElement(trigger as React.ReactElement<{ onClick?: () => void }>, {
+            onClick: () => setOpen(true),
+          })
+        : defaultTrigger}
 
-      {/* Manual Account Form */}
-      {showManualForm && (
-        <AccountForm
-          open={showManualForm}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setShowManualForm(false);
-            }
-          }}
-          onSuccess={handleManualAccountSuccess}
-        />
-      )}
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent
+          side="right"
+          className="flex flex-col w-full sm:max-w-[32.2rem] !p-0 h-full"
+        >
+          <SheetHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border text-left">
+            <SheetTitle>Add Account</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <AccountForm
+              open={open}
+              onOpenChange={setOpen}
+              onSuccess={handleSuccess}
+              variant="embedded"
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

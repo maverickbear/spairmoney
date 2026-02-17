@@ -193,6 +193,7 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
       "/admin/tax-rates": "Tax Rates",
       "/admin/seo": "SEO Settings",
       "/admin/studio": "Sanity Studio",
+      "/admin/docs": "Docs",
       "/design": "Design System",
     };
 

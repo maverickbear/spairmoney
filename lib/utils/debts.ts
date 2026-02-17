@@ -591,3 +591,34 @@ function calculatePeriodsPassed(
   }
 }
 
+/**
+ * Get the next occurrence of a given day of month (1–31).
+ * Used for credit card due dates. Clamps to last day of month when needed (e.g. day 31 in Feb).
+ */
+export function getNextDueDateFromDayOfMonth(
+  dayOfMonth: number,
+  fromDate: Date = new Date()
+): Date {
+  if (dayOfMonth < 1 || dayOfMonth > 31) {
+    const next = new Date(fromDate);
+    next.setMonth(next.getMonth() + 1);
+    next.setDate(1);
+    return next;
+  }
+  const start = new Date(fromDate);
+  start.setHours(0, 0, 0, 0);
+  const year = start.getFullYear();
+  const month = start.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const day = Math.min(dayOfMonth, lastDay);
+  const candidate = new Date(year, month, day);
+  candidate.setHours(0, 0, 0, 0);
+  if (candidate > start) {
+    return candidate;
+  }
+  const nextMonth = new Date(year, month + 1, 1);
+  const nextLastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+  const nextDay = Math.min(dayOfMonth, nextLastDay);
+  return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), nextDay);
+}
+

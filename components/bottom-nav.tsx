@@ -150,7 +150,7 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   !hasSubscription && "opacity-50 cursor-not-allowed",
                   active
-                    ? "text-primary"
+                    ? "text-primary-nav"
                     : "text-muted-foreground hover:text-foreground"
                 )}
                 aria-label={item.label}
@@ -159,14 +159,14 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
                 <Icon
                   className={cn(
                     "h-5 w-5 transition-colors",
-                    active && "text-primary"
+                    active && "text-primary-nav"
                   )}
                   aria-hidden="true"
                 />
                 <span
                   className={cn(
                     "text-[10px] leading-tight transition-colors",
-                    active && "text-primary"
+                    active && "text-primary-nav"
                   )}
                 >
                   {item.label}

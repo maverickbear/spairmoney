@@ -1,7 +1,9 @@
 "use client";
 
-import { ReactNode, useEffect, useState, useRef } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface PageHeaderProps {
   title: string;
@@ -121,11 +123,15 @@ export function PageHeader({ title, description, children, className }: PageHead
                 <p className="text-sm md:text-base text-muted-foreground">{description}</p>
               )}
             </div>
-            {children && (
-              <div className="flex gap-3 flex-wrap">
-                {children}
-              </div>
-            )}
+            <div className="flex gap-3 flex-wrap items-center">
+              {children}
+              <Button asChild variant="outline" size="medium" className="shrink-0">
+                <Link href="/feedback">
+                  <span className="md:hidden">Feedback</span>
+                  <span className="hidden md:inline">Give Your Feedback</span>
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>

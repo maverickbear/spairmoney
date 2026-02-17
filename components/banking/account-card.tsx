@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Loader2, RefreshCw, Unlink, AlertCircle, Star } from "lucide-react";
+import { Edit, Trash2, Loader2, Star } from "lucide-react";
 import { formatMoney } from "@/components/common/money";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getInitials, isValidAvatarUrl } from "@/lib/utils/avatar";
 
@@ -57,20 +57,8 @@ export function AccountCard({
     <Card className="transition-all flex flex-col">
       <CardHeader className="pb-3 p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            {account.institutionLogo ? (
-              <img 
-                src={account.institutionLogo} 
-                alt={account.institutionName || 'Bank logo'} 
-                className="h-6 w-6 rounded object-contain flex-shrink-0"
-              />
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-sm font-semibold truncate">{account.name}</CardTitle>
-              {account.institutionName && (
-                <p className="text-sm text-muted-foreground truncate">{account.institutionName}</p>
-              )}
-            </div>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm font-semibold truncate">{account.name}</CardTitle>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
             {onSetDefault && (
@@ -144,9 +132,12 @@ export function AccountCard({
                   <div key={owner.id || `owner-${idx}`} className="relative flex-shrink-0">
                     {isValidAvatarUrl(owner.avatarUrl) ? (
                       <>
-                        <img
+                        <Image
                           src={owner.avatarUrl!}
                           alt={owner.name || "Owner"}
+                          width={32}
+                          height={32}
+                          unoptimized
                           className="h-8 w-8 rounded-full object-cover border-2 border-background"
                           onError={(e) => {
                             const img = e.currentTarget;

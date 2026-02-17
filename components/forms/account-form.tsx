@@ -22,9 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/toast-provider";
-import { supabase } from "@/lib/supabase";
 import { LimitWarning } from "@/components/billing/limit-warning";
 import { Loader2 } from "lucide-react";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
@@ -41,6 +40,18 @@ interface Account {
   updatedAt?: string;
   ownerIds?: string[];
   dueDayOfMonth?: number | null;
+  /** Optional; some API shapes use userId instead of ownerIds for single-owner */
+  userId?: string;
+  /** Optional; some API shapes use accountType instead of type */
+  accountType?: string;
+}
+
+interface MemberResponse {
+  status?: string;
+  memberId?: string;
+  name?: string;
+  email: string;
+  isOwner?: boolean;
 }
 
 interface Household {
@@ -56,9 +67,13 @@ interface AccountFormProps {
   account?: Account;
   onSuccess?: () => void;
   initialAccountLimit?: { current: number; limit: number } | null;
+  /** When "embedded", only form content is rendered (no Dialog). Use inside Sheet/drawer. */
+  variant?: "dialog" | "embedded";
 }
 
-export function AccountForm({ open, onOpenChange, account, onSuccess, initialAccountLimit }: AccountFormProps) {
+const VALID_ACCOUNT_TYPES = ["cash", "checking", "savings", "credit", "investment", "other"] as const;
+
+export function AccountForm({ open, onOpenChange, account, onSuccess, initialAccountLimit, variant = "dialog" }: AccountFormProps) {
   const { toast } = useToast();
   const [households, setHouseholds] = useState<Household[]>([]);
   const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
@@ -131,10 +146,11 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
       const { members } = await response.json();
       
       // Transform household members into households format
-      const householdsList: Household[] = members
-        .filter((member: any) => member.status === "active" && member.memberId) // Only include active members with memberId
-        .map((member: any) => ({
-          id: member.memberId!, // memberId is guaranteed to exist due to filter
+      const membersList = (members ?? []) as MemberResponse[];
+      const householdsList: Household[] = membersList
+        .filter((member) => member.status === "active" && member.memberId) // Only include active members with memberId
+        .map((member) => ({
+          id: member.memberId!,
           name: member.name || member.email,
           email: member.email,
           isOwner: member.isOwner || false,
@@ -170,34 +186,56 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
     }
   }
 
+  // Reset form when drawer opens: load account data for Edit, or defaults for Add.
+  // Do not wait for currentUserId for account fields (name, type, etc.) so Edit shows all data immediately.
+  const normalizeType = useCallback((t: unknown): (typeof VALID_ACCOUNT_TYPES)[number] => {
+    const s = typeof t === "string" ? t.trim().toLowerCase() : "";
+    if ((VALID_ACCOUNT_TYPES as readonly string[]).includes(s)) return s as (typeof VALID_ACCOUNT_TYPES)[number];
+    if (s?.includes("credit")) return "credit";
+    return "checking";
+  }, []);
+
   useEffect(() => {
-    if (open && currentUserId) {
-      if (account) {
-        // When editing, use existing ownerIds
-        const ownerIds = account.ownerIds || (account as any).userId ? [(account as any).userId] : [];
-        setSelectedOwnerIds(ownerIds);
-        form.reset({
-          name: account.name,
-          type: account.type as "cash" | "checking" | "savings" | "credit" | "investment" | "other",
-          creditLimit: account.creditLimit ?? undefined,
-          initialBalance: account.initialBalance ?? undefined,
-          ownerIds: ownerIds,
-          dueDayOfMonth: account.dueDayOfMonth ?? undefined,
-        });
-      } else {
-        setSelectedOwnerIds([]);
-        setPrimaryOwnerId(currentUserId ?? null);
-        form.reset({
-          name: "",
-          type: "checking",
-          creditLimit: undefined,
-          initialBalance: undefined,
-          ownerIds: [],
-          dueDayOfMonth: undefined,
-        });
+    if (!open) return;
+
+    if (account) {
+      const ownerIds = account.ownerIds?.length ? account.ownerIds : account.userId ? [account.userId] : [];
+      setSelectedOwnerIds(ownerIds);
+      setPrimaryOwnerId(currentUserId ?? ownerIds[0] ?? null);
+      const typeValue = normalizeType(account.type ?? account.accountType);
+      const creditLimitVal = account.creditLimit != null ? Number(account.creditLimit) : undefined;
+      const initialBalanceVal = account.initialBalance != null ? Number(account.initialBalance) : undefined;
+      const dueDayVal = account.dueDayOfMonth != null ? Number(account.dueDayOfMonth) : undefined;
+      form.reset({
+        name: account.name ?? "",
+        type: typeValue,
+        creditLimit: creditLimitVal,
+        initialBalance: initialBalanceVal,
+        ownerIds,
+        dueDayOfMonth: dueDayVal,
+      });
+      // Force Select to show type (Radix can miss first reset when drawer opens)
+      form.setValue("type", typeValue);
+      if (typeValue === "credit") {
+        form.setValue("creditLimit", creditLimitVal ?? undefined);
+        form.setValue("dueDayOfMonth", dueDayVal ?? undefined);
       }
+      if (["checking", "savings", "cash"].includes(typeValue)) {
+        form.setValue("initialBalance", initialBalanceVal ?? undefined);
+      }
+    } else {
+      setSelectedOwnerIds([]);
+      setPrimaryOwnerId(currentUserId ?? null);
+      form.reset({
+        name: "",
+        type: "checking",
+        creditLimit: undefined,
+        initialBalance: undefined,
+        ownerIds: [],
+        dueDayOfMonth: undefined,
+      });
     }
-  }, [open, account, form, currentUserId]);
+  }, [open, account, form, currentUserId, normalizeType]);
 
   function handleOwnerToggle(ownerId: string, checked: boolean) {
     // Current user ID is always included, so we only manage additional household IDs
@@ -250,20 +288,18 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
         type: data.type,
         ownerIds: isLinkingToAnotherMember ? [] : finalOwnerIds,
         ...(isLinkingToAnotherMember && primaryOwnerId ? { ownerUserId: primaryOwnerId } : {}),
-        ...(data.type === "credit" && data.creditLimit !== undefined 
-          ? { creditLimit: data.creditLimit } 
-          : {}),
-        ...(data.type === "credit" && data.dueDayOfMonth !== undefined 
-          ? { dueDayOfMonth: data.dueDayOfMonth } 
-          : {}),
-        ...((data.type === "checking" || data.type === "savings" || data.type === "cash")
-          ? { 
-              initialBalance: account 
-                ? (data.initialBalance !== undefined ? data.initialBalance : account.initialBalance ?? 0)
-                : (data.initialBalance ?? 0)
-            } 
-          : {}),
       };
+
+      if (data.type === "credit") {
+        payload.creditLimit = data.creditLimit ?? null;
+        payload.dueDayOfMonth = data.dueDayOfMonth ?? null;
+      }
+
+      if (data.type === "checking" || data.type === "savings" || data.type === "cash") {
+        payload.initialBalance = account
+          ? (data.initialBalance !== undefined ? data.initialBalance : (account.initialBalance ?? 0))
+          : (data.initialBalance ?? 0);
+      }
 
       const res = await fetch(url, {
         method,
@@ -321,18 +357,9 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-        <DialogHeader>
-          <DialogTitle>{account ? "Edit" : "Add"} Account</DialogTitle>
-          <DialogDescription>
-            {account ? "Update the account details" : "Create a new account"}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+  const formContent = (
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           {/* Show limit warning for new accounts - show immediately if limit reached */}
           {!account && currentAccountLimit && currentAccountLimit.limit !== -1 && (
             <LimitWarning
@@ -350,40 +377,42 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
           {/* Hide form fields if limit is reached for new accounts */}
           {(!account && isLimitReached) ? null : (
             <>
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Name</label>
-                <Input {...form.register("name")} size="medium" required />
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Name</label>
+                  <Input {...form.register("name")} size="medium" required />
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Type</label>
-                <Select
-                  value={form.watch("type")}
-                  onValueChange={(value) => {
-                    form.setValue("type", value as "checking" | "savings" | "credit" | "cash" | "investment" | "other");
-                    // Clear credit limit when changing away from credit type
-                    if (value !== "credit") {
-                      form.setValue("creditLimit", undefined);
-                    }
-                    // Clear initial balance when changing away from checking/savings/cash
-                    if (value !== "checking" && value !== "savings" && value !== "cash") {
-                      form.setValue("initialBalance", undefined);
-                    }
-                  }}
-                  required
-                >
-                  <SelectTrigger size="medium">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="checking">Checking</SelectItem>
-                    <SelectItem value="savings">Savings</SelectItem>
-                    <SelectItem value="credit">Credit Card</SelectItem>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="investment">Investment</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Type</label>
+                  <Select
+                    value={form.watch("type") ?? "checking"}
+                    onValueChange={(value) => {
+                      form.setValue("type", value as "checking" | "savings" | "credit" | "cash" | "investment" | "other");
+                      // Clear credit limit when changing away from credit type
+                      if (value !== "credit") {
+                        form.setValue("creditLimit", undefined);
+                      }
+                      // Clear initial balance when changing away from checking/savings/cash
+                      if (value !== "checking" && value !== "savings" && value !== "cash") {
+                        form.setValue("initialBalance", undefined);
+                      }
+                    }}
+                    required
+                  >
+                    <SelectTrigger size="medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="checking">Checking</SelectItem>
+                      <SelectItem value="savings">Savings</SelectItem>
+                      <SelectItem value="credit">Credit Card</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="investment">Investment</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {!account && (userRole === "admin" || userRole === "super_admin") && (
@@ -483,7 +512,7 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                     <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
                       {households.filter((household) => household.id !== currentUserId).length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                          You haven't invited any member yet.{" "}
+                          You haven&apos;t invited any member yet.{" "}
                           <Link href="/members" className="text-foreground hover:underline font-medium">
                             Invite
                           </Link>{" "}
@@ -540,6 +569,22 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
             </div>
           </DialogFooter>
         </form>
+  );
+
+  if (variant === "embedded") {
+    return formContent;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
+        <DialogHeader>
+          <DialogTitle>{account ? "Edit" : "Add"} Account</DialogTitle>
+          <DialogDescription>
+            {account ? "Update the account details" : "Create a new account"}
+          </DialogDescription>
+        </DialogHeader>
+        {formContent}
       </DialogContent>
     </Dialog>
   );

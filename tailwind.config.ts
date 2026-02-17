@@ -51,6 +51,7 @@ const config = {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
           text: "hsl(var(--primary-text))",
+          nav: "hsl(var(--primary-nav))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4FCF7D", // Using primary-500 from colors.ts
+  themeColor: "#73E99D", // Primary brand color
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,

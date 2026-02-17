@@ -14,6 +14,7 @@ import {
   Calculator,
   Search,
   FileCode,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
@@ -30,6 +31,7 @@ const adminNavItems = [
   { href: "/admin/tax-rates", label: "Tax Rates", icon: Calculator },
   { href: "/admin/seo", label: "SEO Settings", icon: Search },
   { href: "/admin/studio", label: "Sanity Studio", icon: FileCode },
+  { href: "/admin/docs", label: "Docs", icon: BookOpen },
 ];
 
 export function AdminSideNav() {

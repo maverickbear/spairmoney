@@ -58,7 +58,7 @@ export class AccountsRepository implements IAccountsRepository {
     }
     
     const selectFields = options?.selectFields || [
-      "id", "name", "type", "initial_balance", 
+      "id", "name", "type", "initial_balance", "credit_limit", "due_day_of_month",
       "created_at", "updated_at", "user_id", "household_id", "is_default"
     ];
 
@@ -150,16 +150,21 @@ export class AccountsRepository implements IAccountsRepository {
   }): Promise<AccountRow> {
     const supabase = await createServerClient();
 
-    // Map camelCase to snake_case for database
+    // Map camelCase to snake_case for database; coerce numerics (Supabase expects number or null)
+    const creditLimit = data.creditLimit != null ? Number(data.creditLimit) : null;
+    const initialBalance = data.initialBalance != null ? Number(data.initialBalance) : null;
+    const dueDay = data.dueDayOfMonth != null ? Number(data.dueDayOfMonth) : null;
+    const typeStr = typeof data.type === "string" ? data.type.trim().toLowerCase() : data.type;
+
     const { data: account, error } = await supabase
       .from("accounts")
       .insert({
         id: data.id,
         name: data.name,
-        type: data.type,
-        credit_limit: data.creditLimit ?? null,
-        initial_balance: data.initialBalance ?? null,
-        due_day_of_month: data.dueDayOfMonth ?? null,
+        type: typeStr,
+        credit_limit: creditLimit,
+        initial_balance: initialBalance,
+        due_day_of_month: dueDay != null && Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31 ? dueDay : null,
         currency_code: data.currencyCode || 'USD',
         user_id: data.userId,
         household_id: data.householdId ?? null,
@@ -194,10 +199,10 @@ export class AccountsRepository implements IAccountsRepository {
   ): Promise<AccountRow> {
     const supabase = await createServerClient();
 
-    // Map camelCase to snake_case for database
+    // Map camelCase to snake_case for database; coerce type and numerics so Supabase gets correct types
     const updateData: Partial<{
       name: string;
-      type: 'cash' | 'checking' | 'savings' | 'credit' | 'investment' | 'other';
+      type: string;
       credit_limit: number | null;
       initial_balance: number | null;
       due_day_of_month: number | null;
@@ -205,10 +210,13 @@ export class AccountsRepository implements IAccountsRepository {
       updated_at: string;
     }> = {};
     if (data.name !== undefined) updateData.name = data.name;
-    if (data.type !== undefined) updateData.type = data.type;
-    if (data.creditLimit !== undefined) updateData.credit_limit = data.creditLimit;
-    if (data.initialBalance !== undefined) updateData.initial_balance = data.initialBalance;
-    if (data.dueDayOfMonth !== undefined) updateData.due_day_of_month = data.dueDayOfMonth;
+    if (data.type !== undefined) updateData.type = typeof data.type === "string" ? data.type.trim().toLowerCase() : data.type;
+    if (data.creditLimit !== undefined) updateData.credit_limit = data.creditLimit != null ? Number(data.creditLimit) : null;
+    if (data.initialBalance !== undefined) updateData.initial_balance = data.initialBalance != null ? Number(data.initialBalance) : null;
+    if (data.dueDayOfMonth !== undefined) {
+      const d = data.dueDayOfMonth != null ? Number(data.dueDayOfMonth) : null;
+      updateData.due_day_of_month = d != null && Number.isInteger(d) && d >= 1 && d <= 31 ? d : null;
+    }
     if (data.currencyCode !== undefined) updateData.currency_code = data.currencyCode;
     if (data.updatedAt !== undefined) updateData.updated_at = data.updatedAt;
 
@@ -228,20 +236,31 @@ export class AccountsRepository implements IAccountsRepository {
   }
 
   /**
-   * Soft delete an account
+   * Permanently delete an account from Supabase.
+   * Removes account_owners rows first to avoid FK violations, then deletes the account row.
    */
   async delete(id: string): Promise<void> {
     const supabase = await createServerClient();
-    const now = new Date().toISOString();
 
+    // Delete account_owners for this account first (FK from account_owners to accounts)
+    const { error: ownersError } = await supabase
+      .from("account_owners")
+      .delete()
+      .eq("account_id", id);
+
+    if (ownersError) {
+      logger.error("[AccountsRepository] Error deleting account owners:", ownersError);
+      throw new Error(`Failed to delete account owners: ${ownersError.message}`);
+    }
+
+    // Hard delete the account row from Supabase
     const { error } = await supabase
       .from("accounts")
-      .update({ deleted_at: now, updated_at: now })
-      .eq("id", id)
-      .is("deleted_at", null); // Only soft-delete if not already deleted
+      .delete()
+      .eq("id", id);
 
     if (error) {
-      logger.error("[AccountsRepository] Error soft-deleting account:", error);
+      logger.error("[AccountsRepository] Error deleting account:", error);
       throw new Error(`Failed to delete account: ${error.message}`);
     }
   }

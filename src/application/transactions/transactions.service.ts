@@ -18,6 +18,7 @@ import { requireTransactionOwnership } from "@/src/infrastructure/utils/security
 import { logger } from "@/src/infrastructure/utils/logger";
 import { encryptDescription, decryptDescription, normalizeDescription, getTransactionAmount } from "@/src/infrastructure/utils/transaction-encryption";
 import { makePlannedPaymentsService } from "@/src/application/planned-payments/planned-payments.factory";
+import { makeCreditCardDebtSyncService } from "@/src/application/credit-card-debt/credit-card-debt-sync.factory";
 import { AppError } from "../shared/app-error";
 import { getCachedSubscriptionData } from "@/src/application/subscriptions/get-dashboard-subscription";
 import { TRANSACTION_IMPORT_BATCH_SIZE, TRANSACTION_IMPORT_BATCH_DELAY_MS, TRANSACTION_IMPORT_PROGRESS_INTERVAL } from "@/src/domain/shared/constants";
@@ -434,6 +435,26 @@ export class TransactionsService {
       description: transactionRow.description ? decryptDescription(transactionRow.description) : null,
     };
 
+    // Sync credit-card debt for affected accounts (expense on credit, or transfer to credit)
+    const creditAccountIdsToSync = new Set<string>();
+    if (data.type === "expense") {
+      creditAccountIdsToSync.add(data.accountId);
+    }
+    if (data.type === "transfer" && data.toAccountId) {
+      creditAccountIdsToSync.add(data.toAccountId);
+    }
+    if (data.type === "transfer" && data.transferFromId) {
+      creditAccountIdsToSync.add(data.accountId);
+    }
+    try {
+      const creditCardDebtSync = makeCreditCardDebtSyncService();
+      for (const accountId of creditAccountIdsToSync) {
+        await creditCardDebtSync.syncForAccount(accountId, userId);
+      }
+    } catch (err) {
+      logger.error("[TransactionsService] Credit card debt sync failed after create:", err);
+    }
+
     return TransactionsMapper.toDomainWithRelations(decryptedRow, {
       account: account ? { ...account, balance: undefined } : null,
       category: category || null,
@@ -483,6 +504,23 @@ export class TransactionsService {
     // Use description only
 
     const row = await this.repository.update(id, updateData);
+
+    // Sync credit-card debt for affected accounts
+    const creditAccountIdsToSync = new Set<string>([row.account_id]);
+    if (row.type === "transfer" && row.transfer_to_id) {
+      creditAccountIdsToSync.add(row.transfer_to_id);
+    }
+    try {
+      const userId = await getCurrentUserId();
+      if (userId) {
+        const creditCardDebtSync = makeCreditCardDebtSyncService();
+        for (const accountId of creditAccountIdsToSync) {
+          await creditCardDebtSync.syncForAccount(accountId, userId);
+        }
+      }
+    } catch (err) {
+      logger.error("[TransactionsService] Credit card debt sync failed after update:", err);
+    }
 
     // Fetch related data (account, category, subcategory) to return complete transaction
     const accountIds = [row.account_id];
@@ -552,10 +590,29 @@ export class TransactionsService {
     // Verify ownership (include deleted transactions since they may be soft-deleted)
     await requireTransactionOwnership(id, true);
 
+    const row = await this.repository.findById(id);
+    const creditAccountIdsToSync = row
+      ? [...new Set([row.account_id, ...(row.type === "transfer" && row.transfer_to_id ? [row.transfer_to_id] : [])])]
+      : [];
+
     const plannedPaymentsService = makePlannedPaymentsService();
     await plannedPaymentsService.deleteByLinkedTransactionIds([id]);
 
     await this.repository.delete(id);
+
+    if (creditAccountIdsToSync.length > 0) {
+      try {
+        const userId = await getCurrentUserId();
+        if (userId) {
+          const creditCardDebtSync = makeCreditCardDebtSyncService();
+          for (const accountId of creditAccountIdsToSync) {
+            await creditCardDebtSync.syncForAccount(accountId, userId);
+          }
+        }
+      } catch (err) {
+        logger.error("[TransactionsService] Credit card debt sync failed after delete:", err);
+      }
+    }
   }
 
   /**
@@ -581,10 +638,39 @@ export class TransactionsService {
       await requireTransactionOwnership(id, true);
     }
 
+    const userId = await getCurrentUserId();
+    const creditAccountIdsToSync = new Set<string>();
+    if (ids.length > 0) {
+      for (const id of ids) {
+        try {
+          const row = await this.repository.findById(id);
+          if (row) {
+            creditAccountIdsToSync.add(row.account_id);
+            if (row.type === "transfer" && row.transfer_to_id) {
+              creditAccountIdsToSync.add(row.transfer_to_id);
+            }
+          }
+        } catch {
+          // ignore per-id failures
+        }
+      }
+    }
+
     const plannedPaymentsService = makePlannedPaymentsService();
     await plannedPaymentsService.deleteByLinkedTransactionIds(ids);
 
     await this.repository.deleteMultiple(ids);
+
+    if (creditAccountIdsToSync.size > 0 && userId) {
+      try {
+        const creditCardDebtSync = makeCreditCardDebtSyncService();
+        for (const accountId of creditAccountIdsToSync) {
+          await creditCardDebtSync.syncForAccount(accountId, userId);
+        }
+      } catch (err) {
+        logger.error("[TransactionsService] Credit card debt sync failed after deleteMultiple:", err);
+      }
+    }
   }
 
   /**

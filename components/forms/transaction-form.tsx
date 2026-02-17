@@ -1123,11 +1123,12 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                       From Account <span className="text-gray-400 text-xs">(optional)</span>
                     </label>
                     <Select
-                      value={form.watch("transferFromId") || ""}
+                      value={form.watch("transferFromId") || "__none__"}
                       onValueChange={(value) => {
-                        form.setValue("transferFromId", value || undefined);
+                        const id = value === "__none__" ? undefined : value;
+                        form.setValue("transferFromId", id);
                         // Clear toAccountId when setting transferFromId
-                        if (value) {
+                        if (id) {
                           form.setValue("toAccountId", undefined);
                         }
                       }}
@@ -1136,7 +1137,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                         <SelectValue placeholder="Select source account (optional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None (add later)</SelectItem>
+                        <SelectItem value="__none__">None (add later)</SelectItem>
                         {accounts
                           .filter((account) => account.id !== form.watch("accountId") && account.type !== "credit")
                           .map((account) => (
