@@ -193,6 +193,23 @@ export class AuthService {
           
           await eventBus.publish(userCreatedEvent);
           logger.info(`[AuthService] UserCreated event published and processed for user ${authData.user.id}`);
+
+          // Send welcome email so every new user receives it (not only after trial/checkout)
+          if (authData.user.email) {
+            try {
+              const { sendWelcomeEmail } = await import("@/lib/utils/email");
+              const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
+              await sendWelcomeEmail({
+                to: authData.user.email,
+                userName: "",
+                founderName: "Naor Tartarotti",
+                appUrl,
+              });
+              logger.info(`[AuthService] Welcome email sent to ${authData.user.email}`);
+            } catch (welcomeError) {
+              logger.error("[AuthService] Error sending welcome email (non-critical):", welcomeError);
+            }
+          }
         } catch (householdError) {
           logger.error("Error processing UserCreated event during signup:", householdError);
           return {

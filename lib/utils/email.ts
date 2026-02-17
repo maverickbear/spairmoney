@@ -903,15 +903,11 @@ function getAccountRemovedEmailTemplate(data: {
     const templatePath = path.join(process.cwd(), "email-templates/account-removed.html");
     let html = fs.readFileSync(templatePath, "utf-8");
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
-    const logoUrl = getLogoUrl(appUrl);
-
     const userName = data.userName?.trim() || "there";
 
     html = html.replace(/\{\{ \.UserName \}\}/g, userName);
     html = html.replace(/\{\{ \.Email \}\}/g, data.email);
     html = html.replace(/\{\{ \.Year \}\}/g, new Date().getFullYear().toString());
-    html = html.replace(/\{\{ \.LogoURL \}\}/g, logoUrl);
 
     return html;
   } catch (error) {

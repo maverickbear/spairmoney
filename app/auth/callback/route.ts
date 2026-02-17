@@ -180,6 +180,20 @@ export async function GET(request: NextRequest) {
           profileCreated = false;
         } else {
           console.log("[OAUTH-CALLBACK] ✅ User profile and household created for OAuth user");
+          // Send welcome email for new OAuth signups (same as manual signup)
+          try {
+            const { sendWelcomeEmail } = await import("@/lib/utils/email");
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
+            await sendWelcomeEmail({
+              to: userEmail,
+              userName: "",
+              founderName: "Naor Tartarotti",
+              appUrl,
+            });
+            console.log("[OAUTH-CALLBACK] Welcome email sent to", userEmail);
+          } catch (welcomeError) {
+            console.warn("[OAUTH-CALLBACK] Failed to send welcome email (non-critical):", welcomeError);
+          }
         }
       } catch (profileError) {
         console.error("[OAUTH-CALLBACK] Error creating user profile:", profileError);
