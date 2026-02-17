@@ -4,8 +4,9 @@
  * No business logic here
  */
 
-import { createServerClient } from "../supabase-server";
+import { createServerClient, createServiceRoleClient } from "../supabase-server";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
 
 export interface HouseholdMemberRow {
   id: string;
@@ -376,6 +377,52 @@ export class MembersRepository {
     }
 
     return members?.length || 0;
+  }
+
+  /**
+   * Transfer household ownership to another active member (service role).
+   * Updates households.created_by and household_members.role for both users.
+   */
+  async transferHouseholdOwnership(
+    householdId: string,
+    currentOwnerId: string,
+    newOwnerId: string
+  ): Promise<void> {
+    const supabase = createServiceRoleClient();
+    const now = formatTimestamp(new Date());
+
+    const { error: householdError } = await supabase
+      .from("households")
+      .update({ created_by: newOwnerId, updated_at: now })
+      .eq("id", householdId)
+      .eq("created_by", currentOwnerId);
+
+    if (householdError) {
+      logger.error("[MembersRepository] Error updating household owner:", householdError);
+      throw new Error(`Failed to transfer household ownership: ${householdError.message}`);
+    }
+
+    const { error: demoteError } = await supabase
+      .from("household_members")
+      .update({ role: "member", updated_at: now })
+      .eq("household_id", householdId)
+      .eq("user_id", currentOwnerId);
+
+    if (demoteError) {
+      logger.error("[MembersRepository] Error demoting current owner:", demoteError);
+      throw new Error(`Failed to transfer household ownership: ${demoteError.message}`);
+    }
+
+    const { error: promoteError } = await supabase
+      .from("household_members")
+      .update({ role: "owner", updated_at: now })
+      .eq("household_id", householdId)
+      .eq("user_id", newOwnerId);
+
+    if (promoteError) {
+      logger.error("[MembersRepository] Error promoting new owner:", promoteError);
+      throw new Error(`Failed to transfer household ownership: ${promoteError.message}`);
+    }
   }
 
   /**

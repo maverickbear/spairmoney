@@ -13,82 +13,15 @@ export class ProfileAnonymizationService {
   constructor() {}
 
   /**
-   * Anonymize user PII using SQL function and Supabase Auth Admin API
-   * This anonymizes name, email, phone, date_of_birth, avatar_url
-   * and sets deleted_at timestamp
-   * Also updates email in auth.users to allow email reuse
+   * Anonymize user PII and remove from Supabase Auth completely.
+   * 1) SQL anonymizes public.users and household_members (deleted_at, anonymized PII).
+   * 2) Auth user is deleted so nothing remains in auth.users.
    */
   async anonymizeUserPII(userId: string): Promise<void> {
     try {
       const serviceSupabase = createServiceRoleClient();
 
-      // Generate anonymized email (same format as SQL function)
-      const anonUuid = crypto.randomUUID().replace(/-/g, '');
-      const anonEmail = `deleted+${anonUuid}@example.com`;
-
-      // Step 1: Anonymize email in Supabase Auth (auth.users)
-      // This is critical to allow email reuse for new account creation
-      try {
-        const { createClient } = await import("@supabase/supabase-js");
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || 
-                                   process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-        if (supabaseServiceKey && supabaseUrl) {
-          const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false,
-            },
-          });
-
-          // Update email in auth.users using Admin API
-          const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
-            userId,
-            {
-              email: anonEmail,
-            }
-          );
-
-          if (authUpdateError) {
-            logger.warn("[ProfileAnonymizationService] Warning: Could not update email in auth.users, trying to delete user:", {
-              userId,
-              error: authUpdateError.message,
-            });
-            
-            // If update fails, try to delete user from auth.users to allow email reuse
-            // This is safe because we're doing soft delete in public.users
-            const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
-            
-            if (deleteError) {
-              logger.warn("[ProfileAnonymizationService] Warning: Could not delete user from auth.users:", {
-                userId,
-                error: deleteError.message,
-              });
-              // Continue with database anonymization even if auth operations fail
-            } else {
-              logger.info("[ProfileAnonymizationService] Successfully deleted user from auth.users to allow email reuse", {
-                userId,
-              });
-            }
-          } else {
-            logger.info("[ProfileAnonymizationService] Successfully anonymized email in auth.users", {
-              userId,
-              anonEmail,
-            });
-          }
-        } else {
-          logger.warn("[ProfileAnonymizationService] Missing Supabase credentials - cannot update auth.users email");
-        }
-      } catch (authError) {
-        logger.warn("[ProfileAnonymizationService] Exception updating email in auth.users:", {
-          userId,
-          error: authError instanceof Error ? authError.message : "Unknown error",
-        });
-        // Continue with database anonymization even if auth update fails
-      }
-
-      // Step 2: Call SQL function to anonymize user data in public.users
+      // Step 1: Call SQL function to anonymize user data in public.users and household_members
       const { error } = await serviceSupabase.rpc("anonymize_user_data", {
         p_user_id: userId,
       });
@@ -102,6 +35,41 @@ export class ProfileAnonymizationService {
       }
 
       logger.info("[ProfileAnonymizationService] Successfully anonymized user PII", { userId });
+
+      // Step 2: Delete user from auth.users so nothing remains in Supabase Auth
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY ||
+          process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        if (supabaseServiceKey && supabaseUrl) {
+          const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false,
+            },
+          });
+
+          const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+
+          if (deleteError) {
+            logger.warn("[ProfileAnonymizationService] Could not delete user from auth.users:", {
+              userId,
+              error: deleteError.message,
+            });
+          } else {
+            logger.info("[ProfileAnonymizationService] Deleted user from auth.users", { userId });
+          }
+        } else {
+          logger.warn("[ProfileAnonymizationService] Missing Supabase credentials - cannot delete auth user");
+        }
+      } catch (authError) {
+        logger.warn("[ProfileAnonymizationService] Exception deleting auth user:", {
+          userId,
+          error: authError instanceof Error ? authError.message : "Unknown error",
+        });
+      }
     } catch (error) {
       if (error instanceof AppError) {
         throw error;

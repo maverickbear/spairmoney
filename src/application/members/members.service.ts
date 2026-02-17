@@ -1312,5 +1312,61 @@ export class MembersService {
       return { isOwner: false, householdId: null, memberCount: 0, householdName: null };
     }
   }
+
+  /**
+   * Get other active members in a household (for ownership transfer).
+   * Excludes the current owner; returns only members with user_id (accepted invitations).
+   */
+  async getTransferableMembers(
+    householdId: string,
+    currentOwnerId: string
+  ): Promise<Array<{ id: string; name: string | null }>> {
+    const memberRows = await this.repository.findAllByHousehold(householdId);
+    const otherUserIds = memberRows
+      .filter(
+        (m) =>
+          m.user_id != null &&
+          m.user_id !== currentOwnerId &&
+          m.status === "active" &&
+          m.role !== "owner"
+      )
+      .map((m) => m.user_id as string);
+
+    if (otherUserIds.length === 0) return [];
+
+    const supabase = await createServerClient();
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, name")
+      .in("id", otherUserIds);
+
+    return (users || []).map((u) => ({ id: u.id, name: u.name ?? null }));
+  }
+
+  /**
+   * Transfer household ownership to another active member.
+   * Caller must be the current owner; newOwnerId must be an active non-owner member.
+   */
+  async transferOwnership(
+    currentOwnerId: string,
+    householdId: string,
+    newOwnerId: string
+  ): Promise<void> {
+    const check = await this.checkHouseholdOwnership(currentOwnerId);
+    if (!check.isOwner || check.householdId !== householdId) {
+      throw new AppError("You are not the owner of this household", 400);
+    }
+    if (newOwnerId === currentOwnerId) {
+      throw new AppError("Cannot transfer ownership to yourself", 400);
+    }
+
+    const members = await this.getTransferableMembers(householdId, currentOwnerId);
+    const newOwnerInList = members.some((m) => m.id === newOwnerId);
+    if (!newOwnerInList) {
+      throw new AppError("Selected user is not an active member of this household", 400);
+    }
+
+    await this.repository.transferHouseholdOwnership(householdId, currentOwnerId, newOwnerId);
+  }
 }
 

@@ -167,7 +167,7 @@ export function MoreMenuSheet({
   const router = useRouter();
   // Use Context instead of local state and fetch
   const { user, checking: checkingAuth } = useAuthSafe();
-  const { subscription, plan, checking: checkingSubscription } = useSubscriptionSafe();
+  const { subscription, plan, interval: subscriptionInterval, checking: checkingSubscription } = useSubscriptionSafe();
   
   // Derive data from Context
   const loading = checkingAuth || checkingSubscription;
@@ -183,9 +183,7 @@ export function MoreMenuSheet({
     avatarUrl: user.avatarUrl ?? null,
   } : null;
   
-  // Build planInfo from Context
-  // Note: interval is not in Subscription domain type, so we default to "month"
-  // If interval is needed, it can be fetched separately or added to SubscriptionContext
+  // Build planInfo from Context (interval from Stripe so billing cycle displays correctly)
   const planInfo: PlanInfo | null = plan && subscription ? {
     plan: {
       id: plan.id,
@@ -199,7 +197,7 @@ export function MoreMenuSheet({
       currentPeriodEnd: subscription.currentPeriodEnd?.toString() ?? null,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     },
-    interval: "month" as const, // Default to month, can be enhanced later if needed
+    interval: subscriptionInterval ?? "month",
   } : null;
 
   const isActive = (href: string) => {

@@ -892,7 +892,7 @@ export class SubscriptionsRepository {
       householdId: string;
       planId: string;
       stripeSubscriptionId: string;
-      stripeCustomerId: string;
+      stripeCustomerId: string | null;
       status: "active" | "trialing" | "cancelled" | "past_due" | "unpaid";
       currentPeriodStart: string;
       currentPeriodEnd: string;

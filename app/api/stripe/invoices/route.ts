@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
+import { makeStripeService } from "@/src/application/stripe/stripe.factory";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -11,12 +12,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   typescript: true,
 });
 
-
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient();
-    
-    // Get current user
+
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
     if (authError || !authUser) {
       return NextResponse.json(
@@ -25,23 +24,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get subscription to find Stripe customer ID
-    // FIX: Use app_subscriptions table (not system.subscriptions) and snake_case column names
-    const { data: subscription, error: subError } = await supabase
-      .from("app_subscriptions")
-      .select("stripe_customer_id")
-      .eq("user_id", authUser.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Resolve Stripe customer ID from DB or Stripe (by email) so billing history works
+    // even when app_subscriptions row was deleted or stripe_customer_id was cleared
+    const stripeService = makeStripeService();
+    const stripeCustomerId = await stripeService.getStripeCustomerId(authUser.id);
 
-    if (subError) {
-      console.error("[INVOICES] Error fetching subscription:", subError);
-    }
-
-    // Map snake_case to camelCase for use
-    const stripeCustomerId = subscription?.stripe_customer_id;
-    
     if (!stripeCustomerId) {
       return NextResponse.json({
         invoices: [],

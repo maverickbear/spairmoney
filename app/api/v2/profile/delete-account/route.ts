@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { makeProfileService } from "@/src/application/profile/profile.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
 
 /**
  * DELETE /api/v2/profile/delete-account
- * Delete user account immediately
+ * Delete user account completely (Supabase auth + data, Stripe subscription + customer).
  */
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     const userId = await getCurrentUserId();
     if (!userId) {
@@ -20,16 +20,19 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error deleting account:", error);
-    
+
     if (error instanceof AppError) {
       return NextResponse.json(
         { error: error.message },
         { status: error.statusCode }
       );
     }
-    
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete account" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete account",
+      },
       { status: 500 }
     );
   }

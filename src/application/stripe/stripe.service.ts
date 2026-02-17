@@ -697,6 +697,25 @@ export class StripeService {
       appSubscriptionId,
       status,
     });
+
+    // Send welcome email so user receives confirmation after subscribing via Stripe Checkout
+    try {
+      const { data: authUser, error: authError } = await serviceRoleClient.auth.admin.getUserById(userId);
+      if (!authError && authUser?.user?.email) {
+        const { sendWelcomeEmail } = await import("@/lib/utils/email");
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
+        await sendWelcomeEmail({
+          to: authUser.user.email,
+          userName: "",
+          founderName: "Naor Tartarotti",
+          appUrl,
+        });
+        logger.info("[StripeService] Welcome email sent after checkout.session.completed to:", authUser.user.email);
+      }
+    } catch (welcomeEmailError) {
+      logger.error("[StripeService] Error sending welcome email after checkout:", welcomeEmailError);
+      // Don't fail webhook if email fails
+    }
   }
 
   /**
@@ -1115,6 +1134,15 @@ export class StripeService {
   }
 
   /**
+   * Get Stripe customer ID for a user (public). Uses app_subscriptions first; if none or missing
+   * stripe_customer_id, resolves or creates customer via Stripe so Billing (invoices, payment methods) works
+   * even when the DB row was deleted or stripe_customer_id was cleared.
+   */
+  async getStripeCustomerId(userId: string): Promise<string | null> {
+    return this.getStripeCustomerIdForPaymentMethods(userId);
+  }
+
+  /**
    * Get Stripe customer ID for a user. Uses app_subscriptions first; if none (e.g. no subscription yet),
    * resolves or creates customer via createOrGetStripeCustomer so Billing page works for new users.
    */
@@ -1150,10 +1178,33 @@ export class StripeService {
         user.name ?? null,
         null
       );
+      if (customerId) {
+        this.persistStripeCustomerIdIfMissing(userId, customerId).catch((err) =>
+          logger.warn("[StripeService] Failed to persist stripe_customer_id to Supabase:", err)
+        );
+      }
       return customerId;
     } catch {
       return null;
     }
+  }
+
+  /**
+   * When we resolved customer from Stripe (not from DB), persist stripe_customer_id to app_subscriptions
+   * so invoices and other flows see it. Only updates existing rows (use service role); does not create rows.
+   */
+  private async persistStripeCustomerIdIfMissing(userId: string, customerId: string): Promise<void> {
+    const row = await this.subscriptionsRepository.findByUserId(userId, true);
+    if (!row?.id || row.stripe_customer_id) return;
+    await this.subscriptionsRepository.update(
+      row.id,
+      { stripeCustomerId: customerId, updatedAt: new Date().toISOString() },
+      true
+    );
+    logger.info("[StripeService] Persisted stripe_customer_id to app_subscriptions", {
+      userId,
+      subscriptionId: row.id,
+    });
   }
 
   /**

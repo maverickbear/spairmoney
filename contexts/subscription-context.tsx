@@ -8,6 +8,8 @@ import { getDefaultFeatures } from "@/lib/utils/plan-features";
 interface SubscriptionContextValue {
   subscription: Subscription | null;
   plan: Plan | null;
+  /** Billing interval from Stripe (month/year); null when no subscription or unknown */
+  interval: "month" | "year" | null;
   limits: PlanFeatures;
   checking: boolean;
   refetch: () => Promise<void>;
@@ -38,6 +40,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     initialData?.subscription ?? null
   );
   const [plan, setPlan] = useState<Plan | null>(initialData?.plan ?? null);
+  const [interval, setInterval] = useState<"month" | "year" | null>(null);
   const [limits, setLimits] = useState<PlanFeatures>(
     initialData?.plan?.features ?? getDefaultFeatures()
   );
@@ -71,7 +74,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     subscriptionRef.current = subscription;
   }, [subscription]);
 
-  const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null }> => {
+  const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null; interval: "month" | "year" | null }> => {
     try {
       const response = await fetch("/api/billing/subscription");
       
@@ -81,6 +84,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
           return {
             subscription: null,
             plan: null,
+            interval: null,
           };
         }
         
@@ -100,6 +104,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
           return {
             subscription: subscriptionRef.current,
             plan: planRef.current,
+            interval: null,
           };
         }
         
@@ -113,18 +118,21 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       const result = {
         subscription: data.subscription ?? null,
         plan: data.plan ?? null,
+        interval: data.interval ?? null,
       };
       
       return {
         subscription: result.subscription ?? null,
         plan: result.plan ?? null,
+        interval: result.interval ?? null,
       };
     } catch (error) {
       log.error("Error fetching subscription:", error);
       // On network errors, return current state from refs to avoid clearing subscription data
       return { 
         subscription: subscriptionRef.current, 
-        plan: planRef.current 
+        plan: planRef.current,
+        interval: null,
       };
     }
   }, [log]);
@@ -150,7 +158,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     lastFetchRef.current = Date.now();
 
     try {
-      const { subscription: newSubscription, plan: newPlan } = await fetchSubscription();
+      const { subscription: newSubscription, plan: newPlan, interval: newInterval } = await fetchSubscription();
       
       // Check if we got rate limited (cooldown was set during fetch)
       const wasRateLimited = rateLimitCooldownRef.current > cooldownBeforeFetch;
@@ -160,6 +168,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       if (!wasRateLimited) {
         setSubscription(newSubscription);
         setPlan(newPlan);
+        setInterval(newInterval);
       } else {
         log.log("Rate limited during fetch, preserving current subscription state");
       }
@@ -288,6 +297,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       value={{
         subscription,
         plan,
+        interval,
         limits,
         checking,
         refetch,
@@ -320,6 +330,7 @@ export function useSubscriptionSafe() {
     return {
       subscription: null,
       plan: null,
+      interval: null,
       limits: getDefaultFeatures(),
       checking: false,
       refetch: async () => {},

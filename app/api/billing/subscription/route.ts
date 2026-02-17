@@ -41,10 +41,9 @@ export async function GET(request: Request) {
     
     // Fetch everything in parallel for better performance
     const [intervalResult, limitsResult] = await Promise.all([
-      // Determine subscription interval (monthly/yearly) from Stripe
-      // OPTIMIZATION: Only fetch from Stripe if explicitly requested (includeStripe=true)
+      // Determine subscription interval (monthly/yearly) from Stripe - always fetch when we have a subscription so UI shows correct billing cycle
       (async (): Promise<"month" | "year" | null> => {
-        if (!includeStripe || !subscription?.stripeSubscriptionId || !plan) {
+        if (!subscription?.stripeSubscriptionId || !plan) {
           return null;
         }
         try {

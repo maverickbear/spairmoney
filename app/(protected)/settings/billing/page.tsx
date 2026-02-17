@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense, lazy } from "react";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
@@ -17,6 +17,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+/** Minimum ms between loadBillingData calls (avoids storm on visibility/portal return). */
+const LOAD_BILLING_COOLDOWN_MS = 5000;
+/** When we get 429, don't retry for this long (ms). */
+const RATE_LIMIT_COOLDOWN_MS = 60000;
 
 // Lazy load PaymentHistory to improve initial load time
 const PaymentHistory = lazy(() => 
@@ -64,6 +69,10 @@ export default function BillingPage() {
   // OPTIMIZED: Share household info between components to avoid duplicate calls
   const [householdInfo, setHouseholdInfo] = useState<{ isOwner: boolean; isMember: boolean; ownerId?: string; ownerName?: string } | null>(null);
 
+  const portalReturnHandledRef = useRef(false);
+  const lastLoadBillingRef = useRef<number>(0);
+  const rateLimitCooldownRef = useRef<number>(0);
+
   const syncSubscription = useCallback(async () => {
     try {
       setSyncing(true);
@@ -98,19 +107,38 @@ export default function BillingPage() {
   }, [toast]);
 
   const loadBillingData = useCallback(async (force = false) => {
-    // Don't reload if already loaded and not forced
-    if (hasLoaded && !syncing && !force) {
+    const now = Date.now();
+    if (rateLimitCooldownRef.current > now) {
+      return;
+    }
+    if (!force && hasLoaded && !syncing) {
+      return;
+    }
+    if (force && now - lastLoadBillingRef.current < LOAD_BILLING_COOLDOWN_MS) {
       return;
     }
 
     try {
       setLoading(true);
-      
-      // Single API call that returns everything (subscription, plan, limits, transactionLimit, accountLimit)
+      lastLoadBillingRef.current = now;
+
       const subResponse = await fetch("/api/v2/billing/subscription", {
         cache: "no-store",
       });
-      
+
+      if (subResponse.status === 429) {
+        const retryAfter = subResponse.headers.get("Retry-After");
+        const cooldownSec = retryAfter ? parseInt(retryAfter, 10) : 60;
+        rateLimitCooldownRef.current = now + Math.min(cooldownSec * 1000, RATE_LIMIT_COOLDOWN_MS);
+        setHasLoaded(true);
+        toast({
+          title: "Too many requests",
+          description: "Please wait a moment before refreshing.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (!subResponse.ok) {
         console.error("Failed to fetch subscription:", subResponse.status);
         setSubscription(null);
@@ -133,7 +161,6 @@ export default function BillingPage() {
         interval: subData.interval ?? null,
       };
 
-      // Update state
       setSubscription(result.subscription);
       setPlan(result.plan);
       setLimits(result.limits);
@@ -146,7 +173,7 @@ export default function BillingPage() {
     } finally {
       setLoading(false);
     }
-  }, [hasLoaded, syncing]);
+  }, [hasLoaded, syncing, toast]);
   
   // Mark as loaded when component mounts (page structure is ready)
   useEffect(() => {
@@ -156,20 +183,22 @@ export default function BillingPage() {
     return () => clearTimeout(timer);
   }, [perf]);
 
-  // Check if user is returning from Stripe Portal
+  // Check if user is returning from Stripe Portal (run only once per portal_return to avoid loop)
   useEffect(() => {
     const portalReturn = searchParams.get("portal_return");
-    if (portalReturn === "true") {
-      // Redirect to billing page
-      router.replace("/settings/billing", { scroll: false });
-      // Force reload after sync
-      setHasLoaded(false);
-      // Sync subscription from Stripe
-      syncSubscription().then(() => {
-        // Reload billing data after sync
-        loadBillingData(true);
-      });
+    if (portalReturn !== "true") {
+      portalReturnHandledRef.current = false;
+      return;
     }
+    if (portalReturnHandledRef.current) {
+      return;
+    }
+    portalReturnHandledRef.current = true;
+    router.replace("/settings/billing", { scroll: false });
+    syncSubscription().then(() => {
+      lastLoadBillingRef.current = 0;
+      loadBillingData(true);
+    });
   }, [searchParams, router, syncSubscription, loadBillingData]);
 
   // OPTIMIZED: Load household info once and share between components

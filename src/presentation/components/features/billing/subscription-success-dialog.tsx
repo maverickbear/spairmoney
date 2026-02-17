@@ -108,6 +108,14 @@ export function SubscriptionSuccessDialog({
   const handleGoToDashboard = async () => {
     // Close the dialog first
     onOpenChange(false);
+
+    // Revalidate subscription cache so the next page load sees the new subscription
+    // and the pricing dialog does not reappear
+    try {
+      await fetch("/api/v2/billing/revalidate-subscription", { method: "POST" });
+    } catch (e) {
+      console.warn("[SUCCESS-DIALOG] Revalidate subscription cache failed:", e);
+    }
     
     // Trigger confetti animation after dialog closes
     try {

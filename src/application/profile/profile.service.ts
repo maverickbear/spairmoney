@@ -404,24 +404,34 @@ export class ProfileService {
   }
 
   /**
-   * Delete user account
+   * Delete user account completely.
+   * If user is household owner with other members, ownership is auto-transferred to the first
+   * available member so the household remains consistent; then the account is removed from
+   * Supabase (auth + anonymized data) and Stripe (subscription + customer).
    */
   async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
     try {
-      // 1. Check household ownership
       const membersService = makeMembersService();
       const householdCheck = await membersService.checkHouseholdOwnership(userId);
-      if (householdCheck.isOwner && householdCheck.memberCount > 1) {
-        throw new AppError(
-          `You are the owner of a household "${householdCheck.householdName || "Household"}" with ${householdCheck.memberCount - 1} other member(s). Please transfer ownership to another member or remove all members before deleting your account.`,
-          400
+
+      if (householdCheck.isOwner && householdCheck.memberCount > 1 && householdCheck.householdId) {
+        const members = await membersService.getTransferableMembers(
+          householdCheck.householdId,
+          userId
         );
+        if (members.length > 0) {
+          await membersService.transferOwnership(
+            userId,
+            householdCheck.householdId,
+            members[0].id
+          );
+        }
       }
 
       // External banking connections no longer used
       logger.info("[ProfileService] Skip external connections", { userId });
 
-      // 3. Cancel active subscription in Stripe (don't fail if this fails, but log it)
+      // 3. Cancel active subscription in Stripe and delete Stripe customer (nothing remains in Stripe)
       const subscriptionsService = makeSubscriptionsService();
       const subscriptionResult = await subscriptionsService.cancelUserSubscription(userId);
       if (subscriptionResult.cancelled) {
@@ -432,6 +442,7 @@ export class ProfileService {
           error: subscriptionResult.error,
         });
       }
+      await subscriptionsService.deleteStripeCustomerForUser(userId);
 
       // 4. Delete account immediately
       const deletionResult = await this.deleteAccountImmediately(userId);
@@ -450,7 +461,7 @@ export class ProfileService {
 
       return {
         success: true,
-        message: "Account deleted successfully. Your personal information has been anonymized and your account has been deactivated. Some records required by law may be retained for compliance purposes.",
+        message: "Account removed completely. Your data has been removed from Supabase and Stripe.",
       };
     } catch (error) {
       logger.error("[ProfileService] Error deleting account:", error);

@@ -37,7 +37,6 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
       setError(`Please type "${DELETE_CONFIRMATION_TEXT}" to confirm`);
       return;
     }
-
     if (!confirmed) {
       setError("Please confirm that you understand this action cannot be undone");
       return;
@@ -47,61 +46,39 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
     setLoading(true);
 
     try {
-      const response = await fetch("/api/v2/profile/delete-account", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
+      const response = await fetch("/api/v2/profile/delete-account", { method: "DELETE" });
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || result.message || "Failed to delete account");
       }
-      
+
       if (result.success) {
         toast({
           title: "Account deleted",
-          description: "Your account has been deactivated and your personal information has been anonymized. You will be redirected to the home page.",
+          description:
+            "Your account has been removed. You will be redirected to the home page.",
           variant: "success",
         });
-        
-        // Close dialog
         onOpenChange(false);
-        
-        // Ensure Supabase client is signed out on client side
         try {
           await supabase.auth.signOut();
-        } catch (signOutError) {
-          // Ignore sign out errors since account is already deleted
-          console.log("Sign out after deletion (account already deleted)");
+        } catch {
+          // ignore
         }
-        
-        // Wait a moment for the toast to show, then force a complete page reload
-        // This ensures all caches and contexts are cleared
         setTimeout(() => {
           window.location.href = "/";
         }, 2000);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete account";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete account";
       setError(errorMessage);
-      
-      // Check if it's a household ownership error
-      if (errorMessage.includes("household") || errorMessage.includes("owner")) {
-        toast({
-          title: "Cannot delete account",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -135,11 +112,9 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
             <AlertTitle>Warning: This will permanently delete your account</AlertTitle>
             <AlertDescription>
               <ul className="list-disc list-inside space-y-1 mt-2">
-                <li><strong>Personal information will be removed:</strong> Your name, email, phone number, date of birth, and profile photo will be anonymized</li>
-                <li><strong>Account access will be revoked:</strong> Your active subscription will be cancelled immediately</li>
-                <li><strong>Data retention:</strong> Some records required by law (such as transaction history and subscription records) will be kept for legal and fiscal compliance, but will no longer be linked to your identity</li>
-                <li><strong>Email reuse:</strong> Your email address can be used immediately to create a new account, but your previous data will remain anonymized and cannot be recovered</li>
-                <li><strong>This action cannot be undone</strong> - there is no recovery period</li>
+                <li><strong>Your account will be removed completely</strong> from Supabase and Stripe</li>
+                <li><strong>Personal data will be anonymized or removed;</strong> your subscription will be cancelled and the Stripe customer deleted</li>
+                <li><strong>This action cannot be undone</strong></li>
               </ul>
             </AlertDescription>
           </Alert>
@@ -176,7 +151,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
               htmlFor="confirm-deletion"
               className="text-sm leading-relaxed cursor-pointer"
             >
-              I understand that this action cannot be undone. My personal information will be anonymized, my account will be deactivated, and I will not be able to access my account after deletion. Some records required by law may be retained but will no longer be linked to my identity.
+              I understand that my account will be removed completely and this cannot be undone.
             </label>
           </div>
 
@@ -189,11 +164,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={loading}
-          >
+          <Button variant="outline" onClick={handleClose} disabled={loading}>
             Cancel
           </Button>
           <Button

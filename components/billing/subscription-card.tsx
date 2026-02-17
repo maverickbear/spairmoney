@@ -21,10 +21,12 @@ interface UserHouseholdInfo {
 interface SubscriptionCardProps {
   subscription: Subscription | null;
   plan: Plan | null;
+  /** Billing interval from Stripe; when null, defaults to monthly for display */
+  interval?: "month" | "year" | null;
   onSubscriptionUpdated?: () => void;
 }
 
-export function SubscriptionCard({ subscription, plan, onSubscriptionUpdated }: SubscriptionCardProps) {
+export function SubscriptionCard({ subscription, plan, interval, onSubscriptionUpdated }: SubscriptionCardProps) {
   const [loading, setLoading] = useState(false);
   const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(null);
 
@@ -75,9 +77,11 @@ export function SubscriptionCard({ subscription, plan, onSubscriptionUpdated }: 
       </Card>
     );
   }
-  const price = subscription.currentPeriodStart && subscription.currentPeriodEnd
-    ? plan.priceMonthly
+  const isYearly = interval === "year";
+  const displayPrice = subscription.currentPeriodStart && subscription.currentPeriodEnd
+    ? (isYearly ? plan.priceYearly : plan.priceMonthly)
     : 0;
+  const priceLabel = isYearly ? "per year" : "per month";
 
   return (
     <Card>
@@ -92,10 +96,10 @@ export function SubscriptionCard({ subscription, plan, onSubscriptionUpdated }: 
               {plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} plan
             </CardDescription>
           </div>
-          {price > 0 && (
+          {displayPrice > 0 && (
             <div className="text-right">
-              <div className="text-2xl font-bold">${price.toFixed(2)}</div>
-              <div className="text-sm text-muted-foreground">per month</div>
+              <div className="text-2xl font-bold">${displayPrice.toFixed(2)}</div>
+              <div className="text-sm text-muted-foreground">{priceLabel}</div>
             </div>
           )}
         </div>

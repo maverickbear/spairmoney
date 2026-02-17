@@ -740,5 +740,46 @@ export class SubscriptionsService {
       return { cancelled: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }
+
+  /**
+   * Delete Stripe customer for a user (used during account deletion so nothing remains in Stripe).
+   * Finds subscription by user/household, deletes the customer in Stripe, and clears stripe_customer_id in DB.
+   */
+  async deleteStripeCustomerForUser(userId: string): Promise<void> {
+    try {
+      const { MembersRepository } = await import("@/src/infrastructure/database/repositories/members.repository");
+      const membersRepository = new MembersRepository();
+      const householdId = await membersRepository.getActiveHouseholdId(userId);
+
+      let subscription = null;
+      if (householdId) {
+        subscription = await this.repository.findByHouseholdId(householdId, true);
+      }
+      if (!subscription) {
+        subscription = await this.repository.findByUserId(userId, true);
+      }
+
+      if (!subscription?.stripe_customer_id) {
+        return;
+      }
+
+      const customerId = subscription.stripe_customer_id;
+      const { getStripeClient } = await import("@/src/infrastructure/external/stripe/stripe-client");
+      const stripe = getStripeClient();
+      await stripe.customers.del(customerId);
+      logger.info("[SubscriptionsService] Deleted Stripe customer for user", { userId, customerId });
+
+      await this.repository.update(subscription.id, {
+        stripeCustomerId: null,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error("[SubscriptionsService] Error deleting Stripe customer (non-blocking):", {
+        userId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      // Do not throw - account deletion should complete even if Stripe customer delete fails
+    }
+  }
 }
 

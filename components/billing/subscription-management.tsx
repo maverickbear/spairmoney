@@ -144,9 +144,11 @@ export function SubscriptionManagement({
       </Card>
     );
   }
-  const price = subscription.currentPeriodStart && subscription.currentPeriodEnd
-    ? (interval === "year" ? plan.priceYearly / 12 : plan.priceMonthly)
+  const isYearly = interval === "year";
+  const displayPrice = subscription.currentPeriodStart && subscription.currentPeriodEnd
+    ? (isYearly ? plan.priceYearly : plan.priceMonthly)
     : 0;
+  const priceLabel = isYearly ? "per year" : "per month";
   const isCancelled = subscription.cancelAtPeriodEnd || subscription.status === "cancelled";
   const isFullyCancelled = subscription.status === "cancelled";
 
@@ -160,17 +162,17 @@ export function SubscriptionManagement({
                 {plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} Plan
               </CardTitle>
               <CardDescription className="mt-1">
-                {interval === "year" 
+                {interval === "year"
                   ? "Yearly Subscription"
                   : interval === "month"
                   ? "Monthly Subscription"
                   : "Subscription"}
               </CardDescription>
             </div>
-            {price > 0 && (
+            {displayPrice > 0 && (
               <div className="text-right">
-                <div className="text-2xl font-bold">${price.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">per month</div>
+                <div className="text-2xl font-bold">${displayPrice.toFixed(2)}</div>
+                <div className="text-sm text-muted-foreground">{priceLabel}</div>
               </div>
             )}
           </div>
