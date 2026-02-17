@@ -163,6 +163,8 @@ export async function GET(request: NextRequest) {
 
     // Create user profile and household whenever the user is not in the User table (same as manual signup).
     // This covers: new Google signup, or OAuth callback running without flow param, or previous callback failure.
+    // If profile creation fails, we must not redirect to dashboard (user would have session but no profile).
+    let profileCreated = true; // assume existing users or success
     if (!userExistsInApp) {
       try {
         const { makeAuthService } = await import("@/src/application/auth/auth.factory");
@@ -175,12 +177,22 @@ export async function GET(request: NextRequest) {
         });
         if (!profileResult.success) {
           console.error("[OAUTH-CALLBACK] Failed to create user profile:", profileResult.message);
+          profileCreated = false;
         } else {
           console.log("[OAUTH-CALLBACK] ✅ User profile and household created for OAuth user");
         }
       } catch (profileError) {
         console.error("[OAUTH-CALLBACK] Error creating user profile:", profileError);
+        profileCreated = false;
       }
+    }
+
+    if (!profileCreated) {
+      await supabase.auth.signOut();
+      const redirectUrl = new URL("/auth/login", requestUrl.origin);
+      redirectUrl.searchParams.set("error", "profile_creation_failed");
+      redirectUrl.searchParams.set("error_description", "We couldn't create your account. Please try again or use email sign up.");
+      return NextResponse.redirect(redirectUrl);
     }
 
     // Check if email is already confirmed by Google

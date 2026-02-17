@@ -63,8 +63,13 @@ export class AuthRepository implements IAuthRepository {
     // Retry logic to handle timing issues with auth.users synchronization
     const maxRetries = 5;
     const retryDelay = 600; // 600ms initial delay, then exponential backoff
-    
+    const initialDelayMs = 200; // Brief delay before first attempt so OAuth-created auth.users row is visible (FK)
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Before first attempt, short delay so auth.users is visible after OAuth exchangeCodeForSession
+      if (attempt === 0 && initialDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, initialDelayMs));
+      }
       // Before attempting insert on retry, verify user exists in auth.users
       // This helps catch timing issues early
       if (attempt > 0) {

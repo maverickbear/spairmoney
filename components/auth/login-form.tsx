@@ -124,6 +124,8 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
       setError(errorDescription || "An error occurred during sign in with Google. Please try again.");
     } else if (oauthError === "pending_invitation") {
       setError(errorDescription || "This email has a pending household invitation. Please accept the invitation from your email or use the invitation link to create your account.");
+    } else if (oauthError === "profile_creation_failed") {
+      setError(errorDescription || "We couldn't create your account. Please try again or use email sign up.");
     } else if (oauthError === "exchange_failed" || oauthError === "no_code" || oauthError === "unexpected_error") {
       setError("Failed to complete sign in. Please try again.");
     }
