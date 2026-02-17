@@ -1,10 +1,9 @@
 /**
- * Profile Anonymization Service
- * Business logic for anonymizing user personal information (PII)
- * Used during account deletion to comply with privacy regulations
+ * Profile deletion service.
+ * Handles full user deletion from public schema and Supabase Auth (no anonymization).
  */
 
-import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
+import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 
 import { logger } from "@/src/infrastructure/utils/logger";
 import { AppError } from "@/src/application/shared/app-error";
@@ -13,9 +12,69 @@ export class ProfileAnonymizationService {
   constructor() {}
 
   /**
+   * Delete user completely: remove all public data via delete_user_completely RPC,
+   * then remove the user from auth.users. No data is kept or anonymized.
+   */
+  async deleteUserCompletely(userId: string): Promise<void> {
+    try {
+      const serviceSupabase = createServiceRoleClient();
+
+      const { error: rpcError } = await serviceSupabase.rpc("delete_user_completely", {
+        p_user_id: userId,
+      });
+
+      if (rpcError) {
+        logger.error("[ProfileAnonymizationService] Error in delete_user_completely:", {
+          userId,
+          error: rpcError.message,
+        });
+        throw new AppError("Failed to delete user data", 500);
+      }
+
+      logger.info("[ProfileAnonymizationService] Public data removed for user", { userId });
+
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY ||
+        process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      if (!supabaseServiceKey || !supabaseUrl) {
+        throw new AppError("Missing Supabase credentials - cannot delete auth user", 500);
+      }
+
+      const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
+
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+
+      if (deleteError) {
+        logger.error("[ProfileAnonymizationService] Failed to delete user from auth.users:", {
+          userId,
+          error: deleteError.message,
+        });
+        throw new AppError("Failed to delete auth user", 500);
+      }
+
+      logger.info("[ProfileAnonymizationService] Deleted user from auth.users", { userId });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error("[ProfileAnonymizationService] Exception in deleteUserCompletely:", {
+        userId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw new AppError("Failed to delete user completely", 500);
+    }
+  }
+
+  /**
+   * @deprecated Use deleteUserCompletely for full removal. Kept only for reference.
    * Anonymize user PII and remove from Supabase Auth completely.
-   * 1) SQL anonymizes public.users and household_members (deleted_at, anonymized PII).
-   * 2) Auth user is deleted so nothing remains in auth.users.
    */
   async anonymizeUserPII(userId: string): Promise<void> {
     try {

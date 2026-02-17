@@ -42,6 +42,12 @@ export interface PasswordResetEmailData {
   appUrl?: string;
 }
 
+export interface AccountRemovedEmailData {
+  to: string;
+  userName?: string;
+  appUrl?: string;
+}
+
 export async function sendInvitationEmail(data: InvitationEmailData): Promise<void> {
   console.log("[EMAIL] sendInvitationEmail called with:", {
     to: data.to,
@@ -849,6 +855,78 @@ function getWelcomeEmailTemplate(data: {
       </td>
     </tr>
   </table>
+</body>
+</html>
+    `.trim();
+  }
+}
+
+export async function sendAccountRemovedEmail(data: AccountRemovedEmailData): Promise<void> {
+  const resend = getResend();
+
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Account removed email will not be sent.");
+    return;
+  }
+
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+
+  try {
+    const emailPayload = {
+      from: finalFromEmail,
+      to: data.to,
+      subject: "Your Spair Money account has been removed",
+      html: getAccountRemovedEmailTemplate({
+        userName: data.userName,
+        email: data.to,
+      }),
+    };
+    const result = await resend.emails.send(emailPayload);
+
+    if (result.error) {
+      const errorMessage = result.error.message || JSON.stringify(result.error);
+      console.error("[EMAIL] Error sending account removed email:", result.error);
+      throw new Error(`Resend API error: ${errorMessage}`);
+    }
+    console.log("[EMAIL] Account removed confirmation email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending account removed email:", error);
+    // Don't throw - account deletion must complete even if email fails
+  }
+}
+
+function getAccountRemovedEmailTemplate(data: {
+  userName?: string;
+  email: string;
+}): string {
+  try {
+    const templatePath = path.join(process.cwd(), "email-templates/account-removed.html");
+    let html = fs.readFileSync(templatePath, "utf-8");
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
+    const logoUrl = getLogoUrl(appUrl);
+
+    const userName = data.userName?.trim() || "there";
+
+    html = html.replace(/\{\{ \.UserName \}\}/g, userName);
+    html = html.replace(/\{\{ \.Email \}\}/g, data.email);
+    html = html.replace(/\{\{ \.Year \}\}/g, new Date().getFullYear().toString());
+    html = html.replace(/\{\{ \.LogoURL \}\}/g, logoUrl);
+
+    return html;
+  } catch (error) {
+    console.error("[EMAIL] Error reading account-removed email template:", error);
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Account removed</title></head>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h1>Your account has been removed</h1>
+  <p>Hi ${(data.userName?.trim() || "there").replace(/</g, "&lt;")},</p>
+  <p>This email confirms that your Spair Money account has been permanently removed, as requested.</p>
+  <p>Your personal data has been deleted from our systems.</p>
+  <p>If you did not request this change, please contact us as soon as possible.</p>
+  <p>© ${new Date().getFullYear()} Spair Money.</p>
 </body>
 </html>
     `.trim();

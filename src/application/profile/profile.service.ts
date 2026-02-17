@@ -407,10 +407,13 @@ export class ProfileService {
    * Delete user account completely.
    * If user is household owner with other members, ownership is auto-transferred to the first
    * available member so the household remains consistent; then the account is removed from
-   * Supabase (auth + anonymized data) and Stripe (subscription + customer).
+   * Supabase (auth + all public data; no anonymization) and Stripe (subscription + customer).
    */
   async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
     try {
+      // Capture user email and name before any deletion step (needed for confirmation email)
+      const userRow = await this.repository.findById(userId);
+
       const membersService = makeMembersService();
       const householdCheck = await membersService.checkHouseholdOwnership(userId);
 
@@ -444,6 +447,22 @@ export class ProfileService {
       }
       await subscriptionsService.deleteStripeCustomerForUser(userId);
 
+      // Send confirmation email before deletion (non-blocking)
+      if (userRow?.email) {
+        try {
+          const { sendAccountRemovedEmail } = await import("@/lib/utils/email");
+          await sendAccountRemovedEmail({
+            to: userRow.email,
+            userName: userRow.name ?? undefined,
+          });
+        } catch (emailError) {
+          logger.error("[ProfileService] Failed to send account-removed email (deletion continues)", {
+            userId,
+            error: emailError instanceof Error ? emailError.message : "Unknown error",
+          });
+        }
+      }
+
       // 4. Delete account immediately
       const deletionResult = await this.deleteAccountImmediately(userId);
       if (!deletionResult.success) {
@@ -473,107 +492,25 @@ export class ProfileService {
   }
 
   /**
-   * Delete account immediately using soft delete + PII anonymization
-   * Uses service role to bypass RLS and anonymize user data
-   * Maintains fiscal/legal records while removing personal information
+   * Delete account immediately: remove all user data from public schema and auth.
+   * No soft delete, no anonymization. Uses delete_user_completely RPC then auth.admin.deleteUser.
    */
   private async deleteAccountImmediately(userId: string): Promise<{
     success: boolean;
     error?: string;
   }> {
     try {
-      const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
       const { makeProfileAnonymizationService } = await import("./profile.factory");
 
-      logger.debug("[ProfileService] Attempting to soft delete and anonymize user:", userId);
+      logger.debug("[ProfileService] Attempting full user deletion:", userId);
 
-      // Use service role to access data
-      const serviceSupabase = createServiceRoleClient();
-      
-      // Step 1: Anonymize user PII using SQL function
-      // This anonymizes name, email, phone, date_of_birth, avatar_url
-      // and sets deleted_at timestamp
-      const anonymizationService = makeProfileAnonymizationService();
-      try {
-        await anonymizationService.anonymizeUserPII(userId);
-        logger.info("[ProfileService] Successfully anonymized user PII", { userId });
-      } catch (anonError) {
-        logger.error("[ProfileService] Error anonymizing user PII:", {
-          userId,
-          error: anonError instanceof Error ? anonError.message : "Unknown error",
-        });
-        // Continue with deletion even if anonymization fails partially
-      }
+      const deletionService = makeProfileAnonymizationService();
+      await deletionService.deleteUserCompletely(userId);
 
-      // Step 2: Revoke all sessions
-      try {
-        await anonymizationService.revokeAllSessions(userId);
-      } catch (sessionError) {
-        logger.warn("[ProfileService] Warning: Could not revoke all sessions:", {
-          userId,
-          error: sessionError instanceof Error ? sessionError.message : "Unknown error",
-        });
-        // Continue - session revocation is not critical
-      }
-
-      // Step 3: Revoke external tokens
-      try {
-        await anonymizationService.revokeAllTokens(userId);
-      } catch (tokenError) {
-        logger.warn("[ProfileService] Warning: Could not revoke all tokens:", {
-          userId,
-          error: tokenError instanceof Error ? tokenError.message : "Unknown error",
-        });
-        // Continue
-      }
-
-      // Step 4: Verify that anonymization was successful
-      // Check if deleted_at was set
-      const { data: userCheck, error: checkError } = await serviceSupabase
-        .from("users")
-        .select("deleted_at, email")
-        .eq("id", userId)
-        .single();
-
-      if (checkError) {
-        logger.error("[ProfileService] Error verifying user deletion:", {
-          userId,
-          error: checkError.message,
-        });
-        return {
-          success: false,
-          error: "Failed to verify account deletion",
-        };
-      }
-
-      if (!userCheck || !userCheck.deleted_at) {
-        logger.error("[ProfileService] User anonymization did not set deleted_at:", {
-          userId,
-          userCheck,
-        });
-        return {
-          success: false,
-          error: "Failed to complete account deletion",
-        };
-      }
-
-      // Verify email was anonymized
-      if (userCheck.email && !userCheck.email.startsWith("deleted+")) {
-        logger.warn("[ProfileService] Warning: User email may not have been anonymized:", {
-          userId,
-          email: userCheck.email,
-        });
-        // Continue - email anonymization may have failed but account is still deleted
-      }
-
-      // Clear user verification cache
       const { clearUserVerificationCache } = await import("@/lib/utils/verify-user-exists");
       await clearUserVerificationCache(userId);
 
-      logger.info("[ProfileService] Successfully soft deleted and anonymized user", {
-        userId,
-        deletedAt: userCheck.deleted_at,
-      });
+      logger.info("[ProfileService] User deleted completely from Supabase", { userId });
 
       return { success: true };
     } catch (error) {
@@ -583,10 +520,10 @@ export class ProfileService {
         stack: error instanceof Error ? error.stack : undefined,
         userId,
       });
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : "Failed to delete account" 
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to delete account",
       };
     }
   }

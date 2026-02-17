@@ -40,7 +40,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     initialData?.subscription ?? null
   );
   const [plan, setPlan] = useState<Plan | null>(initialData?.plan ?? null);
-  const [interval, setInterval] = useState<"month" | "year" | null>(null);
+  const [billingInterval, setBillingInterval] = useState<"month" | "year" | null>(null);
   const [limits, setLimits] = useState<PlanFeatures>(
     initialData?.plan?.features ?? getDefaultFeatures()
   );
@@ -168,7 +168,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       if (!wasRateLimited) {
         setSubscription(newSubscription);
         setPlan(newPlan);
-        setInterval(newInterval);
+        setBillingInterval(newInterval);
       } else {
         log.log("Rate limited during fetch, preserving current subscription state");
       }
@@ -256,7 +256,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
 
     // Start polling interval - first refetch will happen after 5 minutes
     // (not immediately on mount if we have initialData)
-    const interval = setInterval(() => {
+    const timerId = setInterval(() => {
       const now = Date.now();
       const timeSinceLastFetch = now - lastFetchRef.current;
       
@@ -272,10 +272,10 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       }
     }, POLLING_INTERVAL);
 
-    pollingIntervalRef.current = interval;
+    pollingIntervalRef.current = timerId;
 
     return () => {
-      clearInterval(interval);
+      clearInterval(timerId);
     };
   }, [refetch, log]);
 
@@ -297,7 +297,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       value={{
         subscription,
         plan,
-        interval,
+        interval: billingInterval,
         limits,
         checking,
         refetch,
