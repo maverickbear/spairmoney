@@ -61,8 +61,8 @@ export class AuthRepository implements IAuthRepository {
     const now = formatTimestamp(new Date());
 
     // Retry logic to handle timing issues with auth.users synchronization
-    const maxRetries = 3;
-    const retryDelay = 500; // 500ms initial delay
+    const maxRetries = 5;
+    const retryDelay = 600; // 600ms initial delay, then exponential backoff
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       // Before attempting insert on retry, verify user exists in auth.users

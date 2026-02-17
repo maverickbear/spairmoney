@@ -60,8 +60,10 @@ export class AuthService {
       }
 
       let userData: any = await this.repository.findById(authData.user.id);
-      
+
       if (!userData) {
+        // Brief delay so auth.users row is visible to the DB (avoids FK constraint on public.users)
+        await new Promise((r) => setTimeout(r, 400));
         try {
           userData = await this.repository.createUser({
             id: authData.user.id,
