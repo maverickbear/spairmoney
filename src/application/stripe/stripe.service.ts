@@ -21,6 +21,19 @@ type PlanPriceIds = {
   stripe_price_id_yearly: string | null;
 };
 
+/** Stripe subscription with billing period fields (included in API; SDK Response type may omit). */
+type SubscriptionWithPeriod = Stripe.Subscription & {
+  current_period_start: number;
+  current_period_end: number;
+  cancel_at_period_end?: boolean;
+};
+
+/** Normalized app URL for Stripe redirects (success/cancel). Must match deployed app; set NEXT_PUBLIC_APP_URL in every environment. */
+function getStripeBaseUrl(): string {
+  const url = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
+  return url.endsWith("/") ? url : `${url}/`;
+}
+
 export class StripeService {
   constructor(
     private webhookEventsRepository: WebhookEventsRepository = new WebhookEventsRepository(),
@@ -158,7 +171,7 @@ export class StripeService {
       }
 
       // Create checkout session
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
+      const baseUrl = getStripeBaseUrl();
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         payment_method_types: ["card"],
@@ -176,7 +189,7 @@ export class StripeService {
         payment_method_collection: "if_required",
         client_reference_id: `trial-${planId}-${Date.now()}`,
         success_url: returnUrl 
-          ? `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
+          ? `${baseUrl}${returnUrl.startsWith("/") ? returnUrl.slice(1) : returnUrl}${returnUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`
           : `${baseUrl}subscription/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}dashboard?openPricingModal=true&canceled=true`,
         metadata: {
@@ -296,7 +309,7 @@ export class StripeService {
       }
 
       // Create checkout session
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
+      const baseUrl = getStripeBaseUrl();
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         customer: customerId,
@@ -310,7 +323,7 @@ export class StripeService {
           },
         },
         success_url: returnUrl 
-          ? `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
+          ? `${baseUrl}${returnUrl.startsWith("/") ? returnUrl.slice(1) : returnUrl}${returnUrl.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`
           : `${baseUrl}subscription/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}dashboard?openPricingModal=true&canceled=true`,
         metadata: {
@@ -420,9 +433,9 @@ export class StripeService {
         }
       }
 
-      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/").replace(/\/+$/, "");
-      const successPath = returnUrl ? (returnUrl.startsWith("/") ? returnUrl : `/${returnUrl}`) : "/subscription/success";
-      const cancelPath = cancelUrl || "/dashboard?openPricingModal=true&canceled=true";
+      const baseUrl = getStripeBaseUrl();
+      const successPath = returnUrl ? (returnUrl.startsWith("/") ? returnUrl.slice(1) : returnUrl) : "subscription/success";
+      const cancelPath = cancelUrl || "dashboard?openPricingModal=true&canceled=true";
 
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
@@ -442,7 +455,7 @@ export class StripeService {
         },
         payment_method_collection: "if_required",
         success_url: `${baseUrl}${successPath}${successPath.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancelPath.startsWith("http") ? cancelPath : `${baseUrl}${cancelPath.startsWith("/") ? cancelPath : `/${cancelPath}`}`,
+        cancel_url: cancelPath.startsWith("http") ? cancelPath : `${baseUrl}${cancelPath.startsWith("/") ? cancelPath.slice(1) : cancelPath}`,
         metadata: {
           userId,
           planId,
@@ -482,9 +495,8 @@ export class StripeService {
         return { url: null, error: "No Stripe customer found" };
       }
 
-      let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
-      baseUrl = baseUrl.replace(/\/+$/, '');
-      const returnUrl = `${baseUrl}/settings/billing?portal_return=true`;
+      const baseUrl = getStripeBaseUrl();
+      const returnUrl = `${baseUrl}settings/billing?portal_return=true`;
       
       try {
         new URL(returnUrl);
@@ -592,7 +604,7 @@ export class StripeService {
         await this.webhookEventsRepository.create({
           eventId: event.id,
           eventType: event.type,
-          result: 'error',
+          result,
           errorMessage,
           metadata: {
             handled: false,
@@ -659,8 +671,9 @@ export class StripeService {
     const appSubscriptionId = `${userId}-${planId}`;
     const trialStart = stripeSubscription.trial_start;
     const trialEnd = stripeSubscription.trial_end;
-    const periodStart = (stripeSubscription as any).current_period_start;
-    const periodEnd = (stripeSubscription as any).current_period_end;
+    const subWithPeriod = stripeSubscription as unknown as SubscriptionWithPeriod;
+    const periodStart = subWithPeriod.current_period_start;
+    const periodEnd = subWithPeriod.current_period_end;
 
     const now = new Date().toISOString();
     const row = {
@@ -675,7 +688,7 @@ export class StripeService {
       trial_end_date: trialEnd ? new Date(trialEnd * 1000).toISOString() : null,
       current_period_start: periodStart ? new Date(periodStart * 1000).toISOString() : now,
       current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : now,
-      cancel_at_period_end: !!(stripeSubscription as any).cancel_at_period_end,
+      cancel_at_period_end: !!subWithPeriod.cancel_at_period_end,
       created_at: now,
       updated_at: now,
     };
@@ -1740,6 +1753,7 @@ export class StripeService {
       const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
       const serviceRoleClient = createServiceRoleClient();
 
+      const stripeSubWithPeriod = stripeSubscription as unknown as SubscriptionWithPeriod;
       const { data: newSubscription, error: insertError } = await serviceRoleClient
         .from("app_subscriptions")
         .insert({
@@ -1752,11 +1766,11 @@ export class StripeService {
           stripe_customer_id: customerId,
           trial_start_date: trialStartDate.toISOString(),
           trial_end_date: trialEndDate.toISOString(),
-          current_period_start: (stripeSubscription as any).current_period_start 
-            ? new Date((stripeSubscription as any).current_period_start * 1000).toISOString()
+          current_period_start: stripeSubWithPeriod.current_period_start
+            ? new Date(stripeSubWithPeriod.current_period_start * 1000).toISOString()
             : trialStartDate.toISOString(),
-          current_period_end: (stripeSubscription as any).current_period_end 
-            ? new Date((stripeSubscription as any).current_period_end * 1000).toISOString()
+          current_period_end: stripeSubWithPeriod.current_period_end
+            ? new Date(stripeSubWithPeriod.current_period_end * 1000).toISOString()
             : trialEndDate.toISOString(),
           cancel_at_period_end: false,
         })
@@ -1835,10 +1849,6 @@ export class StripeService {
       await stripe.subscriptions.update(subscription.stripe_subscription_id, {
         trial_end: trialEndTimestamp,
       });
-
-      // Invalidate cache
-      const { makeSubscriptionsService } = await import("../subscriptions/subscriptions.factory");
-      const subscriptionsService = makeSubscriptionsService();
 
       logger.info(`[StripeService] Updated subscription trial for user ${userId}`);
       return { success: true };

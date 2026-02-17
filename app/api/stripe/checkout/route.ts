@@ -15,11 +15,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build return URL - use provided returnUrl or default to subscription success page
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
-    const finalReturnUrl = returnUrl 
-      ? `${baseUrl}${returnUrl.startsWith('/') ? returnUrl : `/${returnUrl}`}`
-      : `${baseUrl}/subscription/success`;
+    // Build return URL - use provided returnUrl or default to subscription success page.
+    // Must match deployed app domain (set NEXT_PUBLIC_APP_URL in each environment).
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/").replace(/\/?$/, "/");
+    const finalReturnUrl = returnUrl
+      ? `${baseUrl}${returnUrl.startsWith("/") ? returnUrl.slice(1) : returnUrl}`
+      : `${baseUrl}subscription/success`;
 
     const stripeService = makeStripeService();
 
