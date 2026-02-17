@@ -45,11 +45,40 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
   // PERFORMANCE OPTIMIZATION: Combine user verification and data fetching into single query
   let userData: { id: string; isBlocked: boolean; role: string } | null = null;
   try {
-    const { data, error: userError } = await supabase
+    let { data, error: userError } = await supabase
       .from("users")
       .select("id, is_blocked, role")
       .eq("id", user.id)
       .single();
+
+    // If user is in Auth but not in User table (e.g. Google OAuth callback never ran or failed),
+    // create profile and household now so behavior matches manual signup.
+    if ((userError || !data) && user.email) {
+      log.info(`[PROTECTED-LAYOUT] User ${user.id} authenticated but not in User table; creating profile and household (same as manual/Google signup).`);
+      try {
+        const { makeAuthService } = await import("@/src/application/auth/auth.factory");
+        const authService = makeAuthService();
+        const profileResult = await authService.createUserProfile({
+          userId: user.id,
+          email: user.email,
+          name: (user.user_metadata?.full_name ?? user.user_metadata?.name) ?? null,
+          avatarUrl: (user.user_metadata?.avatar_url ?? user.user_metadata?.picture) ?? null,
+        });
+        if (profileResult.success) {
+          const { data: newUser, error: refetchError } = await supabase
+            .from("users")
+            .select("id, is_blocked, role")
+            .eq("id", user.id)
+            .single();
+          if (!refetchError && newUser) {
+            data = newUser;
+            userError = null;
+          }
+        }
+      } catch (profileError) {
+        log.error("Error creating user profile in protected layout:", profileError);
+      }
+    }
 
     if (userError || !data) {
       console.warn(`[PROTECTED-LAYOUT] User ${user.id} authenticated but not found in User table. Logging out.`);

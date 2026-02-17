@@ -116,10 +116,20 @@ export async function GET(request: NextRequest) {
       flow: flow || "unknown",
     });
 
-    // Determine if this is signup or signin
-    // Priority: 1. Flow parameter from URL, 2. Check if user exists in User table
+    // Always check if user exists in User table (needed for both flow detection and profile creation)
+    const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
+    const serviceRoleClient = createServiceRoleClient();
+    const { data: existingUser, error: userCheckError } = await serviceRoleClient
+      .from("users")
+      .select("id")
+      .eq("id", authUser.id)
+      .maybeSingle();
+
+    const userExistsInApp = !!existingUser && !userCheckError;
+
+    // Determine if this is signup or signin (for OTP vs redirect and invitation checks)
+    // Priority: 1. Flow parameter from URL, 2. User table
     let isSignup: boolean;
-    
     if (flow === "signup") {
       isSignup = true;
       console.log(`[OAUTH-CALLBACK] Flow explicitly set to SIGNUP`);
@@ -127,36 +137,22 @@ export async function GET(request: NextRequest) {
       isSignup = false;
       console.log(`[OAUTH-CALLBACK] Flow explicitly set to SIGNIN`);
     } else {
-      // Fallback: Check if user exists in User table
-      const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
-      const serviceRoleClient = createServiceRoleClient();
-      
-      const { data: existingUser, error: userCheckError } = await serviceRoleClient
-        .from("users")
-        .select("id")
-        .eq("id", authUser.id)
-        .maybeSingle();
-      
-      isSignup = !existingUser || !!userCheckError;
-      console.log(`[OAUTH-CALLBACK] Flow not specified, detected ${isSignup ? 'SIGNUP' : 'SIGNIN'} by checking User table`);
+      isSignup = !userExistsInApp;
+      console.log(`[OAUTH-CALLBACK] Flow not specified, detected ${isSignup ? "SIGNUP" : "SIGNIN"} by checking User table`);
     }
-    
-    console.log(`[OAUTH-CALLBACK] Processing ${isSignup ? 'SIGNUP' : 'SIGNIN'} for user ${authUser.id}`);
+    console.log(`[OAUTH-CALLBACK] Processing ${isSignup ? "SIGNUP" : "SIGNIN"} for user ${authUser.id}`);
 
     // For signup, check for pending invitation (same validation as form signup)
     if (isSignup) {
       const { AuthRepository } = await import("@/src/infrastructure/database/repositories/auth.repository");
       const authRepository = new AuthRepository();
-      
       const pendingInvitation = await authRepository.findPendingInvitation(userEmail);
       if (pendingInvitation) {
         console.warn(`[OAUTH-CALLBACK] User ${userEmail} has pending invitation - blocking signup`, {
           invitationId: pendingInvitation.id,
           householdId: pendingInvitation.householdId,
         });
-        // Sign out the temporary session before redirecting
         await supabase.auth.signOut();
-        
         const redirectUrl = new URL("/auth/login", requestUrl.origin);
         redirectUrl.searchParams.set("error", "pending_invitation");
         redirectUrl.searchParams.set("error_description", "This email has a pending household invitation. Please accept the invitation from your email or use the invitation link to create your account.");
@@ -165,24 +161,22 @@ export async function GET(request: NextRequest) {
       console.log(`[OAUTH-CALLBACK] No pending invitation found for ${userEmail} - proceeding with signup`);
     }
 
-    // For every new signup, create user profile and household immediately (before OTP or redirect).
-    // This ensures the user has a profile even if they drop off before OTP or email_confirmed_at is not set yet.
-    if (isSignup) {
+    // Create user profile and household whenever the user is not in the User table (same as manual signup).
+    // This covers: new Google signup, or OAuth callback running without flow param, or previous callback failure.
+    if (!userExistsInApp) {
       try {
         const { makeAuthService } = await import("@/src/application/auth/auth.factory");
         const authService = makeAuthService();
-
         const profileResult = await authService.createUserProfile({
           userId: authUser.id,
           email: userEmail,
-          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || null,
-          avatarUrl: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
+          name: authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? null,
+          avatarUrl: authUser.user_metadata?.avatar_url ?? authUser.user_metadata?.picture ?? null,
         });
-
         if (!profileResult.success) {
           console.error("[OAUTH-CALLBACK] Failed to create user profile:", profileResult.message);
         } else {
-          console.log("[OAUTH-CALLBACK] ✅ User profile created for signup");
+          console.log("[OAUTH-CALLBACK] ✅ User profile and household created for OAuth user");
         }
       } catch (profileError) {
         console.error("[OAUTH-CALLBACK] Error creating user profile:", profileError);
