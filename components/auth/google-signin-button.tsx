@@ -38,10 +38,11 @@ export function GoogleSignInButton({ variant = "signin", className }: GoogleSign
         localStorage.setItem("lastAuthMethod", "google");
       }
 
-      // Build callback URL on the same origin so the code_verifier cookie is sent when user returns.
-      // Use canonical app URL so redirect lands where the app is deployed (e.g. spair.co).
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "https://spair.co")).replace(/\/?$/, "");
-      const callbackUrl = new URL("/auth/callback", `${appUrl}/`);
+      // CRITICAL: Use current origin so the code_verifier cookie (set by Supabase here) is on the same
+      // host the user returns to. If we use NEXT_PUBLIC_APP_URL and it differs (e.g. spair.co vs www.spair.co),
+      // the user is sent to a different host and the cookie isn't sent → exchangeCodeForSession fails → 401.
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://spair.co";
+      const callbackUrl = new URL("/auth/callback", `${origin}/`);
       callbackUrl.searchParams.set("flow", variant);
       callbackUrl.searchParams.set("redirectTo", "/dashboard");
 
