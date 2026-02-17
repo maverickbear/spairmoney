@@ -28,7 +28,13 @@ type SubscriptionWithPeriod = Stripe.Subscription & {
   cancel_at_period_end?: boolean;
 };
 
-/** Normalized app URL for Stripe redirects (success/cancel). Must match deployed app; set NEXT_PUBLIC_APP_URL in every environment. */
+/**
+ * Normalized app URL for Stripe redirects (success/cancel).
+ * Must be the domain where the Next.js app is served (e.g. https://spair.co).
+ * Do NOT use the Supabase Auth custom domain (e.g. app.spair.co) here, or Stripe
+ * will redirect users to Supabase, which returns "requested path is invalid" for
+ * paths like /subscription/success. Set NEXT_PUBLIC_APP_URL in every environment.
+ */
 function getStripeBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
   return url.endsWith("/") ? url : `${url}/`;
