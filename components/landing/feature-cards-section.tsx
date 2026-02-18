@@ -59,9 +59,9 @@ export function FeatureCardsSection() {
                 />
               </div>
               <CardContent className="p-6">
-                <span className="text-2xl font-bold text-primary">{number}</span>
+                <span className="text-2xl font-bold --sentiment-positive">{number}</span>
                 <div className="mt-4 flex items-center gap-2">
-                  <Icon className="h-5 w-5 text-primary" />
+                  <Icon className="h-5 w-5 --sentiment-positive" />
                   <h3 className="text-lg font-semibold text-foreground">{title}</h3>
                 </div>
                 <p className="mt-2 text-muted-foreground text-sm leading-relaxed">{description}</p>

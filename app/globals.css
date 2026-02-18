@@ -30,9 +30,9 @@
 
     /* Primary colors (Interactive Primary) */
     --primary: 141 73% 68%;
-    /* For neutral interactive elements or emphasising active items in a list: #73E99D */
+    /* For backgrounds only (buttons, badges, active states). Do not use for text. #73E99D */
     --primary-text: 141 73% 45%;
-    /* Darker green for text (~20% darker than primary). Use for clickable labels, links in content, etc. */
+    /* Dark green for text. Use for any text/icon that should read as primary (labels, links, body copy). */
     --primary-foreground: 0 0% 100%;
     /* Use for copy on negative buttons. Turns dark on dark mode to keep elements visible: #FFFFFF */
     --primary-nav: 141 60% 45%;
@@ -79,9 +79,9 @@
     --input: 0 0% 11% / 0.12;
     /* Use on the edges of images to differentiate them from the background, such as flags in avatars: #1C1C1C1F */
 
-    /* Ring color (Interactive Primary) */
-    --ring: 0 72% 45%;
-    /* Interactive Primary: red */
+    /* Ring color (focus/hover on inputs, etc. – brand primary) */
+    --ring: 141 60% 45%;
+    /* Brand primary green – same as primary-nav */
 
     /* Border radius */
     --radius: 12px;
@@ -143,8 +143,8 @@
     /* New sentiment colors */
     --sentiment-negative: 7 86% 35%;
     /* Sentiment Negative: #A8200D */
-    --sentiment-positive: 94 67% 20%;
-    /* Sentiment Positive: #2F5711 */
+    --sentiment-positive: 142 72% 29%;
+    /* Sentiment Positive (Tailwind green-700): #15803d */
     --sentiment-warning: 47 83% 60%;
     /* Sentiment Warning: #EDC843 */
   }
@@ -222,9 +222,9 @@
     --input: 0 0% 100% / 0.12;
     /* Border Neutral: White with alpha for contrast on dark background */
 
-    /* Ring color (Interactive Primary) */
-    --ring: 0 70% 55%;
-    /* Interactive Primary: red */
+    /* Ring color (focus/hover on inputs, etc. – brand primary) */
+    --ring: 141 45% 50%;
+    /* Brand primary green – visible on dark background */
 
     /* Legacy grey scale for dark mode - inverted */
     --grey-50: 0 0% 9%;
@@ -278,8 +278,8 @@
     /* New sentiment colors (same in dark mode) */
     --sentiment-negative: 7 86% 35%;
     /* Sentiment Negative: #A8200D */
-    --sentiment-positive: 94 67% 20%;
-    /* Sentiment Positive: #2F5711 */
+    --sentiment-positive: 142 72% 29%;
+    /* Sentiment Positive (Tailwind green-700): #15803d */
     --sentiment-warning: 47 83% 60%;
     /* Sentiment Warning: #EDC843 */
 

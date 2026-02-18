@@ -65,7 +65,7 @@ export function FeaturesStructuredSection() {
               key={title}
               className="rounded-[32px] border border-border bg-card p-6 shadow-sm"
             >
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/20 text-primary">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/20 --sentiment-positive">
                 <Icon className="h-6 w-6" />
               </div>
               <h3 className="mt-4 text-lg font-bold text-foreground">{title}</h3>
@@ -75,7 +75,7 @@ export function FeaturesStructuredSection() {
                     key={item}
                     className="text-sm text-muted-foreground leading-relaxed flex items-start gap-2"
                   >
-                    <span className="text-primary mt-0.5 shrink-0">•</span>
+                    <span className="--sentiment-positive mt-0.5 shrink-0">•</span>
                     <span>{item}</span>
                   </li>
                 ))}

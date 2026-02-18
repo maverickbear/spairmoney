@@ -261,7 +261,7 @@ export function MoreMenuSheet({
                 />
               ) : (
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border">
-                  <span className="text-lg font-semibold text-primary">
+                  <span className="text-lg font-semibold --sentiment-positive">
                     {getInitials(userProfile?.name)}
                   </span>
                 </div>
@@ -405,7 +405,7 @@ export function MoreMenuSheet({
                           "hover:bg-muted/50 active:scale-[0.98]",
                           !isLast && "border-b border-border",
                           active
-                            ? "bg-primary/10 text-primary"
+                            ? "bg-primary/10 --sentiment-positive"
                             : "text-foreground"
                         )}
                       >
@@ -422,7 +422,7 @@ export function MoreMenuSheet({
                         <span
                           className={cn(
                             "text-sm font-medium flex-1",
-                            active && "text-primary"
+                            active && "--sentiment-positive"
                           )}
                         >
                           {item.label}
@@ -451,7 +451,7 @@ export function MoreMenuSheet({
                         "hover:bg-muted/50 active:scale-[0.98]",
                         !isLast && "border-b border-border",
                         active
-                          ? "bg-primary/10 text-primary"
+                          ? "bg-primary/10 --sentiment-positive"
                           : "text-foreground"
                       )}
                     >
@@ -468,7 +468,7 @@ export function MoreMenuSheet({
                       <span
                         className={cn(
                           "text-sm font-medium flex-1",
-                          active && "text-primary"
+                          active && "--sentiment-positive"
                         )}
                       >
                         {item.label}

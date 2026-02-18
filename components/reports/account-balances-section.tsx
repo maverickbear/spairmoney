@@ -103,7 +103,7 @@ export function AccountBalancesSection({
                 className={cn(
                   "text-2xl font-bold flex items-center gap-2",
                   balanceChange >= 0
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-sentiment-positive"
                     : "text-red-600 dark:text-red-400"
                 )}
               >
@@ -118,7 +118,7 @@ export function AccountBalancesSection({
                 className={cn(
                   "text-sm",
                   balanceChangePercent >= 0
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-sentiment-positive"
                     : "text-red-600 dark:text-red-400"
                 )}
               >

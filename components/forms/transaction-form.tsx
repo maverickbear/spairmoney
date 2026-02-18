@@ -1380,7 +1380,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                               onChange={() => {
                                 form.setValue("expenseType", "variable");
                               }}
-                              className="w-4 h-4 text-primary border-border focus:ring-primary"
+                              className="w-4 h-4 --sentiment-positive border-border focus:ring-primary"
                             />
                             <span className="text-sm">Variable</span>
                           </label>
@@ -1393,7 +1393,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                               onChange={() => {
                                 form.setValue("expenseType", "fixed");
                               }}
-                              className="w-4 h-4 text-primary border-border focus:ring-primary"
+                              className="w-4 h-4 --sentiment-positive border-border focus:ring-primary"
                             />
                             <span className="text-sm">Fixed</span>
                           </label>

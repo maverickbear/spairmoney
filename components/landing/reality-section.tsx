@@ -33,7 +33,7 @@ export function RealitySection() {
         <div className="mt-12 grid sm:grid-cols-3 gap-8 md:gap-12">
           {STATS.map(({ value, description }) => (
             <div key={value} className="text-center">
-              <p className="text-4xl md:text-5xl font-bold text-primary">{value}</p>
+              <p className="text-4xl md:text-5xl font-bold --sentiment-positive">{value}</p>
               <p className="mt-2 text-sm md:text-base text-muted-foreground leading-snug max-w-[200px] mx-auto">
                 {description}
               </p>

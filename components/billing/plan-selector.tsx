@@ -140,7 +140,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
               className={`flex items-center gap-2 ${interval === "year" ? "shadow-sm" : ""}`}
             >
               Yearly
-              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-[10px] px-1.5 py-0 h-4 font-semibold hover:bg-green-100 dark:hover:bg-green-900">
+              <Badge className="bg-green-100 text-sentiment-positive dark:bg-green-900 dark:text-sentiment-positive text-[10px] px-1.5 py-0 h-4 font-semibold hover:bg-green-100 dark:hover:bg-green-900">
                 10% OFF
               </Badge>
             </Button>
@@ -177,7 +177,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                       <td key={plan.id} className="px-6 py-4 text-center text-sm">
                         {hasDiscount && originalYearlyPrice && (
                           <div className="mb-1">
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs mb-1 hover:bg-green-100 dark:hover:bg-green-900">
+                            <Badge variant="secondary" className="bg-green-100 text-sentiment-positive dark:bg-green-900 dark:text-sentiment-positive text-xs mb-1 hover:bg-green-100 dark:hover:bg-green-900">
                               10% OFF
                             </Badge>
                             <div>
@@ -220,7 +220,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasBankIntegration ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -232,7 +232,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasBudgets ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -244,7 +244,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasGoals ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -256,7 +256,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasReceiptScanner ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -268,7 +268,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasInvestments ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -280,7 +280,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasAdvancedReports ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -292,7 +292,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasCsvImport ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -304,7 +304,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasCsvExport ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -316,7 +316,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasDebts ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -328,7 +328,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   {sortedPlans.map((plan) => (
                     <td key={plan.id} className="px-6 py-4 text-center">
                       {plan.features.hasHousehold ? (
-                        <Check className="h-5 w-5 text-primary mx-auto" />
+                        <Check className="h-5 w-5 --sentiment-positive mx-auto" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -480,7 +480,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   <ul className="space-y-2">
                     {allFeatures.map((feature, index) => (
                       <li key={index} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                        <Check className="h-4 w-4 --sentiment-positive flex-shrink-0" />
                         <span className="text-muted-foreground">{feature}</span>
                       </li>
                     ))}

@@ -179,7 +179,7 @@ export function PricingDialog({
 
         {trialStarted ? (
           <div className="flex flex-col items-center justify-center py-12 px-6">
-            <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
+            <CheckCircle2 className="h-16 w-16 text-sentiment-positive mb-4" />
             <h3 className="text-2xl font-semibold mb-2">Trial Active!</h3>
             <p className="text-muted-foreground text-center mb-6">
               Your 30-day free trial has started. You now have full access to all features.

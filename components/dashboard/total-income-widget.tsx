@@ -43,7 +43,7 @@ export function TotalIncomeWidget({ transactions }: TotalIncomeWidgetProps) {
             <span className={cn(
               "text-2xl font-semibold",
               totalIncome > 0 
-                ? "text-green-600 dark:text-green-400" 
+                ? "text-sentiment-positive" 
                 : "text-muted-foreground"
             )}>
               {formatMoney(totalIncome)}

@@ -246,7 +246,7 @@ export function DynamicPricingTable({
                     {leftFeatures.map((feature, index) => (
                       <div key={index} className="flex items-start gap-2">
                         {feature.enabled && (
-                          <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                          <Check className="h-5 w-5 --sentiment-positive flex-shrink-0 mt-0.5" />
                         )}
                         {!feature.enabled && (
                           <span className="h-5 w-5 flex-shrink-0 mt-0.5" />
@@ -267,7 +267,7 @@ export function DynamicPricingTable({
                     {rightFeatures.map((feature, index) => (
                       <div key={index + midPoint} className="flex items-start gap-2">
                       {feature.enabled && (
-                        <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                        <Check className="h-5 w-5 --sentiment-positive flex-shrink-0 mt-0.5" />
                       )}
                       {!feature.enabled && (
                         <span className="h-5 w-5 flex-shrink-0 mt-0.5" />

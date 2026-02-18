@@ -115,7 +115,7 @@ export function ImportProgress({ jobIds, onComplete }: ImportProgressProps) {
     // All jobs completed successfully
     return (
       <Alert className="mb-4 border-green-200 bg-green-50">
-        <CheckCircle2 className="h-4 w-4 text-green-600" />
+        <CheckCircle2 className="h-4 w-4 text-sentiment-positive" />
         <AlertDescription className="text-sentiment-positive">
           Import completed successfully! {allJobs.reduce((sum, j) => sum + (j.syncedItems || 0), 0)} transactions imported.
         </AlertDescription>
@@ -130,7 +130,7 @@ export function ImportProgress({ jobIds, onComplete }: ImportProgressProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {job.status === 'processing' && (
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <Loader2 className="h-4 w-4 animate-spin --sentiment-positive" />
               )}
               {job.status === 'completed' && (
                 <CheckCircle2 className="h-4 w-4 text-sentiment-positive" />
@@ -167,7 +167,7 @@ export function ImportProgress({ jobIds, onComplete }: ImportProgressProps) {
           )}
 
           {job.status === 'completed' && (
-            <div className="text-sm text-green-700">
+            <div className="text-sm text-sentiment-positive">
               Successfully imported {job.syncedItems || 0} transactions
               {job.skippedItems > 0 && `, skipped ${job.skippedItems} duplicates`}
             </div>

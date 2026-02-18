@@ -35,7 +35,7 @@ export default async function TermsOfServicePage() {
   return (
     <ContentPageLayout
       hero={{
-        icon: <FileText className="h-10 w-10 shrink-0 text-primary" />,
+        icon: <FileText className="h-10 w-10 shrink-0 --sentiment-positive" />,
         title: "Terms of Service",
         subtitle: `Last updated: ${LAST_UPDATED}`,
       }}

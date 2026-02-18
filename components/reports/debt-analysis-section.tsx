@@ -48,7 +48,7 @@ export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Principal Paid</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+              <p className="text-2xl font-bold text-sentiment-positive">
                 {formatMoney(totalPrincipalPaid)}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -110,7 +110,7 @@ export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
             {lowPriorityDebts.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <CheckCircle2 className="h-4 w-4 text-sentiment-positive" />
                   Low Priority Debts
                 </h3>
                 <div className="space-y-2">

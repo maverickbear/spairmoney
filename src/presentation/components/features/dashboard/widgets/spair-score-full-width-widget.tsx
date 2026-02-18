@@ -221,8 +221,8 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                     <span
                       className={cn(
                         "text-base font-semibold tabular-nums",
-                        !empty && m.good && "text-green-700 dark:text-green-400",
-                        !empty && !m.good && m.value !== "—" && "text-amber-700 dark:text-amber-400"
+                        !empty && m.good && "text-sentiment-positive",
+                        !empty && !m.good && m.value !== "—" && "text-sentiment-warning"
                       )}
                     >
                       {m.value}

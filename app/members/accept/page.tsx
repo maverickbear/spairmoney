@@ -303,7 +303,7 @@ function AcceptInvitationForm() {
             {(status === "validating" || status === "processing") && (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <Loader2 className="h-8 w-8 animate-spin --sentiment-positive" />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {status === "validating" && "Please wait while we validate your invitation..."}
@@ -337,7 +337,7 @@ function AcceptInvitationForm() {
             {status === "success" && (
               <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
-                  <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  <CheckCircle2 className="h-8 w-8 text-sentiment-positive" />
                 </div>
                 <div className="text-center space-y-2">
                   <p className="text-sm font-medium">{message}</p>

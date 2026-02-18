@@ -56,13 +56,13 @@ export function AccountsBreakdownModal({
   const getAccountTypeColor = (type: string) => {
     switch (type) {
       case "checking":
-        return "bg-blue-100 dark:bg-blue-900/30 text-primary border-blue-200 dark:border-blue-800";
+        return "bg-blue-100 dark:bg-blue-900/30 --sentiment-positive border-blue-200 dark:border-blue-800";
       case "savings":
         return "bg-green-100 dark:bg-green-900/30 text-sentiment-positive border-green-200 dark:border-green-800";
       case "credit":
         return "bg-red-100 dark:bg-red-900/30 text-sentiment-negative border-red-200 dark:border-red-800";
       case "investment":
-        return "bg-primary/10 dark:bg-primary/30 text-primary dark:text-primary border-primary/20 dark:border-primary/30";
+        return "bg-primary/10 dark:bg-primary/30 --sentiment-positive dark:--sentiment-positive border-primary/20 dark:border-primary/30";
       default:
         return "bg-muted text-muted-foreground border-border";
     }
@@ -133,7 +133,7 @@ export function AccountsBreakdownModal({
               <div className="flex items-center justify-between rounded-lg border bg-card/50 p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-primary/10 p-2">
-                    <Building2 className="h-5 w-5 text-primary" />
+                    <Building2 className="h-5 w-5 --sentiment-positive" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-foreground">{household}</h3>

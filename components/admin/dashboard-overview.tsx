@@ -344,10 +344,10 @@ export function DashboardOverview({
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-primary" />
+              <CreditCard className="h-4 w-4 --sentiment-positive" />
               Trialing
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
+            <TrendingUp className="h-4 w-4 --sentiment-positive" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{overview.trialingSubscriptions.toLocaleString()}</div>
@@ -364,7 +364,7 @@ export function DashboardOverview({
                 {trialRate}% of total users
               </p>
               {overview.trialingSubscriptions > 0 && (
-                <p className="text-xs font-medium text-primary">
+                <p className="text-xs font-medium --sentiment-positive">
                   Potential revenue
                 </p>
               )}

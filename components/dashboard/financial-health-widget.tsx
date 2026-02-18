@@ -74,7 +74,7 @@ export function FinancialHealthWidget({ data, lastMonthIncome, lastMonthExpenses
       case "warning":
         return <AlertTriangle className="h-4 w-4 text-sentiment-warning" />;
       default:
-        return <Info className="h-4 w-4 text-primary" />;
+        return <Info className="h-4 w-4 --sentiment-positive" />;
     }
   };
 

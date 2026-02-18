@@ -42,14 +42,14 @@ export function BlogGridCard({ post }: BlogGridCardProps) {
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   i % 2 === 0
                     ? "bg-muted text-muted-foreground"
-                    : "bg-primary/10 text-primary"
+                    : "bg-primary/10 --sentiment-positive"
                 }`}
               >
                 {tag}
               </span>
             ))}
           </div>
-          <h3 className="text-lg font-semibold tracking-tight text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
+          <h3 className="text-lg font-semibold tracking-tight text-foreground line-clamp-2 mb-2 group-hover:--sentiment-positive transition-colors">
             {post.title}
           </h3>
           <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
@@ -66,7 +66,7 @@ export function BlogGridCard({ post }: BlogGridCardProps) {
               />
             ) : (
               <div
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium --sentiment-positive"
                 aria-hidden
               >
                 {post.author.slice(0, 1).toUpperCase()}

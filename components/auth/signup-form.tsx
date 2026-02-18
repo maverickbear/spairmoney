@@ -290,7 +290,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
               {passwordRequirements.map(({ label, met }) => (
                 <li key={label} className="flex items-center gap-2">
                   {met ? (
-                    <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <Check className="h-4 w-4 shrink-0 --sentiment-positive" aria-hidden />
                   ) : (
                     <Circle className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
                   )}

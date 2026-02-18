@@ -210,16 +210,16 @@ export function SubscriptionSuccessDialog({
                   {subscriptionStatus === "trialing" ? (
                     <>
                       <li className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                         <span>Your 30-day trial is active and you have access to all pro features</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                         <span>You'll only be charged after your trial ends. Cancel anytime—your plan stays active until the end of your billing cycle.</span>
                       </li>
                       {trialEndDate && (
                         <li className="flex items-start gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                           <span>
                             Your trial ends on {new Date(trialEndDate).toLocaleDateString("en-US", {
                               year: "numeric",
@@ -230,22 +230,22 @@ export function SubscriptionSuccessDialog({
                         </li>
                       )}
                       <li className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                         <span>You can add a payment method anytime from your billing settings</span>
                       </li>
                     </>
                   ) : (
                     <>
                       <li className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                         <span>Your subscription is now active and you have access to all pro features</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                         <span>You can manage your subscription anytime from your billing settings</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                         <span>A confirmation email has been sent to your email address</span>
                       </li>
                     </>

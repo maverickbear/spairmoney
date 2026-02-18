@@ -83,8 +83,8 @@ export function DebtOverviewWidget({ data, loading, error }: DebtOverviewWidgetP
           {data.nextMilestone && (
             <div className="p-2 rounded border bg-primary/5 border-primary/20">
               <div className="flex items-center gap-1.5 mb-1">
-                <CreditCard className="h-3 w-3 text-primary" />
-                <p className="text-xs font-semibold text-primary">Next</p>
+                <CreditCard className="h-3 w-3 --sentiment-positive" />
+                <p className="text-xs font-semibold --sentiment-positive">Next</p>
               </div>
               <p className="text-xs font-medium mb-0.5 truncate">{data.nextMilestone.milestoneDescription}</p>
               <p className="text-xs text-muted-foreground">

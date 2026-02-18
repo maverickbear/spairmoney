@@ -11,7 +11,7 @@ export const metadata = {
 const LAST_UPDATED = "February 17, 2025";
 
 const externalLinkClass =
-  "text-foreground underline underline-offset-4 hover:text-primary";
+  "text-foreground underline underline-offset-4 hover:--sentiment-positive";
 
 export default async function PrivacyPolicyPage() {
   let proPlanName = "PRO";
@@ -35,7 +35,7 @@ export default async function PrivacyPolicyPage() {
   return (
     <ContentPageLayout
       hero={{
-        icon: <Shield className="h-10 w-10 shrink-0 text-primary" />,
+        icon: <Shield className="h-10 w-10 shrink-0 --sentiment-positive" />,
         title: "Privacy Policy",
         subtitle: `Last updated: ${LAST_UPDATED}`,
       }}

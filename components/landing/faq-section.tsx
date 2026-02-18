@@ -26,7 +26,7 @@ export function FAQSection() {
         <Accordion type="single" defaultValue="faq-0" collapsible className="mt-8 space-y-2">
           {LANDING_FAQ_ITEMS.map((item, i) => (
             <AccordionItem key={i} value={`faq-${i}`}>
-              <AccordionTrigger className="text-left data-[state=open]:text-primary">
+              <AccordionTrigger className="text-left data-[state=open]:--sentiment-positive">
                 {item.q}
               </AccordionTrigger>
               <AccordionContent>{item.a}</AccordionContent>

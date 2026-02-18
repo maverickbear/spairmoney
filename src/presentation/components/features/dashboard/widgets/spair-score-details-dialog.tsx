@@ -105,7 +105,7 @@ export function SpairScoreDetailsDialog({
                     <div className="flex items-baseline gap-2">
                        <span className="text-3xl font-bold">{empty ? "—" : data.score}</span>
                     </div>
-                    <p className={cn("text-xs font-medium truncate", empty ? "text-muted-foreground" : "text-primary")}>
+                    <p className={cn("text-xs font-medium truncate", empty ? "text-muted-foreground" : "--sentiment-positive")}>
                       {empty ? "No data" : data.classification}
                     </p>
                   </div>
@@ -145,7 +145,7 @@ export function SpairScoreDetailsDialog({
               </div>
               <div className="relative h-3 w-full rounded-full bg-secondary overflow-visible">
                 {/* Gradient Background */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 opacity-80" />
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-sentiment-positive opacity-80" />
                 
                 {/* Marker: hide when empty so we don't show "0%" */}
                 {!empty && (
@@ -184,7 +184,7 @@ export function SpairScoreDetailsDialog({
                            <p className="font-medium text-sm">{alert.title}</p>
                            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{alert.description}</p>
                            {alert.action && (
-                             <p className="text-xs text-primary font-medium mt-1.5">{alert.action}</p>
+                             <p className="text-xs text-sentiment-positive font-medium mt-1.5">{alert.action}</p>
                            )}
                         </div>
                       </CardContent>
@@ -197,7 +197,7 @@ export function SpairScoreDetailsDialog({
                         <div className={cn(
                           "h-2 w-2 rounded-full mt-1.5 shrink-0", 
                           suggestion.impact === 'high' ? "bg-red-500" : 
-                          suggestion.impact === 'medium' ? "bg-yellow-500" : "bg-green-500"
+                          suggestion.impact === 'medium' ? "bg-yellow-500" : "bg-sentiment-positive"
                         )} />
                         <div className="min-w-0 flex-1">
                            <p className="font-medium text-sm">{suggestion.title}</p>
@@ -209,7 +209,7 @@ export function SpairScoreDetailsDialog({
 
                  {data.alerts.length === 0 && data.suggestions.length === 0 && (
                     <div className="flex gap-3 items-center text-muted-foreground p-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      <CheckCircle2 className="h-5 w-5 text-sentiment-positive" />
                       <span className="text-sm">Great job! No specific recommendations at this time.</span>
                     </div>
                  )}
@@ -261,25 +261,25 @@ export function SpairScoreDetailsDialog({
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Net Flow</p>
-                      <p className={cn(empty ? "" : data.netAmount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+                      <p className={cn(empty ? "" : data.netAmount >= 0 ? "text-sentiment-positive" : "text-red-600 dark:text-red-400")}>
                         {empty ? "—" : formatMoney(data.netAmount)}
                       </p>
                     </div>
                     <div>
                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Savings Rate</p>
-                       <p className={cn(empty ? "" : data.savingsRate >= 20 ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400")}>
+                       <p className={cn(empty ? "" : data.savingsRate >= 20 ? "text-sentiment-positive" : "text-yellow-600 dark:text-yellow-400")}>
                          {empty ? "—" : `${data.savingsRate.toFixed(1)}%`}
                        </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Emergency Fund</p>
-                      <p className={cn(empty ? "" : data.emergencyFundMonths >= 6 ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400")}>
+                      <p className={cn(empty ? "" : data.emergencyFundMonths >= 6 ? "text-sentiment-positive" : "text-yellow-600 dark:text-yellow-400")}>
                         {empty ? "—" : `${data.emergencyFundMonths.toFixed(1)} months`}
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Debt Exposure</p>
-                      <p className={cn(empty ? "" : data.debtExposure === "Low" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+                      <p className={cn(empty ? "" : data.debtExposure === "Low" ? "text-sentiment-positive" : "text-red-600 dark:text-red-400")}>
                         {empty ? "—" : data.debtExposure}
                       </p>
                     </div>

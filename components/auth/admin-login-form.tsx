@@ -81,7 +81,7 @@ export function AdminLoginForm() {
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
       {registered && (
-        <Alert className="border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400">
+        <Alert className="border-green-500/50 bg-green-500/10 text-sentiment-positive">
           <CheckCircle2 className="h-4 w-4" />
           <AlertDescription>Account created. Sign in below.</AlertDescription>
         </Alert>

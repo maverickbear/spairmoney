@@ -741,7 +741,7 @@ export default function SubscriptionsPage() {
                     </TableCell>
                     <TableCell>
                       {subscription.isActive ? (
-                        <Badge variant="outline" className="border-green-500 dark:border-green-400 text-green-600 dark:text-green-400">
+                        <Badge variant="outline" className="border-green-500 dark:border-green-400 text-sentiment-positive">
                           Active
                         </Badge>
                       ) : (

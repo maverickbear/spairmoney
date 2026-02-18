@@ -202,7 +202,7 @@ export function BudgetsTab() {
             <CardContent className="pt-6">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Remaining</p>
-                <p className={`text-2xl font-bold ${totalRemaining < 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
+                <p className={`text-2xl font-bold ${totalRemaining < 0 ? "text-destructive" : "text-sentiment-positive"}`}>
                   {formatMoney(totalRemaining)}
                 </p>
               </div>

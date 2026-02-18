@@ -83,7 +83,7 @@ export function SubscriptionsWidget({ data, className }: SubscriptionsWidgetProp
 function ServiceIcon({ name }: { name: string }) {
   const n = name.toLowerCase();
   // Simple brand detection
-  if (n.includes("spotify")) return <Music className="h-5 w-5 text-green-500" />;
+  if (n.includes("spotify")) return <Music className="h-5 w-5 text-sentiment-positive" />;
   if (n.includes("netflix") || n.includes("youtube") || n.includes("hulu") || n.includes("disney")) return <MonitorPlay className="h-5 w-5 text-red-500" />;
   if (n.includes("chatgpt") || n.includes("openai") || n.includes("claude")) return <MessageSquare className="h-5 w-5 text-emerald-600" />;
   if (n.includes("aws") || n.includes("google") || n.includes("azure")) return <Zap className="h-5 w-5 text-yellow-500" />;

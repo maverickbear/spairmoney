@@ -239,7 +239,7 @@ export function GoalsTab() {
             <CardContent className="pt-6">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Allocation</p>
-                <p className={`text-2xl font-bold ${totalAllocation > 100 ? "text-red-600 dark:text-red-400" : totalAllocation > 90 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`}>
+                <p className={`text-2xl font-bold ${totalAllocation > 100 ? "text-red-600 dark:text-red-400" : totalAllocation > 90 ? "text-yellow-600 dark:text-yellow-400" : "text-sentiment-positive"}`}>
                   {totalAllocation.toFixed(1)}%
                 </p>
                 <p className="text-xs text-muted-foreground">

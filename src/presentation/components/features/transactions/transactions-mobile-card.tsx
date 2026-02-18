@@ -218,7 +218,7 @@ export function TransactionsMobileCard({
           <div className="flex-shrink-0">
                 <span className={cn(
               "text-base font-medium",
-              isIncome ? "text-green-600 dark:text-green-400" : 
+              isIncome ? "text-sentiment-positive" : 
               isExpense ? "text-red-600 dark:text-red-400" : 
               "text-foreground"
                 )}>

@@ -88,7 +88,7 @@ function NonClickablePortfolioPerformanceWidget() {
             <div className="text-2xl font-bold tabular-nums mb-1">
               {formatMoney(currentValue)}
             </div>
-            <div className={`text-sm font-semibold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <div className={`text-sm font-semibold ${change >= 0 ? 'text-sentiment-positive' : 'text-red-600'}`}>
               {change >= 0 ? '+' : ''}{formatMoney(change)} ({changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%) today
             </div>
           </div>
@@ -441,7 +441,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
       <div className="bg-white dark:bg-card rounded-lg border border-border shadow-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-lg bg-primary/10">
-            <Download className="h-5 w-5 text-primary" />
+            <Download className="h-5 w-5 --sentiment-positive" />
           </div>
           <div>
             <p className="text-sm font-semibold">Import Complete</p>
@@ -451,7 +451,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
         <div className="space-y-2 text-xs">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Categorized</span>
-            <span className="font-medium text-green-600">2,623 (92%)</span>
+            <span className="font-medium text-sentiment-positive">2,623 (92%)</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Needs review</span>
@@ -468,7 +468,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
       <div className="bg-white dark:bg-card rounded-lg border border-border shadow-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-lg bg-primary/10">
-            <Download className="h-5 w-5 text-primary" />
+            <Download className="h-5 w-5 --sentiment-positive" />
           </div>
           <div>
             <p className="text-sm font-semibold">Export Ready</p>
@@ -541,7 +541,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
         <div className="mb-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-lg bg-primary/10">
-              <Users className="h-5 w-5 text-primary" />
+              <Users className="h-5 w-5 --sentiment-positive" />
             </div>
             <div>
               <p className="text-sm font-semibold">Household Overview</p>
@@ -580,7 +580,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
         <div className="mb-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-lg bg-primary/10">
-              <Building2 className="h-5 w-5 text-primary" />
+              <Building2 className="h-5 w-5 --sentiment-positive" />
             </div>
             <div>
               <p className="text-sm font-semibold">Connected Banks</p>
@@ -613,7 +613,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
         </div>
         <div className="pt-3 border-t border-border">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-3 w-3 text-green-600" />
+            <CheckCircle2 className="h-3 w-3 text-sentiment-positive" />
             <span>Last sync: 2 minutes ago</span>
           </div>
         </div>
@@ -631,7 +631,7 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
           <div className="space-y-2 text-xs">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Income</span>
-              <span className="font-medium text-green-600">$5,450</span>
+              <span className="font-medium text-sentiment-positive">$5,450</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Expenses</span>
@@ -639,13 +639,13 @@ export function FeaturePromotionWidget({ featureName }: FeaturePromotionWidgetPr
             </div>
             <div className="flex justify-between pt-2 border-t border-border">
               <span className="font-semibold">Net</span>
-              <span className="font-semibold text-green-600">+$1,220</span>
+              <span className="font-semibold text-sentiment-positive">+$1,220</span>
             </div>
           </div>
         </div>
         <div className="pt-3 border-t border-border">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-3 w-3 text-green-600" />
+            <CheckCircle2 className="h-3 w-3 text-sentiment-positive" />
             <span>No limits - track everything</span>
           </div>
         </div>

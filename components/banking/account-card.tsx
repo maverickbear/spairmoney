@@ -172,7 +172,7 @@ export function AccountCard({
                 <div className={cn(
                   "text-sm font-bold",
                   account.balance >= 0 
-                    ? "text-green-600 dark:text-green-400" 
+                    ? "text-sentiment-positive" 
                     : "text-red-600 dark:text-red-400"
                 )}>
                   {formatMoney(account.balance)}
@@ -189,7 +189,7 @@ export function AccountCard({
                 <div className={cn(
                   "text-sm font-semibold",
                   available !== null && available >= 0
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-sentiment-positive"
                     : "text-red-600 dark:text-red-400"
                 )}>
                   {available !== null ? formatMoney(available) : "-"}
@@ -202,7 +202,7 @@ export function AccountCard({
               <div className={cn(
                 "text-lg font-bold",
                 account.balance >= 0 
-                  ? "text-green-600 dark:text-green-400" 
+                  ? "text-sentiment-positive" 
                   : "text-red-600 dark:text-red-400"
               )}>
                 {formatMoney(account.balance)}

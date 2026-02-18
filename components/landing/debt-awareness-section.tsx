@@ -55,11 +55,11 @@ export function DebtAwarenessSection() {
               key={region}
               className="rounded-[32px] border border-border bg-card p-6 shadow-sm text-center"
             >
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-primary">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 --sentiment-positive">
                 <Icon className="h-5 w-5" />
               </div>
               <p className="mt-3 text-sm font-semibold text-foreground">{region}</p>
-              <p className="mt-2 text-3xl md:text-4xl font-bold text-primary">{value}</p>
+              <p className="mt-2 text-3xl md:text-4xl font-bold --sentiment-positive">{value}</p>
               <p className="mt-2 text-sm text-muted-foreground leading-snug">
                 {description}
               </p>

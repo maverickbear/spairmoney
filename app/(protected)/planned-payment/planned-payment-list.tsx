@@ -640,7 +640,7 @@ export function PlannedPaymentList() {
                         </div>
                         <div className={cn("font-bold text-sm", 
                           payment.type === "expense" ? "text-red-600 dark:text-red-400" :
-                          payment.type === "income" ? "text-green-600 dark:text-green-400" :
+                          payment.type === "income" ? "text-sentiment-positive" :
                           ""
                         )}>
                           {payment.type === "expense" ? "-" : payment.type === "income" ? "+" : ""}
@@ -986,7 +986,7 @@ export function PlannedPaymentList() {
                           )}
                         </TableCell>
                         <TableCell className="text-right text-xs md:text-sm">
-                          <div className="font-bold tabular-nums text-green-600 dark:text-green-400">
+                          <div className="font-bold tabular-nums text-sentiment-positive">
                             +{formatMoney(amount)}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1 hidden md:block">

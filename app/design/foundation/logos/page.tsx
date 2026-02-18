@@ -161,27 +161,27 @@ export default function LogosPage() {
           <CardContent>
             <div className="space-y-3 text-muted-foreground">
               <div className="flex items-start gap-2">
-                <span className="text-primary">•</span>
+                <span className="--sentiment-positive">•</span>
                 <p><strong className="text-foreground">Clear Space:</strong> Maintain minimum clear space around the logo equal to the height of the icon</p>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">•</span>
+                <span className="--sentiment-positive">•</span>
                 <p><strong className="text-foreground">Color Selection:</strong> Use black/white logos on light backgrounds, white/dark-mode logos on dark backgrounds</p>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">•</span>
+                <span className="--sentiment-positive">•</span>
                 <p><strong className="text-foreground">Format:</strong> Prefer SVG for web use, PNG for email templates and when transparency is needed</p>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">•</span>
+                <span className="--sentiment-positive">•</span>
                 <p><strong className="text-foreground">Do Not:</strong> Distort, rotate, or modify the logo. Maintain aspect ratio and original colors</p>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">•</span>
+                <span className="--sentiment-positive">•</span>
                 <p><strong className="text-foreground">Accessibility:</strong> Ensure sufficient contrast (WCAG AA minimum) between logo and background</p>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-primary">•</span>
+                <span className="--sentiment-positive">•</span>
                 <p><strong className="text-foreground">Resolution:</strong> Use @2x versions for high-DPI displays and print materials</p>
               </div>
             </div>

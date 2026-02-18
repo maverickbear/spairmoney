@@ -42,7 +42,7 @@ export function BlogFeaturedSection({ post }: BlogFeaturedSectionProps) {
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   i % 2 === 0
                     ? "bg-muted text-muted-foreground"
-                    : "bg-primary/10 text-primary"
+                    : "bg-primary/10 --sentiment-positive"
                 }`}
               >
                 {tag}
@@ -55,13 +55,13 @@ export function BlogFeaturedSection({ post }: BlogFeaturedSectionProps) {
               {format(date, "d MMM yyyy")}
             </time>
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl lg:text-3xl mb-3 group-hover:text-primary transition-colors">
+          <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl lg:text-3xl mb-3 group-hover:--sentiment-positive transition-colors">
             {post.title}
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base leading-relaxed line-clamp-2 mb-4">
             {post.description}
           </p>
-          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium --sentiment-positive">
             Read article
             <ArrowUpRight className="h-4 w-4" aria-hidden />
           </span>

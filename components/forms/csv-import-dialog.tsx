@@ -897,7 +897,7 @@ export function CsvImportDialog({
                         )}>
                           <Upload className={cn(
                             "h-8 w-8 transition-colors",
-                            isDragging ? "text-primary" : "text-muted-foreground"
+                            isDragging ? "--sentiment-positive" : "text-muted-foreground"
                           )} />
                         </div>
                         <p className="text-sm font-medium mb-1">
@@ -1208,7 +1208,7 @@ export function CsvImportDialog({
                                 </SelectContent>
                               </Select>
                               {currentMapping && (
-                                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                                <CheckCircle2 className="h-5 w-5 text-sentiment-positive flex-shrink-0" />
                               )}
                             </div>
                           );
@@ -1270,7 +1270,7 @@ export function CsvImportDialog({
                                 </SelectContent>
                               </Select>
                               {matchedAccount && (
-                                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                                <CheckCircle2 className="h-5 w-5 text-sentiment-positive flex-shrink-0" />
                               )}
                             </div>
                           );

@@ -52,7 +52,7 @@ export function WidgetExpandableCard({
       {pill && (
         <div className={cn(
           "inline-block px-2 py-1 rounded text-xs mt-2",
-          pill.variant === "positive" && "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+          pill.variant === "positive" && "bg-green-100 text-sentiment-positive dark:bg-green-900 dark:text-sentiment-positive",
           pill.variant === "warning" && "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
           pill.variant === "negative" && "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
           !pill.variant && "bg-muted text-muted-foreground"

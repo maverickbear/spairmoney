@@ -57,7 +57,7 @@ export function FinancialAlertsWidget({ data, loading, error }: FinancialAlertsW
       case 'warning':
         return <AlertTriangle className="h-5 w-5 text-sentiment-warning" />;
       default:
-        return <Info className="h-5 w-5 text-primary" />;
+        return <Info className="h-5 w-5 --sentiment-positive" />;
     }
   };
 

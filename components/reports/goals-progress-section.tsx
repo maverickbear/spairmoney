@@ -100,7 +100,7 @@ function GoalCard({ goal, isCompleted = false }: { goal: GoalWithCalculations; i
           <div className="flex items-center gap-2">
             <p className="font-semibold">{goal.name}</p>
             {isCompleted && (
-              <span className="text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+              <span className="text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900 text-sentiment-positive">
                 Completed
               </span>
             )}
@@ -166,7 +166,7 @@ function GoalCard({ goal, isCompleted = false }: { goal: GoalWithCalculations; i
                   ? "text-red-600 dark:text-red-400"
                   : goal.priority === "Medium"
                   ? "text-yellow-600 dark:text-yellow-400"
-                  : "text-green-600 dark:text-green-400"
+                  : "text-sentiment-positive"
               )}
             >
               {goal.priority}

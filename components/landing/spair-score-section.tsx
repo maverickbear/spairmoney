@@ -40,7 +40,7 @@ export function SpairScoreSection() {
               {BULLETS.map((text) => (
                 <li key={text} className="flex items-center gap-3">
                   <span className="shrink-0 rounded-full bg-primary/20 p-1">
-                    <Check className="h-4 w-4 text-primary" />
+                    <Check className="h-4 w-4 --sentiment-positive" />
                   </span>
                   <span className="text-muted-foreground">{text}</span>
                 </li>

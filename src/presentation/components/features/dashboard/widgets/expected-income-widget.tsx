@@ -12,12 +12,15 @@ interface ExpectedIncomeWidgetProps {
   data: ExpectedIncomeOverview | null;
   onRefresh: () => void;
   className?: string;
+  /** When set, the whole card is clickable to open a breakdown (e.g. from dashboard) */
+  onCardClick?: () => void;
 }
 
 export function ExpectedIncomeWidget({
   data,
   onRefresh,
   className,
+  onCardClick,
 }: ExpectedIncomeWidgetProps) {
   const [editOpen, setEditOpen] = useState(false);
 
@@ -33,6 +36,7 @@ export function ExpectedIncomeWidget({
       <WidgetCard
         title="Income"
         className={cn("min-h-0 h-auto", className)}
+        onClick={onCardClick}
         headerAction={
           <Button
             variant="link"

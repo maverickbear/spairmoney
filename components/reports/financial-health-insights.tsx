@@ -44,7 +44,7 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
       case "medium":
         return "text-yellow-600 dark:text-yellow-400";
       default:
-        return "text-green-600 dark:text-green-400";
+        return "text-sentiment-positive";
     }
   };
 
@@ -106,7 +106,7 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
                                 ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
                                 : suggestion.impact === "medium"
                                 ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300"
-                                : "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                                : "bg-green-100 dark:bg-green-900 text-sentiment-positive"
                             )}
                           >
                             {suggestion.impact} impact
@@ -126,7 +126,7 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
           {/* No alerts or suggestions */}
           {financialHealth.alerts.length === 0 && financialHealth.suggestions.length === 0 && (
             <div className="text-center py-8">
-              <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400 mx-auto mb-3" />
+              <CheckCircle2 className="h-12 w-12 text-sentiment-positive mx-auto mb-3" />
               <p className="text-sm font-medium">Great job!</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Your Spair Score looks good. Keep up the excellent work!

@@ -2204,7 +2204,7 @@ export default function TransactionsPage() {
                   )}
                 </TableCell>
                 <TableCell className={`text-right font-medium text-xs md:text-sm ${
-                  tx.type === "income" ? "text-green-600 dark:text-green-400" :
+                  tx.type === "income" ? "text-sentiment-positive" :
                   tx.type === "expense" ? "text-red-600 dark:text-red-400" :
                   tx.type === "transfer" ? "text-foreground" : ""
                 }`}>
@@ -2359,7 +2359,7 @@ export default function TransactionsPage() {
                     {transactionSummaryModal.type === "transfer" && transactionSummaryModal.transferToId ? "—" : (transactionSummaryModal.description || "—")}
                   </span>
                   <span className="text-muted-foreground">Amount</span>
-                  <span className={`font-medium ${transactionSummaryModal.type === "income" ? "text-green-600 dark:text-green-400" : transactionSummaryModal.type === "expense" ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
+                  <span className={`font-medium ${transactionSummaryModal.type === "income" ? "text-sentiment-positive" : transactionSummaryModal.type === "expense" ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
                     {transactionSummaryModal.type === "expense" ? "-" : ""}{formatMoney(transactionSummaryModal.amount)}
                   </span>
                 </div>
@@ -2605,7 +2605,7 @@ export default function TransactionsPage() {
                           <div className="flex items-center gap-2 w-full">
                             <span className="flex-1">{category.name}</span>
                             {isActive && (
-                              <Check className="h-4 w-4 text-primary" />
+                              <Check className="h-4 w-4 --sentiment-positive" />
                             )}
                           </div>
                         </SelectItem>

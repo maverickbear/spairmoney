@@ -47,7 +47,7 @@ const RadioGroupItem = React.forwardRef<HTMLInputElement, RadioGroupItemProps>(
         checked={isChecked}
         onChange={() => context.onValueChange?.(itemValue)}
         className={cn(
-          "h-4 w-4 border-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer",
+          "h-4 w-4 border-input --sentiment-positive focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer",
           className
         )}
         {...props}

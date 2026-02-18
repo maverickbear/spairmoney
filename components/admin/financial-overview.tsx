@@ -88,7 +88,7 @@ export function FinancialOverview({ financial, loading }: FinancialOverviewProps
         <Card className="border-primary/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-primary" />
+              <DollarSign className="h-4 w-4 --sentiment-positive" />
               Monthly Recurring Revenue
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-sentiment-positive" />
@@ -107,7 +107,7 @@ export function FinancialOverview({ financial, loading }: FinancialOverviewProps
               <p className="text-xs text-muted-foreground">
                 {formatCurrency(annualRunRate)} annual run rate
               </p>
-              <p className="text-xs font-medium text-primary">
+              <p className="text-xs font-medium --sentiment-positive">
                 {financial.subscriptionDetails.length} active subscriptions
               </p>
             </div>
@@ -162,7 +162,7 @@ export function FinancialOverview({ financial, loading }: FinancialOverviewProps
         <Card className="border-primary/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
+              <TrendingUp className="h-4 w-4 --sentiment-positive" />
               Total Estimated MRR
             </CardTitle>
           </CardHeader>
@@ -180,7 +180,7 @@ export function FinancialOverview({ financial, loading }: FinancialOverviewProps
               <p className="text-xs text-muted-foreground">
                 {formatCurrency(totalAnnualRunRate)} annual run rate
               </p>
-              <p className="text-xs font-medium text-primary">
+              <p className="text-xs font-medium --sentiment-positive">
                 {growthPotential}% from trials
               </p>
             </div>
@@ -199,7 +199,7 @@ export function FinancialOverview({ financial, loading }: FinancialOverviewProps
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
+                  <Calendar className="h-5 w-5 --sentiment-positive" />
                   Upcoming Trial Expirations
                 </CardTitle>
                 <CardDescription className="mt-1">
@@ -277,7 +277,7 @@ export function FinancialOverview({ financial, loading }: FinancialOverviewProps
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
+                <Target className="h-5 w-5 --sentiment-positive" />
                 Revenue Breakdown by Plan
               </CardTitle>
               <CardDescription className="mt-1">

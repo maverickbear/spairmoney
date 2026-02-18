@@ -535,7 +535,7 @@ export default function AccountsPage() {
                           <div className={cn(
                             "font-semibold",
                             account.balance >= 0 
-                              ? "text-green-600 dark:text-green-400" 
+                              ? "text-sentiment-positive" 
                               : "text-red-600 dark:text-red-400"
                           )}>
                             {formatMoney(account.balance)}

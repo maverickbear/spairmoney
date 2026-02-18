@@ -22,7 +22,7 @@ export function BlogPostCard({ post }: BlogPostCardProps) {
           >
             {format(date, "MMMM d, yyyy")}
           </time>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground group-hover:text-primary transition-colors line-clamp-2">
+          <h2 className="text-lg font-semibold tracking-tight text-foreground group-hover:--sentiment-positive transition-colors line-clamp-2">
             {post.title}
           </h2>
           <p className="text-sm text-muted-foreground line-clamp-2">

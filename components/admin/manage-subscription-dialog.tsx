@@ -329,7 +329,7 @@ export function ManageSubscriptionDialog({
                 <div className="space-y-6">
                   <div className="text-sm text-muted-foreground">
                     To cancel a subscription with a refund, you need to create and issue a credit note, or{" "}
-                    <span className="text-primary font-medium">update</span> the subscription end date and configure the pro rata behavior.
+                    <span className="--sentiment-positive font-medium">update</span> the subscription end date and configure the pro rata behavior.
                   </div>
 
                   <div className="space-y-4">

@@ -14,6 +14,7 @@ import { ExpectedIncomeWidget } from "./widgets/expected-income-widget";
 import { WidgetCard } from "./widgets/widget-card";
 import { formatMoney } from "@/components/common/money";
 import { SpairScoreDetailsDialog } from "./widgets/spair-score-details-dialog";
+import { DashboardCardBreakdownSheet, type DashboardBreakdownCardType } from "./widgets/dashboard-card-breakdown-sheet";
 import { SpairScoreFullWidthWidget } from "./widgets/spair-score-full-width-widget";
 import { RefreshCcw } from "lucide-react";
 import { useDashboardSnapshot } from "@/src/presentation/contexts/dashboard-snapshot-context";
@@ -52,6 +53,7 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
     setSelectedMemberId,
   } = useDashboardSnapshot();
   const [showSpairScoreDetails, setShowSpairScoreDetails] = useState(false);
+  const [breakdownCard, setBreakdownCard] = useState<DashboardBreakdownCardType | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [members, setMembers] = useState<HouseholdMemberOption[]>([]);
 
@@ -118,11 +120,11 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
             onValueChange={(value) => setSelectedMemberId(value === "everyone" ? null : value)}
           >
             <SelectTrigger
-              className="inline-flex w-auto max-w-[50%] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal text-primary-text hover:text-primary cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate min-w-0"
+              className="inline-flex w-auto max-w-[50%] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal --sentiment-positive hover:--sentiment-positive cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate min-w-0"
               size="medium"
               aria-label="Change whose finances to view"
             >
-              <span className="text-primary-text font-bold truncate" title={selectedDisplayName}>{selectedDisplayName}&apos;s </span>
+              <span className="--sentiment-positive font-bold truncate" title={selectedDisplayName}>{selectedDisplayName}&apos;s </span>
             </SelectTrigger>
             <SelectContent align="start">
               <SelectItem value="everyone">Family</SelectItem>
@@ -148,7 +150,7 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
       <DashboardLayout>
         {/* Stats Section: 2 cols until xl, then 4 - avoids cramping on 1024px (768px content) */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 xl:gap-6 mb-4 xl:mb-6 [&>*]:min-w-0">
-           <WidgetCard title="Available" className="min-h-0 h-auto">
+           <WidgetCard title="Available" className="min-h-0 h-auto" onClick={() => setBreakdownCard("available")}>
               {(() => {
                 const available = data.accountStats?.totalAvailable ??
                   (data.accountStats?.totalChecking ?? 0);
@@ -172,8 +174,9 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
              data={data.expectedIncomeOverview ?? null}
              onRefresh={handleRefresh}
              className="min-h-0 h-auto"
+             onCardClick={() => setBreakdownCard("income")}
            />
-           <WidgetCard title="Savings" className="min-h-0 h-auto">
+           <WidgetCard title="Savings" className="min-h-0 h-auto" onClick={() => setBreakdownCard("savings")}>
               {(() => {
                 const savings = data.accountStats?.totalSavings ?? 0;
                 const card = data.accountStats?.savingsCard;
@@ -196,7 +199,7 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                 );
               })()}
            </WidgetCard>
-           <WidgetCard title="Net Worth" className="min-h-0 h-auto">
+           <WidgetCard title="Net Worth" className="min-h-0 h-auto" onClick={() => setBreakdownCard("net-worth")}>
               {(() => {
                 const nw = data.netWorth;
                 const hasData = nw != null;
@@ -236,6 +239,13 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
           open={showSpairScoreDetails}
           onOpenChange={setShowSpairScoreDetails}
           data={data.spairScore?.details}
+        />
+
+        <DashboardCardBreakdownSheet
+          open={breakdownCard !== null}
+          onOpenChange={(open) => !open && setBreakdownCard(null)}
+          cardType={breakdownCard}
+          data={data}
         />
 
         {/* Top Section: Total Budgets + Spending */}

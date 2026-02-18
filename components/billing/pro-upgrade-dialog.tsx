@@ -255,7 +255,7 @@ export function ProUpgradeDialog({
                           ${priceYearly.toFixed(2)} / year
                         </span>
                         {yearlySavingsPct > 0 && (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium --sentiment-positive">
                             Save {yearlySavingsPct}%
                           </span>
                         )}
@@ -296,7 +296,7 @@ export function ProUpgradeDialog({
 
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-background/80 backdrop-blur-sm">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="h-8 w-8 animate-spin --sentiment-positive" />
             </div>
           )}
         </DialogPrimitive.Content>

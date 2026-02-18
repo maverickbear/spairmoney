@@ -117,7 +117,7 @@ export function ImportProgress({ jobIds, onComplete }: ImportProgressProps) {
     return (
       <Alert className="mb-4 border-sentiment-positive/30 bg-sentiment-positive/10">
         <CheckCircle2 className="h-4 w-4 text-sentiment-positive" />
-        <AlertDescription className="text-green-800">
+        <AlertDescription className="text-sentiment-positive">
           Import completed successfully! {allJobs.reduce((sum, j) => sum + (j.syncedItems || 0), 0)} transactions imported.
         </AlertDescription>
       </Alert>
@@ -134,7 +134,7 @@ export function ImportProgress({ jobIds, onComplete }: ImportProgressProps) {
                 <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
               )}
               {job.status === 'completed' && (
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <CheckCircle2 className="h-4 w-4 text-sentiment-positive" />
               )}
               {job.status === 'failed' && (
                 <XCircle className="h-4 w-4 text-red-600" />
@@ -168,7 +168,7 @@ export function ImportProgress({ jobIds, onComplete }: ImportProgressProps) {
           )}
 
           {job.status === 'completed' && (
-            <div className="text-sm text-green-700">
+            <div className="text-sm text-sentiment-positive">
               Successfully imported {job.syncedItems || 0} transactions
               {job.skippedItems > 0 && `, skipped ${job.skippedItems} duplicates`}
             </div>

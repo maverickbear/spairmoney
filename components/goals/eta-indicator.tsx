@@ -31,7 +31,7 @@ export function ETAIndicator({
 
   if (monthsToGoal === 0) {
     return (
-      <div className={cn("text-sm font-semibold text-green-600", className)}>
+      <div className={cn("text-sm font-semibold text-sentiment-positive", className)}>
         Goal reached!
       </div>
     );

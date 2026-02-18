@@ -190,7 +190,7 @@ export default function FAQPage() {
                 href="/privacy-policy"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-foreground underline underline-offset-4 hover:text-primary"
+                className="text-foreground underline underline-offset-4 hover:--sentiment-positive"
               >
                 Privacy Policy
               </Link>
@@ -259,7 +259,7 @@ export default function FAQPage() {
     <ContentPageLayout
       hero={{
         icon: (
-          <HelpCircle className="h-10 w-10 shrink-0 text-primary sm:h-12 sm:w-12" />
+          <HelpCircle className="h-10 w-10 shrink-0 --sentiment-positive sm:h-12 sm:w-12" />
         ),
         title: "Frequently Asked Questions",
         subtitle: "Find answers to the most common questions about Spair Money",
@@ -383,7 +383,7 @@ export default function FAQPage() {
                 <strong className="text-foreground">Email:</strong>{" "}
                 <a
                   href="mailto:support@spair.co"
-                  className="break-all text-primary underline underline-offset-4 hover:text-primary/90"
+                  className="break-all --sentiment-positive underline underline-offset-4 hover:--sentiment-positive/90"
                 >
                   support@spair.co
                 </a>

@@ -157,7 +157,7 @@ export function PlanIntervalSelector({
                   Current
                 </Badge>
               ) : (
-                <Badge variant="secondary" className="text-xs bg-primary/10 text-primary shrink-0 px-2">
+                <Badge variant="secondary" className="text-xs bg-primary/10 --sentiment-positive shrink-0 px-2">
                   Save 17%
                 </Badge>
               )}

@@ -65,20 +65,20 @@ export function FinancialOverviewCard({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">Total Income</p>
-              <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <DollarSign className="h-4 w-4 text-sentiment-positive" />
             </div>
             <p className="text-2xl font-bold">{formatMoney(currentIncome)}</p>
             {lastIncome > 0 && (
               <div className="flex items-center gap-1 text-xs">
                 {incomeChange >= 0 ? (
-                  <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
+                  <TrendingUp className="h-3 w-3 text-sentiment-positive" />
                 ) : (
                   <TrendingDown className="h-3 w-3 text-red-600 dark:text-red-400" />
                 )}
                 <span
                   className={cn(
                     incomeChange >= 0
-                      ? "text-green-600 dark:text-green-400"
+                      ? "text-sentiment-positive"
                       : "text-red-600 dark:text-red-400"
                   )}
                 >
@@ -99,14 +99,14 @@ export function FinancialOverviewCard({
             {lastExpenses > 0 && (
               <div className="flex items-center gap-1 text-xs">
                 {expensesChange <= 0 ? (
-                  <TrendingDown className="h-3 w-3 text-green-600 dark:text-green-400" />
+                  <TrendingDown className="h-3 w-3 text-sentiment-positive" />
                 ) : (
                   <TrendingUp className="h-3 w-3 text-red-600 dark:text-red-400" />
                 )}
                 <span
                   className={cn(
                     expensesChange <= 0
-                      ? "text-green-600 dark:text-green-400"
+                      ? "text-sentiment-positive"
                       : "text-red-600 dark:text-red-400"
                   )}
                 >
@@ -125,7 +125,7 @@ export function FinancialOverviewCard({
                 className={cn(
                   "h-4 w-4",
                   currentNet >= 0
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-sentiment-positive"
                     : "text-red-600 dark:text-red-400"
                 )}
               />
@@ -134,7 +134,7 @@ export function FinancialOverviewCard({
               className={cn(
                 "text-2xl font-bold",
                 currentNet >= 0
-                  ? "text-green-600 dark:text-green-400"
+                  ? "text-sentiment-positive"
                   : "text-red-600 dark:text-red-400"
               )}
             >
@@ -143,14 +143,14 @@ export function FinancialOverviewCard({
             {lastNet !== 0 && (
               <div className="flex items-center gap-1 text-xs">
                 {netChange >= 0 ? (
-                  <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
+                  <TrendingUp className="h-3 w-3 text-sentiment-positive" />
                 ) : (
                   <TrendingDown className="h-3 w-3 text-red-600 dark:text-red-400" />
                 )}
                 <span
                   className={cn(
                     netChange >= 0
-                      ? "text-green-600 dark:text-green-400"
+                      ? "text-sentiment-positive"
                       : "text-red-600 dark:text-red-400"
                   )}
                 >
@@ -171,7 +171,7 @@ export function FinancialOverviewCard({
               className={cn(
                 "text-2xl font-bold",
                 savingsRate >= 20
-                  ? "text-green-600 dark:text-green-400"
+                  ? "text-sentiment-positive"
                   : savingsRate >= 10
                   ? "text-yellow-600 dark:text-yellow-400"
                   : "text-red-600 dark:text-red-400"
@@ -216,7 +216,7 @@ export function FinancialOverviewCard({
                   className={cn(
                     "text-3xl font-bold",
                     financialHealth.score >= 80
-                      ? "text-green-600 dark:text-green-400"
+                      ? "text-sentiment-positive"
                       : financialHealth.score >= 60
                       ? "text-yellow-600 dark:text-yellow-400"
                       : "text-red-600 dark:text-red-400"

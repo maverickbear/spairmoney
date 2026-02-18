@@ -26,7 +26,7 @@ export default async function MaintenancePage() {
         {/* Maintenance Icon */}
         <div className="flex justify-center">
           <div className="p-6 bg-primary/10 rounded-full">
-            <Wrench className="w-12 h-12 text-primary" />
+            <Wrench className="w-12 h-12 --sentiment-positive" />
           </div>
         </div>
 

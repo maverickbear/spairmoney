@@ -68,7 +68,7 @@ export default function ContactPage() {
   return (
     <ContentPageLayout
       hero={{
-        icon: <Mail className="h-8 w-8 text-primary" />,
+        icon: <Mail className="h-8 w-8 --sentiment-positive" />,
         title: "Contact",
         subtitle: "Get in touch. We'll respond within 24 hours.",
       }}

@@ -74,7 +74,7 @@ export function PricingSection() {
             <ul className="mt-6 space-y-3">
               {INCLUDED.map((item) => (
                 <li key={item} className="flex items-center gap-3">
-                  <Check className="h-5 w-5 shrink-0 text-primary" />
+                  <Check className="h-5 w-5 shrink-0 --sentiment-positive" />
                   <span className="text-muted-foreground">{item}</span>
                 </li>
               ))}

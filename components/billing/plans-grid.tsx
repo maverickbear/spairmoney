@@ -252,7 +252,7 @@ export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlan
                   {features.map((feature, index) => (
                     <li key={index} className="flex items-start gap-1.5">
                       {feature.enabled && (
-                        <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                        <Check className="h-4 w-4 --sentiment-positive flex-shrink-0 mt-0.5" />
                       )}
                       {!feature.enabled && (
                         <span className="h-4 w-4 flex-shrink-0 mt-0.5" />

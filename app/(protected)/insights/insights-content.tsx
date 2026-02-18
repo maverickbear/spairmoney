@@ -237,7 +237,7 @@ export function SpairScoreInsightsPage({
   const getIconColor = (type: "success" | "warning" | "danger") => {
     switch (type) {
       case "success":
-        return "text-green-600 dark:text-green-400";
+        return "text-sentiment-positive";
       case "warning":
         return "text-amber-600 dark:text-amber-400";
       case "danger":
@@ -528,7 +528,7 @@ export function SpairScoreInsightsPage({
       {alerts.length === 0 && suggestions.length === 0 && (
         <div className="text-center py-12 px-4">
           <div className="inline-flex items-center justify-center w-16 h-16 mb-4">
-            <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+            <CheckCircle2 className="h-8 w-8 text-sentiment-positive" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">Great job!</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">

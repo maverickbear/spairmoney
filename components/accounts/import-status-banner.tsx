@@ -132,7 +132,7 @@ export function ImportStatusBanner() {
     <Alert className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5">
-          <Loader2 className="h-5 w-5 text-primary animate-spin" />
+          <Loader2 className="h-5 w-5 --sentiment-positive animate-spin" />
         </div>
         <div className="flex-1 min-w-0">
           <AlertDescription className="text-blue-900 dark:text-blue-100">

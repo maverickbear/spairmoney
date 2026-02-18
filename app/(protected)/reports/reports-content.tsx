@@ -212,13 +212,13 @@ export function ReportsContent({
                           <TableCell className="text-right font-medium text-xs md:text-sm">{formatMoney(item.budget)}</TableCell>
                           <TableCell className="text-right font-medium text-xs md:text-sm">{formatMoney(item.actual)}</TableCell>
                           <TableCell className={`text-right font-medium text-xs md:text-sm hidden md:table-cell ${
-                            difference >= 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+                            difference >= 0 ? "text-red-600 dark:text-red-400" : "text-sentiment-positive"
                           }`}>
                             {difference >= 0 ? "+" : ""}{formatMoney(difference)}
                           </TableCell>
                           <TableCell className={`text-right font-medium text-xs md:text-sm ${
                             percentage > 100 ? "text-red-600 dark:text-red-400" :
-                            percentage > 90 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"
+                            percentage > 90 ? "text-yellow-600 dark:text-yellow-400" : "text-sentiment-positive"
                           }`}>
                             {percentage.toFixed(1)}%
                           </TableCell>

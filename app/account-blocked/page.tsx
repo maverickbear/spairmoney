@@ -50,7 +50,7 @@ export default async function AccountBlockedPage() {
           {/* Contact Support Card */}
           <div className="bg-primary/5 rounded-lg p-6 space-y-4 border border-primary/20">
             <div className="flex items-start gap-3">
-              <Mail className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+              <Mail className="w-5 h-5 --sentiment-positive mt-0.5 shrink-0" />
               <div className="text-left space-y-2">
                 <p className="font-medium">Need Help?</p>
                 <p className="text-sm text-muted-foreground">

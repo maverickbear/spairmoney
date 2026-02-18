@@ -260,7 +260,7 @@ export function ChangePlanConfirmationModal({
             {isDowngrade ? (
               <AlertTriangle className="h-6 w-6 text-yellow-500" />
             ) : (
-              <Check className="h-6 w-6 text-green-500" />
+              <Check className="h-6 w-6 text-sentiment-positive" />
             )}
             {isDowngrade ? "Confirm Downgrade" : "Confirm Upgrade"}
           </DialogTitle>
@@ -306,7 +306,7 @@ export function ChangePlanConfirmationModal({
           {isUpgrade && gainedFeatures.length > 0 && (
             <div>
               <h3 className="font-semibold mb-2">Features you will gain:</h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-green-600 dark:text-green-400">
+              <ul className="list-disc list-inside space-y-1 text-sm text-sentiment-positive">
                 {gainedFeatures.map((feature, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <Check className="h-4 w-4 flex-shrink-0 mt-0.5" />

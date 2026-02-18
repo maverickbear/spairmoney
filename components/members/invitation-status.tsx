@@ -21,7 +21,7 @@ export function InvitationStatus({ status, className }: InvitationStatusProps) {
         return {
           label: "Active",
           variant: "default" as const,
-          className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+          className: "bg-green-100 text-sentiment-positive dark:bg-green-900 dark:text-sentiment-positive",
         };
       case "declined":
         return {

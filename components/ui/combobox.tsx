@@ -441,7 +441,7 @@ export function Combobox({
                             {value === item.id && (
                               <Check
                                 className={cn(
-                                  "text-primary flex-shrink-0 ml-2",
+                                  "--sentiment-positive flex-shrink-0 ml-2",
                                   sizeConfig.icon
                                 )}
                               />
@@ -483,7 +483,7 @@ export function Combobox({
                         {value === item.id && (
                           <Check
                             className={cn(
-                              "text-primary flex-shrink-0 ml-2",
+                              "--sentiment-positive flex-shrink-0 ml-2",
                               sizeConfig.icon
                             )}
                           />

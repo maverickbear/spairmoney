@@ -10,7 +10,7 @@ const designCategories = [
     title: "Foundation",
     description: "Core design tokens and building blocks",
     icon: Layout,
-    color: "bg-primary/10 text-primary border-primary/20",
+    color: "bg-primary/10 --sentiment-positive border-primary/20",
     items: [
       {
         title: "Colors",

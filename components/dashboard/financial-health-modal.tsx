@@ -80,7 +80,7 @@ export function FinancialHealthModal({
       case "warning":
         return <AlertTriangle className="h-5 w-5 text-sentiment-warning" />;
       default:
-        return <Info className="h-5 w-5 text-primary" />;
+        return <Info className="h-5 w-5 --sentiment-positive" />;
     }
   };
 
@@ -183,7 +183,7 @@ export function FinancialHealthModal({
                 </p>
                 <p className={`text-xs mt-1 ${
                   hasLastMonthExpenses && expensesMomChange !== null
-                    ? expensesMomChange >= 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+                    ? expensesMomChange >= 0 ? "text-red-600 dark:text-red-400" : "text-sentiment-positive"
                     : "text-muted-foreground"
                 }`}>
                   {hasLastMonthExpenses && expensesMomChange !== null
@@ -199,7 +199,7 @@ export function FinancialHealthModal({
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {data.netAmount >= 0 ? (
-                    <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <TrendingUp className="h-5 w-5 text-sentiment-positive" />
                   ) : (
                     <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
                   )}
@@ -207,7 +207,7 @@ export function FinancialHealthModal({
                 </div>
                 <span className={cn(
                   "text-lg font-semibold",
-                  data.netAmount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                  data.netAmount >= 0 ? "text-sentiment-positive" : "text-red-600 dark:text-red-400"
                 )}>
                   {formatMoney(data.netAmount)}
                 </span>
@@ -230,7 +230,7 @@ export function FinancialHealthModal({
                   </div>
                   <span className={cn(
                     "text-sm font-semibold",
-                    data.savingsRate >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    data.savingsRate >= 0 ? "text-sentiment-positive" : "text-red-600 dark:text-red-400"
                   )}>
                     {data.savingsRate >= 0 ? "+" : ""}{data.savingsRate.toFixed(1)}%
                   </span>
