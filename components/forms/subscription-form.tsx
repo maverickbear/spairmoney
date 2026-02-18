@@ -200,46 +200,39 @@ export function SubscriptionForm({
       }
       const data = await response.json();
       setSubscriptionServiceCategories(data.categories || []);
-      
-      // If editing and we have a service name, try to find and select the service
-      if (subscription && subscription.serviceName && data.categories.length > 0) {
-        const service = data.categories
-          .flatMap((cat: any) => cat.services)
-          .find((s: any) => s.name === subscription.serviceName);
-        if (service) {
-          setSelectedServiceId(service.id);
-        }
-      }
     } catch (error) {
       console.error("Error loading subscription services:", error);
     }
   }
 
-
-
-
-  // Set category filter when editing and categories are loaded
+  // When editing: set Subscription Category and service from subscription service categories
+  // (dropdown options come from subscriptionServiceCategories, not transaction allCategories)
   useEffect(() => {
-    if (open && subscription && subscription.subcategoryId && allCategories.length > 0) {
-      // Find the subcategory in the loaded categories (groups removed)
-      const subscriptionsCategories = allCategories.filter((category) => {
-        const categoryName = category.name?.toLowerCase() || "";
-        return categoryName.includes("subscription");
-      });
-      
-      for (const category of subscriptionsCategories) {
-        if (category.subcategories) {
-          const subcategory = category.subcategories.find(
-            (sub) => sub.id === subscription.subcategoryId
-          );
-          if (subcategory) {
-            setSelectedCategoryFilter(category.id);
-            break;
-          }
+    if (!open || !subscription || subscriptionServiceCategories.length === 0) return;
+    const categories = subscriptionServiceCategories.filter((cat: { services: unknown[] }) => cat.services?.length > 0);
+    // Prefer match by service name
+    if (subscription.serviceName) {
+      for (const cat of categories) {
+        const services = (cat as { id: string; services: Array<{ id: string; name: string }> }).services ?? [];
+        const service = services.find((s) => s.name === subscription.serviceName);
+        if (service) {
+          setSelectedCategoryFilter(cat.id);
+          form.setValue("categoryId", cat.id);
+          setSelectedServiceId(service.id);
+          return;
         }
       }
     }
-  }, [open, subscription, allCategories]);
+    // Fallback: match by subscription category name (e.g. "Streaming") to subscription service category
+    if (subscription.category?.name) {
+      const nameLower = subscription.category.name.toLowerCase();
+      const match = categories.find((cat: { name: string }) => cat.name?.toLowerCase() === nameLower);
+      if (match) {
+        setSelectedCategoryFilter(match.id);
+        form.setValue("categoryId", match.id);
+      }
+    }
+  }, [open, subscription, subscriptionServiceCategories, form]);
 
   // Initialize form when editing
   useEffect(() => {
