@@ -354,7 +354,7 @@ export function GoalsTab() {
         open={isTopUpOpen}
         onOpenChange={setIsTopUpOpen}
         goal={selectedGoal}
-        onConfirm={async (amount) => {
+        onConfirm={async (amount, fromAccountId) => {
           if (!selectedGoal) return;
           const goalId = selectedGoal.id;
           const oldBalance = selectedGoal.currentBalance;
@@ -368,7 +368,7 @@ export function GoalsTab() {
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ amount }),
+              body: JSON.stringify(fromAccountId != null ? { amount, fromAccountId } : { amount }),
             });
 
             if (!response.ok) {
@@ -404,7 +404,7 @@ export function GoalsTab() {
         open={isWithdrawOpen}
         onOpenChange={setIsWithdrawOpen}
         goal={selectedGoal}
-        onConfirm={async (amount) => {
+        onConfirm={async (amount, toAccountId) => {
           if (!selectedGoal) return;
           const goalId = selectedGoal.id;
           const oldBalance = selectedGoal.currentBalance;
@@ -418,7 +418,7 @@ export function GoalsTab() {
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ amount }),
+              body: JSON.stringify(toAccountId != null ? { amount, toAccountId } : { amount }),
             });
 
             if (!response.ok) {

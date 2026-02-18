@@ -8,7 +8,7 @@ export const metadata = {
   description: "Privacy Policy for Spair Money",
 };
 
-const LAST_UPDATED = "February 1, 2025";
+const LAST_UPDATED = "February 17, 2025";
 
 const externalLinkClass =
   "text-foreground underline underline-offset-4 hover:text-primary";
@@ -43,23 +43,24 @@ export default async function PrivacyPolicyPage() {
       <article className="space-y-6">
         <LegalSection title="Introduction">
           <p>
-            Spair Money is a product created by Maverick Bear Design, a
-            Canadian company. At Spair Money (&quot;we,&quot; &quot;our,&quot; or
-            &quot;us&quot;), we are committed to protecting your privacy. This
-            Privacy Policy explains how we collect, use, disclose, and safeguard
-            your information when you use our financial management application
-            and services.
+            Spair Money is operated by Maverick Bear Design, a Canadian company
+            (&quot;Company,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We are committed to
+            protecting your privacy. This Privacy Policy (&quot;Policy&quot;) describes how we
+            collect, use, disclose, and safeguard personal and other information
+            when you use the Spair Money financial management application and
+            related services (the &quot;Service&quot;).
           </p>
           <p>
-            Please read this Privacy Policy carefully. By using our services, you
-            agree to the collection and use of information in accordance with
-            this policy.
+            Please read this Policy carefully. By accessing or using the Service,
+            you acknowledge that you have read this Policy and consent to the
+            collection, use, and disclosure of your information as described
+            herein. If you do not agree, you must not use the Service.
           </p>
         </LegalSection>
 
         <LegalSection title="Information We Collect">
           <div>
-            <h3>Personal Information</h3>
+            <h3>Information You Provide</h3>
             <p>
               We collect information that you provide directly to us, including:
             </p>
@@ -67,57 +68,70 @@ export default async function PrivacyPolicyPage() {
               <li>Name and email address</li>
               <li>Phone number (optional)</li>
               <li>Profile picture or avatar URL (optional)</li>
-              <li>Payment and billing information</li>
+              <li>Payment and billing information (processed by our payment
+                provider; we do not store full payment card details)</li>
             </ul>
           </div>
           <div>
-            <h3>Financial Information</h3>
-            <p>To provide our services, we collect and store:</p>
+            <h3>Financial and Transaction Information</h3>
+            <p>
+              To provide the Service, we collect and store financial and
+              transaction-related information that you enter, import, or that is
+              generated through your use of the Service, including:
+            </p>
             <ul>
               <li>
-                Transaction data (amounts, dates, descriptions, categories,
-                subcategories, tags, recurring patterns)
+                <strong>Transactions:</strong> Amounts, dates, descriptions,
+                categories, subcategories, tags, and recurring patterns
               </li>
               <li>
-                Account information (account names, types, balances, limits,
-                credit limits, account numbers when applicable)
+                <strong>Accounts:</strong> Account names, types, balances,
+                limits, and (where applicable) account identifiers; data may be
+                entered manually or imported via CSV — we do not store your
+                bank login credentials
               </li>
               <li>
-                Budget and goal information (monthly budgets, savings goals,
-                progress tracking, target amounts, priorities)
+                <strong>Budgets and goals:</strong> Budget amounts, savings
+                goals, progress, target amounts, and priorities
               </li>
               <li>
-                Investment data: securities (stocks, ETFs, bonds), holdings,
-                positions, portfolio values, investment transactions (buys, sells,
-                dividends, transfers), market prices, asset allocation
+                <strong>Planned and recurring payments:</strong> Payment
+                schedules, due dates, amounts, and related reminders
               </li>
               <li>
-                Debt tracking data: loan types, balances, interest rates,
-                payment schedules, minimum payments, due dates, payment history,
-                principal and interest paid
+                <strong>Subscription tracking:</strong> Information about
+                recurring subscriptions and services you track within the
+                Service
               </li>
               <li>
-                Bank account data: account names, types, balances, transaction
-                history (manually entered or imported via CSV)
+                <strong>Investments:</strong> Securities, holdings, positions,
+                portfolio values, investment transactions, and related data
               </li>
               <li>
-                Category learning data: historical transaction patterns used for
-                AI-powered categorization suggestions
+                <strong>Debts:</strong> Loan types, balances, interest rates,
+                payment schedules, payment history, and related data
               </li>
               <li>
-                AI interaction data: queries, responses, and insights generated
-                through AI features
+                <strong>Receipt and categorization:</strong> Where you use
+                receipt scanning, we may process images and extracted data to
+                provide transaction suggestions; historical patterns may be
+                used for AI-powered categorization
+              </li>
+              <li>
+                <strong>AI usage:</strong> Queries, responses, and insights
+                generated through AI-powered features (e.g., categorization,
+                insights)
               </li>
             </ul>
           </div>
           <div>
-            <h3>Automatically Collected Information</h3>
-            <p>When you use our services, we automatically collect:</p>
+            <h3>Information Collected Automatically</h3>
+            <p>When you use the Service, we may automatically collect:</p>
             <ul>
-              <li>Device information and identifiers</li>
-              <li>Usage data and analytics</li>
-              <li>IP address and location data</li>
-              <li>Cookies and similar tracking technologies</li>
+              <li>Device and browser information and identifiers</li>
+              <li>Usage data and analytics (e.g., feature use, session duration)</li>
+              <li>IP address and general location data</li>
+              <li>Cookies and similar technologies (as described in this Policy)</li>
             </ul>
           </div>
         </LegalSection>
@@ -125,30 +139,27 @@ export default async function PrivacyPolicyPage() {
         <LegalSection title="How We Use Your Information">
           <p>We use the information we collect to:</p>
           <ul>
-            <li>Provide, maintain, and improve our services</li>
-            <li>Process transactions and manage your account</li>
-            <li>Import and manage bank account data via CSV import</li>
+            <li>Provide, maintain, and improve the Service</li>
+            <li>Process payments, manage your account, and enforce plan limits</li>
+            <li>Import, store, and manage data you provide or import (e.g., via CSV)</li>
             <li>
               Provide AI-powered category suggestions and financial insights
-              using OpenAI
+              (e.g., via OpenAI), and receipt-scanning features where available
             </li>
             <li>
-              Manage household member accounts and permissions ({proPlanName}{" "}
-              plan)
+              Manage household accounts and member permissions (on {proPlanName}{" "}
+              and applicable plans)
             </li>
-            <li>Calculate budgets, goals, investments, and debt tracking</li>
-            <li>Generate reports, analytics, and financial health scores</li>
+            <li>Calculate and display budgets, goals, investments, debts, and planned payments</li>
+            <li>Generate reports, analytics, and financial health scores (e.g., Spair Score)</li>
             <li>
-              Send you important updates, notifications, and transactional emails
-              via Resend
+              Send transactional and service-related emails (e.g., verification,
+              password reset, notifications) via our email provider (Resend)
             </li>
-            <li>Respond to your inquiries and provide customer support</li>
-            <li>Monitor service performance and errors using Sentry</li>
-            <li>Detect, prevent, and address technical issues and security threats</li>
-            <li>Comply with legal obligations and enforce our terms</li>
-            <li>Personalize your experience and provide relevant content</li>
-            <li>Track account usage and enforce subscription plan limits</li>
-            <li>Maintain security logs and audit trails for account actions</li>
+            <li>Respond to inquiries and provide customer support</li>
+            <li>Monitor performance and diagnose errors (e.g., via Sentry), and protect against abuse</li>
+            <li>Comply with legal obligations and enforce our Terms of Service</li>
+            <li>Maintain security logs and audit trails for account and safety purposes</li>
           </ul>
         </LegalSection>
 
@@ -159,71 +170,63 @@ export default async function PrivacyPolicyPage() {
           </p>
           <ul>
             <li>
-              <strong>Service Providers:</strong> With trusted third-party service
-              providers who assist us in operating our platform, including:
+              <strong>Service providers:</strong> With trusted third parties that
+              help us operate the Service, under contractual obligations to
+              protect your data, including:
               <ul>
                 <li>
-                  <strong>Stripe:</strong> For payment processing and
-                  subscription management. We do not store payment card
-                  information — all payment data is handled by Stripe.
+                  <strong>Stripe:</strong> Payment processing and subscription
+                  management. We do not store payment card details; Stripe
+                  handles all payment data in a PCI-compliant manner.
                 </li>
                 <li>
-                  <strong>CSV Import:</strong> For importing bank account
-                  transactions. We only receive account information,
-                  transactions, and balances — we never access your bank
-                  credentials.
+                  <strong>OpenAI:</strong> AI-powered categorization and
+                  insights. Transaction-related data (e.g., descriptions,
+                  patterns) may be sent to OpenAI to generate suggestions. We
+                  minimize personally identifiable information shared and do not
+                  use OpenAI to train models on your data for other customers.
                 </li>
                 <li>
-                  <strong>OpenAI:</strong> For AI-powered categorization and
-                  financial insights. Transaction data and patterns may be
-                  processed by OpenAI to generate category suggestions and
-                  insights. We do not share personally identifiable information
-                  with OpenAI beyond what is necessary for the service.
+                  <strong>Sentry:</strong> Error tracking and performance
+                  monitoring. We filter sensitive data before sending
+                  information to Sentry.
                 </li>
                 <li>
-                  <strong>Sentry:</strong> For error tracking and performance
-                  monitoring. Error logs may include technical information about
-                  your use of the service, but we filter sensitive data before
-                  sending to Sentry.
+                  <strong>Resend:</strong> Transactional email delivery (e.g.,
+                  verification, password reset). Your email address and
+                  necessary account information are shared for delivery only.
                 </li>
                 <li>
-                  <strong>Resend:</strong> For sending transactional emails
-                  (verification codes, password resets, notifications). Email
-                  addresses and basic account information are shared with Resend
-                  for email delivery.
+                  <strong>Supabase:</strong> Database hosting, authentication,
+                  and application backend. Your data is stored in Supabase
+                  infrastructure under our configuration and security controls.
                 </li>
                 <li>
-                  <strong>Supabase:</strong> For database hosting, authentication,
-                  and cloud infrastructure. All your data is stored securely in
-                  Supabase&apos;s infrastructure.
-                </li>
-                <li>
-                  <strong>Vercel:</strong> For application hosting and content
-                  delivery. Usage data and performance metrics may be collected by
-                  Vercel.
+                  <strong>Vercel:</strong> Application hosting and delivery.
+                  Usage and performance data may be processed by Vercel in
+                  connection with serving the Service.
                 </li>
               </ul>
             </li>
             <li>
-              <strong>Household Members:</strong> If you are part of a household
-              account ({proPlanName} plan), your financial data may be shared
-              with other household members as configured. Each household member
-              maintains separate financial data (transactions, accounts,
-              budgets), but the account owner can view and manage all household
-              members. You control which members have access to your household
-              account.
+              <strong>Household members:</strong> On plans that include
+              household features ({proPlanName} and applicable plans), data may
+              be shared with other members of your household as you configure.
+              The account owner can view and manage household members. You are
+              responsible for whom you invite.
             </li>
             <li>
-              <strong>Legal Requirements:</strong> When required by law, court
-              order, or government regulation
+              <strong>Legal compliance:</strong> When required by applicable
+              law, court order, or governmental authority
             </li>
             <li>
-              <strong>Business Transfers:</strong> In connection with a merger,
-              acquisition, or sale of assets (with notice to users)
+              <strong>Business transfers:</strong> In connection with a merger,
+              sale of assets, or similar transaction, subject to notice and
+              continued protection of your information
             </li>
             <li>
-              <strong>With Your Consent:</strong> When you explicitly authorize
-              us to share your information
+              <strong>With your consent:</strong> When you have given explicit
+              consent for a specific disclosure
             </li>
           </ul>
         </LegalSection>
@@ -436,96 +439,97 @@ export default async function PrivacyPolicyPage() {
         </LegalSection>
 
         <LegalSection title="Your Rights and Choices">
-          <p>You have the following rights regarding your personal information:</p>
+          <p>Depending on your location and applicable law, you may have the right to:</p>
           <ul>
             <li>
-              <strong>Access:</strong> Request access to your personal data
+              <strong>Access:</strong> Request access to the personal data we
+              hold about you
             </li>
             <li>
-              <strong>Correction:</strong> Update or correct inaccurate
-              information
+              <strong>Correction:</strong> Request correction of inaccurate or
+              incomplete personal data
             </li>
             <li>
               <strong>Deletion:</strong> Request deletion of your account and
-              data
+              associated data, subject to legal and operational requirements
             </li>
             <li>
-              <strong>Export:</strong> Export your data in a portable format
+              <strong>Portability:</strong> Receive your data in a portable
+              format (e.g., export) where technically feasible
             </li>
             <li>
               <strong>Opt-out:</strong> Unsubscribe from marketing communications
+              (transactional and service-related messages may still be sent)
             </li>
             <li>
-              <strong>Account Settings:</strong> Manage your privacy preferences
-              in Settings
+              <strong>Object or restrict:</strong> Object to certain processing
+              or request restriction in accordance with applicable law
             </li>
           </ul>
           <p>
-            To exercise these rights, please contact us at legal@spair.co
-            or use the account settings in the application.
+            You can manage many preferences in your account settings. To
+            exercise any of the above rights, contact us at legal@spair.co. We
+            will respond in accordance with applicable data protection laws.
           </p>
         </LegalSection>
 
         <LegalSection title="Data Retention">
           <p>
-            We retain your personal and financial information for as long as
-            your account is active or as needed to provide our services.
-            Specific retention periods:
+            We retain your information for as long as your account is active and
+            as needed to provide the Service, and as required by law. In
+            particular:
           </p>
           <ul>
             <li>
-              <strong>Active Accounts:</strong> Data is retained while your
-              account is active and needed for service provision
+              <strong>Active accounts:</strong> Data is retained while your
+              account is active and necessary for the Service
             </li>
             <li>
-              <strong>Account Deletion:</strong> Upon account deletion request,
-              all data is permanently deleted immediately
+              <strong>Account deletion:</strong> Upon your request to delete
+              your account, we will permanently delete your data in accordance
+              with our internal procedures and applicable law
             </li>
             <li>
-              <strong>Imported Data:</strong> When you delete imported CSV data,
-              we remove it from our systems
+              <strong>Security and compliance:</strong> Security logs, audit
+              trails, and similar records may be retained for a longer period
+              for security, fraud prevention, and legal compliance
             </li>
             <li>
-              <strong>Security Logs:</strong> Security and audit logs (including
-              account blocks and suspensions) may be retained longer for
-              security and compliance purposes
+              <strong>Legal hold:</strong> We may retain data longer when
+              required by law, regulation, or for the establishment, exercise,
+              or defence of legal claims
             </li>
             <li>
-              <strong>Legal Requirements:</strong> Data may be retained longer if
-              required by law, regulation, or legitimate business purposes (e.g.,
-              tax records, dispute resolution)
-            </li>
-            <li>
-              <strong>Backup Data:</strong> Our database provider (Supabase)
-              maintains automatic backups for disaster recovery. Backup retention
-              is managed by Supabase according to their service terms (typically
-              7–30 days depending on the service plan). We do not maintain
-              separate backup copies beyond the provider&apos;s automatic backup
-              system.
+              <strong>Backups:</strong> Our infrastructure provider (Supabase)
+              may retain backups for a limited period (e.g., 7–30 days depending
+              on plan). We do not maintain separate long-term backup copies
+              beyond such provider-managed backups.
             </li>
           </ul>
           <p>
-            You can request immediate deletion of your data by contacting us at
-            legal@spair.co. We will process deletion requests in
-            accordance with applicable data protection laws.
+            To request deletion of your data, contact us at legal@spair.co. We
+            will process requests in accordance with applicable data protection
+            laws.
           </p>
         </LegalSection>
 
         <LegalSection title="Children's Privacy">
           <p>
-            Our services are not intended for individuals under the age of 18.
-            We do not knowingly collect personal information from children. If you
-            believe we have collected information from a child, please contact us
-            immediately and we will take steps to delete such information.
+            The Service is not directed to individuals under the age of 18. We
+            do not knowingly collect personal information from children under
+            18. If you believe we have collected such information, please
+            contact us at legal@spair.co and we will take steps to delete it.
           </p>
         </LegalSection>
 
         <LegalSection title="Changes to This Privacy Policy">
           <p>
-            We may update this Privacy Policy from time to time. We will notify
-            you of any material changes by posting the new Privacy Policy on
-            this page and updating the &quot;Last updated&quot; date. You are advised to
-            review this Privacy Policy periodically for any changes.
+            We may update this Policy from time to time. We will post the
+            revised Policy on this page and update the &quot;Last updated&quot; date.
+            Material changes may also be communicated via the Service or email
+            where appropriate. Your continued use of the Service after the
+            effective date of the revised Policy constitutes your acceptance of
+            it. We encourage you to review this Policy periodically.
           </p>
         </LegalSection>
 
@@ -575,20 +579,21 @@ export default async function PrivacyPolicyPage() {
 
         <LegalSection title="Contact Us">
           <p>
-            If you have any questions about this Privacy Policy or our data
-            practices, please contact us:
+            For questions about this Policy or our data practices, or to
+            exercise your privacy rights (access, correction, deletion,
+            portability, or complaints), please contact us:
           </p>
           <div className="space-y-2 text-sm [&_strong]:text-foreground">
-            <p><strong>Company:</strong> Maverick Bear Design (Canadian company)</p>
+            <p><strong>Operator:</strong> Maverick Bear Design (Canada)</p>
             <p><strong>Product:</strong> Spair Money</p>
-            <p><strong>Privacy & Legal:</strong> legal@spair.co</p>
+            <p><strong>Privacy & legal:</strong> legal@spair.co</p>
             <p><strong>Security:</strong> security@spair.co</p>
             <p><strong>Support:</strong> support@spair.co</p>
           </div>
           <p>
-            For data protection inquiries, data subject access requests, or to
-            exercise your privacy rights, please email legal@spair.co
-            with &quot;Privacy Request&quot; in the subject line.
+            For data subject requests or privacy complaints, please email
+            legal@spair.co with &quot;Privacy Request&quot; in the subject line. We
+            will respond in accordance with applicable law.
           </p>
         </LegalSection>
       </article>

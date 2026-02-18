@@ -1,27 +1,32 @@
 /**
  * Single source of truth for landing page FAQ content.
  * Used by FAQSection (UI) and FAQPage JSON-LD (SEO).
+ * Focused on objections and common questions.
  */
 
 export const LANDING_FAQ_ITEMS = [
   {
-    q: "What is Spair Money?",
-    a: "Spair Money is a simple app that helps you manage all your money in one place. You can track spending, set budgets, save for goals, and see where your money goes.",
-  },
-  {
-    q: "How does it work?",
-    a: "You add accounts and transactions manually or import from CSV. The app sorts your spending into categories, helps you create budgets, and shows your financial health with the Spair Score.",
-  },
-  {
-    q: "Is my data safe?",
+    q: "Is my data secure?",
     a: "Yes. We use bank-level encryption and never sell your information. Your data is private and in your control.",
   },
   {
-    q: "What's the free trial?",
-    a: "You get a 30-day free trial with full access. You'll only be charged after the trial ends. Cancel anytime—your plan stays active until the end of your billing cycle (monthly or annual).",
+    q: "Can I cancel anytime?",
+    a: "Yes. Cancel anytime—your plan stays active until the end of your billing cycle (monthly or annual). No questions asked.",
   },
   {
-    q: "What's included?",
-    a: "Unlimited transactions and accounts, dashboard, Spair Score, budgets, goals, reports, receipts, and household sharing. Everything in one plan.",
+    q: "Do I need to connect my bank?",
+    a: "No. You can add accounts and transactions manually or import from CSV. Connect only what you're comfortable with.",
+  },
+  {
+    q: "Can I use it with my partner?",
+    a: "Yes. Household sharing lets you invite your partner or family to the same household so you can manage money together.",
+  },
+  {
+    q: "Does it track subscriptions automatically?",
+    a: "Yes. Spair highlights recurring spending and subscriptions so you can see what you're paying regularly.",
+  },
+  {
+    q: "Does it work on mobile?",
+    a: "Spair is a responsive web app—you can use it on your phone's browser. A dedicated mobile app may come later.",
   },
 ] as const;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeGoalsService } from "@/src/application/goals/goals.factory";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import { topUpAmountSchema } from "@/src/domain/goals/goals.validations";
 import { revalidateTag } from 'next/cache';
 
@@ -11,7 +12,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { amount } = body;
+    const { amount, fromAccountId } = body;
 
     // Validate amount using domain schema
     const validationResult = topUpAmountSchema.safeParse(amount);
@@ -28,7 +29,7 @@ export async function POST(
     }
     
     const service = makeGoalsService();
-    const goal = await service.addTopUp(id, validationResult.data);
+    const goal = await service.addTopUp(id, validationResult.data, fromAccountId ?? undefined);
     
     // Invalidate cache
     revalidateTag(`dashboard-${userId}`, 'max');
@@ -37,6 +38,9 @@ export async function POST(
     return NextResponse.json(goal, { status: 200 });
   } catch (error) {
     console.error("Error adding top-up to goal:", error);
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to add top-up" },
       { status: 400 }

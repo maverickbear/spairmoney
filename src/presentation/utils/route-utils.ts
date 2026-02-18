@@ -39,6 +39,7 @@ export function getRouteInfo(pathname: string | null): RouteInfo {
   const isPrivacyPolicyPage = pathname === "/privacy-policy";
   const isTermsOfServicePage = pathname === "/terms-of-service";
   const isFAQPage = pathname === "/faq";
+  const isContactPage = pathname === "/contact";
   const isSubscriptionSuccessPage = pathname === "/subscription/success";
   const isMaintenancePage = pathname === "/maintenance";
   const isDesignPage = pathname.startsWith("/design");
@@ -50,6 +51,7 @@ export function getRouteInfo(pathname: string | null): RouteInfo {
     isPrivacyPolicyPage ||
     isTermsOfServicePage ||
     isFAQPage ||
+    isContactPage ||
     isSubscriptionSuccessPage ||
     isMaintenancePage ||
     isDesignPage ||

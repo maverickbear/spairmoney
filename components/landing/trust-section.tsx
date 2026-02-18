@@ -7,16 +7,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 
 const TESTIMONIALS = [
-  { stars: 5, quote: "Finally, one place where I see everything. No more spreadsheets. Budgets and the Spair Score actually help me stay on track.", name: "James W.", role: "Designer" },
-  { stars: 5, quote: "Simple and clear. My finances finally make sense. The dashboard is exactly what I needed.", name: "Sarah L.", role: "Teacher" },
-  { stars: 4, quote: "Really solid app for tracking expenses and goals. Would be perfect if it had a mobile app—I'd use it even more on the go.", name: "Michael B.", role: "Freelancer" },
-  { stars: 5, quote: "Tracking expenses used to be a chore. Now it takes seconds. Category suggestions are spot on.", name: "Emily C.", role: "Parent" },
-  { stars: 4, quote: "Great for household budgeting. Would love to see PDF export for reports so I can share with my advisor.", name: "David M.", role: "Engineer" },
-  { stars: 5, quote: "The goals feature kept me accountable. Hit my first savings target in years. No complaints.", name: "Jennifer K.", role: "User" },
-  { stars: 5, quote: "Clean interface, does what it says. Bank-level security and no upsells. Refreshing.", name: "Christopher T.", role: "Developer" },
-  { stars: 4, quote: "Works well for me and my partner. Only suggestion: dark mode on the dashboard would be easier on the eyes at night.", name: "Amanda R.", role: "Consultant" },
-  { stars: 5, quote: "Worth every penny. Budgets, goals, and the Spair Score in one place. Finally stopped overspending.", name: "Daniel P.", role: "User" },
-  { stars: 5, quote: "Straightforward and reliable. CSV import saved me hours. Recommended to a few friends already.", name: "Nicole G.", role: "Small business" },
+  { stars: 5, quote: "I thought I was good with money until Spair showed me $300 in subscriptions.", name: "— User" },
+  { stars: 5, quote: "I finally understand why my savings weren't growing.", name: "— User" },
+  { stars: 5, quote: "Finally, one place where I see everything. No more spreadsheets. Budgets and the Spair Score actually help me stay on track.", name: "James W." },
+  { stars: 5, quote: "Simple and clear. My finances finally make sense. The dashboard is exactly what I needed.", name: "Sarah L." },
+  { stars: 5, quote: "Tracking expenses used to be a chore. Now it takes seconds. Category suggestions are spot on.", name: "Emily C." },
 ];
 
 const AUTO_ADVANCE_MS = 5000;
@@ -49,15 +44,16 @@ export function TrustSection() {
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-6 text-center">Trusted with your money.</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">People don&apos;t need more budgeting apps.</h2>
+          <p className="text-muted-foreground text-center mb-6">They need clarity.</p>
           <div className="relative flex items-center gap-2">
             <button
               type="button"
               aria-label="Previous testimonial"
-              className="absolute left-0 z-10 -translate-x-2 md:-translate-x-4 h-9 w-9 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center text-foreground hover:bg-muted transition-colors"
+              className="absolute left-0 z-10 -translate-x-1 sm:-translate-x-2 md:-translate-x-4 h-8 w-8 sm:h-9 sm:w-9 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center text-foreground hover:bg-muted transition-colors touch-manipulation"
               onClick={() => goTo(index - 1)}
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
             <Card className="flex-1 border border-border bg-card shadow-sm overflow-hidden">
               <CardContent className="p-6 md:p-8 text-center">
@@ -73,19 +69,22 @@ export function TrustSection() {
                   &ldquo;{t.quote}&rdquo;
                 </p>
                 <p className="mt-4 font-semibold text-foreground">{t.name}</p>
-                <p className="text-sm text-muted-foreground">{t.role}</p>
-                <div className="flex justify-center gap-1.5 mt-6">
+                <div className="flex flex-wrap justify-center gap-2 sm:gap-1.5 mt-6">
                   {TESTIMONIALS.map((_, i) => (
                     <button
                       key={i}
                       type="button"
                       aria-label={`Go to testimonial ${i + 1}`}
-                      className={cn(
-                        "h-2 w-2 rounded-full transition-colors",
-                        i === index ? "bg-primary w-6" : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
-                      )}
+                      className="group min-w-[44px] min-h-[44px] flex items-center justify-center -m-2 sm:m-0 sm:min-w-0 sm:min-h-0 touch-manipulation"
                       onClick={() => setIndex(i)}
-                    />
+                    >
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full transition-colors block",
+                          i === index ? "bg-primary w-6" : "bg-muted-foreground/30 group-hover:bg-muted-foreground/50"
+                        )}
+                      />
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -93,10 +92,10 @@ export function TrustSection() {
             <button
               type="button"
               aria-label="Next testimonial"
-              className="absolute right-0 z-10 translate-x-2 md:translate-x-4 h-9 w-9 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center text-foreground hover:bg-muted transition-colors"
+              className="absolute right-0 z-10 translate-x-1 sm:translate-x-2 md:translate-x-4 h-8 w-8 sm:h-9 sm:w-9 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center text-foreground hover:bg-muted transition-colors touch-manipulation"
               onClick={() => goTo(index + 1)}
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
           </div>
         </div>

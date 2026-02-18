@@ -16,6 +16,8 @@ export interface FeatureSpotlightProps {
   ctaHref?: string;
   /** When true, image is on the right (alternating layout) */
   reverse?: boolean;
+  /** When true, show full image without cropping (e.g. dashboard screenshot) */
+  fullView?: boolean;
 }
 
 export function FeatureSpotlightSection({
@@ -27,6 +29,7 @@ export function FeatureSpotlightSection({
   ctaText = "Start 30-day free trial",
   ctaHref = "/auth/signup",
   reverse = false,
+  fullView = false,
 }: FeatureSpotlightProps) {
   const { ref, inView } = useInView();
 
@@ -41,12 +44,17 @@ export function FeatureSpotlightSection({
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           <div className={cn("relative w-full", reverse && "lg:order-2")}>
-            <div className="relative aspect-[4/3] max-w-lg mx-auto rounded-[32px] bg-[#f8f4f1] overflow-hidden">
+            <div
+              className={cn(
+                "relative mx-auto rounded-[32px] bg-[#f8f4f1] overflow-hidden",
+                fullView ? "aspect-video max-w-2xl w-full" : "aspect-[4/3] max-w-lg w-full"
+              )}
+            >
               <LandingImage
                 src={image}
                 alt={imageAlt}
                 fill
-                className="object-cover"
+                className={fullView ? "object-contain" : "object-cover"}
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
             </div>

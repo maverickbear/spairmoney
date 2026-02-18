@@ -16,10 +16,11 @@ export function HeroSection() {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div ref={headlineRef} className={cn("order-2 lg:order-1 text-center lg:text-left transition-all duration-700 ease-out", headlineInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6")}>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
-              Personal finance at peace.
+              Your money isn’t disappearing — it’s just hiding.
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-xl leading-relaxed mx-auto lg:mx-0">
-              One calm place for your money. Track spending, budgets, goals, and more—all in one place.
+              Small daily purchases add up fast. Coffee. Lunch. Subscriptions. Delivery.
+              Spair shows you exactly where your money goes — so you can take control.
             </p>
             <div className="mt-10 flex flex-wrap gap-4 justify-center lg:justify-start">
               <Button
@@ -27,10 +28,10 @@ export function HeroSection() {
                 size="large"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform"
               >
-                <Link href="/auth/signup">Start 30-day free trial</Link>
+                <Link href="/auth/signup">Reveal My Spending</Link>
               </Button>
               <Button asChild variant="outline" size="large">
-                <Link href="#pricing">See pricing</Link>
+                <Link href="#features">See How It Works</Link>
               </Button>
             </div>
           </div>

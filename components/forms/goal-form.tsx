@@ -179,7 +179,7 @@ export function GoalForm({
           goals = await res.json();
           setCachedGoals(goals); // Cache the result
         }
-        const otherGoals = (goals || []).filter((g: any) => g.id !== goal?.id && !g.isCompleted);
+        const otherGoals = (goals || []).filter((g: any) => g.id !== goal?.id && !g.isCompleted && !g.isPaused);
         const totalAllocation = otherGoals.reduce((sum: number, g: any) => sum + (g.incomePercentage || 0), 0) + effectiveIncomePercentage;
 
         let allocationError: string | undefined;
@@ -685,6 +685,16 @@ export function GoalForm({
                 <SelectItem value="36">36 months (3 years)</SelectItem>
                 <SelectItem value="48">48 months (4 years)</SelectItem>
                 <SelectItem value="60">60 months (5 years)</SelectItem>
+                <SelectItem value="72">72 months (6 years)</SelectItem>
+                <SelectItem value="84">84 months (7 years)</SelectItem>
+                <SelectItem value="96">96 months (8 years)</SelectItem>
+                <SelectItem value="108">108 months (9 years)</SelectItem>
+                <SelectItem value="120">120 months (10 years)</SelectItem>
+                <SelectItem value="144">144 months (12 years)</SelectItem>
+                <SelectItem value="180">180 months (15 years)</SelectItem>
+                <SelectItem value="240">240 months (20 years)</SelectItem>
+                <SelectItem value="300">300 months (25 years)</SelectItem>
+                <SelectItem value="360">360 months (30 years)</SelectItem>
               </SelectContent>
             </Select>
             {form.formState.errors.targetMonths && (

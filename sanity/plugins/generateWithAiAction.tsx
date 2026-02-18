@@ -2,11 +2,17 @@
 
 /**
  * Document action "Generate with AI" for Blog Post.
- * Calls the app API to generate title, description, body; then patches the current document.
+ * Calls the app API to generate title, description, body; then creates or updates the document.
+ * New (unsaved) documents don't exist in the dataset yet, so we create them first when patch fails.
  */
 
-import { useClient} from 'sanity'
+import { useClient } from 'sanity'
 import type { DocumentActionComponent } from 'sanity'
+
+function isDocumentNotFoundError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return /document.*not found|was not found/i.test(message)
+}
 
 export const generateWithAiAction: DocumentActionComponent = (props) => {
   const client = useClient({ apiVersion: '2024-01-01' })
@@ -32,7 +38,6 @@ export const generateWithAiAction: DocumentActionComponent = (props) => {
           return
         }
 
-        // Convert plain text body to Portable Text blocks
         const paragraphs = (data.body || '')
           .split(/\n\n+/)
           .filter((p: string) => p.trim())
@@ -46,17 +51,31 @@ export const generateWithAiAction: DocumentActionComponent = (props) => {
         }))
 
         const today = new Date().toISOString().slice(0, 10)
-        await client
-          .patch(docId)
-          .set({
-            title: data.title || 'Untitled',
-            description: data.description || '',
-            slug: data.slug ? { _type: 'slug', current: data.slug } : undefined,
-            datePublished: today,
-            author: 'Spair Money',
-            body: blocks,
-          })
-          .commit()
+        const payload = {
+          title: data.title || 'Untitled',
+          description: data.description || '',
+          slug: data.slug ? { _type: 'slug' as const, current: data.slug } : undefined,
+          datePublished: today,
+          author: 'Spair Money',
+          body: blocks,
+        }
+
+        try {
+          await client
+            .patch(docId)
+            .set(payload)
+            .commit()
+        } catch (patchErr) {
+          if (isDocumentNotFoundError(patchErr)) {
+            await client.createIfNotExists({
+              _id: docId,
+              _type: 'post',
+              ...payload,
+            })
+          } else {
+            throw patchErr
+          }
+        }
 
         window.alert('Content generated! Review and add slug if needed, then publish.')
       } catch (err) {

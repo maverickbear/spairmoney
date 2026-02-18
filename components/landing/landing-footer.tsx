@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 
 const FOOTER_LINKS = [
   { label: "Features", href: "#features" },
@@ -23,7 +22,7 @@ export function LandingFooter() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-sm text-white">
-            Spair Money — Personal finance at peace.
+            Spair Money — Clarity over chaos.
           </p>
           <nav className="flex flex-wrap items-center justify-center gap-6">
             {FOOTER_LINKS.map(({ label, href }) => (

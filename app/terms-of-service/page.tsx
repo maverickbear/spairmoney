@@ -8,7 +8,7 @@ export const metadata = {
   description: "Terms of Service for Spair Money",
 };
 
-const LAST_UPDATED = "February 1, 2025";
+const LAST_UPDATED = "February 17, 2025";
 
 export default async function TermsOfServicePage() {
   let proPlanName = "PRO";
@@ -43,16 +43,31 @@ export default async function TermsOfServicePage() {
       <article className="space-y-6">
         <LegalSection title="Agreement to Terms">
           <p>
-            Spair Money is a product created by Maverick Bear Design, a
-            Canadian company. These Terms of Service (&quot;Terms&quot;) constitute a
-            legally binding agreement between you and Spair Money (&quot;we,&quot;
-            &quot;our,&quot; or &quot;us&quot;) regarding your use of our financial management
-            application and services (the &quot;Service&quot;).
+            Spair Money is a product operated by Maverick Bear Design, a
+            Canadian company (&quot;Company,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). These Terms of
+            Service (&quot;Terms&quot;) constitute a legally binding agreement between you
+            (&quot;you&quot; or &quot;User&quot;) and Maverick Bear Design governing your access to and
+            use of the Spair Money financial management application and related
+            services (collectively, the &quot;Service&quot;).
           </p>
           <p>
-            By accessing or using our Service, you agree to be bound by these
-            Terms. If you do not agree to these Terms, you may not access or use
-            the Service.
+            By creating an account, accessing, or using the Service, you
+            acknowledge that you have read, understood, and agree to be bound by
+            these Terms. If you do not agree to these Terms, you must not access
+            or use the Service.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="Definitions">
+          <p>
+            In these Terms, unless the context otherwise requires: &quot;User
+            Content&quot; means any data, content, or materials you submit,
+            upload, or transmit through the Service. &quot;Account&quot; means the
+            account you create to use the Service. &quot;Subscription&quot; means
+            a paid plan for the Service. &quot;Household&quot; means a shared
+            account structure available on certain plans, allowing multiple
+            members to use the Service under one subscription. Other capitalized
+            terms have the meanings given where they first appear.
           </p>
         </LegalSection>
 
@@ -95,60 +110,70 @@ export default async function TermsOfServicePage() {
           <div>
             <h3>Permitted Use</h3>
             <p>
-              You may use the Service for personal, non-commercial purposes in
-              accordance with these Terms. You agree to use the Service only for
-              lawful purposes and in a way that does not infringe the rights of
-              others.
+              You may use the Service for personal, non-commercial financial
+              management in accordance with these Terms. You agree to use the
+              Service only for lawful purposes and in a manner that does not
+              infringe the rights of others or violate any applicable law.
             </p>
           </div>
           <div>
             <h3>Service Features</h3>
             <p>
-              The Service includes various features, some of which may be subject
-              to plan limitations:
+              The Service includes features such as dashboard and reports;
+              bank account and transaction management; budgets and savings
+              goals; debt and loan tracking; planned and recurring payments;
+              subscription tracking; categories and (on eligible plans) receipt
+              scanning and household members. Some features are subject to plan
+              limitations:
             </p>
             <ul>
               <li>
                 <strong>Household Members:</strong> Available on the {proPlanName}{" "}
-                plan. You may invite family members to your account. Each member
-                maintains separate financial data, and you are responsible for
+                plan. You may invite members to your Household. Each member
+                may maintain separate financial data. You are responsible for
                 managing member access and permissions. The account owner can
                 view and manage all household members&apos; data.
               </li>
               <li>
-                <strong>AI-Powered Features:</strong> The Service uses
-                OpenAI-powered artificial intelligence to provide category
-                suggestions, financial insights, and automated categorization
-                based on your historical data. These are suggestions only, and
-                you are responsible for verifying and approving all AI-generated
-                content. We do not guarantee the accuracy of AI suggestions.
+                <strong>AI-Powered Features:</strong> The Service may use
+                artificial intelligence (e.g., OpenAI) for category
+                suggestions, financial insights, and categorization. All such
+                output is for convenience only. You are responsible for
+                verifying and approving any AI-generated content. We do not
+                guarantee the accuracy of AI suggestions or insights.
+              </li>
+              <li>
+                <strong>Receipt Scanning:</strong> Where available, receipt
+                scanning is provided for convenience. We do not guarantee
+                accuracy of extracted data. You are responsible for verifying
+                all transaction details.
               </li>
               <li>
                 <strong>CSV Import/Export:</strong> You may import and export
-                your financial data in CSV format. You are responsible for the
-                accuracy of imported data and for maintaining backups of
-                exported data. Imported data may require manual verification and
+                financial data in CSV format. You are responsible for the
+                accuracy of imported data and for maintaining your own backups.
+                Imported data may require manual verification and
                 categorization.
               </li>
               <li>
-                <strong>Investment Tracking:</strong> You may track investments,
-                securities, positions, and portfolio performance. Investment
-                data may be entered manually. We do not provide investment advice
-                and are not responsible for investment decisions made based on
-                data displayed in the Service.
+                <strong>Investment Tracking:</strong> You may track
+                investments, securities, positions, and portfolio performance.
+                We do not provide investment, legal, or tax advice and are not
+                responsible for any decisions you make based on data or
+                insights displayed in the Service.
               </li>
               <li>
-                <strong>Debt Management:</strong> You may track loans, mortgages,
-                credit cards, and other debts. Debt information may be entered
-                manually or imported via CSV. We do not provide debt management
-                advice.
+                <strong>Debt and Planned Payments:</strong> You may track
+                debts, loans, and planned or recurring payments. We do not
+                provide debt or financial advice. You are responsible for
+                ensuring the accuracy of all data you enter.
               </li>
               <li>
-                <strong>Plan Limits:</strong> Your subscription plan includes
-                specific limits (e.g., number of transactions per month, number of
-                accounts). You agree not to exceed these limits and understand
-                that exceeding limits may result in service restrictions or
-                require plan upgrades.
+                <strong>Plan Limits:</strong> Your subscription plan may
+                include limits (e.g., transactions, accounts, household
+                members). You agree not to exceed these limits. Exceeding
+                limits may result in service restrictions or require a plan
+                upgrade.
               </li>
             </ul>
           </div>
@@ -330,7 +355,7 @@ export default async function TermsOfServicePage() {
 
         <LegalSection title="Limitation of Liability">
           <p>
-            TO THE MAXIMUM EXTENT PERMITTED BY LAW, SPARE FINANCE SHALL NOT BE
+            TO THE MAXIMUM EXTENT PERMITTED BY LAW, SPAIR MONEY AND MAVERICK BEAR DESIGN SHALL NOT BE
             LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
             PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED
             DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER
@@ -345,8 +370,9 @@ export default async function TermsOfServicePage() {
 
         <LegalSection title="Indemnification">
           <p>
-            You agree to indemnify, defend, and hold harmless Spair Money and
-            its officers, directors, employees, and agents from any claims,
+            You agree to indemnify, defend, and hold harmless Maverick Bear Design,
+            Spair Money, and their respective officers, directors, employees,
+            and agents from and against any claims,
             damages, losses, liabilities, and expenses (including legal fees)
             arising from:
           </p>
@@ -402,10 +428,40 @@ export default async function TermsOfServicePage() {
         <LegalSection title="Changes to Terms">
           <p>
             We reserve the right to modify these Terms at any time. We will
-            notify you of any material changes by posting the updated Terms on
-            this page and updating the &quot;Last updated&quot; date. Your continued use
-            of the Service after such changes constitutes your acceptance of the
-            modified Terms.
+            notify you of material changes by posting the updated Terms on this
+            page and updating the &quot;Last updated&quot; date. Your continued use of
+            the Service after the effective date of the revised Terms
+            constitutes your acceptance of them. If you do not agree to the
+            revised Terms, you must stop using the Service and may terminate
+            your account.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="Severability">
+          <p>
+            If any provision of these Terms is held to be invalid, illegal, or
+            unenforceable by a court of competent jurisdiction, such
+            invalidity, illegality, or unenforceability shall not affect any
+            other provision of these Terms, and these Terms shall be construed
+            as if such provision had never been included.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="Entire Agreement">
+          <p>
+            These Terms, together with our Privacy Policy and any other
+            policies or guidelines we publish in connection with the Service,
+            constitute the entire agreement between you and us regarding the
+            Service and supersede any prior agreements, communications, or
+            understandings, whether written or oral.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="Waiver">
+          <p>
+            Our failure to enforce any right or provision of these Terms shall
+            not constitute a waiver of such right or provision. Any waiver must
+            be in writing and signed by us to be effective.
           </p>
         </LegalSection>
 
@@ -442,33 +498,36 @@ export default async function TermsOfServicePage() {
           </p>
         </LegalSection>
 
-        <LegalSection title="Governing Law">
+        <LegalSection title="Governing Law and Dispute Resolution">
           <p>
-            Spair Money is operated by Maverick Bear Design, a Canadian
-            company. These Terms shall be governed by and construed in
-            accordance with the laws of Canada and the province in which
-            Maverick Bear Design operates, without regard to its conflict of law
-            provisions. Any disputes arising from these Terms or the Service
-            shall be resolved through binding arbitration or in the appropriate
-            courts of Canada.
+            These Terms shall be governed by and construed in accordance with
+            the laws of the Province of Ontario and the federal laws of Canada
+            applicable therein, without regard to conflict of law principles.
+            The United Nations Convention on Contracts for the International
+            Sale of Goods does not apply.
           </p>
           <p>
-            If you are located outside of Canada, you agree that by using the
-            Service, you consent to the transfer of your information to Canada
-            and the processing of such information in accordance with Canadian
-            law and these Terms.
+            Any dispute, claim, or controversy arising out of or relating to
+            these Terms or the Service shall be resolved exclusively in the
+            courts of the Province of Ontario, and you irrevocably submit to
+            the personal jurisdiction of such courts. You waive any objection
+            to venue or forum non conveniens.
+          </p>
+          <p>
+            If you are located outside Canada, you consent to the transfer and
+            processing of your information in Canada in accordance with
+            Canadian law and our Privacy Policy.
           </p>
         </LegalSection>
 
         <LegalSection title="Contact Information">
           <p>
-            If you have any questions about these Terms of Service, please
-            contact us:
+            For questions about these Terms, please contact us:
           </p>
           <div className="space-y-2 text-sm [&_strong]:text-foreground">
-            <p><strong>Company:</strong> Maverick Bear Design (Canadian company)</p>
+            <p><strong>Operator:</strong> Maverick Bear Design (Canada)</p>
             <p><strong>Product:</strong> Spair Money</p>
-            <p><strong>Email:</strong> legal@spair.co</p>
+            <p><strong>Legal:</strong> legal@spair.co</p>
             <p><strong>Support:</strong> support@spair.co</p>
           </div>
         </LegalSection>

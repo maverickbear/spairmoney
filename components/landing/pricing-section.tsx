@@ -10,14 +10,17 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const INCLUDED = [
-  "Unlimited transactions and accounts",
-  "Dashboard and Spair Score",
-  "Budgets, goals, and reports",
-  "Receipt scanning",
-  "Advanced reports",
-  "CSV import and export",
+  "Unlimited accounts",
+  "Unlimited transactions",
+  "Smart categories",
+  "Recurring subscription tracking",
+  "Budgets & goals",
   "Debt tracking",
+  "Reports & trends",
+  "Spair Score",
   "Household sharing",
+  "Receipt scanning",
+  "CSV import/export",
 ];
 
 const FALLBACK_PRICE_MONTHLY = 14.99;
@@ -64,7 +67,7 @@ export function PricingSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className={cn("grid lg:grid-cols-2 gap-12 lg:gap-16 items-center transition-all duration-700", inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6")}>
           <div className="max-w-xl">
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground">Ready to take control?</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground">One plan. Full clarity.</h2>
             <p className="mt-4 text-muted-foreground text-lg">
               Start your 30-day free trial. You&apos;ll only be charged after the trial ends. Cancel anytime—your plan stays active until the end of your billing cycle (monthly or annual).
             </p>
@@ -145,7 +148,7 @@ export function PricingSection() {
                 router.push(`/auth/signup?planId=${PRO_PLAN_ID}&interval=${interval}`);
               }}
             >
-              Start 30-day free trial
+              Start 30-Day Free Trial
             </Button>
             <p className="mt-4 text-sm text-muted-foreground">
               Encrypted. Private. Yours.

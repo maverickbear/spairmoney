@@ -121,9 +121,9 @@ export class GoalsService {
       ? goals.filter(g => g.id !== excludeGoalId)
       : goals;
 
-    // Sum up all income percentages (excluding paused goals)
+    // Sum up all income percentages (excluding paused and completed goals)
     const totalAllocation = otherGoals
-      .filter(g => !g.is_paused)
+      .filter(g => !g.is_paused && !g.is_completed)
       .reduce((sum, goal) => sum + goal.income_percentage, 0);
 
     const newTotal = totalAllocation + newIncomePercentage;
@@ -507,9 +507,12 @@ export class GoalsService {
   }
 
   /**
-   * Add top-up to goal balance
+   * Add top-up to goal balance.
+   * When the goal is linked to a savings account (account_id), creates a transfer
+   * from the source account to the goal's savings account (money moving between
+   * accounts, not new income). fromAccountId is required in that case.
    */
-  async addTopUp(id: string, amount: number): Promise<BaseGoal> {
+  async addTopUp(id: string, amount: number, fromAccountId?: string | null): Promise<BaseGoal> {
     // Verify ownership
     await requireGoalOwnership(id);
 
@@ -521,6 +524,26 @@ export class GoalsService {
     const newBalance = goal.current_balance + amount;
     const isCompleted = newBalance >= goal.target_amount;
 
+    // When goal is linked to an account, create a transfer (from → savings), not income.
+    if (goal.account_id) {
+      if (!fromAccountId || fromAccountId.trim() === "") {
+        throw new AppError("Source account is required when the goal is linked to a savings account. Select the account you are transferring from (e.g. checking).", 400);
+      }
+      if (fromAccountId === goal.account_id) {
+        throw new AppError("Source account must be different from the goal's savings account.", 400);
+      }
+      const transactionsService = makeTransactionsService();
+      await transactionsService.createTransaction({
+        date: new Date(),
+        type: "transfer",
+        amount,
+        accountId: fromAccountId,
+        toAccountId: goal.account_id,
+        description: `Goal top-up: ${goal.name}`,
+        recurring: false,
+      });
+    }
+
     const goalRow = await this.repository.update(id, {
       currentBalance: newBalance,
       isCompleted,
@@ -528,14 +551,15 @@ export class GoalsService {
       updatedAt: formatTimestamp(new Date()),
     });
 
-
     return GoalsMapper.toDomain(goalRow);
   }
 
   /**
-   * Withdraw from goal balance
+   * Withdraw from goal balance.
+   * When the goal is linked to a savings account (account_id), creates a transfer
+   * from the goal's savings account to the destination account. toAccountId is required then.
    */
-  async withdraw(id: string, amount: number): Promise<BaseGoal> {
+  async withdraw(id: string, amount: number, toAccountId?: string | null): Promise<BaseGoal> {
     // Verify ownership
     await requireGoalOwnership(id);
 
@@ -549,6 +573,27 @@ export class GoalsService {
     }
 
     const newBalance = Math.max(0, goal.current_balance - amount);
+
+    // When goal is linked to an account, create a transfer (savings → to account).
+    if (goal.account_id) {
+      if (!toAccountId || toAccountId.trim() === "") {
+        throw new AppError("Destination account is required when the goal is linked to a savings account. Select where you want to move the money (e.g. checking).", 400);
+      }
+      if (toAccountId === goal.account_id) {
+        throw new AppError("Destination account must be different from the goal's savings account.", 400);
+      }
+      const transactionsService = makeTransactionsService();
+      await transactionsService.createTransaction({
+        date: new Date(),
+        type: "transfer",
+        amount,
+        accountId: goal.account_id,
+        toAccountId,
+        description: `Goal withdrawal: ${goal.name}`,
+        recurring: false,
+      });
+    }
+
     const isCompleted = newBalance >= goal.target_amount;
 
     const goalRow = await this.repository.update(id, {
@@ -557,7 +602,6 @@ export class GoalsService {
       completedAt: isCompleted && !goal.completed_at ? formatTimestamp(new Date()) : (isCompleted ? goal.completed_at : null),
       updatedAt: formatTimestamp(new Date()),
     });
-
 
     return GoalsMapper.toDomain(goalRow);
   }

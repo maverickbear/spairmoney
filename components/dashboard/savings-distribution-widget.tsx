@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatMoney } from "@/components/common/money";
 import { useToast } from "@/components/toast-provider";
 import type { Goal } from "@/src/domain/goals/goals.types";
@@ -35,7 +42,37 @@ export function SavingsDistributionWidget({
   const router = useRouter();
   const [isDistributionDialogOpen, setIsDistributionDialogOpen] = useState(false);
   const [distributionAmounts, setDistributionAmounts] = useState<Record<string, number>>({});
+  const [distributionFromAccountId, setDistributionFromAccountId] = useState<string>("");
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [isDistributing, setIsDistributing] = useState(false);
+
+  const goalsWithAccountAndAmount = useMemo(() => {
+    const entries = Object.entries(distributionAmounts).filter(([, amt]) => amt > 0);
+    return entries
+      .map(([goalId]) => goals.find((g) => g.id === goalId))
+      .filter((g): g is Goal & { accountId?: string | null } => g != null && Boolean((g as any).accountId));
+  }, [distributionAmounts, goals]);
+
+  const needsFromAccountForDistribution = goalsWithAccountAndAmount.length > 0;
+
+  useEffect(() => {
+    if (!isDistributionDialogOpen || !needsFromAccountForDistribution) {
+      setAccounts([]);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/v2/accounts?includeHoldings=false")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: Array<{ id: string; name: string; type: string }>) => {
+        if (!cancelled) setAccounts(list);
+      })
+      .catch(() => {
+        if (!cancelled) setAccounts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDistributionDialogOpen, needsFromAccountForDistribution]);
 
   // Helper function to parse date from Supabase format
   const parseTransactionDate = (dateStr: string | Date): Date => {
@@ -202,8 +239,24 @@ export function SavingsDistributionWidget({
       return;
     }
 
+    if (needsFromAccountForDistribution && !distributionFromAccountId) {
+      toast({
+        title: "Source account required",
+        description: "Select the account to transfer from (e.g. checking).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsDistributing(true);
     try {
+      const body = (id: string, amount: number) => {
+        const goal = goals.find((g) => g.id === id);
+        const hasAccount = goal && (goal as any).accountId;
+        return hasAccount && distributionFromAccountId
+          ? { amount, fromAccountId: distributionFromAccountId }
+          : { amount };
+      };
       // Distribute to each goal
       const promises = Object.entries(distributionAmounts)
         .filter(([_, amount]) => amount > 0)
@@ -213,7 +266,7 @@ export function SavingsDistributionWidget({
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ amount }),
+            body: JSON.stringify(body(goalId, amount)),
           });
           
           if (!response.ok) {
@@ -234,6 +287,7 @@ export function SavingsDistributionWidget({
 
       setIsDistributionDialogOpen(false);
       setDistributionAmounts({});
+      setDistributionFromAccountId("");
       
       // Refresh the page to show updated goal balances
       router.refresh();
@@ -426,14 +480,43 @@ export function SavingsDistributionWidget({
       </Card>
 
       {/* Distribution Dialog */}
-      <Dialog open={isDistributionDialogOpen} onOpenChange={setIsDistributionDialogOpen}>
+      <Dialog
+        open={isDistributionDialogOpen}
+        onOpenChange={(open) => {
+          setIsDistributionDialogOpen(open);
+          if (!open) setDistributionFromAccountId("");
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Distribute Savings</DialogTitle>
             <DialogDescription>
               Adjust the amounts to distribute {formatMoney(savings)} among your goals.
+              {needsFromAccountForDistribution &&
+                " Goals linked to a savings account will receive a transfer from the account you select."}
             </DialogDescription>
           </DialogHeader>
+          {needsFromAccountForDistribution && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">From account</label>
+              <Select
+                value={distributionFromAccountId}
+                onValueChange={setDistributionFromAccountId}
+                disabled={isDistributing}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source account (e.g. checking)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {activeGoals.map((goal) => {
               const amount = distributionAmounts[goal.id] || 0;
@@ -530,7 +613,8 @@ export function SavingsDistributionWidget({
                 isDistributing ||
                 Math.abs(
                   Object.values(distributionAmounts).reduce((sum, val) => sum + val, 0) - savings
-                ) > 0.01
+                ) > 0.01 ||
+                (needsFromAccountForDistribution && !distributionFromAccountId)
               }
               className="bg-sentiment-positive hover:bg-sentiment-positive dark:bg-sentiment-positive dark:hover:bg-sentiment-positive"
             >

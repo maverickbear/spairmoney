@@ -1,32 +1,17 @@
 "use client";
 
 import { useInView } from "@/hooks/use-in-view";
-import { Wallet, TrendingUp, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const CARDS = [
-  {
-    icon: Wallet,
-    iconBg: "bg-primary/20",
-    iconColor: "text-primary",
-    title: "Everything in one place",
-    description: "Accounts and info scattered across apps and spreadsheets? Spair Money brings it all together so you see your full picture at a glance.",
-  },
-  {
-    icon: TrendingUp,
-    iconBg: "bg-primary/15",
-    iconColor: "text-primary",
-    title: "See where money goes",
-    description: "Hard to see where your money actually goes. Clear categories and reports show you spending and trends so you can decide with confidence.",
-  },
-  {
-    icon: Target,
-    iconBg: "bg-primary/10",
-    iconColor: "text-primary",
-    title: "Goals that get started",
-    description: "Goals that never get started because it feels overwhelming? Set targets, track progress, and stay on track—all in one place.",
-  },
+const BREAKDOWN_ITEMS = [
+  { label: "$7 coffee", amount: 7 },
+  { label: "$15 lunch", amount: 15 },
+  { label: "$18 delivery", amount: 18 },
+  { label: "$12 subscription", amount: 12 },
 ];
+
+const DAY_TOTAL = BREAKDOWN_ITEMS.reduce((sum, { amount }) => sum + amount, 0);
+const MONTH_ESTIMATE = DAY_TOTAL * 30;
 
 export function ProblemSection() {
   const { ref, inView } = useInView();
@@ -35,43 +20,44 @@ export function ProblemSection() {
     <section
       ref={ref}
       className={cn(
-        "py-16 md:py-24 transition-all duration-700",
+        "pt-16 md:pt-24 pb-3 transition-all duration-700",
         inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
       )}
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
-        <div className="text-center">
-          <span className="inline-block rounded-full bg-primary/20 px-4 py-1.5 text-sm font-medium text-foreground">
-            Why it matters
-          </span>
-          <h2 className="mt-4 text-2xl md:text-3xl lg:text-4xl font-bold text-foreground">
-            Money shouldn&apos;t feel scattered.
-          </h2>
-          <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto leading-relaxed">
-            Sound familiar? Many people juggle accounts, lose track of spending, and never get started on goals—until they have one place to see it all.
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground text-center">
+          It&apos;s not the big expenses.
+        </h2>
+        <p className="mt-6 text-muted-foreground text-lg leading-relaxed text-center max-w-2xl mx-auto">
+          Most people don&apos;t struggle because of rent or car payments. They struggle because of small,
+          everyday spending that never feels important — until the end of the month.
+        </p>
+
+        <div className="mt-10 mx-auto max-w-sm rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-6 shadow-lg shadow-black/5 dark:shadow-black/20">
+          <p className="text-sm font-medium text-muted-foreground text-center mb-5">
+            Here&apos;s how &ldquo;just a few small things&rdquo; add up.
           </p>
-        </div>
-        <div className="mt-12 grid md:grid-cols-3 gap-6 md:gap-8">
-          {CARDS.map(({ icon: Icon, iconBg, iconColor, title, description }) => (
-            <div
-              key={title}
-              className="rounded-[32px] border border-border bg-card p-6 shadow-sm text-center md:text-left"
-            >
-              <div
-                className={cn(
-                  "inline-flex h-12 w-12 items-center justify-center rounded-lg",
-                  iconBg,
-                  iconColor
-                )}
+          <ul className="space-y-2.5">
+            {BREAKDOWN_ITEMS.map(({ label, amount }) => (
+              <li
+                key={label}
+                className="flex items-center justify-between text-sm text-foreground"
               >
-                <Icon className="h-6 w-6" />
-              </div>
-              <h3 className="mt-4 text-lg font-bold text-foreground">{title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                {description}
-              </p>
-            </div>
-          ))}
+                <span>{label}</span>
+                <span className="font-medium tabular-nums">${amount}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-5 pt-5 border-t border-border">
+            <p className="text-center">
+              <span className="font-semibold text-foreground">${DAY_TOTAL}/day</span>
+              <span className="text-muted-foreground mx-1.5">→</span>
+              <span className="font-bold text-destructive tabular-nums">${MONTH_ESTIMATE.toLocaleString()}/mo</span>
+            </p>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              Most people never track it. Spair shows patterns.
+            </p>
+          </div>
         </div>
       </div>
     </section>
