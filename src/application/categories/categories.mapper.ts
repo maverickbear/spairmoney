@@ -11,13 +11,11 @@ export class CategoriesMapper {
    * Map repository row to domain entity
    */
   static categoryToDomain(row: CategoryRow): BaseCategory {
-    // Default to "expense" if type is null (for backward compatibility with existing categories)
-    // New categories should always have type set
     return {
       id: row.id,
       name: row.name,
       type: row.type || "expense",
-      userId: row.user_id,
+      householdId: row.household_id ?? null,
       isSystem: row.is_system,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -32,7 +30,7 @@ export class CategoriesMapper {
       id: domain.id,
       name: domain.name,
       type: domain.type ?? null,
-      user_id: domain.userId ?? null,
+      household_id: domain.householdId ?? null,
       created_at: domain.createdAt,
       updated_at: domain.updatedAt,
     };
@@ -55,7 +53,7 @@ export class CategoriesMapper {
       id: row.id,
       name: row.name,
       categoryId: row.category_id,
-      userId: row.user_id,
+      householdId: row.household_id ?? null,
       isSystem: row.is_system,
       logo: row.logo,
       createdAt: row.created_at,
@@ -71,7 +69,7 @@ export class CategoriesMapper {
       id: domain.id,
       name: domain.name,
       category_id: domain.categoryId,
-      user_id: domain.userId ?? null,
+      household_id: domain.householdId ?? null,
       logo: domain.logo ?? null,
       created_at: domain.createdAt,
       updated_at: domain.updatedAt,

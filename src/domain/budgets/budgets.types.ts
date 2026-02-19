@@ -24,7 +24,7 @@ export interface BudgetWithRelations extends BaseBudget {
   category?: {
     id: string;
     name: string;
-    type?: "income" | "expense";
+    type?: "income" | "expense" | "transfer";
   } | null;
   subcategory?: { id: string; name: string } | null;
   /** @deprecated Groups have been completely removed. This field is never set and should not be used. */

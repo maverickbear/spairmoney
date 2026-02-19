@@ -1,8 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { getActiveHouseholdId } from "@/lib/utils/household";
 import { AppError } from "@/src/application/shared/app-error";
+import { getCacheHeaders } from "@/src/infrastructure/utils/cache-headers";
 import { revalidateTag } from 'next/cache';
+
+/**
+ * GET /api/v2/categories/[id]
+ * Returns a single category with subcategories. Used when editing to load fresh data from DB.
+ * Only returns system categories or categories in the current user's household (or legacy user-owned).
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const service = makeCategoriesService();
+    const category = await service.getCategoryById(id);
+
+    if (!category) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
+    const householdId = await getActiveHouseholdId(userId);
+    const canAccess =
+      category.isSystem === true ||
+      (category.householdId != null && category.householdId === householdId);
+    if (!canAccess) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const subcategories = await service.getSubcategoriesByCategory(id);
+    const categoryWithSubcategories = {
+      ...category,
+      subcategories: subcategories.map((s) => ({ id: s.id, name: s.name, logo: s.logo ?? null })),
+    };
+
+    const cacheHeaders = getCacheHeaders("static");
+    return NextResponse.json(categoryWithSubcategories, {
+      status: 200,
+      headers: cacheHeaders,
+    });
+  } catch (error) {
+    console.error("Error fetching category:", error);
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to fetch category" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function PATCH(
   request: NextRequest,

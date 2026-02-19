@@ -464,7 +464,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
         name: cat.name,
         type: cat.type || "expense", // Default to expense if type is missing
         isSystem: cat.isSystem || false,
-        userId: cat.userId || null,
+        householdId: cat.householdId ?? null,
         subcategories: Array.isArray(cat.subcategories) ? cat.subcategories : [],
       }));
       

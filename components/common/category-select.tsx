@@ -16,7 +16,7 @@ type Subcategory = BaseSubcategory;
 interface CategorySelectProps {
   categoryId?: string;
   subcategoryId?: string;
-  type?: "income" | "expense"; // Transaction type to filter categories
+  type?: "income" | "expense" | "transfer"; // Transaction type to filter categories
   onCategoryChange?: (categoryId: string) => void;
   onSubcategoryChange?: (subcategoryId: string) => void;
   includeSubcategory?: boolean;

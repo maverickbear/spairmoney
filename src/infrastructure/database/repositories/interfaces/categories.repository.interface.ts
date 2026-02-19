@@ -8,6 +8,7 @@ import { CategoryRow, SubcategoryRow } from "../categories.repository";
 export interface ICategoriesRepository {
   findCategoriesByIds(
     ids: string[],
+    householdId?: string | null,
     accessToken?: string,
     refreshToken?: string
   ): Promise<CategoryRow[]>;
@@ -18,6 +19,7 @@ export interface ICategoriesRepository {
   ): Promise<CategoryRow | null>;
   findSubcategoriesByIds(
     ids: string[],
+    householdId?: string | null,
     accessToken?: string,
     refreshToken?: string
   ): Promise<SubcategoryRow[]>;
@@ -29,8 +31,8 @@ export interface ICategoriesRepository {
   createCategory(data: {
     id: string;
     name: string;
-    type: "income" | "expense";
-    userId: string;
+    type: "income" | "expense" | "transfer";
+    householdId: string | null;
     createdAt: string;
     updatedAt: string;
   }): Promise<CategoryRow>;
@@ -39,7 +41,7 @@ export interface ICategoriesRepository {
     name: string;
     categoryId: string;
     logo: string | null;
-    userId: string;
+    householdId: string | null;
     createdAt: string;
     updatedAt: string;
   }): Promise<SubcategoryRow>;

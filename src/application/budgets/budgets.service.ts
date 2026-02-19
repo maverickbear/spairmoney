@@ -87,10 +87,10 @@ export class BudgetsService {
     // Fetch categories and subcategories (groups have been removed)
     const [categories, subcategories] = await Promise.all([
       categoryIds.length > 0 
-        ? this.categoriesRepository.findCategoriesByIds(categoryIds, accessToken, refreshToken)
+        ? this.categoriesRepository.findCategoriesByIds(categoryIds, householdId ?? undefined, accessToken, refreshToken)
         : Promise.resolve([]),
       subcategoryIds.length > 0
-        ? this.categoriesRepository.findSubcategoriesByIds(subcategoryIds, accessToken, refreshToken)
+        ? this.categoriesRepository.findSubcategoriesByIds(subcategoryIds, householdId ?? undefined, accessToken, refreshToken)
         : Promise.resolve([]),
     ]);
 

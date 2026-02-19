@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,10 +48,17 @@ export function CategoriesModule({
   // Use external dialog state if provided, otherwise use internal
   const isDialogOpen = externalIsCreateDialogOpen !== undefined ? externalIsCreateDialogOpen : internalIsDialogOpen;
   const setIsDialogOpen = externalOnCreateDialogChange || setInternalIsDialogOpen;
-  
-  // When dialog opens externally (from header), ensure selectedCategory is null
+
+  // Track when we open the dialog for edit so we don't clear selectedCategory (only clear when "Create New" is clicked)
+  const openingForEditRef = useRef(false);
+
+  // When dialog opens from "Create New" button (external), clear selection so dialog shows create form
   useEffect(() => {
-    if (externalIsCreateDialogOpen && externalIsCreateDialogOpen === true && selectedCategory !== null) {
+    if (openingForEditRef.current) {
+      openingForEditRef.current = false;
+      return;
+    }
+    if (externalIsCreateDialogOpen === true && selectedCategory !== null) {
       setSelectedCategory(null);
     }
   }, [externalIsCreateDialogOpen, selectedCategory]);
@@ -59,11 +66,35 @@ export function CategoriesModule({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [deletingSubcategoryId, setDeletingSubcategoryId] = useState<string | null>(null);
+  const [loadingCategoryForEdit, setLoadingCategoryForEdit] = useState(false);
 
   useEffect(() => {
     loadData();
     loadCurrentUser();
   }, []);
+
+  /** Load category by id from API (fresh from DB) and open edit dialog */
+  async function openEditDialog(category: Category) {
+    if (!checkWriteAccess()) return;
+    setLoadingCategoryForEdit(true);
+    openingForEditRef.current = true;
+    try {
+      const res = await fetch(`/api/v2/categories/${category.id}`);
+      if (res.ok) {
+        const fresh: Category = await res.json();
+        setSelectedCategory(fresh);
+        setIsDialogOpen(true);
+      } else {
+        setSelectedCategory(category);
+        setIsDialogOpen(true);
+      }
+    } catch {
+      setSelectedCategory(category);
+      setIsDialogOpen(true);
+    } finally {
+      setLoadingCategoryForEdit(false);
+    }
+  }
 
   async function loadCurrentUser() {
     try {
@@ -97,39 +128,29 @@ export function CategoriesModule({
     }
   }
 
-  // Separate system and user categories
+  // Separate system and household (custom) categories; API already returns only current user's household
   const { systemCategories, userCategories } = useMemo(() => {
-    // Remove duplicate categories by ID (keep first occurrence)
     const uniqueCategories = Array.from(
       new Map(categories.map((cat) => [cat.id, cat])).values()
     );
-    
-    // Separate system and user categories
-    // System categories: isSystem === true
-    // User categories: isSystem === false AND userId === currentUserId (to ensure only current user's categories)
+
     const system = uniqueCategories
       .filter((cat) => cat.isSystem === true)
       .sort((a, b) => a.name.localeCompare(b.name));
-    
+
     const user = uniqueCategories
-      .filter((cat) => 
-        cat.userId !== null && (currentUserId ? cat.userId === currentUserId : false)
-      )
+      .filter((cat) => cat.isSystem !== true)
       .map((category) => ({
         ...category,
-        subcategories: category.subcategories?.filter((subcat) => {
-          // Subcategories don't have userId, so we filter by parent category
-          // Only show subcategories that belong to user-created categories
-          return category.userId !== null && category.userId === currentUserId;
-        }),
+        subcategories: category.subcategories?.filter(() => true),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    
+
     return {
       systemCategories: system,
       userCategories: user,
     };
-  }, [categories, currentUserId]);
+  }, [categories]);
 
   function handleDeleteCategory(id: string) {
     if (!checkWriteAccess()) return;
@@ -262,34 +283,29 @@ export function CategoriesModule({
                                           variant="ghost"
                                           size="icon"
                                           className="h-8 w-8"
-                                          onClick={() => {
-                                            if (!checkWriteAccess()) return;
-                                            setSelectedCategory(category);
-                                            setIsDialogOpen(true);
-                                          }}
+                                          onClick={() => openEditDialog(category)}
                                           title="Edit category"
+                                          disabled={loadingCategoryForEdit}
                                         >
                                           <Edit className="h-4 w-4" />
                                         </Button>
-                                        {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() => {
-                                              if (!checkWriteAccess()) return;
-                                              handleDeleteCategory(category.id);
-                                            }}
-                                            title="Delete category"
-                                            disabled={deletingCategoryId === category.id}
-                                          >
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                          onClick={() => {
+                                            if (!checkWriteAccess()) return;
+                                            handleDeleteCategory(category.id);
+                                          }}
+                                          title="Delete category"
+                                          disabled={deletingCategoryId === category.id}
+                                        >
                                             {deletingCategoryId === category.id ? (
                                               <Loader2 className="h-4 w-4 animate-spin" />
                                             ) : (
                                               <Trash2 className="h-4 w-4" />
                                             )}
                                           </Button>
-                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -313,25 +329,23 @@ export function CategoriesModule({
                                             )}
                                             {subcat.name}
                                           </span>
-                                          {category.userId !== null && category.userId !== undefined && currentUserId && category.userId === currentUserId && (
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                              onClick={() => {
-                                                if (!checkWriteAccess()) return;
-                                                handleDeleteSubcategory(subcat.id);
-                                              }}
-                                              title="Delete subcategory"
-                                              disabled={deletingSubcategoryId === subcat.id}
-                                            >
-                                              {deletingSubcategoryId === subcat.id ? (
-                                                <Loader2 className="h-3 w-3 animate-spin text-destructive" />
-                                              ) : (
-                                                <X className="h-3 w-3 text-destructive" />
-                                              )}
-                                            </Button>
-                                          )}
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => {
+                                              if (!checkWriteAccess()) return;
+                                              handleDeleteSubcategory(subcat.id);
+                                            }}
+                                            title="Delete subcategory"
+                                            disabled={deletingSubcategoryId === subcat.id}
+                                          >
+                                            {deletingSubcategoryId === subcat.id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                                            ) : (
+                                              <X className="h-3 w-3 text-destructive" />
+                                            )}
+                                          </Button>
                                         </div>
                                       ))}
                                     </div>
@@ -381,26 +395,23 @@ export function CategoriesModule({
                                     )}
                                     {subcat.name}
                                   </span>
-                                  {/* Only show delete button for user-created subcategories */}
-                                  {category.userId !== null && category.userId !== undefined && currentUserId && category.userId === currentUserId && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => {
-                                        if (!checkWriteAccess()) return;
-                                        handleDeleteSubcategory(subcat.id);
-                                      }}
-                                      title="Delete subcategory"
-                                      disabled={deletingSubcategoryId === subcat.id}
-                                    >
-                                      {deletingSubcategoryId === subcat.id ? (
-                                        <Loader2 className="h-3 w-3 animate-spin text-destructive" />
-                                      ) : (
-                                        <X className="h-3 w-3 text-destructive" />
-                                      )}
-                                    </Button>
-                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => {
+                                      if (!checkWriteAccess()) return;
+                                      handleDeleteSubcategory(subcat.id);
+                                    }}
+                                    title="Delete subcategory"
+                                    disabled={deletingSubcategoryId === subcat.id}
+                                  >
+                                    {deletingSubcategoryId === subcat.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                                    ) : (
+                                      <X className="h-3 w-3 text-destructive" />
+                                    )}
+                                  </Button>
                                 </div>
                               ))}
                             </div>
@@ -415,34 +426,29 @@ export function CategoriesModule({
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 md:h-10 md:w-10"
-                                onClick={() => {
-                                  if (!checkWriteAccess()) return;
-                                  setSelectedCategory(category);
-                                  setIsDialogOpen(true);
-                                }}
+                                onClick={() => openEditDialog(category)}
                                 title="Edit category"
+                                disabled={loadingCategoryForEdit}
                               >
                                 <Edit className="h-3 w-3 md:h-4 md:w-4" />
                               </Button>
-                              {category.userId !== null && (currentUserId ? category.userId === currentUserId : false) && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 md:h-10 md:w-10"
-                                  onClick={() => {
-                                    if (!checkWriteAccess()) return;
-                                    handleDeleteCategory(category.id);
-                                  }}
-                                  title="Delete category"
-                                  disabled={deletingCategoryId === category.id}
-                                >
-                                  {deletingCategoryId === category.id ? (
-                                    <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                                  )}
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 md:h-10 md:w-10"
+                                onClick={() => {
+                                  if (!checkWriteAccess()) return;
+                                  handleDeleteCategory(category.id);
+                                }}
+                                title="Delete category"
+                                disabled={deletingCategoryId === category.id}
+                              >
+                                {deletingCategoryId === category.id ? (
+                                  <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                )}
+                              </Button>
                             </div>
                           )}
                         </TableCell>
@@ -456,7 +462,7 @@ export function CategoriesModule({
             <div className="rounded-lg border p-12">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  No custom categories found
+                  No household categories yet. Create one to share with everyone in your household.
                 </p>
               </div>
             </div>

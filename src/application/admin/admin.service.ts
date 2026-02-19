@@ -1058,7 +1058,7 @@ export class AdminService {
         ? this.accountsRepository.findByIds(Array.from(accountIds))
         : Promise.resolve([]),
       subcategoryIds.size > 0
-        ? this.categoriesRepository.findSubcategoriesByIds(Array.from(subcategoryIds))
+        ? this.categoriesRepository.findSubcategoriesByIds(Array.from(subcategoryIds), undefined)
         : Promise.resolve([]),
     ]);
 

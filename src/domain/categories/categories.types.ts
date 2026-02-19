@@ -6,8 +6,8 @@
 export interface BaseCategory {
   id: string;
   name: string;
-  type: "income" | "expense";
-  userId?: string | null;
+  type: "income" | "expense" | "transfer";
+  householdId?: string | null;
   isSystem?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -17,7 +17,7 @@ export interface BaseSubcategory {
   id: string;
   name: string;
   categoryId: string;
-  userId?: string | null;
+  householdId?: string | null;
   isSystem?: boolean;
   logo?: string | null;
   createdAt?: string;

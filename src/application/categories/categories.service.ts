@@ -10,6 +10,7 @@ import { BaseCategory, BaseSubcategory, CategoryWithRelations, SubcategoryWithRe
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { getCurrentTimestamp } from "@/src/infrastructure/utils/timestamp";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
+import { getActiveHouseholdId } from "@/lib/utils/household";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
 import { cacheLife, cacheTag } from 'next/cache';
@@ -22,31 +23,23 @@ async function canUserWrite(userId: string): Promise<boolean> {
 import { AppError } from "../shared/app-error";
 
 // Cached helper functions (must be standalone, not class methods)
-// CRITICAL: Cannot pass repository as parameter in cached functions
-// Must create repository inside the function to avoid "temporary client reference" error
-async function getAllCategoriesCached(): Promise<CategoryWithRelations[]> {
+// Cache is keyed by householdId so each household gets correct categories.
+async function getAllCategoriesCached(householdId?: string | null): Promise<CategoryWithRelations[]> {
   'use cache: private'
-  cacheTag('categories')
+  cacheTag('categories', householdId ? `categories-household-${householdId}` : 'categories-global')
   cacheLife('hours')
 
-  // Can access cookies() directly with 'use cache: private'
-  // Repository will access cookies through createServerClient()
-
-  // Create repository inside cached function to avoid temporary client reference error
   const repository = new CategoriesRepository();
 
-  // Fetch categories first
-  const categoryRows = await repository.findAllCategories();
+  const categoryRows = await repository.findAllCategories(householdId ?? undefined);
   const categoryIds = categoryRows.map(c => c.id);
 
-  // Fetch subcategories in parallel (optimized: single query for all subcategories)
   const allSubcategoriesRaw = categoryIds.length > 0
-    ? await repository.findSubcategoriesByCategoryIds(categoryIds)
+    ? await repository.findSubcategoriesByCategoryIds(categoryIds, householdId ?? undefined)
     : [];
 
   const allSubcategories = allSubcategoriesRaw.map(s => ({ ...s, categoryId: s.category_id }));
-  
-  // Map to domain with relations
+
   const categories: CategoryWithRelations[] = categoryRows.map(categoryRow => {
     const subcategories = allSubcategories.filter(s => s.categoryId === categoryRow.id);
 
@@ -60,26 +53,21 @@ async function getAllCategoriesCached(): Promise<CategoryWithRelations[]> {
 }
 
 async function getSubcategoriesByCategoryCached(
-  categoryId: string
+  categoryId: string,
+  householdId?: string | null
 ): Promise<SubcategoryWithRelations[]> {
   'use cache: private'
-  cacheTag('categories', `category-${categoryId}`)
+  cacheTag('categories', `category-${categoryId}`, householdId ? `categories-household-${householdId}` : 'categories-global')
   cacheLife('hours')
-  
-  // Can access cookies() directly with 'use cache: private'
-  // Repository will access cookies through createServerClient()
-  
-  // Create repository inside cached function to avoid temporary client reference error
+
   const repository = new CategoriesRepository();
 
-  // Verify category exists
   const category = await repository.findCategoryById(categoryId);
   if (!category) {
     return [];
   }
 
-  // Get subcategories
-  const subcategoryRows = await repository.findSubcategoriesByCategoryId(categoryId);
+  const subcategoryRows = await repository.findSubcategoriesByCategoryId(categoryId, householdId ?? undefined);
 
   return subcategoryRows.map(row =>
     CategoriesMapper.subcategoryToDomainWithRelations(row, category)
@@ -90,17 +78,21 @@ export class CategoriesService {
   constructor(private repository: CategoriesRepository) {}
 
   /**
-   * Get all categories with relations
+   * Get all categories with relations (system + current user's active household).
    */
   async getAllCategories(): Promise<CategoryWithRelations[]> {
-    return getAllCategoriesCached();
+    const userId = await getCurrentUserId();
+    const householdId = userId ? await getActiveHouseholdId(userId) : null;
+    return getAllCategoriesCached(householdId);
   }
 
   /**
-   * Get subcategories by category
+   * Get subcategories by category (system + current user's active household).
    */
   async getSubcategoriesByCategory(categoryId: string): Promise<SubcategoryWithRelations[]> {
-    return getSubcategoriesByCategoryCached(categoryId);
+    const userId = await getCurrentUserId();
+    const householdId = userId ? await getActiveHouseholdId(userId) : null;
+    return getSubcategoriesByCategoryCached(categoryId, householdId);
   }
 
   /**
@@ -153,7 +145,7 @@ export class CategoriesService {
   }
 
   /**
-   * Create a new category
+   * Create a new category (scoped to current user's active household).
    */
   async createCategory(data: CategoryFormData): Promise<CategoryWithRelations> {
     const userId = await getCurrentUserId();
@@ -161,7 +153,11 @@ export class CategoriesService {
       throw new AppError("Unauthorized", 401);
     }
 
-    // Check if user has paid plan
+    const householdId = await getActiveHouseholdId(userId);
+    if (!householdId) {
+      throw new AppError("Active household required to create custom categories", 400);
+    }
+
     const isPaidPlan = await canUserWrite(userId);
     if (!isPaidPlan) {
       throw new AppError("Creating custom categories requires a paid plan", 403);
@@ -174,7 +170,7 @@ export class CategoriesService {
       id,
       name: data.name,
       type: data.type,
-      userId,
+      householdId,
       createdAt: now,
       updatedAt: now,
     });
@@ -183,7 +179,7 @@ export class CategoriesService {
   }
 
   /**
-   * Update a category
+   * Update a category (must belong to current user's household or legacy user).
    */
   async updateCategory(id: string, data: Partial<CategoryFormData>): Promise<CategoryWithRelations> {
     const userId = await getCurrentUserId();
@@ -191,13 +187,14 @@ export class CategoriesService {
       throw new AppError("Unauthorized", 401);
     }
 
-    // Verify category belongs to user
+    const householdId = await getActiveHouseholdId(userId);
     const existingCategory = await this.repository.findCategoryById(id);
     if (!existingCategory) {
       throw new AppError("Category not found", 404);
     }
 
-    if (existingCategory.user_id !== userId) {
+    const canEdit = existingCategory.household_id != null && existingCategory.household_id === householdId;
+    if (!canEdit) {
       throw new AppError("Cannot update system default categories", 403);
     }
 
@@ -219,7 +216,7 @@ export class CategoriesService {
   }
 
   /**
-   * Delete a category
+   * Delete a category (must belong to current user's household or legacy user).
    */
   async deleteCategory(id: string): Promise<void> {
     const userId = await getCurrentUserId();
@@ -227,22 +224,22 @@ export class CategoriesService {
       throw new AppError("Unauthorized", 401);
     }
 
-    // Verify category belongs to user
+    const householdId = await getActiveHouseholdId(userId);
     const category = await this.repository.findCategoryById(id);
     if (!category) {
       throw new AppError("Category not found", 404);
     }
 
-    if (category.user_id !== userId) {
+    const canDelete = category.household_id != null && category.household_id === householdId;
+    if (!canDelete) {
       throw new AppError("Cannot delete system default categories", 403);
     }
 
     await this.repository.deleteCategory(id);
-
   }
 
   /**
-   * Create a new subcategory
+   * Create a new subcategory (category must be system or current user's household).
    */
   async createSubcategory(data: SubcategoryFormData): Promise<SubcategoryWithRelations> {
     const userId = await getCurrentUserId();
@@ -250,42 +247,43 @@ export class CategoriesService {
       throw new AppError("Unauthorized", 401);
     }
 
-    // Verify category exists
+    const householdId = await getActiveHouseholdId(userId);
     const category = await this.repository.findCategoryById(data.categoryId);
     if (!category) {
       throw new AppError("Category not found", 404);
     }
 
-    // If category is system default, user needs paid plan
     if (category.is_system === true) {
       const isPaidPlan = await canUserWrite(userId);
       if (!isPaidPlan) {
         throw new AppError("Creating subcategories for system default categories requires a paid plan", 403);
       }
-    } else if (category.user_id !== userId) {
-      throw new AppError("Category not found or access denied", 404);
+    } else {
+      const canUseCategory = category.household_id != null && category.household_id === householdId;
+      if (!canUseCategory) {
+        throw new AppError("Category not found or access denied", 404);
+      }
     }
 
     const id = crypto.randomUUID();
     const now = getCurrentTimestamp();
-    const subcategoryUserId = category.is_system === true ? userId : category.user_id;
+    const subcategoryHouseholdId = category.is_system === true ? null : category.household_id;
 
     const subcategoryRow = await this.repository.createSubcategory({
       id,
       name: data.name,
       categoryId: data.categoryId,
-      userId: subcategoryUserId,
+      householdId: subcategoryHouseholdId,
       logo: data.logo || null,
       createdAt: now,
       updatedAt: now,
     });
 
-
     return CategoriesMapper.subcategoryToDomainWithRelations(subcategoryRow, category);
   }
 
   /**
-   * Update a subcategory
+   * Update a subcategory (must belong to current user's household or legacy user).
    */
   async updateSubcategory(id: string, data: Partial<SubcategoryFormData>): Promise<SubcategoryWithRelations> {
     const userId = await getCurrentUserId();
@@ -293,19 +291,21 @@ export class CategoriesService {
       throw new AppError("Unauthorized", 401);
     }
 
-    // Verify subcategory exists and user has access
+    const householdId = await getActiveHouseholdId(userId);
     const subcategory = await this.repository.findSubcategoryById(id);
     if (!subcategory) {
       throw new AppError("Subcategory not found", 404);
     }
 
-    // Check if user can update (must own subcategory or category)
     const category = await this.repository.findCategoryById(subcategory.category_id);
     if (!category) {
       throw new AppError("Category not found", 404);
     }
 
-    if (subcategory.user_id !== userId && category.user_id !== userId) {
+    const canEdit =
+      (subcategory.household_id != null && subcategory.household_id === householdId) ||
+      (category.household_id != null && category.household_id === householdId);
+    if (!canEdit) {
       throw new AppError("Cannot update this subcategory", 403);
     }
 
@@ -327,7 +327,7 @@ export class CategoriesService {
   }
 
   /**
-   * Delete a subcategory
+   * Delete a subcategory (must belong to current user's household or legacy user).
    */
   async deleteSubcategory(id: string): Promise<void> {
     const userId = await getCurrentUserId();
@@ -335,24 +335,25 @@ export class CategoriesService {
       throw new AppError("Unauthorized", 401);
     }
 
-    // Verify subcategory exists and user has access
+    const householdId = await getActiveHouseholdId(userId);
     const subcategory = await this.repository.findSubcategoryById(id);
     if (!subcategory) {
       throw new AppError("Subcategory not found", 404);
     }
 
-    // Check if user can delete (must own subcategory or category)
     const category = await this.repository.findCategoryById(subcategory.category_id);
     if (!category) {
       throw new AppError("Category not found", 404);
     }
 
-    if (subcategory.user_id !== userId && category.user_id !== userId) {
+    const canDelete =
+      (subcategory.household_id != null && subcategory.household_id === householdId) ||
+      (category.household_id != null && category.household_id === householdId);
+    if (!canDelete) {
       throw new AppError("Cannot delete this subcategory", 403);
     }
 
     await this.repository.deleteSubcategory(id);
-
   }
 
 }

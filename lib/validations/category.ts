@@ -3,9 +3,9 @@ import { z } from "zod";
 // NOTE: Groups have been completely removed. Categories now have a direct type property.
 export const categorySchema = z.object({
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["income", "expense"], {
+  type: z.enum(["income", "expense", "transfer"], {
     required_error: "Type is required",
-    invalid_type_error: "Type must be either 'income' or 'expense'",
+    invalid_type_error: "Type must be 'income', 'expense', or 'transfer'",
   }),
 });
 

@@ -12,8 +12,8 @@ import { ICategoriesRepository } from "./interfaces/categories.repository.interf
 export interface CategoryRow {
   id: string;
   name: string;
-  type: "income" | "expense" | null;
-  user_id: string | null;
+  type: "income" | "expense" | "transfer" | null;
+  household_id: string | null;
   is_system: boolean;
   created_at: string;
   updated_at: string;
@@ -23,7 +23,7 @@ export interface SubcategoryRow {
   id: string;
   name: string;
   category_id: string;
-  user_id: string | null;
+  household_id: string | null;
   is_system: boolean;
   logo: string | null;
   created_at: string;
@@ -32,27 +32,23 @@ export interface SubcategoryRow {
 
 export class CategoriesRepository implements ICategoriesRepository {
   /**
-   * Find all categories for a user
+   * Find all categories: system + household's custom (or legacy user's when householdId is null).
    */
   async findAllCategories(
+    householdId?: string | null,
     accessToken?: string,
     refreshToken?: string
   ): Promise<CategoryRow[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || null;
 
     let query = supabase
       .from("categories")
       .select("*")
       .order("name", { ascending: true });
 
-    // If authenticated, get system categories (is_system = true) OR user's own categories
-    if (userId) {
-      query = query.or(`is_system.eq.true,user_id.eq.${userId}`);
+    if (householdId) {
+      query = query.or(`is_system.eq.true,household_id.eq.${householdId}`);
     } else {
-      // If not authenticated, only return system categories
       query = query.eq("is_system", true);
     }
 
@@ -94,10 +90,11 @@ export class CategoriesRepository implements ICategoriesRepository {
   }
 
   /**
-   * Find multiple categories by IDs
+   * Find multiple categories by IDs (system + household or legacy user).
    */
   async findCategoriesByIds(
     ids: string[],
+    householdId?: string | null,
     accessToken?: string,
     refreshToken?: string
   ): Promise<CategoryRow[]> {
@@ -107,17 +104,13 @@ export class CategoriesRepository implements ICategoriesRepository {
 
     const supabase = await createServerClient(accessToken, refreshToken);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || null;
-
     let query = supabase
       .from("categories")
-      .select("id, name, type")
+      .select("id, name, type, household_id, is_system, created_at, updated_at")
       .in("id", ids);
 
-    // If authenticated, get system categories (is_system = true) OR user's own categories
-    if (userId) {
-      query = query.or(`is_system.eq.true,user_id.eq.${userId}`);
+    if (householdId) {
+      query = query.or(`is_system.eq.true,household_id.eq.${householdId}`);
     } else {
       query = query.eq("is_system", true);
     }
@@ -138,12 +131,14 @@ export class CategoriesRepository implements ICategoriesRepository {
   async createCategory(data: {
     id: string;
     name: string;
-    type: "income" | "expense";
-    userId: string | null;
+    type: "income" | "expense" | "transfer";
+    householdId: string | null;
     createdAt: string;
     updatedAt: string;
   }): Promise<CategoryRow> {
     const supabase = await createServerClient();
+
+    const isSystem = data.householdId === null;
 
     const { data: category, error } = await supabase
       .from("categories")
@@ -151,8 +146,8 @@ export class CategoriesRepository implements ICategoriesRepository {
         id: data.id,
         name: data.name,
         type: data.type,
-        user_id: data.userId,
-        is_system: data.userId === null,
+        household_id: data.householdId,
+        is_system: isSystem,
         created_at: data.createdAt,
         updated_at: data.updatedAt,
       })
@@ -174,7 +169,7 @@ export class CategoriesRepository implements ICategoriesRepository {
     id: string,
     data: Partial<{
       name: string;
-      type: "income" | "expense";
+      type: "income" | "expense" | "transfer";
       updatedAt: string;
     }>
   ): Promise<CategoryRow> {
@@ -218,17 +213,15 @@ export class CategoriesRepository implements ICategoriesRepository {
   }
 
   /**
-   * Find all subcategories for a category
+   * Find all subcategories for a category (system + household or legacy user).
    */
   async findSubcategoriesByCategoryId(
     categoryId: string,
+    householdId?: string | null,
     accessToken?: string,
     refreshToken?: string
   ): Promise<SubcategoryRow[]> {
     const supabase = await createServerClient(accessToken, refreshToken);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || null;
 
     let query = supabase
       .from("subcategories")
@@ -236,11 +229,9 @@ export class CategoriesRepository implements ICategoriesRepository {
       .eq("category_id", categoryId)
       .order("name", { ascending: true });
 
-    // If authenticated, get system subcategories (is_system = true) OR subcategories from user's own categories
-    if (userId) {
-      query = query.or(`is_system.eq.true,user_id.eq.${userId}`);
+    if (householdId) {
+      query = query.or(`is_system.eq.true,household_id.eq.${householdId}`);
     } else {
-      // If not authenticated, only return system subcategories
       query = query.eq("is_system", true);
     }
 
@@ -255,10 +246,11 @@ export class CategoriesRepository implements ICategoriesRepository {
   }
 
   /**
-   * Find all subcategories for multiple categories (optimized batch query)
+   * Find all subcategories for multiple categories (system + household or legacy user).
    */
   async findSubcategoriesByCategoryIds(
     categoryIds: string[],
+    householdId?: string | null,
     accessToken?: string,
     refreshToken?: string
   ): Promise<SubcategoryRow[]> {
@@ -268,9 +260,6 @@ export class CategoriesRepository implements ICategoriesRepository {
 
     const supabase = await createServerClient(accessToken, refreshToken);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || null;
-
     let query = supabase
       .from("subcategories")
       .select("*")
@@ -278,11 +267,9 @@ export class CategoriesRepository implements ICategoriesRepository {
       .order("category_id", { ascending: true })
       .order("name", { ascending: true });
 
-    // If authenticated, get system subcategories (is_system = true) OR subcategories from user's own categories
-    if (userId) {
-      query = query.or(`is_system.eq.true,user_id.eq.${userId}`);
+    if (householdId) {
+      query = query.or(`is_system.eq.true,household_id.eq.${householdId}`);
     } else {
-      // If not authenticated, only return system subcategories
       query = query.eq("is_system", true);
     }
 
@@ -324,10 +311,11 @@ export class CategoriesRepository implements ICategoriesRepository {
   }
 
   /**
-   * Find multiple subcategories by IDs
+   * Find multiple subcategories by IDs (system + household or legacy user).
    */
   async findSubcategoriesByIds(
     ids: string[],
+    householdId?: string | null,
     accessToken?: string,
     refreshToken?: string
   ): Promise<SubcategoryRow[]> {
@@ -337,19 +325,14 @@ export class CategoriesRepository implements ICategoriesRepository {
 
     const supabase = await createServerClient(accessToken, refreshToken);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id || null;
-
     let query = supabase
       .from("subcategories")
-      .select("id, name, logo")
+      .select("id, name, logo, category_id, household_id, is_system, created_at, updated_at")
       .in("id", ids);
 
-    // If authenticated, get system subcategories (is_system = true) OR subcategories from user's own categories
-    if (userId) {
-      query = query.or(`is_system.eq.true,user_id.eq.${userId}`);
+    if (householdId) {
+      query = query.or(`is_system.eq.true,household_id.eq.${householdId}`);
     } else {
-      // If not authenticated, only return system subcategories
       query = query.eq("is_system", true);
     }
 
@@ -370,17 +353,14 @@ export class CategoriesRepository implements ICategoriesRepository {
     id: string;
     name: string;
     categoryId: string;
-    userId: string | null;
+    householdId: string | null;
     logo: string | null;
     createdAt: string;
     updatedAt: string;
   }): Promise<SubcategoryRow> {
     const supabase = await createServerClient();
 
-    // Determine is_system based on userId
-    // If userId is null, it's a system subcategory
-    // If userId is not null, it's a user-created subcategory
-    const isSystem = data.userId === null;
+    const isSystem = data.householdId === null;
 
     const { data: subcategory, error } = await supabase
       .from("subcategories")
@@ -388,7 +368,7 @@ export class CategoriesRepository implements ICategoriesRepository {
         id: data.id,
         name: data.name,
         category_id: data.categoryId,
-        user_id: data.userId,
+        household_id: data.householdId,
         is_system: isSystem,
         logo: data.logo,
         created_at: data.createdAt,

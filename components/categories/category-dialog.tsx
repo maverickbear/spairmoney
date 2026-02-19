@@ -13,13 +13,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useState, useEffect } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
@@ -43,10 +43,8 @@ export function CategoryDialog({
   const [subcategoryNames, setSubcategoryNames] = useState<string[]>([""]);
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(category?.id || null);
   
-  // Check if this is a system category (userId === null)
-  // Only system categories when category exists AND userId is null
-  // When category is null (new category), isSystemCategory should be false
-  const isSystemCategory = category !== null && category !== undefined && category.userId === null;
+  // System categories are read-only (isSystem === true). New category (category == null) is not system.
+  const isSystemCategory = category !== null && category !== undefined && category.isSystem === true;
 
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -76,8 +74,12 @@ export function CategoryDialog({
             }
       );
       setCurrentCategoryId(category?.id || null);
-      // Reset subcategory inputs - start with one empty input
-      setSubcategoryNames([""]);
+      // Pre-fill subcategory inputs from existing data when editing; otherwise one empty input
+      const existingNames =
+        category?.subcategories?.map((s) => s.name).filter(Boolean) ?? [];
+      setSubcategoryNames(
+        existingNames.length > 0 ? [...existingNames, ""] : [""]
+      );
     }
   }, [open, category, form]);
 
@@ -99,7 +101,8 @@ export function CategoryDialog({
               id: updatedCategory.id,
               name: updatedCategory.name,
               type: updatedCategory.type,
-              userId: updatedCategory.userId,
+              householdId: updatedCategory.householdId,
+              isSystem: updatedCategory.isSystem,
               subcategories: updatedCategory.subcategories || [],
             };
             onSuccess?.(formattedCategory);
@@ -129,11 +132,18 @@ export function CategoryDialog({
 
       const savedCategory = await res.json();
       setCurrentCategoryId(savedCategory.id);
-      
-      // Create all subcategories from the input fields
+
+      // When editing, only create subcategories that don't already exist (by name)
+      const existingNames = new Set(
+        (category?.subcategories ?? []).map((s) => s.name.trim().toLowerCase())
+      );
       const subcategoryNamesToCreate = subcategoryNames
-        .map(name => name.trim())
-        .filter(name => name.length > 0);
+        .map((name) => name.trim())
+        .filter(
+          (name) =>
+            name.length > 0 &&
+            (!category || !existingNames.has(name.toLowerCase()))
+        );
 
       if (subcategoryNamesToCreate.length > 0) {
         const subcategoryPromises = subcategoryNamesToCreate.map((name) =>
@@ -164,8 +174,9 @@ export function CategoryDialog({
           .filter((r): r is { status: "rejected"; reason: Error; name: string } => r.status === "rejected")
           .map((r) => r.name);
 
-        // Update saved category with created subcategories
-        savedCategory.subcategories = createdSubcategories;
+        // When editing, merge existing subcategories with newly created ones
+        const existingSubs = category?.subcategories ?? [];
+        savedCategory.subcategories = [...existingSubs, ...createdSubcategories];
 
         // Show appropriate message based on results
         if (failedSubcategories.length > 0) {
@@ -193,7 +204,8 @@ export function CategoryDialog({
         id: savedCategory.id,
         name: savedCategory.name,
         type: savedCategory.type,
-        userId: savedCategory.userId,
+        householdId: savedCategory.householdId,
+        isSystem: savedCategory.isSystem,
         subcategories: savedCategory.subcategories || [],
       };
 
@@ -236,19 +248,22 @@ export function CategoryDialog({
 
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-        <DialogHeader>
-          <DialogTitle>{category ? "Edit" : "Add"} Category</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="flex flex-col w-full sm:max-w-2xl !p-0 !gap-0"
+      >
+        <SheetHeader className="px-6 pt-6 pb-2">
+          <SheetTitle>{category ? "Edit" : "Add"} Category</SheetTitle>
+          <SheetDescription>
             {category
               ? "Update the category details below."
               : "Create a new category by entering a name."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {/* Show category name and type when creating new category or editing user category */}
           {(!category || !isSystemCategory) && (
             <>
@@ -271,7 +286,7 @@ export function CategoryDialog({
                 <label className="text-sm font-medium">Type</label>
                 <Select
                   value={form.watch("type")}
-                  onValueChange={(value) => form.setValue("type", value as "income" | "expense")}
+                  onValueChange={(value) => form.setValue("type", value as "income" | "expense" | "transfer")}
                   disabled={!!category && isSystemCategory}
                 >
                   <SelectTrigger size="medium">
@@ -280,6 +295,7 @@ export function CategoryDialog({
                   <SelectContent>
                     <SelectItem value="expense">Expense</SelectItem>
                     <SelectItem value="income">Income</SelectItem>
+                    <SelectItem value="transfer">Transfer</SelectItem>
                   </SelectContent>
                 </Select>
                 {form.formState.errors.type && (
@@ -335,7 +351,7 @@ export function CategoryDialog({
 
           </div>
 
-          <DialogFooter>
+          <SheetFooter className="px-6 py-4 border-t border-border">
             <Button
               type="button"
               variant="outline"
@@ -382,10 +398,10 @@ export function CategoryDialog({
                 )}
               </Button>
             )}
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 

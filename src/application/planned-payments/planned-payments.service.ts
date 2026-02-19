@@ -95,6 +95,8 @@ export class PlannedPaymentsService {
       return { plannedPayments: [], total: count || 0 };
     }
 
+    const householdId = finalUserId ? await getActiveHouseholdId(finalUserId) : null;
+
     // Batch fetch related data
     const accountIds = new Set<string>();
     const categoryIds = new Set<string>();
@@ -114,10 +116,10 @@ export class PlannedPaymentsService {
         ? this.accountsRepository.findByIds(Array.from(accountIds), accessToken, refreshToken)
         : Promise.resolve([]),
       categoryIds.size > 0
-        ? this.categoriesRepository.findCategoriesByIds(Array.from(categoryIds), accessToken, refreshToken)
+        ? this.categoriesRepository.findCategoriesByIds(Array.from(categoryIds), householdId ?? undefined, accessToken, refreshToken)
         : Promise.resolve([]),
       subcategoryIds.size > 0
-        ? this.categoriesRepository.findSubcategoriesByIds(Array.from(subcategoryIds), accessToken, refreshToken)
+        ? this.categoriesRepository.findSubcategoriesByIds(Array.from(subcategoryIds), householdId ?? undefined, accessToken, refreshToken)
         : Promise.resolve([]),
       debtIds.size > 0
         ? this.debtsRepository.findByIds(Array.from(debtIds), accessToken, refreshToken)

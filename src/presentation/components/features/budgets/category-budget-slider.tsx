@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 interface Category {
   id: string;
   name: string;
-  type: "income" | "expense";
+  type: "income" | "expense" | "transfer";
   subcategories?: Array<{
     id: string;
     name: string;

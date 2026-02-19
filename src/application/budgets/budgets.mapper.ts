@@ -49,7 +49,7 @@ export class BudgetsMapper {
   static toDomainWithRelations(
     row: BudgetRow,
     relations?: {
-      category?: { id: string; name: string; type?: "income" | "expense" } | null;
+      category?: { id: string; name: string; type?: "income" | "expense" | "transfer" } | null;
       subcategory?: { id: string; name: string } | null;
       /** @deprecated Groups have been removed. This field is kept for backward compatibility. */
       group?: { id: string; name: string } | null;

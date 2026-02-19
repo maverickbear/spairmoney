@@ -83,10 +83,13 @@ export class TransactionsService {
       });
     }
 
+    const userId = await getCurrentUserId();
+    const householdId = userId ? await getActiveHouseholdId(userId) : null;
+
     // Fetch categories using injected repository
     const categoriesMap = new Map<string, { id: string; name: string }>();
     if (categoryIds.length > 0) {
-      const categories = await this.categoriesRepository.findCategoriesByIds(categoryIds, accessToken, refreshToken);
+      const categories = await this.categoriesRepository.findCategoriesByIds(categoryIds, householdId ?? undefined, accessToken, refreshToken);
 
       categories.forEach(category => {
         categoriesMap.set(category.id, { id: category.id, name: category.name });
@@ -96,7 +99,7 @@ export class TransactionsService {
     // Fetch subcategories using injected repository
     const subcategoriesMap = new Map<string, { id: string; name: string; logo?: string | null }>();
     if (subcategoryIds.length > 0) {
-      const subcategories = await this.categoriesRepository.findSubcategoriesByIds(subcategoryIds, accessToken, refreshToken);
+      const subcategories = await this.categoriesRepository.findSubcategoriesByIds(subcategoryIds, householdId ?? undefined, accessToken, refreshToken);
 
       subcategories.forEach(subcategory => {
         subcategoriesMap.set(subcategory.id, { id: subcategory.id, name: subcategory.name, logo: subcategory.logo });
@@ -106,7 +109,7 @@ export class TransactionsService {
     // Fetch suggested categories using injected repository
     const suggestedCategoriesMap = new Map<string, { id: string; name: string }>();
     if (suggestedCategoryIds.length > 0) {
-      const suggestedCategories = await this.categoriesRepository.findCategoriesByIds(suggestedCategoryIds, accessToken, refreshToken);
+      const suggestedCategories = await this.categoriesRepository.findCategoriesByIds(suggestedCategoryIds, householdId ?? undefined, accessToken, refreshToken);
 
       suggestedCategories.forEach(category => {
         suggestedCategoriesMap.set(category.id, { id: category.id, name: category.name });
@@ -116,7 +119,7 @@ export class TransactionsService {
     // Fetch suggested subcategories using injected repository
     const suggestedSubcategoriesMap = new Map<string, { id: string; name: string; logo?: string | null }>();
     if (suggestedSubcategoryIds.length > 0) {
-      const suggestedSubcategories = await this.categoriesRepository.findSubcategoriesByIds(suggestedSubcategoryIds, accessToken, refreshToken);
+      const suggestedSubcategories = await this.categoriesRepository.findSubcategoriesByIds(suggestedSubcategoryIds, householdId ?? undefined, accessToken, refreshToken);
 
       suggestedSubcategories.forEach(subcategory => {
         suggestedSubcategoriesMap.set(subcategory.id, { id: subcategory.id, name: subcategory.name, logo: subcategory.logo });
@@ -415,10 +418,13 @@ export class TransactionsService {
       });
     }
 
+    const userIdForResolve = await getCurrentUserId();
+    const householdIdForResolve = userIdForResolve ? await getActiveHouseholdId(userIdForResolve) : null;
+
     // Fetch category
     const categoriesMap = new Map<string, { id: string; name: string }>();
     if (categoryIds.length > 0) {
-      const categories = await this.categoriesRepository.findCategoriesByIds(categoryIds);
+      const categories = await this.categoriesRepository.findCategoriesByIds(categoryIds, householdIdForResolve ?? undefined);
       categories.forEach(category => {
         categoriesMap.set(category.id, { id: category.id, name: category.name });
       });
@@ -427,7 +433,7 @@ export class TransactionsService {
     // Fetch subcategory
     const subcategoriesMap = new Map<string, { id: string; name: string; logo?: string | null }>();
     if (subcategoryIds.length > 0) {
-      const subcategories = await this.categoriesRepository.findSubcategoriesByIds(subcategoryIds);
+      const subcategories = await this.categoriesRepository.findSubcategoriesByIds(subcategoryIds, householdIdForResolve ?? undefined);
       subcategories.forEach(subcategory => {
         subcategoriesMap.set(subcategory.id, { id: subcategory.id, name: subcategory.name, logo: subcategory.logo });
       });
@@ -549,6 +555,9 @@ export class TransactionsService {
     const categoryIds = row.category_id ? [row.category_id] : [];
     const subcategoryIds = row.subcategory_id ? [row.subcategory_id] : [];
 
+    const userIdForResolve = await getCurrentUserId();
+    const householdIdForResolve = userIdForResolve ? await getActiveHouseholdId(userIdForResolve) : null;
+
     // Fetch account
     const accountsMap = new Map<string, { id: string; name: string; type: string }>();
     if (accountIds.length > 0) {
@@ -561,7 +570,7 @@ export class TransactionsService {
     // Fetch category
     const categoriesMap = new Map<string, { id: string; name: string }>();
     if (categoryIds.length > 0) {
-      const categories = await this.categoriesRepository.findCategoriesByIds(categoryIds);
+      const categories = await this.categoriesRepository.findCategoriesByIds(categoryIds, householdIdForResolve ?? undefined);
       categories.forEach(category => {
         categoriesMap.set(category.id, { id: category.id, name: category.name });
       });
@@ -570,7 +579,7 @@ export class TransactionsService {
     // Fetch subcategory
     const subcategoriesMap = new Map<string, { id: string; name: string; logo?: string | null }>();
     if (subcategoryIds.length > 0) {
-      const subcategories = await this.categoriesRepository.findSubcategoriesByIds(subcategoryIds);
+      const subcategories = await this.categoriesRepository.findSubcategoriesByIds(subcategoryIds, householdIdForResolve ?? undefined);
       subcategories.forEach(subcategory => {
         subcategoriesMap.set(subcategory.id, { id: subcategory.id, name: subcategory.name, logo: subcategory.logo });
       });
