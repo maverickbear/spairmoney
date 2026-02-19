@@ -438,30 +438,10 @@ export interface Database {
       planId: string | null;
       deletedAt: string | null;
     };
-    subscriptionServices: {
-      id: string;
-      categoryId: string;
-      name: string;
-      logo: string | null;
-      displayOrder: number;
-      isActive: boolean;
-      createdAt: string;
-      updatedAt: string;
-    };
     subscriptionServiceCategories: {
       id: string;
       name: string;
       displayOrder: number;
-      isActive: boolean;
-      createdAt: string;
-      updatedAt: string;
-    };
-    subscriptionServicePlans: {
-      id: string;
-      serviceId: string;
-      planName: string;
-      price: number;
-      currency: string;
       isActive: boolean;
       createdAt: string;
       updatedAt: string;

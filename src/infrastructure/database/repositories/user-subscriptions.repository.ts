@@ -14,7 +14,7 @@ import { logger } from "@/src/infrastructure/utils/logger";
 export interface UserServiceSubscriptionRow {
   id: string;
   user_id: string;
-  household_id: string;
+  household_id: string | null;
   service_name: string;
   subcategory_id?: string | null;
   plan_id?: string | null;
@@ -27,6 +27,8 @@ export interface UserServiceSubscriptionRow {
   first_billing_date: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  subscription_category_name?: string | null;
 }
 
 export class UserSubscriptionsRepository {
@@ -39,7 +41,8 @@ export class UserSubscriptionsRepository {
     let query = supabase
       .from("user_subscriptions")
       .select("*")
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .is("deleted_at", null);
 
     // If householdId is provided, also filter by it (for RLS policies)
     if (householdId) {
@@ -71,6 +74,7 @@ export class UserSubscriptionsRepository {
       .from("user_subscriptions")
       .select("*")
       .eq("id", id)
+      .is("deleted_at", null)
       .single();
 
     if (error) {
@@ -103,6 +107,7 @@ export class UserSubscriptionsRepository {
     firstBillingDate: string;
     createdAt: string;
     updatedAt: string;
+    subscriptionCategoryName?: string | null;
   }): Promise<UserServiceSubscriptionRow> {
     const supabase = await createServerClient();
 
@@ -131,6 +136,7 @@ export class UserSubscriptionsRepository {
       first_billing_date: data.firstBillingDate,
       created_at: data.createdAt,
       updated_at: data.updatedAt,
+      subscription_category_name: data.subscriptionCategoryName ?? null,
     };
     if (billingDay !== null) {
       insertData.billing_day = billingDay;
@@ -166,6 +172,7 @@ export class UserSubscriptionsRepository {
     isActive: boolean;
     firstBillingDate: string;
     updatedAt: string;
+    subscriptionCategoryName: string | null;
   }>): Promise<UserServiceSubscriptionRow> {
     const supabase = await createServerClient();
 
@@ -186,6 +193,7 @@ export class UserSubscriptionsRepository {
     if (data.isActive !== undefined) updateData.is_active = data.isActive;
     if (data.firstBillingDate !== undefined) updateData.first_billing_date = data.firstBillingDate;
     if (data.updatedAt !== undefined) updateData.updated_at = data.updatedAt;
+    if (data.subscriptionCategoryName !== undefined) updateData.subscription_category_name = data.subscriptionCategoryName;
 
     const { data: subscription, error } = await supabase
       .from("user_subscriptions")

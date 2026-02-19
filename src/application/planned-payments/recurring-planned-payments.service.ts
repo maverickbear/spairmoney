@@ -181,5 +181,169 @@ export class RecurringPlannedPaymentsService {
 
     return { created, errors };
   }
+
+  /**
+   * Generate planned payments for a single recurring transaction (e.g. after update).
+   * Call after deleting existing planned payments for this transaction so value/dates/description stay in sync.
+   */
+  async generatePlannedPaymentsForRecurringTransaction(
+    transactionId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<{ created: number; errors: number }> {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return { created: 0, errors: 0 };
+    }
+
+    const supabase = await createServerClient(accessToken, refreshToken);
+
+    const { data: tx, error } = await supabase
+      .from("transactions")
+      .select(`
+        *,
+        account:accounts(*),
+        category:categories!transactions_categoryid_fkey(*),
+        subcategory:subcategories!transactions_subcategoryid_fkey(id, name, logo)
+      `)
+      .eq("id", transactionId)
+      .eq("user_id", userId)
+      .eq("is_recurring", true)
+      .single();
+
+    if (error || !tx) {
+      if (error) {
+        logger.warn(
+          "[RecurringPlannedPaymentsService] Error fetching recurring transaction:",
+          error.message
+        );
+      }
+      return { created: 0, errors: 0 };
+    }
+
+    const plannedPaymentsService = makePlannedPaymentsService();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const horizonDate = new Date(today);
+    horizonDate.setDate(horizonDate.getDate() + PLANNED_HORIZON_DAYS);
+    horizonDate.setHours(23, 59, 59, 999);
+
+    const existingPayments = await plannedPaymentsService.getPlannedPayments({
+      source: "recurring",
+      status: "scheduled",
+      startDate: today,
+      endDate: horizonDate,
+    });
+
+    const existingKeys = new Set(
+      existingPayments.plannedPayments.map((pp) => {
+        const date = pp.date instanceof Date ? pp.date : new Date(pp.date);
+        return `${pp.accountId}-${date.toISOString().split("T")[0]}-${pp.amount}`;
+      })
+    );
+
+    const txAny = tx as any;
+    const originalDate = new Date(txAny.date);
+    const originalDay = originalDate.getDate();
+    const amount = getTransactionAmount(txAny.amount) ?? 0;
+
+    if (amount === 0) {
+      return { created: 0, errors: 0 };
+    }
+
+    const accountRelation = txAny.account;
+    const txAccountId =
+      txAny.account_id ??
+      (Array.isArray(accountRelation) ? accountRelation[0]?.id : accountRelation?.id);
+    if (!txAccountId) {
+      logger.warn(
+        `[RecurringPlannedPaymentsService] Skipping recurring transaction ${transactionId}: no account_id`
+      );
+      return { created: 0, errors: 0 };
+    }
+
+    let currentDate = new Date(today);
+    currentDate.setDate(originalDay);
+    currentDate.setHours(0, 0, 0, 0);
+    if (currentDate < today) {
+      currentDate = new Date(currentDate);
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    let created = 0;
+    let errors = 0;
+
+    while (currentDate <= horizonDate) {
+      const dateStr = currentDate.toISOString().split("T")[0];
+      const key = `${txAccountId}-${dateStr}-${amount}`;
+
+      if (existingKeys.has(key)) {
+        currentDate = new Date(currentDate);
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        if (currentDate.getDate() !== originalDay) {
+          currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+          currentDate.setHours(0, 0, 0, 0);
+        }
+        continue;
+      }
+
+      try {
+        let category = null;
+        if (txAny.category) {
+          category = Array.isArray(txAny.category)
+            ? (txAny.category.length > 0 ? txAny.category[0] : null)
+            : txAny.category;
+        }
+        let subcategory = null;
+        if (txAny.subcategory) {
+          subcategory = Array.isArray(txAny.subcategory)
+            ? (txAny.subcategory.length > 0 ? txAny.subcategory[0] : null)
+            : txAny.subcategory;
+        }
+        const description =
+          decryptDescription(txAny.description) ||
+          `Recurring: ${txAny.description || "Transaction"}`;
+        const toAccountId = txAny.type === "transfer" ? (txAny.transfer_to_id ?? null) : null;
+
+        const plannedPaymentData: PlannedPaymentFormData = {
+          date: new Date(currentDate),
+          type: txAny.type,
+          amount: Math.abs(amount),
+          accountId: txAccountId,
+          toAccountId: toAccountId ?? undefined,
+          categoryId: category?.id || null,
+          subcategoryId: subcategory?.id || null,
+          description,
+          source: "recurring",
+          recurringTransactionId: txAny.id,
+        };
+
+        await plannedPaymentsService.createPlannedPayment(plannedPaymentData);
+        created++;
+        existingKeys.add(key);
+      } catch (error) {
+        errors++;
+        logger.error(
+          `[RecurringPlannedPaymentsService] Error creating planned payment for transaction ${transactionId}:`,
+          error
+        );
+      }
+
+      currentDate = new Date(currentDate);
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      if (currentDate.getDate() !== originalDay) {
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        currentDate.setHours(0, 0, 0, 0);
+      }
+    }
+
+    if (created > 0 || errors > 0) {
+      logger.info(
+        `[RecurringPlannedPaymentsService] Created ${created} planned payments for recurring transaction ${transactionId}, ${errors} errors`
+      );
+    }
+
+    return { created, errors };
+  }
 }
 

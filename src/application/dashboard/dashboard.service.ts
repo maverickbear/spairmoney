@@ -1939,6 +1939,22 @@ export class DashboardService {
         return (p.type ?? "expense") as "income" | "expense" | "transfer";
       };
 
+      // Totals: sum of planned payments for the current month only (so they match the "February 2026" label)
+      const now = new Date();
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      const inCurrentMonth = (p: (typeof plannedPayments)[0]) => {
+        const d = new Date(p.date);
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        return dayStart >= monthStart && dayStart <= monthEnd;
+      };
+      const totalPlannedIncomeThisMonth = plannedPayments
+        .filter((p) => p.type === "income" && inCurrentMonth(p))
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const totalPlannedExpenseThisMonth = plannedPayments
+        .filter((p) => p.type === "expense" && inCurrentMonth(p))
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
       // Filter next few
       // Sort by next date
       const items = plannedPayments
@@ -1955,6 +1971,8 @@ export class DashboardService {
         
        return {
          items,
+         totalPlannedIncomeThisMonth,
+         totalPlannedExpenseThisMonth,
          actions: [
            {
              label: "See all",

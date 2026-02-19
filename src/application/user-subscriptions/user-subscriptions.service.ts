@@ -145,6 +145,7 @@ export class UserSubscriptionsService {
         firstBillingDate,
         createdAt: now,
         updatedAt: now,
+        subscriptionCategoryName: data.subscriptionCategoryName?.trim() || null,
       };
 
       const row = await this.repository.create(subscriptionData);
@@ -179,7 +180,7 @@ export class UserSubscriptionsService {
   private async enrichSubscription(row: UserServiceSubscriptionRow): Promise<UserServiceSubscription> {
     const supabase = await createServerClient();
 
-    const [subcategoryResult, accountResult, serviceResult, planResult] = await Promise.all([
+    const [subcategoryResult, accountResult] = await Promise.all([
       row.subcategory_id
         ? supabase
             .from("subcategories")
@@ -192,20 +193,6 @@ export class UserSubscriptionsService {
         .select("id, name")
         .eq("id", row.account_id)
         .single(),
-      row.service_name
-        ? supabase
-            .from("external_services")
-            .select("name, logo")
-            .eq("name", row.service_name)
-            .single()
-        : Promise.resolve({ data: null, error: null }),
-      row.plan_id
-        ? supabase
-            .from("subscription_service_plans")
-            .select("id, plan_name")
-            .eq("id", row.plan_id)
-            .single()
-        : Promise.resolve({ data: null, error: null }),
     ]);
 
     // Fetch parent category (Subscription Category the user selected) for display
@@ -224,7 +211,7 @@ export class UserSubscriptionsService {
       ? { id: subcategoryResult.data.id, name: subcategoryResult.data.name, logo: subcategoryResult.data.logo ?? null }
       : null;
 
-    // Map snake_case database fields to camelCase domain fields
+      // Map snake_case database fields to camelCase domain fields
     return {
       id: row.id,
       userId: row.user_id,
@@ -240,15 +227,13 @@ export class UserSubscriptionsService {
       firstBillingDate: row.first_billing_date,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      subscriptionCategoryName: row.subscription_category_name ?? null,
       // Relations
       subcategory: subcategoryData,
       category: categoryResult.data ? { id: categoryResult.data.id, name: categoryResult.data.name } : null,
       account: accountResult.data || null,
-      serviceLogo: serviceResult.data?.logo || null,
-      plan: planResult.data ? {
-        id: planResult.data.id,
-        planName: planResult.data.plan_name,
-      } : null,
+      serviceLogo: null,
+      plan: null,
     };
   }
 
@@ -382,6 +367,7 @@ export class UserSubscriptionsService {
         isActive?: boolean;
         firstBillingDate?: string;
         updatedAt: string;
+        subscriptionCategoryName?: string | null;
       } = {
         updatedAt: formatTimestamp(new Date()),
       };
@@ -433,6 +419,9 @@ export class UserSubscriptionsService {
       }
       if (data.isActive !== undefined) {
         updateData.isActive = data.isActive;
+      }
+      if (data.subscriptionCategoryName !== undefined) {
+        updateData.subscriptionCategoryName = data.subscriptionCategoryName?.trim() || null;
       }
 
       const updated = await this.repository.update(id, updateData);

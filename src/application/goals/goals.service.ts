@@ -467,8 +467,8 @@ export class GoalsService {
 
     const goal = GoalsMapper.toDomain(goalRow);
 
-    // Sync planned payments for the goal (async, don't wait)
-    if (goal.accountId && (goal.incomePercentage > 0 || data.incomePercentage !== undefined)) {
+    // Sync planned payments whenever the goal can have them (has account, not completed) so name/amount/dates stay in sync
+    if (goal.accountId && !goal.isCompleted) {
       this.calculateIncomeBasis(goal.expectedIncome)
         .then(async (incomeBasis) => {
           if (incomeBasis > 0) {

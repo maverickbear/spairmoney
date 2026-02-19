@@ -93,6 +93,7 @@ export const userServiceSubscriptionFormSchema = z.object({
   accountId: z.string().min(1, "Account ID is required"),
   firstBillingDate: z.union([z.date(), z.string()]),
   categoryId: z.string().optional().nullable(),
+  subscriptionCategoryName: z.string().optional().nullable(),
   newSubcategoryName: z.string().optional().nullable(),
   planId: z.string().optional().nullable(),
 });

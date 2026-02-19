@@ -120,55 +120,34 @@ export class DebtPlannedPaymentsService {
 
   /**
    * Sync all planned payments for a debt
-   * Removes outdated payments and creates new ones
+   * Removes all scheduled payments for this debt, then regenerates so value/dates/name stay in sync
    */
   async syncPlannedPaymentsForDebt(
     debt: DebtWithCalculations
   ): Promise<{ created: number; removed: number; errors: number }> {
     const plannedPaymentsService = makePlannedPaymentsService();
 
-    // Get all existing planned payments for this debt
+    // Get all existing scheduled planned payments for this debt
     const existingPayments = await plannedPaymentsService.getPlannedPayments({
       debtId: debt.id,
       status: "scheduled",
     });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Remove payments that are in the past or debt is paid off/paused
+    // Cancel all scheduled so that amount/dates/name changes are reflected on regenerate
     let removed = 0;
-    if (debt.isPaidOff || debt.isPaused) {
-      for (const payment of existingPayments.plannedPayments) {
-        try {
-          await plannedPaymentsService.cancelPlannedPayment(payment.id);
-          removed++;
-        } catch (error) {
-          logger.error(
-            `[DebtPlannedPaymentsService] Error removing planned payment ${payment.id}:`,
-            error
-          );
-        }
-      }
-    } else {
-      // Remove payments in the past
-      for (const payment of existingPayments.plannedPayments) {
-        const paymentDate = payment.date instanceof Date ? payment.date : new Date(payment.date);
-        if (paymentDate < today) {
-          try {
-            await plannedPaymentsService.cancelPlannedPayment(payment.id);
-            removed++;
-          } catch (error) {
-            logger.error(
-              `[DebtPlannedPaymentsService] Error removing past planned payment ${payment.id}:`,
-              error
-            );
-          }
-        }
+    for (const payment of existingPayments.plannedPayments) {
+      try {
+        await plannedPaymentsService.cancelPlannedPayment(payment.id);
+        removed++;
+      } catch (error) {
+        logger.error(
+          `[DebtPlannedPaymentsService] Error removing planned payment ${payment.id}:`,
+          error
+        );
       }
     }
 
-    // Generate new planned payments
+    // Generate new planned payments (skips if debt is paid off/paused)
     const { created, errors } = await this.generatePlannedPaymentsForDebt(debt);
 
     return { created, removed, errors };

@@ -520,23 +520,10 @@ export interface Database {
           household_id: string | null;
           plan_id: string | null;
           deleted_at: string | null;
+          subscription_category_name: string | null;
         };
         Insert: Omit<Database['public']['Tables']['user_subscriptions']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['user_subscriptions']['Insert']>;
-      };
-      external_services: {
-        Row: {
-          id: string;
-          category_id: string;
-          name: string;
-          logo: string | null;
-          display_order: number;
-          is_active: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: Omit<Database['public']['Tables']['external_services']['Row'], 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Database['public']['Tables']['external_services']['Insert']>;
       };
       external_service_categories: {
         Row: {
@@ -549,20 +536,6 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['external_service_categories']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['external_service_categories']['Insert']>;
-      };
-      external_service_plans: {
-        Row: {
-          id: string;
-          service_id: string;
-          plan_name: string;
-          price: number;
-          currency: string;
-          is_active: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: Omit<Database['public']['Tables']['external_service_plans']['Row'], 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Database['public']['Tables']['external_service_plans']['Insert']>;
       };
       // App billing tables (app_ prefix)
       app_plans: {

@@ -113,9 +113,9 @@ export function SubscriptionForm({
       }));
   };
 
-  // Get subscription categories from new table
+  // Subscription categories from external_service_categories (no services – categories only)
   const getSubscriptionCategories = () => {
-    return subscriptionServiceCategories.filter((cat) => cat.services.length > 0);
+    return subscriptionServiceCategories;
   };
 
   // Get filtered subcategories based on selected category filter
@@ -205,32 +205,20 @@ export function SubscriptionForm({
     }
   }
 
-  // When editing: set Subscription Category and service from subscription service categories
-  // (dropdown options come from subscriptionServiceCategories, not transaction allCategories)
+  // When editing: set Subscription Category from external_service_categories (match by name)
   useEffect(() => {
     if (!open || !subscription || subscriptionServiceCategories.length === 0) return;
-    const categories = subscriptionServiceCategories.filter((cat: { services: unknown[] }) => cat.services?.length > 0);
-    // Prefer match by service name
-    if (subscription.serviceName) {
-      for (const cat of categories) {
-        const services = (cat as { id: string; services: Array<{ id: string; name: string }> }).services ?? [];
-        const service = services.find((s) => s.name === subscription.serviceName);
-        if (service) {
-          setSelectedCategoryFilter(cat.id);
-          form.setValue("categoryId", cat.id);
-          setSelectedServiceId(service.id);
-          return;
-        }
-      }
-    }
-    // Fallback: match by subscription category name (e.g. "Streaming") to subscription service category
-    if (subscription.category?.name) {
-      const nameLower = subscription.category.name.toLowerCase();
-      const match = categories.find((cat: { name: string }) => cat.name?.toLowerCase() === nameLower);
-      if (match) {
-        setSelectedCategoryFilter(match.id);
-        form.setValue("categoryId", match.id);
-      }
+    const nameToMatch =
+      subscription.subscriptionCategoryName?.trim() ||
+      subscription.category?.name?.trim();
+    if (!nameToMatch) return;
+    const nameLower = nameToMatch.toLowerCase();
+    const match = subscriptionServiceCategories.find(
+      (cat: { name: string }) => cat.name?.toLowerCase() === nameLower
+    );
+    if (match) {
+      setSelectedCategoryFilter(match.id);
+      form.setValue("categoryId", match.id);
     }
   }, [open, subscription, subscriptionServiceCategories, form]);
 
@@ -377,38 +365,26 @@ export function SubscriptionForm({
   function handleCategoryFilterClick(categoryId: string | null) {
     setSelectedCategoryFilter(categoryId);
     
-    // If no category is selected, clear service selection
+    // If no category is selected, clear service/subcategory selection but keep the name
     if (!categoryId) {
       setSelectedServiceId(null);
-      form.setValue("serviceName", "");
-      form.setValue("serviceName", "");
       form.setValue("subcategoryId", null);
       return;
     }
     
-    // If a category is selected and current service doesn't belong to it, clear the selection
-      const currentSubcategoryId = form.watch("subcategoryId");
-      if (currentSubcategoryId) {
-        const subcategories = getSubscriptionsSubcategories();
-        const current = subcategories.find((sub) => sub.id === currentSubcategoryId);
-        if (current && current.categoryId !== categoryId) {
-          form.setValue("subcategoryId", null);
-          form.setValue("serviceName", "");
-          setSelectedCategoryId("");
+    // If current subcategory doesn't belong to the new category, clear subcategory only (keep name)
+    const currentSubcategoryId = form.watch("subcategoryId");
+    if (currentSubcategoryId) {
+      const subcategories = getSubscriptionsSubcategories();
+      const current = subcategories.find((sub) => sub.id === currentSubcategoryId);
+      if (current && current.categoryId !== categoryId) {
+        form.setValue("subcategoryId", null);
+        setSelectedCategoryId("");
       }
     }
     
-    // Clear service selection if current service doesn't belong to selected category
-    if (selectedServiceId) {
-      const category = subscriptionServiceCategories.find(
-        (cat) => cat.id === categoryId
-      );
-      const service = category?.services.find((s: any) => s.id === selectedServiceId);
-      if (!service) {
-        setSelectedServiceId(null);
-        form.setValue("serviceName", "");
-      }
-    }
+    // No services per category anymore – clear service selection when category changes
+    setSelectedServiceId(null);
   }
 
 
@@ -474,6 +450,10 @@ export function SubscriptionForm({
          }
       }
 
+      const subscriptionCategoryName = selectedCategoryFilter
+        ? (getSubscriptionCategories().find((c) => c.id === selectedCategoryFilter)?.name ?? null)
+        : null;
+
       const formData: UserServiceSubscriptionFormData = {
         ...data,
         firstBillingDate: data.firstBillingDate instanceof Date 
@@ -482,7 +462,8 @@ export function SubscriptionForm({
         categoryId: finalCategoryId,
         subcategoryId: finalSubcategoryId,
         newSubcategoryName: finalNewSubcategoryName,
-        serviceName: data.serviceName.trim(), 
+        serviceName: data.serviceName.trim(),
+        subscriptionCategoryName,
       };
 
       // Save subscription

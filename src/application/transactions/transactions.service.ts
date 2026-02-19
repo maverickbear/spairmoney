@@ -18,6 +18,7 @@ import { requireTransactionOwnership } from "@/src/infrastructure/utils/security
 import { logger } from "@/src/infrastructure/utils/logger";
 import { encryptDescription, decryptDescription, normalizeDescription, getTransactionAmount } from "@/src/infrastructure/utils/transaction-encryption";
 import { makePlannedPaymentsService } from "@/src/application/planned-payments/planned-payments.factory";
+import { RecurringPlannedPaymentsService } from "@/src/application/planned-payments/recurring-planned-payments.service";
 import { makeCreditCardDebtSyncService } from "@/src/application/credit-card-debt/credit-card-debt-sync.factory";
 import { AppError } from "../shared/app-error";
 import { getCachedSubscriptionData } from "@/src/application/subscriptions/get-dashboard-subscription";
@@ -515,6 +516,16 @@ export class TransactionsService {
     // Remove any planned payments generated from this transaction (recurring or no longer recurring) so the view stays consistent
     const plannedPaymentsService = makePlannedPaymentsService();
     await plannedPaymentsService.deleteByRecurringTransactionIds([id]);
+
+    // Regenerate planned payments if still recurring so value/dates/description stay in sync
+    if (row.is_recurring) {
+      try {
+        const recurringPlannedPaymentsService = new RecurringPlannedPaymentsService();
+        await recurringPlannedPaymentsService.generatePlannedPaymentsForRecurringTransaction(id);
+      } catch (err) {
+        logger.error("[TransactionsService] Error regenerating planned payments for recurring transaction:", err);
+      }
+    }
 
     // Sync credit-card debt for affected accounts
     const creditAccountIdsToSync = new Set<string>([row.account_id]);

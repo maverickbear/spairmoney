@@ -353,6 +353,10 @@ export interface RecurringItem {
 
 export interface RecurringWidgetData extends BaseWidgetData {
   items: RecurringItem[];
+  /** Total planned income for the current month that have not yet occurred. */
+  totalPlannedIncomeThisMonth: number;
+  /** Total planned expense for the current month that have not yet occurred. */
+  totalPlannedExpenseThisMonth: number;
 }
 
 // Widget: Subscriptions

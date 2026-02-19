@@ -24,13 +24,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, displayOrder, isActive } = body;
+    const name = body.name?.trim();
+    if (!name) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
 
-    const category = await service.createSubscriptionServiceCategory({
-      name,
-      displayOrder,
-      isActive,
-    });
+    const category = await service.createSubscriptionServiceCategory({ name });
 
     return NextResponse.json({ category });
   } catch (error) {
@@ -70,12 +69,12 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, displayOrder, isActive } = body;
-
+    const { id, name } = body;
+    if (!id) {
+      return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
+    }
     const category = await service.updateSubscriptionServiceCategory(id, {
-      name,
-      displayOrder,
-      isActive,
+      name: name?.trim(),
     });
 
     return NextResponse.json({ category });

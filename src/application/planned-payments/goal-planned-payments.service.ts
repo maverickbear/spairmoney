@@ -124,7 +124,7 @@ export class GoalPlannedPaymentsService {
 
   /**
    * Sync all planned payments for a goal
-   * Removes outdated payments and creates new ones
+   * Removes all scheduled payments for this goal (by goalId), then regenerates so name/amount/dates stay in sync
    */
   async syncPlannedPaymentsForGoal(
     goal: GoalWithCalculations,
@@ -132,53 +132,28 @@ export class GoalPlannedPaymentsService {
   ): Promise<{ created: number; removed: number; errors: number }> {
     const plannedPaymentsService = makePlannedPaymentsService();
 
-    // Get all existing planned payments for this goal
+    // Get all existing scheduled planned payments for this goal by goalId (not description)
     const existingPayments = await plannedPaymentsService.getPlannedPayments({
       source: "goal",
+      goalId: goal.id,
       status: "scheduled",
     });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Filter payments for this specific goal
-    const goalPayments = existingPayments.plannedPayments.filter((pp) =>
-      pp.description?.includes(goal.name)
-    );
-
-    // Remove payments if goal is completed or paused
+    // Cancel all scheduled so that name/amount/date changes are reflected on regenerate
     let removed = 0;
-    if (goal.isCompleted || goal.isPaused) {
-      for (const payment of goalPayments) {
-        try {
-          await plannedPaymentsService.cancelPlannedPayment(payment.id);
-          removed++;
-        } catch (error) {
-          logger.error(
-            `[GoalPlannedPaymentsService] Error removing planned payment ${payment.id}:`,
-            error
-          );
-        }
-      }
-    } else {
-      // Remove payments in the past
-      for (const payment of goalPayments) {
-        const paymentDate = payment.date instanceof Date ? payment.date : new Date(payment.date);
-        if (paymentDate < today) {
-          try {
-            await plannedPaymentsService.cancelPlannedPayment(payment.id);
-            removed++;
-          } catch (error) {
-            logger.error(
-              `[GoalPlannedPaymentsService] Error removing past planned payment ${payment.id}:`,
-              error
-            );
-          }
-        }
+    for (const payment of existingPayments.plannedPayments) {
+      try {
+        await plannedPaymentsService.cancelPlannedPayment(payment.id);
+        removed++;
+      } catch (error) {
+        logger.error(
+          `[GoalPlannedPaymentsService] Error removing planned payment ${payment.id}:`,
+          error
+        );
       }
     }
 
-    // Generate new planned payments
+    // Generate new planned payments (skips if goal is completed/paused or no account)
     const { created, errors } = await this.generatePlannedPaymentsForGoal(goal, incomeBasis);
 
     return { created, removed, errors };

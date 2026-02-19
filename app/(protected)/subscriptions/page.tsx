@@ -71,14 +71,10 @@ export default function SubscriptionsPage() {
   const [selectedSubscriptions, setSelectedSubscriptions] = useState<Set<string>>(new Set());
   const [isDeletingMultiple, setIsDeletingMultiple] = useState(false);
 
-  useEffect(() => {
-    loadSubscriptions();
-  }, []);
-
-  async function loadSubscriptions() {
+  async function loadSubscriptions(signal?: AbortSignal) {
     try {
       setLoading(true);
-      const response = await fetch("/api/v2/user-subscriptions");
+      const response = await fetch("/api/v2/user-subscriptions", { signal });
       if (!response.ok) {
         throw new Error("Failed to fetch subscriptions");
       }
@@ -87,13 +83,20 @@ export default function SubscriptionsPage() {
       setHasLoaded(true);
       perf.markDataLoaded();
     } catch (error) {
+      if (signal?.aborted || (error as Error).name === "AbortError") return;
       console.error("Error loading subscriptions:", error);
       setHasLoaded(true);
       perf.markDataLoaded();
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }
+
+  useEffect(() => {
+    const ac = new AbortController();
+    loadSubscriptions(ac.signal);
+    return () => ac.abort();
+  }, []);
 
   function handleDelete(id: string) {
     openDialog(
@@ -695,7 +698,7 @@ export default function SubscriptionsPage() {
                       </TableCell>
                     )}
                     <TableCell className="text-muted-foreground">
-                      {subscription.category?.name || subscription.subcategory?.name || "—"}
+                      {subscription.subscriptionCategoryName || subscription.category?.name || subscription.subcategory?.name || "—"}
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">

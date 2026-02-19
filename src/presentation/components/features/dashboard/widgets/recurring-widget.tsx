@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { RecurringWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { WidgetEmptyState } from "./widget-empty-state";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, CalendarClock } from "lucide-react";
+import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, CalendarClock, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 import { formatMoney } from "@/components/common/money";
-import { differenceInCalendarDays, isToday, isTomorrow, parse } from "date-fns";
+import { differenceInCalendarDays, isToday, isTomorrow, parse, format } from "date-fns";
+import { useDashboardSnapshot } from "@/src/presentation/contexts/dashboard-snapshot-context";
+import { useToast } from "@/components/toast-provider";
+import { Button } from "@/components/ui/button";
 
 interface RecurringWidgetProps {
   data: RecurringWidgetData | null;
@@ -18,6 +22,11 @@ const PLANNED_PAYMENTS_EMPTY_DESCRIPTION =
   "A planned payment is a future expense or income you schedule—for example a bill, a transfer, or a one-off payment—so you can see what's coming up.";
 
 export function RecurringWidget({ data, className }: RecurringWidgetProps) {
+  const { refresh } = useDashboardSnapshot();
+  const { toast } = useToast();
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [decliningId, setDecliningId] = useState<string | null>(null);
+
   if (!data) return null;
 
   if (data.items.length === 0) {
@@ -41,43 +50,169 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
     </Link>
   );
 
+  // Use server totals when present; otherwise derive from visible items (e.g. cached snapshot without totals)
+  let totalIncome = data.totalPlannedIncomeThisMonth ?? 0;
+  let totalExpense = data.totalPlannedExpenseThisMonth ?? 0;
+  if (totalIncome === 0 && totalExpense === 0 && data.items.length > 0) {
+    totalIncome = data.items
+      .filter((i) => i.type === "income")
+      .reduce((sum, i) => sum + (i.amount || 0), 0);
+    totalExpense = data.items
+      .filter((i) => i.type === "expense")
+      .reduce((sum, i) => sum + (i.amount || 0), 0);
+  }
+
   return (
     <WidgetCard
       title="Planned Payments"
       headerAction={<SeeAllLink />} 
       className={className}
     >
-      <div className="space-y-4">
-        {data.items.map((item) => (
-          <Link
-            key={item.id}
-            href="/planned-payment"
-            className="flex items-center justify-between rounded-lg transition-colors hover:bg-muted/50 -mx-2 px-2 py-1"
-          >
-            <div className="flex items-center gap-3">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
-                    <TransactionTypeIcon type={item.type} />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {item.type === "income" ? "Income" : item.type === "expense" ? "Expense" : "Transfer"}
-                </TooltipContent>
-              </Tooltip>
-              <div className="flex flex-col">
-                <span className="font-medium text-sm">{item.name}</span>
-                <span className="text-xs text-slate-400">{formatFriendlyDueDate(item.nextDate)}</span>
+      <div className="flex flex-col h-full space-y-6">
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex items-center gap-1.5 text-xl font-bold tracking-tight">
+              <ArrowUp className="h-5 w-5 shrink-0 text-emerald-500" aria-hidden />
+              {formatMoney(totalIncome)}
+            </span>
+            <span className="flex items-center gap-1.5 text-xl font-bold tracking-tight text-muted-foreground">
+              <ArrowDown className="h-5 w-5 shrink-0 text-red-500" aria-hidden />
+              {formatMoney(totalExpense)}
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {format(new Date(), "MMMM yyyy")}
+          </span>
+        </div>
+
+        <div className="space-y-4">
+        {data.items.map((item) => {
+          const dueLabel = formatFriendlyDueDate(item.nextDate);
+          const isDueTomorrow = dueLabel === "Tomorrow";
+          return (
+            <Link
+              key={item.id}
+              href="/planned-payment"
+              className="flex items-center justify-between rounded-lg transition-colors hover:bg-muted/50 -mx-2 px-2 py-1"
+            >
+              <div className="flex items-center gap-3">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
+                      <TransactionTypeIcon type={item.type} />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {item.type === "income" ? "Income" : item.type === "expense" ? "Expense" : "Transfer"}
+                  </TooltipContent>
+                </Tooltip>
+                <div className="flex flex-col">
+                  <span className="font-medium text-sm">{item.name}</span>
+                  <span className={`text-xs ${isDueTomorrow ? "text-red-500 font-medium" : "text-slate-400"}`}>
+                    {dueLabel}
+                  </span>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-               <span className="text-sm font-semibold text-black dark:text-foreground">
-                 {formatMoney(item.amount)}
-               </span>
-            </div>
-          </Link>
-        ))}
+
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-semibold text-black dark:text-foreground">
+                  {formatMoney(item.amount)}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-emerald-600"
+                      disabled={markingPaidId === item.id || decliningId === item.id}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (markingPaidId || decliningId) return;
+                        setMarkingPaidId(item.id);
+                        try {
+                          const res = await fetch(`/api/v2/planned-payments/${item.id}/mark-paid`, { method: "POST" });
+                          if (!res.ok) {
+                            const body = await res.json();
+                            throw new Error(body.error || "Failed to mark as paid");
+                          }
+                          await refresh(true);
+                          toast({
+                            title: "Marked as paid",
+                            description: "Transaction was created.",
+                            variant: "success",
+                          });
+                        } catch (err) {
+                          toast({
+                            title: "Error",
+                            description: err instanceof Error ? err.message : "Failed to mark as paid",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setMarkingPaidId(null);
+                        }
+                      }}
+                      aria-label="Mark as paid"
+                    >
+                      {markingPaidId === item.id ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <CheckCircle className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Mark as paid</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-500"
+                      disabled={markingPaidId === item.id || decliningId === item.id}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (markingPaidId || decliningId) return;
+                        setDecliningId(item.id);
+                        try {
+                          const res = await fetch(`/api/v2/planned-payments/${item.id}/skip`, { method: "POST" });
+                          if (!res.ok) {
+                            const body = await res.json();
+                            throw new Error(body.error || "Failed to decline");
+                          }
+                          await refresh(true);
+                          toast({
+                            title: "Declined",
+                            description: "Payment marked as declined. No transaction was created.",
+                            variant: "success",
+                          });
+                        } catch (err) {
+                          toast({
+                            title: "Error",
+                            description: err instanceof Error ? err.message : "Failed to decline",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setDecliningId(null);
+                        }
+                      }}
+                      aria-label="Decline (mark as skipped)"
+                    >
+                      {decliningId === item.id ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <XCircle className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Decline (no transaction)</TooltipContent>
+                </Tooltip>
+              </div>
+            </Link>
+          );
+        })}
+        </div>
       </div>
     </WidgetCard>
   );

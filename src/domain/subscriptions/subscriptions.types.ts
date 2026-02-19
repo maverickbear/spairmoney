@@ -86,6 +86,7 @@ export interface UserServiceSubscription {
   id: string;
   userId: string;
   serviceName: string;
+  /** Links to subcategories table (expense categorization). Used for reports, budgets, and planned payments so this subscription is categorized under the correct expense category. */
   subcategoryId?: string | null;
   planId?: string | null;
   amount: number;
@@ -97,9 +98,11 @@ export interface UserServiceSubscription {
   firstBillingDate: string;
   createdAt: string;
   updatedAt: string;
+  /** Display name of the subscription service category the user chose (e.g. Music Streaming, Streaming Video). Shown in the list. */
+  subscriptionCategoryName?: string | null;
   // Relations
   subcategory?: { id: string; name: string; logo?: string | null } | null;
-  /** Parent category (Subscription Category the user selected, e.g. Streaming Video, Gaming) */
+  /** Parent transaction category (from categories table; often "Subscription"). Used for expense categorization. */
   category?: { id: string; name: string } | null;
   account?: { id: string; name: string } | null;
   serviceLogo?: string | null; // Logo from SubscriptionService table
@@ -116,6 +119,8 @@ export interface UserServiceSubscriptionFormData {
   accountId: string;
   firstBillingDate: Date | string;
   categoryId?: string | null;
+  /** Display name of the subscription service category (e.g. Music Streaming). Sent by client so the list shows the category the user chose. */
+  subscriptionCategoryName?: string | null;
   newSubcategoryName?: string | null;
   planId?: string | null; // ID of the selected SubscriptionServicePlan
   isActive?: boolean;

@@ -8,7 +8,6 @@ import { AdminRepository } from "@/src/infrastructure/database/repositories/admi
 import { AuthRepository } from "@/src/infrastructure/database/repositories/auth.repository";
 import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
 import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
-import { SubscriptionServicesRepository } from "@/src/infrastructure/database/repositories/subscription-services.repository";
 import { AdminUser, PromoCode, SystemCategory, SystemSubcategory } from "../../domain/admin/admin.types";
 import { adminEmailSchema } from "../../domain/admin/admin.validations";
 import { createServerClient, createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
@@ -37,8 +36,7 @@ export class AdminService {
     private repository: AdminRepository,
     private authRepository: AuthRepository,
     private accountsRepository: AccountsRepository,
-    private categoriesRepository: CategoriesRepository,
-    private subscriptionServicesRepository: SubscriptionServicesRepository
+    private categoriesRepository: CategoriesRepository
   ) {}
 
   /**
@@ -1052,7 +1050,7 @@ export class AdminService {
     });
 
     // Batch fetch all related data in parallel
-    const [users, accounts, subcategories, services] = await Promise.all([
+    const [users, accounts, subcategories] = await Promise.all([
       userIds.size > 0
         ? this.authRepository.findUsersByIds(Array.from(userIds))
         : Promise.resolve([]),
@@ -1062,77 +1060,40 @@ export class AdminService {
       subcategoryIds.size > 0
         ? this.categoriesRepository.findSubcategoriesByIds(Array.from(subcategoryIds))
         : Promise.resolve([]),
-      serviceNames.size > 0
-        ? this.subscriptionServicesRepository.findServicesByNames(Array.from(serviceNames))
-        : Promise.resolve([]),
     ]);
 
-    // Create maps for O(1) lookup
     const usersMap = new Map(users.map((u: any) => [u.id, u]));
     const accountsMap = new Map(accounts.map((a: any) => [a.id, a]));
     const subcategoriesMap = new Map(subcategories.map((s: any) => [s.id, s]));
-    const servicesMap = new Map(services.map((s: any) => [s.name, s]));
 
-    // Enrich subscriptions with related data
     return subscriptions.map((sub: any) => ({
       ...sub,
       amount: Number(sub.amount),
       User: sub.user_id ? (usersMap.get(sub.user_id) || null) : null,
       Account: sub.account_id ? (accountsMap.get(sub.account_id) || null) : null,
       Subcategory: sub.subcategory_id ? (subcategoriesMap.get(sub.subcategory_id) || null) : null,
-      serviceLogo: servicesMap.get(sub.service_name)?.logo || null,
+      serviceLogo: null,
     }));
   }
 
   /**
-   * Get all subscription services (admin - includes inactive)
+   * Get all subscription service categories (admin - includes inactive)
    */
-  async getAllSubscriptionServices(): Promise<{
-    categories: any[];
-    services: any[];
-  }> {
+  async getAllSubscriptionServices(): Promise<{ categories: Array<{ id: string; name: string }> }> {
     const supabase = createServiceRoleClient();
 
-    // Get all categories
-    const { data: categories, error: categoriesError } = await supabase
+    const { data: categories, error } = await supabase
       .from("external_service_categories")
-      .select("*")
-      .order("display_order", { ascending: true });
-
-    if (categoriesError) {
-      logger.error("[AdminService] Error fetching categories:", categoriesError);
-      throw new AppError(`Failed to fetch categories: ${categoriesError.message}`, 500);
-    }
-
-    // Get all services (sorted alphabetically by name)
-    const { data: services, error: servicesError } = await supabase
-      .from("external_services")
-      .select("*")
+      .select("id, name")
       .order("name", { ascending: true });
 
-    if (servicesError) {
-      logger.error("[AdminService] Error fetching services:", servicesError);
-      throw new AppError(`Failed to fetch services: ${servicesError.message}`, 500);
+    if (error) {
+      logger.error("[AdminService] Error fetching categories:", error);
+      throw new AppError(`Failed to fetch categories: ${error.message}`, 500);
     }
 
-    // Group services by category
-    const servicesByCategory = new Map<string, typeof services>();
-    (services || []).forEach((service: any) => {
-      if (!servicesByCategory.has(service.category_id)) {
-        servicesByCategory.set(service.category_id, []);
-      }
-      servicesByCategory.get(service.category_id)!.push(service);
-    });
-
-    // Enrich categories with their services
-    const enrichedCategories = (categories || []).map((category: any) => ({
-      ...category,
-      services: servicesByCategory.get(category.id) || [],
-    }));
-
     return {
-      categories: enrichedCategories,
-      services: services || [],
+      categories: (categories || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })),
     };
   }
 
@@ -1169,131 +1130,6 @@ export class AdminService {
    */
   async deleteSubscriptionServiceCategory(id: string): Promise<void> {
     return this.repository.deleteSubscriptionServiceCategory(id);
-  }
-
-  /**
-   * Create a subscription service
-   */
-  async createSubscriptionService(data: {
-    categoryId: string;
-    name: string;
-    logo?: string | null;
-    isActive?: boolean;
-  }): Promise<any> {
-    if (!data.categoryId || !data.name) {
-      throw new AppError("Category ID and service name are required", 400);
-    }
-
-    const id = `svc_${data.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
-    return this.repository.createSubscriptionService({
-      id,
-      categoryId: data.categoryId,
-      name: data.name,
-      logo: data.logo,
-      isActive: data.isActive ?? true,
-    });
-  }
-
-  /**
-   * Update a subscription service
-   */
-  async updateSubscriptionService(id: string, data: {
-    categoryId?: string;
-    name?: string;
-    logo?: string | null;
-    isActive?: boolean;
-  }): Promise<any> {
-    if (!id) {
-      throw new AppError("Service ID is required", 400);
-    }
-    return this.repository.updateSubscriptionService(id, data);
-  }
-
-  /**
-   * Delete a subscription service
-   */
-  async deleteSubscriptionService(id: string): Promise<void> {
-    if (!id) {
-      throw new AppError("Service ID is required", 400);
-    }
-    return this.repository.deleteSubscriptionService(id);
-  }
-
-  /**
-   * Get all plans for a subscription service
-   */
-  async getAllSubscriptionServicePlans(serviceId: string): Promise<any[]> {
-    if (!serviceId) {
-      throw new AppError("Service ID is required", 400);
-    }
-    return this.repository.getAllSubscriptionServicePlans(serviceId);
-  }
-
-  /**
-   * Create a subscription service plan
-   */
-  async createSubscriptionServicePlan(data: {
-    serviceId: string;
-    planName: string;
-    price: number;
-    currency: string;
-    isActive?: boolean;
-  }): Promise<any> {
-    if (!data.serviceId || !data.planName || data.price === undefined || !data.currency) {
-      throw new AppError("Service ID, plan name, price, and currency are required", 400);
-    }
-
-    if (data.currency !== "USD" && data.currency !== "CAD") {
-      throw new AppError("Currency must be USD or CAD", 400);
-    }
-
-    if (data.price < 0) {
-      throw new AppError("Price must be greater than or equal to 0", 400);
-    }
-
-    const id = `plan_${data.serviceId}_${data.planName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`;
-    return this.repository.createSubscriptionServicePlan({
-      id,
-      serviceId: data.serviceId,
-      planName: data.planName,
-      price: data.price,
-      currency: data.currency,
-      isActive: data.isActive ?? true,
-    });
-  }
-
-  /**
-   * Update a subscription service plan
-   */
-  async updateSubscriptionServicePlan(id: string, data: {
-    planName?: string;
-    price?: number;
-    currency?: string;
-    isActive?: boolean;
-  }): Promise<any> {
-    if (!id) {
-      throw new AppError("Plan ID is required", 400);
-    }
-
-    if (data.currency && data.currency !== "USD" && data.currency !== "CAD") {
-      throw new AppError("Currency must be USD or CAD", 400);
-    }
-
-    if (data.price !== undefined && data.price < 0) {
-      throw new AppError("Price must be greater than or equal to 0", 400);
-    }
-
-    return this.repository.updateSubscriptionServicePlan(id, data);
-  }
-
-  /**
-   * Delete a subscription service plan
-   */
-  async deleteSubscriptionServicePlan(id: string): Promise<void> {
-    if (!id) {
-      throw new AppError("Plan ID is required", 400);
-    }
-    return this.repository.deleteSubscriptionServicePlan(id);
   }
 
   /**

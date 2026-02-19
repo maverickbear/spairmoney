@@ -13,7 +13,10 @@ import { cn } from "@/lib/utils";
 import type { SpairScoreWidgetData } from "@/src/domain/dashboard/types";
 import { Info } from "lucide-react";
 
-const GaugeComponent = dynamic(() => import("react-gauge-component"), { ssr: false });
+const GaugeComponent = dynamic(() => import("react-gauge-component"), {
+  ssr: false,
+  loading: () => <GaugePlaceholder isEmpty classification="—" />,
+});
 
 /** Tier thresholds: 85 Excellent, 70 Strong, 55 Fair, 40 Fragile */
 const TIER_THRESHOLDS = [40, 55, 70, 85] as const;
@@ -57,6 +60,70 @@ const GRAY_ARC = {
   subArcs: [{ limit: 100, color: "#d1d5db" }],
 };
 
+/** Duration for 0→score animation (ms) */
+const GAUGE_ANIMATION_DURATION = 1600;
+const GAUGE_ANIMATION_DELAY = 80;
+
+/**
+ * Static placeholder so the gauge area is always visible (no layout shift).
+ * Matches the gauge container size and shows a gray semicircle.
+ */
+function GaugePlaceholder({
+  isEmpty,
+  classification,
+}: {
+  isEmpty: boolean;
+  classification: string;
+}) {
+  return (
+    <div
+      className="gauge w-full flex flex-col items-center justify-start"
+      style={{
+        aspectRatio: "300 / 147",
+        minHeight: "120px",
+        maxWidth: "100%",
+      }}
+      aria-hidden="true"
+    >
+      <svg
+        viewBox="0 0 300 147"
+        className="w-full h-full block"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ maxWidth: "100%", maxHeight: "100%" }}
+      >
+        {/* Gray semicircle arc (same idea as gauge) */}
+        <path
+          d="M 30 135 A 120 120 0 0 1 270 135"
+          fill="none"
+          stroke="var(--muted-border, #d1d5db)"
+          strokeWidth="18"
+          strokeLinecap="round"
+        />
+        <text
+          x="150"
+          y="105"
+          textAnchor="middle"
+          style={{
+            fontSize: "48px",
+            fontWeight: 800,
+            fill: "var(--muted-foreground)",
+          }}
+        >
+          —
+        </text>
+      </svg>
+      <p
+        className={cn(
+          "text-sm font-medium mt-0.5",
+          isEmpty ? "text-muted-foreground" : "text-foreground"
+        )}
+      >
+        {isEmpty ? "No data" : classification}
+      </p>
+    </div>
+  );
+}
+
 interface SpairScoreFullWidthWidgetProps {
   data: SpairScoreWidgetData | null;
   onOpenDetails: () => void;
@@ -65,7 +132,24 @@ interface SpairScoreFullWidthWidgetProps {
 export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFullWidthWidgetProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  /** Value shown on gauge: start at 0 then animate to score so 0→100 animation runs */
+  const [animatedScore, setAnimatedScore] = useState(0);
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!mounted || !data) return;
+    const empty = data.details?.isEmptyState ?? false;
+    const hasScoreData = !empty;
+    const targetScore = data.score ?? 0;
+    if (!hasScoreData) {
+      setAnimatedScore(0);
+      return;
+    }
+    const t = setTimeout(() => setAnimatedScore(targetScore), GAUGE_ANIMATION_DELAY);
+    return () => clearTimeout(t);
+  }, [mounted, data?.score, data?.details?.isEmptyState]);
+
   const details = data?.details;
   const empty = details?.isEmptyState ?? false;
   const score = data?.score ?? 0;
@@ -170,18 +254,31 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                 paddingBottom: 0,
               }}
             >
-              <div className="flex flex-col items-center gap-1">
-                {mounted ? (
+              <div className="flex flex-col items-center gap-1 w-full min-h-[120px]">
+                {!mounted ? (
+                  <GaugePlaceholder isEmpty={!hasScoreData} classification={classification} />
+                ) : (
                   <GaugeComponent
                     type="semicircle"
                     arc={hasScoreData ? SPAIR_SCORE_ARC : GRAY_ARC}
-                    value={hasScoreData ? score : 0}
+                    value={hasScoreData ? animatedScore : 0}
                     minValue={0}
                     maxValue={100}
-                    pointer={{ hide: true }}
+                    pointer={{
+                      type: "blob",
+                      hide: !hasScoreData,
+                      baseColor: "#fff",
+                      strokeColor: "#000",
+                      strokeWidth: 4,
+                      blobOffset: 0.5,
+                      animate: true,
+                      animationDuration: GAUGE_ANIMATION_DURATION,
+                      animationDelay: GAUGE_ANIMATION_DELAY,
+                    }}
                     labels={{
                       valueLabel: {
                         formatTextValue: (val: number) => (hasScoreData ? String(Math.round(val)) : "—"),
+                        animateValue: true,
                         style: {
                           color: hasScoreData ? "#000" : "var(--muted-foreground)",
                           fill: hasScoreData ? "#000" : "var(--muted-foreground)",
@@ -202,11 +299,6 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                       alignItems: "center",
                     }}
                   />
-                ) : (
-                  <div className="flex items-center justify-center gap-2 h-[100px] w-[120px]">
-                    <span className="text-3xl font-bold tabular-nums">{!hasData ? "—" : score}</span>
-                    <span className="text-base text-muted-foreground">/ 100</span>
-                  </div>
                 )}
                 <p className={cn("text-sm font-medium mt-0.5", !hasScoreData ? "text-muted-foreground" : "text-foreground")}>
                   {!hasScoreData ? "No data" : classification}
