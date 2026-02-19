@@ -2,6 +2,27 @@ import { Resend } from "resend";
 import fs from "fs";
 import path from "path";
 
+/** Production app URL used for invitation links when env or passed URL is localhost. */
+const PRODUCTION_APP_URL = "https://app.spair.co";
+
+/**
+ * Base URL for invitation accept links. Always returns a production URL (never localhost)
+ * so users receive a link that works in production.
+ * Uses INVITATION_BASE_URL if set, otherwise NEXT_PUBLIC_APP_URL only if not localhost, else PRODUCTION_APP_URL.
+ */
+function getInvitationBaseUrl(passedAppUrl?: string): string {
+  const explicit = process.env.INVITATION_BASE_URL?.trim();
+  if (explicit) {
+    return explicit.replace(/\/$/, "");
+  }
+  const resolved = passedAppUrl || process.env.NEXT_PUBLIC_APP_URL || PRODUCTION_APP_URL;
+  const normalized = resolved.replace(/\/$/, "");
+  const isLocalhost =
+    /^https?:\/\/localhost(\d*)(\s|$|\/)/i.test(normalized) ||
+    /^https?:\/\/127\.0\.0\.1(\s|$|\/)/i.test(normalized);
+  return isLocalhost ? PRODUCTION_APP_URL : normalized;
+}
+
 // Initialize Resend only if API key is available
 const getResend = () => {
   const apiKey = process.env.RESEND_API_KEY;
@@ -70,9 +91,10 @@ export async function sendInvitationEmail(data: InvitationEmailData): Promise<vo
   console.log("[EMAIL] ✅ Resend initialized successfully");
 
   const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
-  const invitationLink = `${appUrl}/members/accept?token=${data.invitationToken}`;
+  const invitationBaseUrl = getInvitationBaseUrl(data.appUrl);
+  const invitationLink = `${invitationBaseUrl}/members/accept?token=${data.invitationToken}`;
 
-  console.log("[EMAIL] Invitation link generated:", invitationLink);
+  console.log("[EMAIL] Invitation link generated (production-safe):", invitationLink);
 
   // Always use noreply@spair.co as the sender with "Spair Money" as display name
   const finalFromEmail = "Spair Money <noreply@spair.co>";
@@ -186,15 +208,15 @@ Once verified, emails will be sent from: noreply@spair.co
   }
 }
 
-function getLogoUrl(appUrl?: string): string {
+function getLogoUrl(): string {
   // Get Supabase URL from environment variable
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  
+
   if (!supabaseUrl) {
     // Fallback to hardcoded URL if env var is not set
     return "https://app.spair.co/storage/v1/object/public/images/logo-email.png";
   }
-  
+
   // Construct the public URL for the logo in the images bucket
   return `${supabaseUrl}/storage/v1/object/public/images/logo-email.png`;
 }
@@ -214,7 +236,7 @@ function getInvitationEmailTemplate(data: {
     let html = fs.readFileSync(templatePath, 'utf-8');
     console.log("[EMAIL] Template loaded successfully, length:", html.length);
     
-    const logoUrl = getLogoUrl(data.appUrl);
+    const logoUrl = getLogoUrl();
     
     // Replace template variables
     html = html.replace(/\{\{ \.MemberName \}\}/g, data.memberName || "there");
@@ -229,72 +251,63 @@ function getInvitationEmailTemplate(data: {
     return html;
   } catch (error) {
     console.error("[EMAIL] ❌ Error loading invitation email template:", error);
-    // Fallback to inline template if file read fails
+    // Fallback to inline template if file read fails (layout matches invite.html)
     return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invitation to Spair Money</title>
+  <title>You have been invited - Spair Money</title>
+  <style type="text/css">
+    .logo-dark { display: none !important; }
+    .logo-light { display: inline-block !important; }
+    @media (prefers-color-scheme: dark) {
+      .logo-light { display: none !important; }
+      .logo-dark { display: inline-block !important; }
+      .email-container { background-color: #1a1a1a !important; }
+      .email-text { color: #e5e5e5 !important; }
+      .email-text-muted { color: #a0a0a0 !important; }
+      h1 { color: #ffffff !important; }
+      .button { background-color: #7BC85A !important; }
+    }
+    @media only screen and (max-width: 600px) {
+      .email-content { padding: 30px 20px !important; }
+      .button { padding: 14px 24px !important; font-size: 16px !important; }
+      h1 { font-size: 24px !important; }
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
     <tr>
-      <td style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <!-- Header -->
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" class="email-container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
           <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background-color: #7BC85A; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Spair Money</h1>
+            <td style="padding: 30px 40px 20px; text-align: left;">
+              <img class="logo-light" src="https://app.spair.co/storage/v1/object/public/images/logo-email.png" alt="Spair Money" width="120" height="32" style="height: 32px; width: auto;" />
+              <img class="logo-dark" src="https://app.spair.co/storage/v1/object/public/images/logo-email-darkmode.png" alt="Spair Money" width="120" height="32" style="height: 32px; width: auto;" />
             </td>
           </tr>
-          
-          <!-- Content -->
           <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 20px; color: #1a1a1a; font-size: 24px; font-weight: 600;">You've been invited!</h2>
-              
-              <p style="margin: 0 0 20px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                Hello ${data.memberName || "there"},
-              </p>
-              
-              <p style="margin: 0 0 20px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                <strong>${data.ownerName}</strong> (${data.ownerEmail}) has invited you to join their household on Spair Money.
-              </p>
-              
-              <p style="margin: 0 0 30px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                As a household member, you'll be able to view and manage shared finances, including transactions, budgets, and goals.
-              </p>
-              
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="text-align: center; padding: 20px 0;">
-                    <a href="${data.invitationLink}" style="display: inline-block; padding: 14px 32px; background-color: #7BC85A; color: #16161B; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Accept Invitation</a>
-                  </td>
-                </tr>
-              </table>
-              
-              <p style="margin: 30px 0 0; color: #8a8a8a; font-size: 14px; line-height: 1.6;">
-                Or copy and paste this link into your browser:
-              </p>
-              <p style="margin: 10px 0 0; color: #7BC85A; font-size: 14px; word-break: break-all;">
-                ${data.invitationLink}
-              </p>
-              
-              <p style="margin: 30px 0 0; color: #8a8a8a; font-size: 12px; line-height: 1.6;">
-                If you weren't expecting this invitation, you can safely ignore this email.
-              </p>
+            <td class="email-content" style="padding: 0 40px 40px;">
+              <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700; line-height: 1.3;">You have been invited</h1>
+              <p class="email-text" style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${data.memberName || "there"},</p>
+              <p class="email-text" style="margin: 0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.5;"><strong>${data.ownerName}</strong> (${data.ownerEmail}) has invited you to join their household on Spair Money.</p>
+              <p class="email-text" style="margin: 0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">As a household member, you'll be able to view and manage shared finances, including transactions, budgets, and goals.</p>
+              <div style="text-align: left; margin: 0 0 24px;">
+                <a href="${data.invitationLink}" class="button" style="display: inline-block; padding: 14px 32px; background-color: #7BC85A; color: #16161B; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Accept Invitation</a>
+              </div>
+              <p class="email-text-muted" style="margin: 0 0 16px; color: #8a8a8a; font-size: 14px; line-height: 1.5;">Or copy and paste this link into your browser:</p>
+              <p class="email-text-muted" style="margin: 0 0 24px; color: #8a8a8a; font-size: 14px; line-height: 1.5; word-break: break-all;">${data.invitationLink}</p>
+              <p class="email-text-muted" style="margin: 0 0 16px; color: #8a8a8a; font-size: 14px; line-height: 1.5;">If you didn't expect this invitation, you can safely ignore this email.</p>
+              <p class="email-text" style="margin: 0; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Best regards,<br>Spair Money</p>
             </td>
           </tr>
-          
-          <!-- Footer -->
           <tr>
-            <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="margin: 0; color: #8a8a8a; font-size: 12px;">
-                © ${new Date().getFullYear()} Spair Money. All rights reserved.
-              </p>
+            <td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0 0 8px; color: #8a8a8a; font-size: 12px; line-height: 1.5;">This message was sent to ${data.memberEmail || ""}. If you have questions or complaints, please contact us.</p>
+              <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${new Date().getFullYear()} Spair Money. All rights reserved.</p>
             </td>
           </tr>
         </table>
@@ -380,7 +393,7 @@ export async function sendCheckoutPendingEmail(data: CheckoutPendingEmailData): 
       console.error("[EMAIL] Error details:", {
         message: result.error.message,
         name: result.error.name,
-        statusCode: (result.error as any)?.statusCode,
+        statusCode: (result.error as Error & { statusCode?: number })?.statusCode,
       });
       throw new Error(`Resend API error: ${errorMessage}`);
     } else {
@@ -626,10 +639,9 @@ function getPasswordResetEmailTemplate(data: {
     
     let html = fs.readFileSync(templatePath, 'utf-8');
     console.log("[EMAIL] Template loaded successfully, length:", html.length);
-    
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
-    const logoUrl = getLogoUrl(appUrl);
-    
+
+    const logoUrl = getLogoUrl();
+
     // Replace template variables
     html = html.replace(/\{\{ if \.Name \}\} \{\{ \.Name \}\}\{\{ end \}\}/g, data.userName || "");
     html = html.replace(/\{\{ \.ConfirmationURL \}\}/g, data.resetLink);
@@ -730,7 +742,6 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
     return;
   }
 
-  const appUrl = data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://spair.co/";
   const founderName = data.founderName || "Naor Tartarotti";
   
   // Use founder's email as the sender so replies go directly to the founder
@@ -773,9 +784,8 @@ function getWelcomeEmailTemplate(data: {
   try {
     const templatePath = path.join(process.cwd(), 'email-templates/welcome.html');
     let html = fs.readFileSync(templatePath, 'utf-8');
-    
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spair.co";
-    const logoUrl = getLogoUrl(appUrl);
+
+    const logoUrl = getLogoUrl();
     
     // Replace variables
     html = html.replace(/\{\{ \.FounderName \}\}/g, data.founderName);
