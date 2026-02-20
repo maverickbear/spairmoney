@@ -17,7 +17,7 @@ interface ConfirmDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (close: () => void) => void | Promise<void>;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "default" | "destructive";
@@ -36,16 +36,13 @@ export function ConfirmDialog({
   loading = false,
 }: ConfirmDialogProps) {
   const handleConfirm = async () => {
-    // Close dialog immediately so user can continue using the app
-    onOpenChange(false);
-    
-    // Execute the action in the background (no loading state needed since dialog is closed)
+    const close = () => onOpenChange(false);
     try {
-      await onConfirm();
+      await onConfirm(close);
     } catch (error) {
-      // Error handling is done by the caller
-      // Dialog is already closed, so we don't need to handle it here
       throw error;
+    } finally {
+      close();
     }
   };
 

@@ -13,7 +13,7 @@ interface ConfirmDialogOptions {
 
 interface ConfirmDialogState extends ConfirmDialogOptions {
   open: boolean;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (close: () => void) => void | Promise<void>;
 }
 
 export function useConfirmDialog() {
@@ -22,7 +22,7 @@ export function useConfirmDialog() {
   const openDialog = useCallback(
     (
       options: ConfirmDialogOptions,
-      onConfirm: () => void | Promise<void>
+      onConfirm: (close: () => void) => void | Promise<void>
     ) => {
       setDialogState({
         ...options,
@@ -47,10 +47,8 @@ export function useConfirmDialog() {
       }}
       title={dialogState.title}
       description={dialogState.description}
-      onConfirm={async () => {
-        // Dialog will close immediately in ConfirmDialog component
-        // We just need to execute the action
-        await dialogState.onConfirm();
+      onConfirm={async (close) => {
+        await dialogState.onConfirm(close);
       }}
       confirmLabel={dialogState.confirmLabel}
       cancelLabel={dialogState.cancelLabel}

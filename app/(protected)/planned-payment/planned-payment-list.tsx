@@ -3,7 +3,18 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/components/common/money";
-import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
+import {
+  format,
+  differenceInDays,
+  isToday,
+  isTomorrow,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  addMonths,
+  addDays,
+} from "date-fns";
 import { cn } from "@/lib/utils";
 import { Calendar, Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight, Plus, Pencil } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
@@ -43,12 +54,62 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+export type DateRangePreset = "today" | "this_week" | "this_month" | "next_month" | "next_90_days";
+
+function getDateRangeForPreset(preset: DateRangePreset): { startDate: Date; endDate: Date } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  switch (preset) {
+    case "today": {
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+      return { startDate: today, endDate: end };
+    }
+    case "this_week": {
+      const start = startOfWeek(today, { weekStartsOn: 0 });
+      const end = endOfWeek(today, { weekStartsOn: 0 });
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start, endDate: end };
+    }
+    case "this_month": {
+      const start = startOfMonth(today);
+      const end = endOfMonth(today);
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start, endDate: end };
+    }
+    case "next_month": {
+      const next = addMonths(today, 1);
+      const start = startOfMonth(next);
+      const end = endOfMonth(next);
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start, endDate: end };
+    }
+    case "next_90_days": {
+      const end = addDays(today, PLANNED_HORIZON_DAYS);
+      end.setHours(23, 59, 59, 999);
+      return { startDate: today, endDate: end };
+    }
+    default:
+      return getDateRangeForPreset("next_90_days");
+  }
+}
+
+const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "this_week", label: "This Week" },
+  { value: "this_month", label: "This Month" },
+  { value: "next_month", label: "Next Month" },
+  { value: "next_90_days", label: "Next 90 days" },
+];
+
 export function PlannedPaymentList() {
   const { toast } = useToast();
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [payments, setPayments] = useState<PlannedPayment[]>([]);
   const [totalPayments, setTotalPayments] = useState(0);
   const [activeTab, setActiveTab] = useState<"expense" | "income" | "transfer">("expense");
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>("this_month");
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -148,14 +209,11 @@ export function PlannedPaymentList() {
 
   const loadCounts = useCallback(async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const horizonDate = new Date(today);
-      horizonDate.setDate(horizonDate.getDate() + PLANNED_HORIZON_DAYS);
+      const { startDate, endDate } = getDateRangeForPreset(dateRangePreset);
       
       // Single optimized call to get all counts at once
       const response = await fetch(
-        `/api/planned-payments/counts?startDate=${today.toISOString().split('T')[0]}&endDate=${horizonDate.toISOString().split('T')[0]}&status=scheduled`
+        `/api/planned-payments/counts?startDate=${startDate.toISOString().split('T')[0]}&endDate=${endDate.toISOString().split('T')[0]}&status=scheduled`
       );
       
       if (!response.ok) {
@@ -169,7 +227,7 @@ export function PlannedPaymentList() {
     } catch (error) {
       console.error("Error loading counts:", error);
     }
-  }, []);
+  }, [dateRangePreset]);
 
   const loadPlannedPayments = useCallback(async () => {
     // Cancel any previous request
@@ -183,14 +241,11 @@ export function PlannedPaymentList() {
     try {
       setLoading(true);
       
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const horizonDate = new Date(today);
-      horizonDate.setDate(horizonDate.getDate() + PLANNED_HORIZON_DAYS);
+      const { startDate, endDate } = getDateRangeForPreset(dateRangePreset);
       
       const params = new URLSearchParams();
-      params.append("startDate", today.toISOString().split('T')[0]);
-      params.append("endDate", horizonDate.toISOString().split('T')[0]);
+      params.append("startDate", startDate.toISOString().split('T')[0]);
+      params.append("endDate", endDate.toISOString().split('T')[0]);
       params.append("status", "scheduled");
       params.append("type", activeTab);
       
@@ -254,7 +309,7 @@ export function PlannedPaymentList() {
         abortControllerRef.current = null;
       }
     }
-  }, [activeTab, currentPage, itemsPerPage, isMobile, toast]);
+  }, [activeTab, currentPage, itemsPerPage, isMobile, dateRangePreset, toast]);
 
   // Sync planned payments on mount (only once per session)
   useEffect(() => {
@@ -278,6 +333,17 @@ export function PlannedPaymentList() {
     loadPlannedPayments();
     // Note: We don't reload counts when tab changes because counts are totals for all types
   }, [activeTab, loadPlannedPayments]);
+
+  // Reset to page 1 when date range changes; loadCounts/loadPlannedPayments will re-run via their deps
+  const isFirstMount = useRef(true);
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    setCurrentPage(1);
+    setAllPayments([]);
+  }, [dateRangePreset]);
 
   // Reset loadingMore when payments are loaded
   useEffect(() => {
@@ -588,6 +654,28 @@ export function PlannedPaymentList() {
         </div>
       </div>
 
+      {/* Date range filter - right after Tabs */}
+      <div className="w-full px-4 lg:px-8 pt-3 pb-2 border-b bg-card/50">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Period:</span>
+          <Select
+            value={dateRangePreset}
+            onValueChange={(value) => setDateRangePreset(value as DateRangePreset)}
+          >
+            <SelectTrigger className="w-[180px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DATE_RANGE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="w-full p-4 lg:p-8">
         {/* Mobile Card View */}
         <div className="lg:hidden" ref={pullToRefreshRef}>
@@ -685,14 +773,14 @@ export function PlannedPaymentList() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleMarkAsPaid(payment)}
-                              disabled={isProcessing}
+                              disabled={isProcessing || payment.status !== "scheduled"}
                             >
                               <Check className="h-4 w-4 mr-2" />
                               Mark as Paid
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleSkip(payment)}
-                              disabled={isProcessing}
+                              disabled={isProcessing || payment.status !== "scheduled"}
                             >
                               <SkipForward className="h-4 w-4 mr-2" />
                               Skip
@@ -711,8 +799,8 @@ export function PlannedPaymentList() {
                     </div>
                   );
                 })}
-              {/* Load More button for mobile */}
-              {isMobile && currentPage < totalPages && (
+              {/* Load More button for mobile (show only when 11+ items) */}
+              {isMobile && totalPayments >= 11 && currentPage < totalPages && (
                 <div className="flex items-center justify-center py-6">
                   <Button
                     onClick={handleLoadMore}
@@ -873,14 +961,14 @@ export function PlannedPaymentList() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleMarkAsPaid(payment)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || payment.status !== "scheduled"}
                               >
                                 <Check className="h-4 w-4 mr-2" />
                                 Mark as Paid
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleSkip(payment)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || payment.status !== "scheduled"}
                               >
                                 <SkipForward className="h-4 w-4 mr-2" />
                                 Skip
@@ -1028,14 +1116,14 @@ export function PlannedPaymentList() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleMarkAsPaid(payment)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || payment.status !== "scheduled"}
                               >
                                 <Check className="h-4 w-4 mr-2" />
                                 Mark as Paid
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleSkip(payment)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || payment.status !== "scheduled"}
                               >
                                 <SkipForward className="h-4 w-4 mr-2" />
                                 Skip
@@ -1186,14 +1274,14 @@ export function PlannedPaymentList() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleMarkAsPaid(payment)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || payment.status !== "scheduled"}
                               >
                                 <Check className="h-4 w-4 mr-2" />
                                 Mark as Paid
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleSkip(payment)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || payment.status !== "scheduled"}
                               >
                                 <SkipForward className="h-4 w-4 mr-2" />
                                 Skip
@@ -1219,8 +1307,8 @@ export function PlannedPaymentList() {
         </SimpleTabsContent>
         </div>
 
-        {/* Pagination Controls - Desktop only */}
-        {payments.length > 0 && (
+        {/* Pagination Controls - Desktop only (show only when 11+ items) */}
+        {totalPayments >= 11 && (
           <div className="hidden lg:flex flex-col sm:flex-row items-center justify-between gap-4 px-2 mt-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Items per page:</span>

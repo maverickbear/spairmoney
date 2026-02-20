@@ -21,14 +21,17 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useState, useEffect } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import type { Category, BaseSubcategory } from "@/src/domain/categories/categories.types";
+
+const DUPLICATE_MESSAGE = "A category with this name and type already exists in your household";
 
 interface CategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   category?: Category | null;
+  existingCategories?: Category[];
   onSuccess?: (updatedCategory?: Category) => void;
 }
 
@@ -36,12 +39,14 @@ export function CategoryDialog({
   open,
   onOpenChange,
   category,
+  existingCategories = [],
   onSuccess,
 }: CategoryDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subcategoryNames, setSubcategoryNames] = useState<string[]>([""]);
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(category?.id || null);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
   
   // System categories are read-only (isSystem === true). New category (category == null) is not system.
   const isSystemCategory = category !== null && category !== undefined && category.isSystem === true;
@@ -74,6 +79,7 @@ export function CategoryDialog({
             }
       );
       setCurrentCategoryId(category?.id || null);
+      setDuplicateError(null);
       // Pre-fill subcategory inputs from existing data when editing; otherwise one empty input
       const existingNames =
         category?.subcategories?.map((s) => s.name).filter(Boolean) ?? [];
@@ -82,6 +88,30 @@ export function CategoryDialog({
       );
     }
   }, [open, category, form]);
+
+  // Real-time duplicate check (only for custom name/type; exclude current when editing)
+  const name = form.watch("name");
+  const type = form.watch("type");
+  useEffect(() => {
+    if (!open || existingCategories.length === 0) return;
+    const trimmed = name?.trim() ?? "";
+    if (!trimmed) {
+      setDuplicateError(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const normalized = trimmed.toLowerCase();
+      const currentId = category?.id ?? currentCategoryId;
+      const duplicate = existingCategories.some(
+        (c) =>
+          c.name.trim().toLowerCase() === normalized &&
+          c.type === type &&
+          c.id !== currentId
+      );
+      setDuplicateError(duplicate ? DUPLICATE_MESSAGE : null);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [open, name, type, category?.id, currentCategoryId, existingCategories]);
 
   async function onSubmit(data: CategoryFormData) {
     try {
@@ -127,7 +157,12 @@ export function CategoryDialog({
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "Failed to save category");
+        const message = error.error || "Failed to save category";
+        if (res.status === 409 && message === DUPLICATE_MESSAGE) {
+          setDuplicateError(DUPLICATE_MESSAGE);
+          return;
+        }
+        throw new Error(message);
       }
 
       const savedCategory = await res.json();
@@ -209,16 +244,9 @@ export function CategoryDialog({
         subcategories: savedCategory.subcategories || [],
       };
 
-      // Only close dialog and reload if editing existing category
-      if (category) {
-        onSuccess?.(formattedCategory);
-        onOpenChange(false);
-        form.reset();
-      } else {
-        // For new categories, notify parent but keep dialog open
-        onSuccess?.(formattedCategory);
-      }
-      // For new categories, keep dialog open to allow adding more subcategories
+      onSuccess?.(formattedCategory);
+      onOpenChange(false);
+      form.reset();
       toast({
         title: category ? "Category updated" : "Category created",
         description: category ? "Your category has been updated successfully." : "Your category has been created successfully.",
@@ -226,9 +254,14 @@ export function CategoryDialog({
       });
     } catch (error) {
       console.error("Error saving category:", error);
+      const message = error instanceof Error ? error.message : "Failed to save category";
+      if (message === DUPLICATE_MESSAGE) {
+        setDuplicateError(DUPLICATE_MESSAGE);
+        return;
+      }
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save category",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -239,6 +272,10 @@ export function CategoryDialog({
   function handleSubcategoryNameChange(index: number, value: string) {
     const updated = [...subcategoryNames];
     updated[index] = value;
+    // Keep at least one empty row at the end so the user can always add more
+    if (value.trim() !== "" && index === updated.length - 1) {
+      updated.push("");
+    }
     setSubcategoryNames(updated);
   }
 
@@ -246,12 +283,16 @@ export function CategoryDialog({
     setSubcategoryNames([...subcategoryNames, ""]);
   }
 
+  function handleRemoveSubcategory(index: number) {
+    const updated = subcategoryNames.filter((_, i) => i !== index);
+    setSubcategoryNames(updated.length > 0 ? updated : [""]);
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex flex-col w-full sm:max-w-2xl !p-0 !gap-0"
+        className="flex flex-col w-full sm:max-w-[35.7rem] !p-0 !gap-0"
       >
         <SheetHeader className="px-6 pt-6 pb-2">
           <SheetTitle>{category ? "Edit" : "Add"} Category</SheetTitle>
@@ -275,9 +316,9 @@ export function CategoryDialog({
                   size="medium"
                   disabled={!!category && isSystemCategory}
                 />
-                {form.formState.errors.name && (
+                {(form.formState.errors.name?.message || duplicateError) && (
                   <p className="text-sm text-destructive">
-                    {form.formState.errors.name.message}
+                    {form.formState.errors.name?.message || duplicateError}
                   </p>
                 )}
               </div>
@@ -335,15 +376,18 @@ export function CategoryDialog({
                     size="medium"
                     className="flex-1"
                   />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    onClick={handleAddSubcategoryInput}
-                    className="flex-shrink-0"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  {name.trim() !== "" && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => handleRemoveSubcategory(index)}
+                      className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      aria-label="Remove subcategory"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

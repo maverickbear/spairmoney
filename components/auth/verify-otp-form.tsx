@@ -887,7 +887,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
                   <HelpCircle className="w-4 h-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-[280px] whitespace-normal">
+              <TooltipContent side="right" title="Trusted browser" className="max-w-[280px] whitespace-normal">
                 Only enable this on personal or trusted devices. We'll still ask for your password on future logins, but we won't require a verification code on this browser for a while.
               </TooltipContent>
             </Tooltip>

@@ -537,7 +537,7 @@ export default function SubscriptionsPage() {
 
       {/* Mobile Card View */}
       <div className="lg:hidden">
-        {loading && subscriptions.length > 0 ? (
+        {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i}>
@@ -562,6 +562,14 @@ export default function SubscriptionsPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        ) : filteredSubscriptions.length === 0 ? (
+          <div className="w-full h-full min-h-[400px]">
+            <EmptyState
+              icon={Plus}
+              title="No subscriptions created yet"
+              description="Create your first subscription to start tracking recurring service payments."
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -605,23 +613,13 @@ export default function SubscriptionsPage() {
                 </div>
               );
             })}
-
-            {filteredSubscriptions.length === 0 && (
-              <div className="col-span-full w-full h-full min-h-[400px]">
-                <EmptyState
-                  icon={Plus}
-                  title="No subscriptions created yet"
-                  description="Create your first subscription to start tracking recurring service payments."
-                />
-              </div>
-            )}
           </div>
         )}
       </div>
 
       {/* Desktop Table View */}
-      <div className={`hidden lg:block rounded-lg overflow-x-auto ${filteredSubscriptions.length > 0 || (loading && subscriptions.length > 0) ? 'border' : ''}`}>
-        {loading && subscriptions.length > 0 ? (
+      <div className={`hidden lg:block rounded-lg overflow-x-auto ${filteredSubscriptions.length > 0 || loading ? 'border' : ''}`}>
+        {loading ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -652,7 +650,15 @@ export default function SubscriptionsPage() {
               ))}
             </TableBody>
           </Table>
-        ) : filteredSubscriptions.length > 0 ? (
+        ) : filteredSubscriptions.length === 0 ? (
+          <div className="w-full h-full min-h-[400px]">
+            <EmptyState
+              icon={Plus}
+              title="No subscriptions created yet"
+              description="Create your first subscription to start tracking recurring service payments."
+            />
+          </div>
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -822,14 +828,6 @@ export default function SubscriptionsPage() {
               })}
             </TableBody>
           </Table>
-        ) : (
-          <div className="w-full h-full min-h-[400px]">
-            <EmptyState
-              icon={Plus}
-              title="No subscriptions created yet"
-              description="Create your first subscription to start tracking recurring service payments."
-            />
-          </div>
         )}
       </div>
       </div>

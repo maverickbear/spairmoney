@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeCategoriesService } from "@/src/application/categories/categories.factory";
 import { SubcategoryFormData } from "@/src/domain/categories/categories.validations";
 import { getCurrentUserId, guardWriteAccess, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
+import { AppError } from "@/src/application/shared/app-error";
 import { revalidateTag } from 'next/cache';
 
 export async function PATCH(
@@ -66,6 +67,12 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Error deleting subcategory:", error);
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete subcategory" },
       { status: 500 }

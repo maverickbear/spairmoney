@@ -39,6 +39,7 @@ export interface TransactionFilters {
   startDate?: Date;
   endDate?: Date;
   categoryId?: string;
+  subcategoryId?: string;
   accountId?: string;
   accountIds?: string[];
   type?: 'income' | 'expense' | 'transfer';
@@ -91,6 +92,10 @@ export class TransactionsRepository implements ITransactionsRepository {
 
     if (filters?.categoryId) {
       query = query.eq("category_id", filters.categoryId);
+    }
+
+    if (filters?.subcategoryId) {
+      query = query.eq("subcategory_id", filters.subcategoryId);
     }
 
     if (filters?.accountIds?.length) {
@@ -181,6 +186,10 @@ export class TransactionsRepository implements ITransactionsRepository {
 
     if (filters?.categoryId) {
       query = query.eq("category_id", filters.categoryId);
+    }
+
+    if (filters?.subcategoryId) {
+      query = query.eq("subcategory_id", filters.subcategoryId);
     }
 
     if (filters?.accountIds?.length) {

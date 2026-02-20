@@ -4,6 +4,7 @@
  */
 
 import { CategoriesRepository } from "@/src/infrastructure/database/repositories/categories.repository";
+import { ITransactionsRepository } from "@/src/infrastructure/database/repositories/interfaces/transactions.repository.interface";
 import { CategoriesMapper } from "./categories.mapper";
 import { CategoryFormData, SubcategoryFormData } from "../../domain/categories/categories.validations";
 import { BaseCategory, BaseSubcategory, CategoryWithRelations, SubcategoryWithRelations } from "../../domain/categories/categories.types";
@@ -75,7 +76,10 @@ async function getSubcategoriesByCategoryCached(
 }
 
 export class CategoriesService {
-  constructor(private repository: CategoriesRepository) {}
+  constructor(
+    private repository: CategoriesRepository,
+    private transactionsRepository: ITransactionsRepository
+  ) {}
 
   /**
    * Get all categories with relations (system + current user's active household).
@@ -163,6 +167,16 @@ export class CategoriesService {
       throw new AppError("Creating custom categories requires a paid plan", 403);
     }
 
+    const existingCategories = await this.repository.findAllCategories(householdId);
+    const customCategories = existingCategories.filter((c) => c.household_id === householdId);
+    const normalizedName = data.name.trim().toLowerCase();
+    const duplicate = customCategories.find(
+      (c) => c.name.trim().toLowerCase() === normalizedName && c.type === data.type
+    );
+    if (duplicate) {
+      throw new AppError("A category with this name and type already exists in your household", 409);
+    }
+
     const id = crypto.randomUUID();
     const now = getCurrentTimestamp();
 
@@ -196,6 +210,22 @@ export class CategoriesService {
     const canEdit = existingCategory.household_id != null && existingCategory.household_id === householdId;
     if (!canEdit) {
       throw new AppError("Cannot update system default categories", 403);
+    }
+
+    if (data.name !== undefined || data.type !== undefined) {
+      const existingCategories = await this.repository.findAllCategories(householdId);
+      const customCategories = existingCategories.filter((c) => c.household_id === householdId);
+      const newName = (data.name ?? existingCategory.name ?? "").trim().toLowerCase();
+      const newType = data.type ?? existingCategory.type;
+      const duplicate = customCategories.find(
+        (c) =>
+          c.id !== id &&
+          c.name.trim().toLowerCase() === newName &&
+          (c.type ?? null) === (newType ?? null)
+      );
+      if (duplicate) {
+        throw new AppError("A category with this name and type already exists in your household", 409);
+      }
     }
 
     const updateData: any = {
@@ -233,6 +263,14 @@ export class CategoriesService {
     const canDelete = category.household_id != null && category.household_id === householdId;
     if (!canDelete) {
       throw new AppError("Cannot delete system default categories", 403);
+    }
+
+    const linkedCount = await this.transactionsRepository.count({ categoryId: id });
+    if (linkedCount > 0) {
+      throw new AppError(
+        "Cannot delete this category because it has linked transactions. Change the category of those transactions first.",
+        409
+      );
     }
 
     await this.repository.deleteCategory(id);
@@ -351,6 +389,14 @@ export class CategoriesService {
       (category.household_id != null && category.household_id === householdId);
     if (!canDelete) {
       throw new AppError("Cannot delete this subcategory", 403);
+    }
+
+    const linkedCount = await this.transactionsRepository.count({ subcategoryId: id });
+    if (linkedCount > 0) {
+      throw new AppError(
+        "Cannot delete this subcategory because it has linked transactions. Change the category of those transactions first.",
+        409
+      );
     }
 
     await this.repository.deleteSubcategory(id);

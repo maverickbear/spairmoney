@@ -5,7 +5,7 @@ import { RecurringWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { WidgetEmptyState } from "./widget-empty-state";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, CalendarClock, CheckCircle, XCircle } from "lucide-react";
+import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, CalendarClock, Check, SkipForward, X } from "lucide-react";
 import Link from "next/link";
 import { formatMoney } from "@/components/common/money";
 import { differenceInCalendarDays, isToday, isTomorrow, parse, format } from "date-fns";
@@ -25,7 +25,8 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
   const { refresh } = useDashboardSnapshot();
   const { toast } = useToast();
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
-  const [decliningId, setDecliningId] = useState<string | null>(null);
+  const [skippingId, setSkippingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   if (!data) return null;
 
@@ -124,11 +125,11 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 shrink-0 text-muted-foreground hover:text-emerald-600"
-                      disabled={markingPaidId === item.id || decliningId === item.id}
+                      disabled={markingPaidId === item.id || skippingId === item.id || cancellingId === item.id}
                       onClick={async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (markingPaidId || decliningId) return;
+                        if (markingPaidId || skippingId || cancellingId) return;
                         setMarkingPaidId(item.id);
                         try {
                           const res = await fetch(`/api/v2/planned-payments/${item.id}/mark-paid`, { method: "POST" });
@@ -157,56 +158,116 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                       {markingPaidId === item.id ? (
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                       ) : (
-                        <CheckCircle className="h-5 w-5" />
+                        <Check className="h-4 w-4" />
                       )}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="left">Mark as paid</TooltipContent>
+                  <TooltipContent
+                    side="left"
+                    title="Mark as paid"
+                  >
+                    Creates a transaction with this payment&apos;s date, amount and account, and marks the planned payment as paid.
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-500"
-                      disabled={markingPaidId === item.id || decliningId === item.id}
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-amber-600"
+                      disabled={markingPaidId === item.id || skippingId === item.id || cancellingId === item.id}
                       onClick={async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (markingPaidId || decliningId) return;
-                        setDecliningId(item.id);
+                        if (markingPaidId || skippingId || cancellingId) return;
+                        setSkippingId(item.id);
                         try {
                           const res = await fetch(`/api/v2/planned-payments/${item.id}/skip`, { method: "POST" });
                           if (!res.ok) {
                             const body = await res.json();
-                            throw new Error(body.error || "Failed to decline");
+                            throw new Error(body.error || "Failed to skip");
                           }
                           await refresh(true);
                           toast({
-                            title: "Declined",
-                            description: "Payment marked as declined. No transaction was created.",
+                            title: "Skipped",
+                            description: "Payment skipped. No transaction was created.",
                             variant: "success",
                           });
                         } catch (err) {
                           toast({
                             title: "Error",
-                            description: err instanceof Error ? err.message : "Failed to decline",
+                            description: err instanceof Error ? err.message : "Failed to skip",
                             variant: "destructive",
                           });
                         } finally {
-                          setDecliningId(null);
+                          setSkippingId(null);
                         }
                       }}
-                      aria-label="Decline (mark as skipped)"
+                      aria-label="Skip"
                     >
-                      {decliningId === item.id ? (
+                      {skippingId === item.id ? (
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                       ) : (
-                        <XCircle className="h-5 w-5" />
+                        <SkipForward className="h-4 w-4" />
                       )}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="left">Decline (no transaction)</TooltipContent>
+                  <TooltipContent
+                    side="left"
+                    title="Skip"
+                  >
+                    Marks this occurrence as skipped. No transaction is created. Use when you&apos;re not paying this time (e.g. skipping a month).
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                      disabled={markingPaidId === item.id || skippingId === item.id || cancellingId === item.id}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (markingPaidId || skippingId || cancellingId) return;
+                        setCancellingId(item.id);
+                        try {
+                          const res = await fetch(`/api/v2/planned-payments/${item.id}/cancel`, { method: "POST" });
+                          if (!res.ok) {
+                            const body = await res.json();
+                            throw new Error(body.error || "Failed to cancel");
+                          }
+                          await refresh(true);
+                          toast({
+                            title: "Cancelled",
+                            description: "Payment has been cancelled.",
+                            variant: "success",
+                          });
+                        } catch (err) {
+                          toast({
+                            title: "Error",
+                            description: err instanceof Error ? err.message : "Failed to cancel",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setCancellingId(null);
+                        }
+                      }}
+                      aria-label="Cancel"
+                    >
+                      {cancellingId === item.id ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="left"
+                    title="Cancel"
+                  >
+                    Cancels the planned payment. No transaction is created. Use when the payment should no longer exist (e.g. subscription ended).
+                  </TooltipContent>
                 </Tooltip>
               </div>
             </Link>

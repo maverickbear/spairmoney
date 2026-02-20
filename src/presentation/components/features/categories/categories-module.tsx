@@ -161,12 +161,13 @@ export function CategoriesModule({
         variant: "destructive",
         confirmLabel: "Delete",
       },
-      async () => {
+      async (close) => {
         const categoryToDelete = categories.find(c => c.id === id);
-        
-        // Optimistic update: remove from UI immediately
+
+        // Optimistic update: remove from list immediately, then close dialog
         setCategories(prev => prev.filter(c => c.id !== id));
         setDeletingCategoryId(id);
+        close();
 
         try {
           const response = await fetch(`/api/v2/categories/${id}`, {
@@ -183,8 +184,8 @@ export function CategoriesModule({
             description: "Your category has been deleted successfully.",
             variant: "success",
           });
-          
-          loadData();
+          // Do not call loadData() — it would refetch from cache and bring the deleted category back.
+          // The optimistic update already removed it from the list.
         } catch (error) {
           logger.error("Error deleting category:", error);
           // Revert optimistic update on error
@@ -213,8 +214,23 @@ export function CategoriesModule({
         variant: "destructive",
         confirmLabel: "Delete",
       },
-      async () => {
+      async (close) => {
+        const subcategoryToRestore = (() => {
+          for (const cat of categories) {
+            const sub = (cat.subcategories || []).find(s => s.id === id);
+            if (sub) return { category: cat, subcategory: sub };
+          }
+          return null;
+        })();
+
         setDeletingSubcategoryId(id);
+        // Optimistic update: remove subcategory from list, then close dialog
+        setCategories(prev => prev.map(cat => ({
+          ...cat,
+          subcategories: (cat.subcategories || []).filter(s => s.id !== id),
+        })));
+        close();
+
         try {
           const response = await fetch(`/api/v2/categories/subcategories/${id}`, {
             method: "DELETE",
@@ -224,16 +240,25 @@ export function CategoriesModule({
             const error = await response.json();
             throw new Error(error.error || "Failed to delete subcategory");
           }
-          
+
           toast({
             title: "Subcategory deleted",
             description: "Your subcategory has been deleted successfully.",
             variant: "success",
           });
-          
-          loadData();
+          // Do not call loadData() — cache would bring the deleted subcategory back.
         } catch (error) {
           logger.error("Error deleting subcategory:", error);
+          if (subcategoryToRestore) {
+            setCategories(prev => prev.map(cat =>
+              cat.id === subcategoryToRestore.category.id
+                ? {
+                    ...cat,
+                    subcategories: [...(cat.subcategories || []), subcategoryToRestore.subcategory],
+                  }
+                : cat
+            ));
+          }
           const errorMessage = error instanceof Error ? error.message : "Failed to delete subcategory";
           toast({
             title: "Error",
@@ -477,6 +502,7 @@ export function CategoriesModule({
           }
         }}
         category={selectedCategory}
+        existingCategories={categories}
         onSuccess={(updatedCategory) => {
           if (updatedCategory) {
             // Update state locally without reloading - use functional update to preserve references

@@ -1921,8 +1921,8 @@ export default function TransactionsPage() {
               />
             );
             })}
-            {/* Load More button for mobile */}
-            {isMobile && currentPage < totalPages && (
+            {/* Load More button for mobile (show only when 11+ items) */}
+            {isMobile && totalTransactions >= 11 && currentPage < totalPages && (
               <div className="flex items-center justify-center py-6">
                 <Button
                   onClick={handleLoadMore}
@@ -2225,8 +2225,8 @@ export default function TransactionsPage() {
         </Table>
         </div>
 
-        {/* Pagination Controls - Desktop only */}
-        {transactions.length > 0 && (
+        {/* Pagination Controls - Desktop only (show only when 11+ items) */}
+        {totalTransactions >= 11 && (
           <div className="hidden lg:flex flex-col sm:flex-row items-center justify-between gap-4 px-2 mt-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Items per page:</span>

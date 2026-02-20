@@ -1893,9 +1893,9 @@ export class DashboardService {
       const plannedPaymentsService = makePlannedPaymentsService();
       // getPlannedPayments(filters, accessToken, refreshToken, userId)
       const { plannedPayments } = await plannedPaymentsService.getPlannedPayments(
-        {}, 
-        accessToken, 
-        refreshToken, 
+        { status: "scheduled" },
+        accessToken,
+        refreshToken,
         userId
       );
       
