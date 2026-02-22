@@ -61,16 +61,16 @@ export function ExpectedIncomeWidget({
                 </p>
               ) : data.expectedMonthlyIncome > 0 ? (
                 <p className="text-xs sm:text-sm text-muted-foreground truncate" title={formatMoney(data.expectedMonthlyIncome)}>
-                  Expected (after tax): {formatMoney(data.expectedMonthlyIncome)}/month
+                  Expected <span className="font-semibold text-foreground">{formatMoney(data.expectedMonthlyIncome)}</span>/month
                 </p>
               ) : null}
               {data.nextPaycheckDays != null && data.nextPaycheckAmount != null ? (
-                <p className="text-xs sm:text-sm text-muted-foreground truncate" title={`Next: ${formatMoney(data.nextPaycheckAmount)} in ${data.nextPaycheckDays} days`}>
-                  Next: {formatMoney(data.nextPaycheckAmount)} in {data.nextPaycheckDays} days
+                <p className="text-xs sm:text-sm text-muted-foreground truncate" title={`Next ${formatMoney(data.nextPaycheckAmount)} in ${data.nextPaycheckDays} days`}>
+                  Next <span className="font-semibold text-foreground">{formatMoney(data.nextPaycheckAmount)}</span> in <span className="font-semibold text-foreground">{data.nextPaycheckDays}</span> days
                 </p>
               ) : (
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Next: —
+                  Next <span className="font-semibold text-foreground">—</span>
                 </p>
               )}
             </>

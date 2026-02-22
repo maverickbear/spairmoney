@@ -266,7 +266,7 @@ export default function BudgetsPage() {
                     subcategoryBudgets={subcategoryBudgets}
                     period={now}
                     onBudgetChange={loadData}
-                    maxAmount={10000}
+                    maxAmount={2000}
                     step={50}
                   />
                 );

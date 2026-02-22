@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { LimitWarning } from "@/components/billing/limit-warning";
 import { Loader2 } from "lucide-react";
@@ -73,6 +73,13 @@ interface AccountFormProps {
 
 const VALID_ACCOUNT_TYPES = ["cash", "checking", "savings", "credit", "investment", "other"] as const;
 
+function normalizeTypeForDefaults(t: unknown): (typeof VALID_ACCOUNT_TYPES)[number] {
+  const s = typeof t === "string" ? t.trim().toLowerCase() : "";
+  if ((VALID_ACCOUNT_TYPES as readonly string[]).includes(s)) return s as (typeof VALID_ACCOUNT_TYPES)[number];
+  if (s?.includes("credit")) return "credit";
+  return "checking";
+}
+
 export function AccountForm({ open, onOpenChange, account, onSuccess, initialAccountLimit, variant = "dialog" }: AccountFormProps) {
   const { toast } = useToast();
   const [households, setHouseholds] = useState<Household[]>([]);
@@ -84,16 +91,32 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
   const [loadingLimit, setLoadingLimit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<AccountFormData>({
-    resolver: zodResolver(accountSchema),
-    defaultValues: {
+  const defaultValues = useMemo((): AccountFormData => {
+    if (account) {
+      const typeValue = normalizeTypeForDefaults(account.type ?? account.accountType);
+      const ownerIds = account.ownerIds?.length ? account.ownerIds : account.userId ? [account.userId] : [];
+      return {
+        name: account.name ?? "",
+        type: typeValue,
+        creditLimit: account.creditLimit != null ? Number(account.creditLimit) : undefined,
+        initialBalance: account.initialBalance != null ? Number(account.initialBalance) : undefined,
+        ownerIds,
+        dueDayOfMonth: account.dueDayOfMonth != null ? Number(account.dueDayOfMonth) : undefined,
+      };
+    }
+    return {
       name: "",
       type: "checking",
       creditLimit: undefined,
       initialBalance: undefined,
       ownerIds: [],
       dueDayOfMonth: undefined,
-    },
+    };
+  }, [account]);
+
+  const form = useForm<AccountFormData>({
+    resolver: zodResolver(accountSchema),
+    defaultValues,
   });
   
   const accountType = form.watch("type");

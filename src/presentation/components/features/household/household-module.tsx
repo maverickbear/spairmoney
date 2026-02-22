@@ -7,10 +7,15 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
-import { Plus, Edit as EditIcon, Trash2, Crown, Mail, Users, Loader2 } from "lucide-react";
+import { Plus, Edit as EditIcon, Trash2, Crown, Mail, Users, Loader2, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MemberForm } from "@/components/members/member-form";
 import type { HouseholdMember } from "@/src/domain/members/members.types";
-import { useSubscription } from "@/hooks/use-subscription";
 import { EmptyState } from "@/components/common/empty-state";
 import { useAuthSafe } from "@/contexts/auth-context";
 import {
@@ -51,16 +56,31 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
   const [editingMember, setEditingMember] = useState<HouseholdMember | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const { limits, checking: limitsLoading } = useSubscription();
-  
-  // Use AuthContext for role instead of fetching
+
   const { role: currentUserRole } = useAuthSafe();
 
+  // Fetch members once on mount; no dependency on subscription to avoid repeated reloads
   useEffect(() => {
-    if (!limitsLoading) {
-      loadData();
+    let cancelled = false;
+    async function fetchMembers() {
+      setLoading(true);
+      try {
+        const response = await fetch("/api/v2/members");
+        if (cancelled) return;
+        if (!response.ok) throw new Error("Failed to fetch members data");
+        const { members: data } = await response.json();
+        setMembers(data ?? []);
+      } catch (error) {
+        if (!cancelled) console.error("Error loading data:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-  }, [limitsLoading]);
+    fetchMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Sync external invite state from page (e.g. MobileAddBar) into the form
   useEffect(() => {
@@ -70,16 +90,14 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
     }
   }, [externalInviteOpen]);
 
-  // OPTIMIZED: Fetch only members data, role comes from Context
+  /** Refetch members after mutations (delete, invite, edit). Not used on initial load. */
   async function loadData() {
     try {
       setLoading(true);
       const response = await fetch("/api/v2/members");
-      if (!response.ok) {
-        throw new Error("Failed to fetch members data");
-      }
+      if (!response.ok) throw new Error("Failed to fetch members data");
       const { members: data } = await response.json();
-      setMembers(data || []);
+      setMembers(data ?? []);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -197,30 +215,21 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
             />
           </div>
         ) : (
-          <div className="rounded-lg border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs md:text-sm">Member</TableHead>
-                  <TableHead className="text-xs md:text-sm">Email</TableHead>
-                  <TableHead className="text-xs md:text-sm">Role</TableHead>
-                  <TableHead className="text-xs md:text-sm">Status</TableHead>
-                  <TableHead className="text-xs md:text-sm">Date</TableHead>
-                  <TableHead className="text-xs md:text-sm">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {members.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-medium text-xs md:text-sm">
-                      <div className="flex items-center gap-3">
+          <>
+            {/* Mobile: card list */}
+            <div className="space-y-3 lg:hidden">
+              {members.map((member) => (
+                <Card key={member.id} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 gap-3">
                         <div className="relative flex-shrink-0">
                           {member.avatarUrl ? (
                             <>
                               <img
                                 src={member.avatarUrl}
                                 alt={member.name || member.email}
-                                className="h-10 w-10 rounded-full object-cover border-2"
+                                className="h-11 w-11 rounded-full object-cover border-2 border-border"
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                   const initialsContainer = e.currentTarget.nextElementSibling;
@@ -229,104 +238,239 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                                   }
                                 }}
                               />
-                              <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border-2">
+                              <div className="h-11 w-11 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border-2 border-border">
                                 {getInitials(member.name)}
                               </div>
                             </>
                           ) : (
-                            <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border-2">
+                            <div className="h-11 w-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border-2 border-border">
                               {getInitials(member.name)}
                             </div>
                           )}
                         </div>
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span>{member.name || member.email}</span>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-foreground truncate">
+                              {member.name || member.email}
+                            </span>
                             {member.isOwner && (
-                              <Badge variant="default" className="flex items-center gap-1">
+                              <Badge variant="default" className="flex shrink-0 items-center gap-1">
                                 <Crown className="h-3 w-3" />
                                 Owner
                               </Badge>
                             )}
+                            {member.isOwner ? (
+                              <Badge variant="default" className="rounded-full border-border bg-white text-gray-900 hover:bg-gray-50 text-xs shrink-0">
+                                Admin
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant={member.role === "admin" ? "default" : "secondary"}
+                                className={`text-xs shrink-0 ${member.role === "admin" ? "rounded-full border-border bg-white text-gray-900 hover:bg-gray-50" : ""}`}
+                              >
+                                {member.role === "admin" ? "Admin" : "Member"}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{member.email}</p>
+                          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                            {member.isOwner ? (
+                              <>
+                                <Badge variant="secondary" className="rounded-full bg-primary text-primary-foreground border-transparent text-xs">
+                                  Active
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  Since {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <InvitationStatus status={member.status} />
+                                <span className="text-xs text-muted-foreground">
+                                  {member.status === "pending"
+                                    ? `Invited ${member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}`
+                                    : member.acceptedAt
+                                      ? `Joined ${new Date(member.acceptedAt).toLocaleDateString()}`
+                                      : "—"}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-xs md:text-sm text-muted-foreground">
-                      {member.email}
-                    </TableCell>
-                    <TableCell className="text-xs md:text-sm">
-                      {member.isOwner ? (
-                        <Badge variant="default" className="rounded-full border-border bg-white text-gray-900 hover:bg-gray-50">
-                          Admin
-                        </Badge>
-                      ) : (
-                        <Badge variant={member.role === "admin" ? "default" : "secondary"} className={member.role === "admin" ? "rounded-full border-border bg-white text-gray-900 hover:bg-gray-50" : ""}>
-                          {member.role === "admin" ? "Admin" : "Member"}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs md:text-sm">
-                      {member.isOwner ? (
-                        <Badge variant="secondary" className="rounded-full bg-primary text-primary-foreground border-transparent hover:bg-primary">Active</Badge>
-                      ) : (
-                        <InvitationStatus status={member.status} />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs md:text-sm text-muted-foreground">
-                      {member.isOwner ? (
-                        <span>Since {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}</span>
-                      ) : member.status === "pending" ? (
-                        <span>Invited {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}</span>
-                      ) : member.acceptedAt ? (
-                        <span>Joined {new Date(member.acceptedAt).toLocaleDateString()}</span>
-                      ) : (
-                        <span>-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {!member.isOwner && (currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && canWrite && (
-                        <div className="flex space-x-1 md:space-x-2">
-                          {member.status === "pending" && (
+                      {!member.isOwner &&
+                        (currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) &&
+                        canWrite && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {member.status === "pending" && (
+                                <DropdownMenuItem onClick={() => handleResend(member)}>
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  Resend
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={() => handleEdit(member)}>
+                                <EditIcon className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(member)}
+                                disabled={deletingId === member.id}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                {deletingId === member.id ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                )}
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden lg:block rounded-lg border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs md:text-sm">Member</TableHead>
+                    <TableHead className="text-xs md:text-sm">Email</TableHead>
+                    <TableHead className="text-xs md:text-sm">Role</TableHead>
+                    <TableHead className="text-xs md:text-sm">Status</TableHead>
+                    <TableHead className="text-xs md:text-sm">Date</TableHead>
+                    <TableHead className="text-xs md:text-sm">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {members.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell className="font-medium text-xs md:text-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            {member.avatarUrl ? (
+                              <>
+                                <img
+                                  src={member.avatarUrl}
+                                  alt={member.name || member.email}
+                                  className="h-10 w-10 rounded-full object-cover border-2"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                    const initialsContainer = e.currentTarget.nextElementSibling;
+                                    if (initialsContainer) {
+                                      (initialsContainer as HTMLElement).style.display = "flex";
+                                    }
+                                  }}
+                                />
+                                <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground hidden items-center justify-center text-sm font-semibold border-2">
+                                  {getInitials(member.name)}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold border-2">
+                                {getInitials(member.name)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span>{member.name || member.email}</span>
+                              {member.isOwner && (
+                                <Badge variant="default" className="flex items-center gap-1">
+                                  <Crown className="h-3 w-3" />
+                                  Owner
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm text-muted-foreground">
+                        {member.email}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {member.isOwner ? (
+                          <Badge variant="default" className="rounded-full border-border bg-white text-gray-900 hover:bg-gray-50">
+                            Admin
+                          </Badge>
+                        ) : (
+                          <Badge variant={member.role === "admin" ? "default" : "secondary"} className={member.role === "admin" ? "rounded-full border-border bg-white text-gray-900 hover:bg-gray-50" : ""}>
+                            {member.role === "admin" ? "Admin" : "Member"}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm">
+                        {member.isOwner ? (
+                          <Badge variant="secondary" className="rounded-full bg-primary text-primary-foreground border-transparent hover:bg-primary">Active</Badge>
+                        ) : (
+                          <InvitationStatus status={member.status} />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm text-muted-foreground">
+                        {member.isOwner ? (
+                          <span>Since {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}</span>
+                        ) : member.status === "pending" ? (
+                          <span>Invited {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}</span>
+                        ) : member.acceptedAt ? (
+                          <span>Joined {new Date(member.acceptedAt).toLocaleDateString()}</span>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {!member.isOwner && (currentUserRole === "admin" || currentUserRole === "super_admin" || currentUserRole === null) && canWrite && (
+                          <div className="flex space-x-1 md:space-x-2">
+                            {member.status === "pending" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 md:h-10 md:w-10"
+                                onClick={() => handleResend(member)}
+                                title="Resend invitation email"
+                              >
+                                <Mail className="h-3 w-3 md:h-4 md:w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 md:h-10 md:w-10"
-                              onClick={() => handleResend(member)}
-                              title="Resend invitation email"
+                              onClick={() => handleEdit(member)}
                             >
-                              <Mail className="h-3 w-3 md:h-4 md:w-4" />
+                              <EditIcon className="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-10 md:w-10"
-                            onClick={() => handleEdit(member)}
-                          >
-                            <EditIcon className="h-3 w-3 md:h-4 md:w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 md:h-10 md:w-10"
-                            onClick={() => handleDelete(member)}
-                            disabled={deletingId === member.id}
-                          >
-                            {deletingId === member.id ? (
-                              <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 md:h-10 md:w-10"
+                              onClick={() => handleDelete(member)}
+                              disabled={deletingId === member.id}
+                            >
+                              {deletingId === member.id ? (
+                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
 
         <MemberForm

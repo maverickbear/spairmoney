@@ -29,6 +29,7 @@ const DOC_ITEMS: { path: string; label: string }[] = [
   { path: "features/RECEIPTS.md", label: "Receipts" },
   { path: "features/TAXES.md", label: "Taxes" },
   { path: "features/ADMIN.md", label: "Admin" },
+  { path: "LANDING_VS_FEATURES.md", label: "Landing vs features" },
 ];
 
 export function DocsClient() {

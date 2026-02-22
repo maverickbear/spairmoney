@@ -43,7 +43,7 @@ export function CategoryBudgetSlider({
   subcategoryBudgets,
   period,
   onBudgetChange,
-  maxAmount = 10000,
+  maxAmount = 2000,
   step = 50,
 }: CategoryBudgetSliderProps) {
   const { toast } = useToast();

@@ -88,14 +88,16 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
       : action.label
     : null;
 
+  const alertVariant = variant === "destructive" ? "destructive" : variant === "success" ? "success" : "default";
+
   return (
     <div className="relative shadow-lg transition-all animate-in slide-in-from-top-5 fade-in-0 duration-300">
       <Alert
-        variant={variant === "destructive" ? "destructive" : "default"}
+        variant={alertVariant}
         className={cn("pr-10", action && "pb-12")}
       >
-        {variant === "success" && <CheckCircle2 className="h-4 w-4" />}
-        {variant === "destructive" && <AlertCircle className="h-4 w-4" />}
+        {variant === "success" && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+        {variant === "destructive" && <AlertCircle className="h-4 w-4 shrink-0" />}
         <AlertTitle>{title}</AlertTitle>
         {description && <AlertDescription>{description}</AlertDescription>}
         {action && (
@@ -119,7 +121,8 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
         className={cn(
           "absolute top-4 right-4 rounded-md p-1 opacity-70 hover:opacity-100 transition-opacity",
           variant === "destructive" && "text-destructive hover:bg-destructive/10",
-          "text-muted-foreground hover:bg-secondary"
+          variant === "success" && "text-sentiment-positive hover:bg-sentiment-positive-bg",
+          (variant === "default" || !variant) && "text-muted-foreground hover:bg-secondary"
         )}
       >
         <X className="h-4 w-4" />

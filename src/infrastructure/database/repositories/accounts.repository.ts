@@ -83,6 +83,41 @@ export class AccountsRepository implements IAccountsRepository {
   }
 
   /**
+   * Map raw Supabase row to AccountRow.
+   * Supabase may return snake_case keys; we normalize so type and other fields are always present.
+   */
+  private static toAccountRow(raw: Record<string, unknown>): AccountRow {
+    const typeVal = raw.type ?? raw.account_type;
+    const typeStr = typeof typeVal === "string" ? typeVal.trim().toLowerCase() : "";
+    const validTypes: AccountRow["type"][] = ["cash", "checking", "savings", "credit", "investment", "other"];
+    const type = validTypes.includes(typeStr as AccountRow["type"]) ? (typeStr as AccountRow["type"]) : "other";
+
+    const toNum = (v: unknown): number | null => {
+      if (v == null) return null;
+      if (typeof v === "number" && !Number.isNaN(v)) return v;
+      if (typeof v === "string") { const n = Number(v); return Number.isNaN(n) ? null : n; }
+      return null;
+    };
+
+    return {
+      id: String(raw.id ?? ""),
+      name: String(raw.name ?? ""),
+      type,
+      user_id: raw.user_id != null ? String(raw.user_id) : null,
+      credit_limit: toNum(raw.credit_limit),
+      initial_balance: toNum(raw.initial_balance),
+      currency_code: raw.currency_code != null ? String(raw.currency_code) : null,
+      created_at: String(raw.created_at ?? ""),
+      updated_at: String(raw.updated_at ?? ""),
+      due_day_of_month: toNum(raw.due_day_of_month) != null && Number.isInteger(Number(raw.due_day_of_month)) ? Number(raw.due_day_of_month) : null,
+      extra_credit: Number(raw.extra_credit) || 0,
+      household_id: raw.household_id != null ? String(raw.household_id) : null,
+      deleted_at: raw.deleted_at != null ? String(raw.deleted_at) : null,
+      is_default: Boolean(raw.is_default),
+    };
+  }
+
+  /**
    * Find account by ID
    */
   async findById(id: string, accessToken?: string, refreshToken?: string): Promise<AccountRow | null> {
@@ -103,7 +138,8 @@ export class AccountsRepository implements IAccountsRepository {
       throw new Error(`Failed to fetch account: ${error.message}`);
     }
 
-    return account as AccountRow;
+    if (!account || typeof account !== "object") return null;
+    return AccountsRepository.toAccountRow(account as Record<string, unknown>);
   }
 
   /**
@@ -505,7 +541,8 @@ export class AccountsRepository implements IAccountsRepository {
    */
   async setDefaultAccount(accountId: string, userId: string): Promise<void> {
     const supabase = await createServerClient();
-    
+    void userId; // Passed for API consistency; RLS scopes which rows can be updated.
+
     // First, verify the account belongs to the user or their household (implicitly checked by verifying ownership in service)
     // We'll perform this update in two steps or a transaction if possible.
     // Since we don't have explicit transaction support here in the client easily exposed,

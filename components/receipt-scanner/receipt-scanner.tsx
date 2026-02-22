@@ -76,10 +76,10 @@ export function ReceiptScanner({
   React.useEffect(() => {
     if (open && initialMode) {
       if (initialMode === "camera" && isMobileOrTablet) {
-        // Small delay to ensure dialog is fully open
+        // Delay so dialog is fully open and video element can mount (important on mobile)
         setTimeout(() => {
           startCamera();
-        }, 100);
+        }, 300);
       } else if (initialMode === "upload") {
         // Small delay to ensure dialog is fully open
         setTimeout(() => {
@@ -103,10 +103,8 @@ export function ReceiptScanner({
         video: { facingMode: "environment" }, // Use back camera on mobile
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setShowCamera(true);
-      }
+      // Set showCamera true first so the <video> mounts; we attach the stream in useEffect
+      setShowCamera(true);
     } catch (error) {
       console.error("Error accessing camera:", error);
       toast({
@@ -117,6 +115,18 @@ export function ReceiptScanner({
       setShowCamera(false);
     }
   };
+
+  // Attach stream to video once the element is mounted (needed because video only renders when showCamera is true)
+  React.useEffect(() => {
+    if (!showCamera || !streamRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = streamRef.current;
+    video.play().catch((err) => console.error("[ReceiptScanner] Video play failed:", err));
+    return () => {
+      stopCamera();
+    };
+  }, [showCamera]);
 
   const capturePhoto = () => {
     if (!videoRef.current) return;
@@ -243,6 +253,7 @@ export function ReceiptScanner({
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
                 className="w-full h-full object-contain"
               />
               <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">

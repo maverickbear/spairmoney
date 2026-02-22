@@ -667,7 +667,17 @@ export default function AccountsPage() {
                             throw new Error(err.error || "Failed to load account");
                           }
                           const data = await res.json();
-                          setSelectedAccount(data as Account);
+                          // Merge list account so type and other display fields are always present when editing
+                          const merged: Account = {
+                            ...account,
+                            ...data,
+                            type: data.type ?? account.type,
+                            name: data.name ?? account.name,
+                            creditLimit: data.creditLimit ?? account.creditLimit,
+                            initialBalance: data.initialBalance ?? account.initialBalance,
+                            dueDayOfMonth: data.dueDayOfMonth ?? account.dueDayOfMonth,
+                          };
+                          setSelectedAccount(merged);
                           setIsFormOpen(true);
                         } catch (e) {
                           toast({

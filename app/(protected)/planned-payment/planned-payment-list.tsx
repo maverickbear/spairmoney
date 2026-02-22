@@ -14,9 +14,10 @@ import {
   endOfMonth,
   addMonths,
   addDays,
+  subMonths,
 } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Calendar, Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight, Plus, Pencil } from "lucide-react";
+import { Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import type { BasePlannedPayment as PlannedPayment } from "@/src/domain/planned-payments/planned-payments.types";
 import { PLANNED_HORIZON_DAYS } from "@/src/domain/planned-payments/planned-payments.types";
@@ -53,14 +54,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
-export type DateRangePreset = "today" | "this_week" | "this_month" | "next_month" | "next_90_days";
+export type DateRangePreset = "all_time" | "today" | "this_week" | "this_month" | "next_month" | "next_90_days";
 
 function getDateRangeForPreset(preset: DateRangePreset): { startDate: Date; endDate: Date } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   switch (preset) {
+    case "all_time": {
+      const start = subMonths(today, 24);
+      start.setHours(0, 0, 0, 0);
+      const end = addDays(today, PLANNED_HORIZON_DAYS);
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start, endDate: end };
+    }
     case "today": {
       const end = new Date(today);
       end.setHours(23, 59, 59, 999);
@@ -91,11 +100,12 @@ function getDateRangeForPreset(preset: DateRangePreset): { startDate: Date; endD
       return { startDate: today, endDate: end };
     }
     default:
-      return getDateRangeForPreset("next_90_days");
+      return getDateRangeForPreset("all_time");
   }
 }
 
 const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
+  { value: "all_time", label: "All Time" },
   { value: "today", label: "Today" },
   { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" },
@@ -106,10 +116,11 @@ const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
 export function PlannedPaymentList() {
   const { toast } = useToast();
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [payments, setPayments] = useState<PlannedPayment[]>([]);
   const [totalPayments, setTotalPayments] = useState(0);
   const [activeTab, setActiveTab] = useState<"expense" | "income" | "transfer">("expense");
-  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>("this_month");
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>("all_time");
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -516,11 +527,11 @@ export function PlannedPaymentList() {
         const data = await response.json();
         throw new Error(data.error || "Failed to cancel payment");
       }
-      
-      // Reload payments to reflect changes
-      setCurrentPage(1);
-      setAllPayments([]);
-      await Promise.all([loadCounts(), loadPlannedPayments()]);
+
+      setPayments((prev) => prev.filter((p) => p.id !== payment.id));
+      setAllPayments((prev) => prev.filter((p) => p.id !== payment.id));
+      setTotalPayments((prev) => Math.max(0, prev - 1));
+      await loadCounts();
       toast({
         title: "Payment cancelled",
         description: "This payment has been cancelled.",
@@ -541,6 +552,98 @@ export function PlannedPaymentList() {
     }
   };
 
+  // Current list of payment IDs for the active tab (desktop: current page; mobile: all loaded)
+  const currentListPayments = isMobile ? mobilePayments : sortedPayments;
+  const currentListIds = useMemo(
+    () => new Set(currentListPayments.map((p) => p.id)),
+    [currentListPayments]
+  );
+  const allCurrentSelected =
+    currentListIds.size > 0 && currentListPayments.every((p) => selectedIds.has(p.id));
+  const someCurrentSelected = currentListPayments.some((p) => selectedIds.has(p.id));
+
+  useEffect(() => {
+    const indeterminate = someCurrentSelected && !allCurrentSelected;
+    document.querySelectorAll<HTMLInputElement>("[data-planned-payment-select-all]").forEach((el) => {
+      el.indeterminate = indeterminate;
+    });
+  }, [someCurrentSelected, allCurrentSelected]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeTab, dateRangePreset]);
+
+  const handleToggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        currentListPayments.forEach((p) => next.add(p.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        currentListPayments.forEach((p) => next.delete(p.id));
+        return next;
+      });
+    }
+  };
+
+  const handleToggleSelectOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (
+      !window.confirm(
+        `Delete ${ids.length} planned payment(s)? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setProcessingIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/v2/planned-payments/${id}`, { method: "DELETE" })
+        )
+      );
+      const idsSet = new Set(ids);
+      setSelectedIds(new Set());
+      setPayments((prev) => prev.filter((p) => !idsSet.has(p.id)));
+      setAllPayments((prev) => prev.filter((p) => !idsSet.has(p.id)));
+      setTotalPayments((prev) => Math.max(0, prev - ids.length));
+      toast({
+        title: "Planned payments deleted",
+        description: `${ids.length} payment(s) have been deleted.`,
+      });
+      await loadCounts();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete some payments",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+  }, [selectedIds, loadCounts]);
+
   const getDaysUntil = (date: string | Date) => {
     const dueDate = date instanceof Date ? date : new Date(date);
     const today = new Date();
@@ -553,17 +656,25 @@ export function PlannedPaymentList() {
     const dueDate = date instanceof Date ? date : new Date(date);
     const daysUntil = getDaysUntil(dueDate);
 
-    if (isToday(dueDate)) {
-      return "Today";
-    } else if (isTomorrow(dueDate)) {
-      return "Tomorrow";
-    } else if (daysUntil <= 7) {
-      // Return day name in English
-      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      return dayNames[dueDate.getDay()];
-    } else {
-      return format(dueDate, "MM/dd/yyyy");
+    if (daysUntil < 0) return "Overdue";
+    if (isToday(dueDate)) return "Today";
+    if (isTomorrow(dueDate)) return "Tomorrow";
+    if (daysUntil >= 2 && daysUntil <= 6) return `In ${daysUntil} days`;
+    if (daysUntil >= 7 && daysUntil <= 13) return "Next Week";
+    if (daysUntil >= 14 && daysUntil <= 20) return "In 2 weeks";
+    if (daysUntil >= 21 && daysUntil <= 27) return "In 3 weeks";
+    if (daysUntil >= 28 && daysUntil <= 59) return "Next Month";
+    if (daysUntil >= 60) {
+      const months = Math.round(daysUntil / 30);
+      return `In ${months} months`;
     }
+    return format(dueDate, "MMM d, yyyy");
+  };
+
+  /** Formatted date for support text (e.g. "Feb 20, 2026") */
+  const formatDateSupport = (date: string | Date) => {
+    const dueDate = date instanceof Date ? date : new Date(date);
+    return format(dueDate, "MMM d, yyyy");
   };
 
   const getUrgencyColor = (daysUntil: number) => {
@@ -676,6 +787,37 @@ export function PlannedPaymentList() {
         </div>
       </div>
 
+      {/* Selection bar: show when at least one item is selected */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 lg:px-8 py-3 border-b bg-card shadow-sm">
+          <span className="text-sm text-muted-foreground">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="medium"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Clear selection
+            </Button>
+            <Button
+              variant="destructive"
+              size="medium"
+              onClick={() => handleDeleteSelected()}
+              disabled={Array.from(selectedIds).some((id) => processingIds.has(id))}
+            >
+              {Array.from(selectedIds).some((id) => processingIds.has(id)) ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="w-full p-4 lg:p-8">
         {/* Mobile Card View */}
         <div className="lg:hidden" ref={pullToRefreshRef}>
@@ -711,20 +853,46 @@ export function PlannedPaymentList() {
             </div>
           ) : (
             <>
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                <Checkbox
+                  data-planned-payment-select-all
+                  checked={allCurrentSelected}
+                  onCheckedChange={handleToggleSelectAll}
+                  aria-label="Select all"
+                />
+                <span className="text-sm text-muted-foreground">Select all</span>
+              </div>
               {mobilePayments.map((payment, index) => {
                   const daysUntil = getDaysUntil(payment.date);
                   const amount = Math.abs(payment.amount || 0);
                   const dateLabel = formatDateLabel(payment.date);
                   const isProcessing = processingIds.has(payment.id);
+                  const isSelected = selectedIds.has(payment.id);
                   
                   return (
-                    <div key={payment.id || index} className="mb-4 p-4 border rounded-lg">
+                    <div
+                      key={payment.id || index}
+                      className={cn(
+                        "mb-4 p-4 border rounded-lg flex gap-3",
+                        isSelected && "bg-muted/50 border-primary/30"
+                      )}
+                    >
+                      <div className="flex-shrink-0 pt-0.5">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleToggleSelectOne(payment.id, !!checked)}
+                          aria-label={`Select ${getCategoryName(payment)}`}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className={cn("font-medium text-sm", getUrgencyColor(daysUntil))}>
+                        <div>
+                          <div className={cn("font-medium text-sm", getUrgencyColor(daysUntil))}>
                             {dateLabel}
-                          </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDateSupport(payment.date)}
+                          </div>
                         </div>
                         <div className={cn("font-bold text-sm", 
                           payment.type === "expense" ? "text-red-600 dark:text-red-400" :
@@ -793,8 +961,9 @@ export function PlannedPaymentList() {
                               <X className="h-4 w-4 mr-2" />
                               Cancel
                             </DropdownMenuItem>
-                          </DropdownMenuContent>
+                            </DropdownMenuContent>
                         </DropdownMenu>
+                      </div>
                       </div>
                     </div>
                   );
@@ -847,6 +1016,14 @@ export function PlannedPaymentList() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10 pr-0">
+                      <Checkbox
+                        data-planned-payment-select-all
+                        checked={allCurrentSelected}
+                        onCheckedChange={handleToggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs md:text-sm">Date</TableHead>
                     <TableHead className="text-xs md:text-sm">Description</TableHead>
                     <TableHead className="text-xs md:text-sm hidden md:table-cell">Category</TableHead>
@@ -862,24 +1039,25 @@ export function PlannedPaymentList() {
                     const amount = Math.abs(payment.amount || 0);
                     const dateLabel = formatDateLabel(payment.date);
                     const isProcessing = processingIds.has(payment.id);
+                    const isSelected = selectedIds.has(payment.id);
 
                     return (
-                      <TableRow key={payment.id || index} className="hover:bg-muted/50">
+                      <TableRow key={payment.id || index} className={cn("hover:bg-muted/50", isSelected && "bg-muted/50")}>
+                        <TableCell className="w-10 pr-0">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleToggleSelectOne(payment.id, !!checked)}
+                            aria-label={`Select ${getCategoryName(payment)}`}
+                          />
+                        </TableCell>
                         <TableCell className="text-xs md:text-sm">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className={cn("font-medium", getUrgencyColor(daysUntil))}>
+                          <div>
+                            <div className={cn("font-medium", getUrgencyColor(daysUntil))}>
                               {dateLabel}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 md:hidden">
-                            {daysUntil >= 0
-                              ? daysUntil === 0
-                                ? "Today"
-                                : daysUntil === 1
-                                ? "1 day"
-                                : `${daysUntil} days`
-                              : "Overdue"}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {formatDateSupport(payment.date)}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs md:text-sm">
@@ -1007,6 +1185,14 @@ export function PlannedPaymentList() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10 pr-0">
+                      <Checkbox
+                        data-planned-payment-select-all
+                        checked={allCurrentSelected}
+                        onCheckedChange={handleToggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs md:text-sm">Date</TableHead>
                     <TableHead className="text-xs md:text-sm">Description</TableHead>
                     <TableHead className="text-xs md:text-sm hidden md:table-cell">Category</TableHead>
@@ -1022,24 +1208,25 @@ export function PlannedPaymentList() {
                     const amount = Math.abs(payment.amount || 0);
                     const dateLabel = formatDateLabel(payment.date);
                     const isProcessing = processingIds.has(payment.id);
+                    const isSelected = selectedIds.has(payment.id);
 
                     return (
-                      <TableRow key={payment.id || index} className="hover:bg-muted/50">
+                      <TableRow key={payment.id || index} className={cn("hover:bg-muted/50", isSelected && "bg-muted/50")}>
+                        <TableCell className="w-10 pr-0">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleToggleSelectOne(payment.id, !!checked)}
+                            aria-label={`Select ${getCategoryName(payment)}`}
+                          />
+                        </TableCell>
                         <TableCell className="text-xs md:text-sm">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className={cn("font-medium", getUrgencyColor(daysUntil))}>
+                          <div>
+                            <div className={cn("font-medium", getUrgencyColor(daysUntil))}>
                               {dateLabel}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 md:hidden">
-                            {daysUntil >= 0
-                              ? daysUntil === 0
-                                ? "Today"
-                                : daysUntil === 1
-                                ? "1 day"
-                                : `${daysUntil} days`
-                              : "Overdue"}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {formatDateSupport(payment.date)}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs md:text-sm">
@@ -1162,6 +1349,14 @@ export function PlannedPaymentList() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10 pr-0">
+                      <Checkbox
+                        data-planned-payment-select-all
+                        checked={allCurrentSelected}
+                        onCheckedChange={handleToggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs md:text-sm">Date</TableHead>
                     <TableHead className="text-xs md:text-sm">Description</TableHead>
                     <TableHead className="text-xs md:text-sm hidden md:table-cell">From Account</TableHead>
@@ -1177,24 +1372,25 @@ export function PlannedPaymentList() {
                     const amount = Math.abs(payment.amount || 0);
                     const dateLabel = formatDateLabel(payment.date);
                     const isProcessing = processingIds.has(payment.id);
+                    const isSelected = selectedIds.has(payment.id);
 
                     return (
-                      <TableRow key={payment.id || index} className="hover:bg-muted/50">
+                      <TableRow key={payment.id || index} className={cn("hover:bg-muted/50", isSelected && "bg-muted/50")}>
+                        <TableCell className="w-10 pr-0">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleToggleSelectOne(payment.id, !!checked)}
+                            aria-label={`Select ${getCategoryName(payment)}`}
+                          />
+                        </TableCell>
                         <TableCell className="text-xs md:text-sm">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className={cn("font-medium", getUrgencyColor(daysUntil))}>
+                          <div>
+                            <div className={cn("font-medium", getUrgencyColor(daysUntil))}>
                               {dateLabel}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 md:hidden">
-                            {daysUntil >= 0
-                              ? daysUntil === 0
-                                ? "Today"
-                                : daysUntil === 1
-                                ? "1 day"
-                                : `${daysUntil} days`
-                              : "Overdue"}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {formatDateSupport(payment.date)}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs md:text-sm">

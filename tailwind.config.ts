@@ -110,6 +110,7 @@ const config = {
         sentiment: {
           negative: "hsl(var(--sentiment-negative))",
           positive: "hsl(var(--sentiment-positive))",
+          "positive-bg": "hsl(var(--sentiment-positive-bg))",
           warning: "hsl(var(--sentiment-warning))",
         },
         "content-link": "hsl(var(--content-link))",

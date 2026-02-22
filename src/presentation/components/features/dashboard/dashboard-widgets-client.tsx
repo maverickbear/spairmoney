@@ -120,11 +120,11 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
             onValueChange={(value) => setSelectedMemberId(value === "everyone" ? null : value)}
           >
             <SelectTrigger
-              className="inline-flex w-auto max-w-[50%] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal --sentiment-positive hover:--sentiment-positive cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate min-w-0"
+              className="inline-flex w-auto max-w-[50%] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal text-sentiment-positive hover:text-sentiment-positive cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate min-w-0"
               size="medium"
               aria-label="Change whose finances to view"
             >
-              <span className="--sentiment-positive font-bold truncate" title={selectedDisplayName}>{selectedDisplayName}&apos;s </span>
+              <span className="text-sentiment-positive font-bold truncate" title={selectedDisplayName}>{selectedDisplayName}&apos;s </span>
             </SelectTrigger>
             <SelectContent align="start">
               <SelectItem value="everyone">Family</SelectItem>
@@ -161,10 +161,10 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                       {formatMoney(available)}
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={card?.freeToSpend != null ? formatMoney(card.freeToSpend) : undefined}>
-                      Free: {card?.freeToSpend != null ? formatMoney(card.freeToSpend) : "—"}
+                      Free <span className="font-semibold text-foreground">{card?.freeToSpend != null ? formatMoney(card.freeToSpend) : "—"}</span>
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={card?.projectedEndOfMonth != null ? formatMoney(card.projectedEndOfMonth) : undefined}>
-                      End of month: {card?.projectedEndOfMonth != null ? formatMoney(card.projectedEndOfMonth) : "—"}
+                      End of month <span className="font-semibold text-foreground">{card?.projectedEndOfMonth != null ? formatMoney(card.projectedEndOfMonth) : "—"}</span>
                     </p>
                   </div>
                 );
@@ -187,13 +187,13 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">
                       {card?.savingPercentOfIncome != null
-                        ? `Saved ${card.savingPercentOfIncome}% this month`
-                        : "—"}
+                        ? <>Saved <span className="font-semibold text-foreground">{card.savingPercentOfIncome}%</span> this month</>
+                        : <span className="font-semibold text-foreground">—</span>}
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">
                       {card?.emergencyFundMonths != null
-                        ? `Emergency fund: ${card.emergencyFundMonths} months`
-                        : "Emergency fund: —"}
+                        ? <>Emergency fund <span className="font-semibold text-foreground">{card.emergencyFundMonths} months</span></>
+                        : <>Emergency fund <span className="font-semibold text-foreground">—</span></>}
                     </p>
                   </div>
                 );
@@ -213,10 +213,10 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                       {netWorthStr}
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={hasData ? formatMoney(assets) : undefined}>
-                      Assets: {hasData ? formatMoney(assets) : "—"}
+                      Assets <span className="font-semibold text-foreground">{hasData ? formatMoney(assets) : "—"}</span>
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={hasData ? formatMoney(liabilities) : undefined}>
-                      Debt: {hasData ? formatMoney(liabilities) : "—"}
+                      Debt <span className="font-semibold text-foreground">{hasData ? formatMoney(liabilities) : "—"}</span>
                     </p>
                   </div>
                 );

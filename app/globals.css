@@ -145,6 +145,8 @@
     /* Sentiment Negative: #A8200D */
     --sentiment-positive: 142 72% 29%;
     /* Sentiment Positive (Tailwind green-700): #15803d */
+    --sentiment-positive-bg: 142 48% 96%;
+    /* Solid light green for success alerts/toasts (no transparency) */
     --sentiment-warning: 47 83% 60%;
     /* Sentiment Warning: #EDC843 */
   }
@@ -280,6 +282,8 @@
     /* Sentiment Negative: #A8200D */
     --sentiment-positive: 142 72% 29%;
     /* Sentiment Positive (Tailwind green-700): #15803d */
+    --sentiment-positive-bg: 142 40% 18%;
+    /* Solid dark green for success alerts/toasts in dark mode (no transparency) */
     --sentiment-warning: 47 83% 60%;
     /* Sentiment Warning: #EDC843 */
 
