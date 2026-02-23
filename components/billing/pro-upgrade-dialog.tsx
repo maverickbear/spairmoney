@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Tag, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const FEATURES = [
@@ -27,7 +28,7 @@ interface ProUpgradeDialogProps {
   subscriptionStatus?: UpgradeDialogSubscriptionStatus;
   currentPlanId?: string;
   currentInterval?: "month" | "year" | null;
-  onSelectPlan: (planId: string, interval: "month" | "year") => void;
+  onSelectPlan: (planId: string, interval: "month" | "year", promoCode?: string) => void;
   onManageSubscription?: () => void;
   canClose?: boolean;
   loading?: boolean;
@@ -99,6 +100,8 @@ export function ProUpgradeDialog({
   const [plan, setPlan] = useState<Plan | null>(null);
   const [plansLoading, setPlansLoading] = useState(true);
   const [interval, setInterval] = useState<"month" | "year">("year");
+  const [promoCode, setPromoCode] = useState("");
+  const [showPromoInput, setShowPromoInput] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -130,6 +133,13 @@ export function ProUpgradeDialog({
     };
   }, [open, currentPlanId, currentInterval]);
 
+  useEffect(() => {
+    if (!open) {
+      setPromoCode("");
+      setShowPromoInput(false);
+    }
+  }, [open]);
+
   const copy = getCopy(subscriptionStatus);
   const needsReactivation =
     subscriptionStatus === "cancelled" || subscriptionStatus === "past_due" || subscriptionStatus === "unpaid";
@@ -148,7 +158,7 @@ export function ProUpgradeDialog({
       onManageSubscription();
       return;
     }
-    if (plan) onSelectPlan(plan.id, interval);
+    if (plan) onSelectPlan(plan.id, interval, promoCode.trim() || undefined);
   }
 
   function handleSecondary() {
@@ -265,6 +275,51 @@ export function ProUpgradeDialog({
                       </p>
                     </button>
                   </>
+                )}
+              </div>
+
+              {/* Promo code – optional */}
+              <div className="mt-4">
+                {!showPromoInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowPromoInput(true)}
+                    className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
+                  >
+                    <Tag className="h-3.5 w-3.5" />
+                    Have a promo code?
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Enter code"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value)}
+                        className="font-mono text-sm h-9"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 h-9 px-2 text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setPromoCode("");
+                          setShowPromoInput(false);
+                        }}
+                        aria-label="Remove promo code"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {promoCode.trim() && (
+                      <p className="text-xs text-muted-foreground">
+                        Applied: <span className="font-mono font-medium text-foreground">{promoCode.trim()}</span>
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 

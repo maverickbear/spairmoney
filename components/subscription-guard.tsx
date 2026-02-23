@@ -48,6 +48,7 @@ export function SubscriptionGuard({
       if (landing?.planId && landing?.interval) {
         redirectAttempted.current = true;
         clearLandingPlan();
+        const promoCode = searchParams.get("promo")?.trim();
         fetch("/api/billing/checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -55,6 +56,7 @@ export function SubscriptionGuard({
             planId: landing.planId,
             interval: landing.interval,
             returnUrl: "/subscription/success",
+            ...(promoCode && { promoCode }),
           }),
         })
           .then((res) => res.json())

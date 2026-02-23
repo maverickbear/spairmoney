@@ -50,7 +50,7 @@ export function PricingDialog({
     }
   }, [open]);
 
-  async function handleSelectPlan(planId: string, interval: "month" | "year") {
+  async function handleSelectPlan(planId: string, interval: "month" | "year", promoCode?: string) {
     setLoading(true);
     try {
       const response = await fetch("/api/billing/checkout-session", {
@@ -58,7 +58,11 @@ export function PricingDialog({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ planId, interval }),
+        body: JSON.stringify({
+          planId,
+          interval,
+          ...(promoCode && promoCode.trim() && { promoCode: promoCode.trim() }),
+        }),
       });
 
       const data = await response.json();
