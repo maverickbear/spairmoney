@@ -173,9 +173,8 @@ performance-reports/
 .next/analyze/**
 
 # ============================================
-# Documentation
+# Documentation (docs/ is versioned so /admin/docs can serve content in production)
 # ============================================
-/docs/
 
 # ============================================
 # Storybook

@@ -6,10 +6,6 @@ infrastructure/docker-compose.yml
 *.local
 .env.local
 
-# Documentation at project root (not needed for builds).
-# Use /docs/ so we do NOT exclude app/admin/(dashboard)/docs/ (the /admin/docs route).
-/docs/
-
 # Scripts (not needed for builds)
 scripts/
 
