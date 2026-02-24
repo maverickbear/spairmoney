@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -108,6 +110,7 @@ interface VerifyOtpFormProps {
 export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("auth");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -249,12 +252,12 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
     const otpCode = otpToVerify.join("");
     
     if (otpCode.length !== 6) {
-      setError("Please enter the complete 6-digit code");
+      setError(t("enterComplete6DigitCode"));
       return;
     }
 
     if (!email) {
-      setError("Email is required");
+      setError(t("emailRequired"));
       return;
     }
 
@@ -334,14 +337,14 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
             setError(null);
           } else {
             // No session, show error
-            setError("This code has already been used. Please request a new one.");
+            setError(t("codeAlreadyUsed"));
             setOtp(["", "", "", "", "", ""]);
             inputRefs.current[0]?.focus();
             setLoading(false);
             return;
           }
         } else {
-          setError(verifyError.message || "Invalid verification code. Please try again.");
+          setError(verifyError.message || t("invalidVerificationCode"));
           setOtp(["", "", "", "", "", ""]);
           inputRefs.current[0]?.focus();
           setLoading(false);
@@ -368,7 +371,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
 
       // For signup, check if email is confirmed
       if (!isGoogleOAuth && !data.user.email_confirmed_at) {
-        setError("Email verification failed. Please try again.");
+        setError(t("emailVerificationFailed"));
         setLoading(false);
         return;
       }
@@ -380,7 +383,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         const { data: { session: checkSession } } = await supabase.auth.getSession();
         
         if (!checkSession) {
-        setError("Verification failed. Please try again.");
+        setError(t("verificationFailed"));
           setLoading(false);
         return;
         }
@@ -429,7 +432,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         
         if (userError || !currentUser) {
           console.error("Session verification failed after", maxAttempts, "attempts:", userError);
-          setError("Failed to establish session. Please try again.");
+          setError(t("failedToEstablishSession"));
           setLoading(false);
           return;
         }
@@ -632,7 +635,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         const { data: { user: finalUserCheck }, error: finalCheckError } = await supabase.auth.getUser();
         
         if (finalCheckError || !finalUserCheck) {
-          setError("Session verification failed. Please try again.");
+          setError(t("sessionVerificationFailed"));
           return;
         }
 
@@ -693,12 +696,12 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
             return;
           } else {
             const errorData = await completeResponse.json();
-            setError(errorData.error || "Failed to complete invitation. Please try again.");
+            setError(errorData.error || t("failedToCompleteInvitation"));
             return;
           }
         } catch (error) {
           console.error("[OTP] Error completing invitation:", error);
-          setError("Failed to complete invitation. Please try again.");
+          setError(t("failedToCompleteInvitation"));
           return;
         }
       }
@@ -749,7 +752,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       router.push(path);
     } catch (error) {
       console.error("Error verifying OTP:", error);
-      setError("An unexpected error occurred. Please try again.");
+      setError(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -758,7 +761,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
   // Resend OTP
   async function handleResend() {
     if (!email) {
-      setError("Email is required");
+      setError(t("emailRequired"));
       return;
     }
 
@@ -787,15 +790,15 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         setOtp(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
         setError(null);
-        setSuccessMessage("Code resent successfully! Please check your inbox.");
+        setSuccessMessage(t("codeResentSuccess"));
         setTimeRemaining(300); // Reset timer to 5 minutes
         setTimeout(() => setSuccessMessage(null), 5000);
       } else {
-        setError(data.error || "Failed to resend code. Please try again.");
+        setError(data.error || t("failedToResendCode"));
       }
     } catch (error) {
       console.error("Error resending OTP:", error);
-      setError("Failed to resend code. Please try again.");
+      setError(t("failedToResendCode"));
     } finally {
       setResending(false);
     }
@@ -806,7 +809,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>{t("error")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -814,7 +817,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       {successMessage && (
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Success</AlertTitle>
+          <AlertTitle>{t("success")}</AlertTitle>
           <AlertDescription>{successMessage}</AlertDescription>
         </Alert>
       )}
@@ -823,18 +826,18 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
         <div>
           <div className="flex items-center justify-between mb-2 w-full">
             <span className="text-sm font-medium text-foreground">
-              Verification Code
+              {t("verificationCode")}
             </span>
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              Code expires in: <span className="font-medium text-foreground">{timeRemaining > 0 ? formatTime(timeRemaining) : "0:00"}</span>
+              {t("codeExpiresIn")} <span className="font-medium text-foreground">{timeRemaining > 0 ? formatTime(timeRemaining) : "0:00"}</span>
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Enter the 6-digit code sent to <span className="font-medium">{email}</span>
+            {t("enterCodeSentTo")} <span className="font-medium">{email}</span>
           </p>
           {timeRemaining === 0 && (
             <p className="text-sm text-destructive font-medium mt-2">
-              Code has expired. Please request a new one.
+              {t("codeExpiredRequestNew")}
             </p>
           )}
         </div>
@@ -874,7 +877,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
               htmlFor="trust-browser"
               className="text-sm text-foreground cursor-pointer select-none"
             >
-              Don't ask again for this browser
+              {t("dontAskAgainBrowser")}
             </label>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -887,8 +890,8 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
                   <HelpCircle className="w-4 h-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" title="Trusted browser" className="max-w-[280px] whitespace-normal">
-                Only enable this on personal or trusted devices. We'll still ask for your password on future logins, but we won't require a verification code on this browser for a while.
+              <TooltipContent side="right" title={t("trustedBrowserTooltip")} className="max-w-[280px] whitespace-normal">
+                {t("trustedBrowserTooltip")}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -899,13 +902,13 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
       {loading && (
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
-          <span>Verifying...</span>
+          <span>{t("verifying")}</span>
         </div>
       )}
 
       <div className="text-center flex items-center justify-center gap-2">
         <p className="text-sm text-muted-foreground">
-          Didn't receive the code?
+          {t("didntReceiveCode")}
         </p>
         <button
           type="button"
@@ -916,10 +919,10 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           {resending ? (
             <>
               <Loader2 className="w-3 h-3 animate-spin" />
-              Resending...
+              {t("resendingCode")}
             </>
           ) : (
-            "Resend Code"
+            t("resendCode")
           )}
         </button>
       </div>
@@ -933,7 +936,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           disabled={loading || resending}
           className="w-full text-sm"
         >
-          Back to login
+          {t("backToLogin")}
         </Button>
       )}
     </div>

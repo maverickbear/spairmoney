@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import {
   Select,
   SelectContent,
@@ -38,7 +39,7 @@ export function CategorySelect({
   useEffect(() => {
     async function loadCategories() {
       try {
-        const response = await fetch("/api/v2/categories?all=true");
+        const response = await fetch(apiUrl("/api/v2/categories?all=true"));
         if (!response.ok) {
           throw new Error("Failed to fetch categories");
         }
@@ -58,7 +59,7 @@ export function CategorySelect({
     if (selectedCategoryId) {
       async function loadSubcategories() {
         try {
-          const response = await fetch(`/api/v2/categories?categoryId=${selectedCategoryId}`);
+          const response = await fetch(apiUrl(`/api/v2/categories?categoryId=${selectedCategoryId}`));
           if (!response.ok) {
             throw new Error("Failed to fetch subcategories");
           }

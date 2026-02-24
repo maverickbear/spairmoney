@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { Link, usePathname } from "@/i18n/navigation";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Moon, Sun, User, LogOut, MessageSquare, HelpCircle, Shield, FileText as FileTextIcon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
+import { Moon, Sun, LogOut, MessageSquare, HelpCircle, Shield, FileText as FileTextIcon, Languages } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuthSafe } from "@/contexts/auth-context";
 import { useSubscriptionSafe } from "@/contexts/subscription-context";
@@ -14,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -31,8 +34,19 @@ interface UserMenuClientProps {
  * 
  * Architecture: Presentation Layer - only consumes state, no business logic
  */
+const LOCALE_OPTIONS: { value: "en" | "pt" | "es"; label: string }[] = [
+  { value: "en", label: "EN" },
+  { value: "pt", label: "PT" },
+  { value: "es", label: "ES" },
+];
+
 export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations("common");
+  const tNav = useTranslations("nav");
+  const tAuth = useTranslations("auth");
   const { theme, setTheme } = useTheme();
   const { user, role, checking: checkingAuth, refetch: refetchAuth } = useAuthSafe();
   const { subscription, plan, checking: checkingSubscription } = useSubscriptionSafe();
@@ -77,7 +91,7 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
   // Handle logout - presentation logic only (calls API route)
   const handleLogout = useCallback(async () => {
     try {
-      const response = await fetch("/api/v2/auth/sign-out", {
+      const response = await fetch(apiUrl("/api/v2/auth/sign-out"), {
         method: "POST",
       });
 
@@ -183,27 +197,47 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
               <DropdownMenuItem asChild className="mb-1">
                 <Link href="/feedback" prefetch={true} className="cursor-pointer">
                   <MessageSquare className="mr-2 h-4 w-4" />
-                  <span>Feedback</span>
+                  <span>{tNav("feedback")}</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="mb-1">
                 <Link href="/help-support" prefetch={true} className="cursor-pointer">
                   <HelpCircle className="mr-2 h-4 w-4" />
-                  <span>Help & Support</span>
+                  <span>{tNav("helpSupport")}</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="mb-1">
                 <Link href="/privacy-policy" prefetch={true} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
                   <Shield className="mr-2 h-4 w-4" />
-                  <span>Privacy Policy</span>
+                  <span>{tNav("privacyPolicy")}</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="mb-1">
                 <Link href="/terms-of-service" prefetch={true} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
                   <FileTextIcon className="mr-2 h-4 w-4" />
-                  <span>Terms of Service</span>
+                  <span>{tNav("termsOfService")}</span>
                 </Link>
               </DropdownMenuItem>
+              {process.env.NODE_ENV !== "production" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="flex items-center gap-2 text-muted-foreground">
+                    <Languages className="h-4 w-4" />
+                    <span>{t("language")}</span>
+                  </DropdownMenuLabel>
+                  {LOCALE_OPTIONS.map(({ value, label }) => (
+                    <DropdownMenuItem key={value} asChild className="mb-1">
+                      <Link
+                        href={pathname}
+                        locale={value}
+                        className={locale === value ? "bg-muted" : undefined}
+                      >
+                        {label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
               {isSuperAdmin && (
                 <>
                   <DropdownMenuSeparator />
@@ -227,7 +261,7 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
                 onClick={handleLogout}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+                <span>{tAuth("logout")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

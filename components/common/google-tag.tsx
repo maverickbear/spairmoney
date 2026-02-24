@@ -2,6 +2,7 @@
 
 import Script from "next/script";
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/utils/api-base-url";
 
 export function GoogleTag() {
   const [googleTagId, setGoogleTagId] = useState<string | null>(null);
@@ -10,7 +11,7 @@ export function GoogleTag() {
     // Fetch Google Tag ID on client side to avoid prerendering issues
     async function fetchGoogleTagId() {
       try {
-        const response = await fetch("/api/seo-settings/public");
+        const response = await fetch(apiUrl("/api/seo-settings/public"));
         if (response.ok) {
           const data = await response.json();
           // The API returns seoSettings directly or nested

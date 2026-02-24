@@ -1,6 +1,8 @@
 "use client";
 
 import { useForm, useWatch } from "react-hook-form";
+import { useTranslations, useLocale } from "next-intl";
+import { apiUrl, categoriesApiUrl } from "@/lib/utils/api-base-url";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { transactionSchema, TransactionFormData } from "@/src/domain/transactions/transactions.validations";
@@ -100,18 +102,15 @@ interface Account {
   isDefault?: boolean;
 }
 
-// Helper function to format account type for display
-function formatAccountType(type: string): string {
-  const typeMap: Record<string, string> = {
-    checking: "Checking",
-    savings: "Savings",
-    credit: "Credit Card",
-    cash: "Cash",
-    investment: "Investment",
-    other: "Other",
-  };
-  return typeMap[type.toLowerCase()] || type;
-}
+// Account type i18n keys (used with tForms)
+const ACCOUNT_TYPE_KEYS: Record<string, string> = {
+  checking: "accountTypeChecking",
+  savings: "accountTypeSavings",
+  credit: "accountTypeCredit",
+  cash: "accountTypeCash",
+  investment: "accountTypeInvestment",
+  other: "accountTypeOther",
+};
 
 
 interface Category {
@@ -127,6 +126,11 @@ interface Category {
 }
 
 export function TransactionForm({ open, onOpenChange, transaction, plannedPayment, onSuccess, defaultType = "expense" }: TransactionFormProps) {
+  const tCommon = useTranslations("common");
+  const tForms = useTranslations("forms");
+  const tTx = useTranslations("transactions");
+  const locale = useLocale();
+  const getAccountTypeLabel = (type: string) => tForms((ACCOUNT_TYPE_KEYS[type.toLowerCase()] || "accountTypeOther") as "accountTypeChecking");
   // Set date after component mounts to avoid SSR/prerendering issues
   const [defaultDate, setDefaultDate] = useState<Date | null>(null);
 
@@ -343,7 +347,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       // OPTIMIZED: Only fetch accounts if we don't have them yet
       // This avoids duplicate calls when form is opened multiple times
       if (accounts.length === 0) {
-      const accountsRes = await fetch("/api/v2/accounts");
+      const accountsRes = await fetch(apiUrl("/api/v2/accounts"));
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
           setAccounts(accountsData);
@@ -426,7 +430,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       // OPTIMIZED: Only fetch accounts if we don't have them yet
       // This avoids duplicate calls when form is opened multiple times
       if (accounts.length === 0) {
-      const accountsRes = await fetch("/api/v2/accounts");
+      const accountsRes = await fetch(apiUrl("/api/v2/accounts"));
       
       if (!accountsRes.ok) {
         logger.error("Error fetching accounts:", accountsRes.status, accountsRes.statusText);
@@ -452,7 +456,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
 
   async function loadAllCategories() {
     try {
-      const res = await fetch("/api/v2/categories?all=true");
+      const res = await fetch(categoriesApiUrl("/api/v2/categories?all=true", locale));
       if (!res.ok) {
         throw new Error("Failed to fetch categories");
       }
@@ -511,7 +515,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
 
     setIsCreatingCategory(true);
     try {
-      const res = await fetch("/api/v2/categories", {
+      const res = await fetch(categoriesApiUrl("/api/v2/categories", locale), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -528,7 +532,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       const newCategory = await res.json();
       
       toast({
-        title: "Category created",
+        title: tForms("categoryCreated"),
         description: "The category has been created successfully.",
         variant: "success",
       });
@@ -583,7 +587,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
         // Subcategories are already in the map with correct structure
       } else {
         // Fetch if not in map
-        const res = await fetch(`/api/v2/categories?categoryId=${categoryId}`);
+        const res = await fetch(categoriesApiUrl(`/api/v2/categories?categoryId=${categoryId}`, locale));
         if (res.ok) {
           const subcats = await res.json().catch(() => []) as Array<{ id: string; name: string; categoryId?: string }>;
           // Note: subcategories state is not used, but kept for potential future use
@@ -669,7 +673,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       // Edit planned payment: PATCH and exit
       if (plannedPayment) {
         const transactionDate = data.date instanceof Date ? data.date : new Date(data.date);
-        const response = await fetch(`/api/v2/planned-payments/${plannedPayment.id}`, {
+        const response = await fetch(apiUrl(`/api/v2/planned-payments/${plannedPayment.id}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -714,7 +718,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       // If date is in the future and it's a new transaction, automatically save as Planned Payment
       if (isFutureDate && !transaction) {
         // Create as PlannedPayment
-        const response = await fetch("/api/v2/planned-payments", {
+        const response = await fetch(apiUrl("/api/v2/planned-payments"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -732,12 +736,12 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to create planned payment");
+          throw new Error(errorData.error || tForms("failedToCreatePlannedPayment"));
         }
 
         toast({
-          title: "Planned Payment created",
-          description: "This payment has been saved as a planned payment and won't affect your current balance.",
+          title: tForms("plannedPaymentCreated"),
+          description: tForms("plannedPaymentCreatedDescription"),
           variant: "success",
         });
 
@@ -773,8 +777,8 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       if (!transaction && transactionLimit) {
         if (transactionLimit.limit !== -1 && transactionLimit.current >= transactionLimit.limit) {
           toast({
-            title: "Limit Reached",
-            description: `You've reached your monthly transaction limit (${transactionLimit.limit}).`,
+            title: tForms("limitReached"),
+            description: tForms("limitReachedDescription", { limit: transactionLimit.limit }),
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -828,7 +832,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       console.log("[TransactionForm] Response received", { status: res.status, ok: res.ok });
 
       if (!res.ok) {
-        let errorMessage = "Failed to save transaction";
+        let errorMessage = tForms("failedToSaveTransaction");
         try {
           const errorData = await res.json();
           errorMessage = errorData.error || errorMessage;
@@ -847,8 +851,8 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       }
 
       toast({
-        title: transaction ? "Transaction updated" : "Transaction created",
-        description: transaction ? "Your transaction has been updated successfully." : "Your transaction has been created successfully.",
+        title: transaction ? tForms("transactionUpdated") : tForms("transactionCreated"),
+        description: transaction ? tForms("transactionUpdatedDescription") : tForms("transactionCreatedDescription"),
         variant: "success",
       });
 
@@ -880,8 +884,8 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
     } catch (error) {
       logger.error("Error saving transaction:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save transaction",
+        title: tCommon("error"),
+        description: error instanceof Error ? error.message : tForms("failedToSaveTransaction"),
         variant: "destructive",
       });
       // Reload limit after error
@@ -918,9 +922,9 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent side="right" className="sm:max-w-[600px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l">
             <SheetHeader className="p-6 pb-4 border-b shrink-0">
-              <SheetTitle className="text-xl">{transaction ? "Edit" : "Add"} Transaction</SheetTitle>
+              <SheetTitle className="text-xl">{transaction ? tCommon("edit") : tCommon("add")} {tForms("transaction")}</SheetTitle>
               <SheetDescription>
-                {transaction ? "Update the transaction details" : "Create a new transaction"}
+                {transaction ? tForms("updateTransactionDescription") : tForms("createTransactionDescription")}
               </SheetDescription>
             </SheetHeader>
 
@@ -953,7 +957,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   size="medium"
                 >
                   <Receipt className="h-5 w-5 mr-2" />
-                  Scan Receipt
+                  {tForms("scanReceipt")}
                 </Button>
               ) : (
                 <Button
@@ -963,7 +967,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   className="w-full"
                 >
                   <Receipt className="h-4 w-4 mr-2" />
-                  Scan Receipt to Auto-fill
+                  {tForms("scanReceiptToAutofill")}
                 </Button>
               )}
             </div>
@@ -977,7 +981,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
             {/* Type */}
             <div className="space-y-1">
               <label className="text-sm font-medium">
-                Type
+                {tForms("typeLabel")}
               </label>
               <Tabs
                 value={form.watch("type")}
@@ -1009,9 +1013,9 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   className="w-full"
                 >
                 <TabsList className="h-fit w-full grid grid-cols-3 md:h-auto">
-                  <TabsTrigger value="expense" className="text-sm">Expense</TabsTrigger>
-                  <TabsTrigger value="income" className="text-sm">Income</TabsTrigger>
-                  <TabsTrigger value="transfer" className="text-sm">Transfer</TabsTrigger>
+                  <TabsTrigger value="expense" className="text-sm">{tTx("expense")}</TabsTrigger>
+                  <TabsTrigger value="income" className="text-sm">{tTx("income")}</TabsTrigger>
+                  <TabsTrigger value="transfer" className="text-sm">{tTx("transfer")}</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -1020,7 +1024,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  Amount
+                  {tForms("amountLabel")}
                 </label>
                 <DollarAmountInput
                   value={form.watch("amount") || undefined}
@@ -1041,7 +1045,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  {form.watch("type") === "transfer" ? "From Account" : "Account"}
+                  {form.watch("type") === "transfer" ? tForms("fromAccountLabel") : tForms("accountLabel")}
                 </label>
                 <Select
                   value={form.watch("accountId") || ""}
@@ -1051,12 +1055,12 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   required
                 >
                   <SelectTrigger size="medium">
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={tForms("selectAccount")} />
                   </SelectTrigger>
                   <SelectContent>
                     {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({formatAccountType(account.type)})
+                        {account.name} ({getAccountTypeLabel(account.type)})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1072,14 +1076,14 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
             {/* Date */}
             <div className="space-y-1">
               <label className="text-sm font-medium">
-                Date
+                {tForms("dateLabel")}
               </label>
               <DatePicker
                 date={form.watch("date")}
                 onDateChange={(date) => {
                   form.setValue("date", date || new Date());
                 }}
-                placeholder="Select date"
+                placeholder={tForms("selectDate")}
                 size="medium"
                 required
               />
@@ -1089,11 +1093,11 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
             {form.watch("type") !== "transfer" && (
               <div className="space-y-1">
                 <label className="text-sm font-medium text-muted-foreground">
-                  Count in month <span className="text-xs">(optional)</span>
+                  {tForms("countInMonthLabel")} <span className="text-xs">{tForms("optional")}</span>
                 </label>
                 <Input
                   size="medium"
-                  placeholder="YYYY-MM (e.g. 2025-01)"
+                  placeholder={tForms("countInMonthPlaceholder")}
                   {...form.register("competencyMonth")}
                   className="font-mono"
                 />
@@ -1103,7 +1107,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Use when the transaction date and the month it should count for differ (e.g. salary on Dec 30 → 2025-01).
+                  {tForms("countInMonthDescription")}
                 </p>
               </div>
             )}
@@ -1120,7 +1124,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                 return (
                   <div className="space-y-1">
                     <label className="text-sm font-medium">
-                      From Account <span className="text-gray-400 text-xs">(optional)</span>
+                      {tForms("fromAccountOptional")}
                     </label>
                     <Select
                       value={form.watch("transferFromId") || "__none__"}
@@ -1134,15 +1138,15 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                       }}
                     >
                       <SelectTrigger size="medium">
-                        <SelectValue placeholder="Select source account (optional)" />
+                        <SelectValue placeholder={tForms("selectSourceAccount")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">None (add later)</SelectItem>
+                        <SelectItem value="__none__">{tForms("noneAddLater")}</SelectItem>
                         {accounts
                           .filter((account) => account.id !== form.watch("accountId") && account.type !== "credit")
                           .map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name} ({formatAccountType(account.type)})
+                              {account.name} ({getAccountTypeLabel(account.type)})
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -1153,7 +1157,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Select the account where the payment came from (e.g., checking or savings)
+                      {tForms("transferFromDescription")}
                     </p>
                   </div>
                 );
@@ -1161,7 +1165,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                 return (
                   <div className="space-y-1">
                     <label className="text-sm font-medium">
-                      To Account
+                      {tForms("toAccountLabel")}
                     </label>
                     <Select
                       value={form.watch("toAccountId") || ""}
@@ -1173,14 +1177,14 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                       required
                     >
                       <SelectTrigger size="medium">
-                        <SelectValue placeholder="Select destination account" />
+                        <SelectValue placeholder={tForms("selectDestinationAccount")} />
                       </SelectTrigger>
                       <SelectContent>
                         {accounts
                           .filter((account) => account.id !== form.watch("accountId"))
                           .map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name} ({formatAccountType(account.type)})
+                              {account.name} ({getAccountTypeLabel(account.type)})
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -1201,14 +1205,14 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1">
                     <label className="text-sm font-medium">
-                      Category {!selectedCategoryId && <span className="text-gray-400 text-[12px]">required</span>}
+                      {tForms("categoryRequired")} {!selectedCategoryId && <span className="text-gray-400 text-[12px]">{tForms("required")}</span>}
                     </label>
                     <Select
                       value={selectedCategoryId && selectedCategoryId !== "__add_category__" ? selectedCategoryId : ""}
                       onValueChange={handleCategoryChange}
                     >
                       <SelectTrigger size="medium">
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder={tForms("selectCategory")} />
                       </SelectTrigger>
                       <SelectContent>
                         {(() => {
@@ -1228,7 +1232,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                         if (filteredCategories.length === 0) {
                           return (
                             <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                              No categories found.
+                              {tForms("noCategoriesFound")}
                             </div>
                           );
                         }
@@ -1251,7 +1255,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                                   className="text-foreground font-medium"
                                 >
                                   <Plus className="mr-2 h-4 w-4 inline" />
-                                  Add Category
+                                  {tForms("addCategory")}
                                 </SelectItem>
                               </>
                             )}
@@ -1269,7 +1273,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
 
                   <div className="space-y-1">
                     <label className="text-sm font-medium">
-                      Subcategory <span className="text-gray-400 text-[12px]">(optional)</span>
+                      {tForms("subcategoryOptional")} <span className="text-gray-400 text-[12px]">{tForms("optional")}</span>
                     </label>
                     <Select
                       value={form.watch("subcategoryId") || ""}
@@ -1279,10 +1283,10 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                       <SelectTrigger size="medium">
                         <SelectValue placeholder={
                           !selectedCategoryId 
-                            ? "Select a category first" 
+                            ? tForms("selectCategoryFirst") 
                             : (subcategoriesMap.get(selectedCategoryId) || []).length === 0
-                            ? "No subcategories available"
-                            : "Select a subcategory"
+                            ? tForms("noSubcategoriesAvailable")
+                            : tForms("selectSubcategory")
                         } />
                       </SelectTrigger>
                       <SelectContent>
@@ -1293,7 +1297,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                           if (!selectedCategoryId) {
                             return (
                               <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                Select a category first
+                                {tForms("selectCategoryFirst")}
                               </div>
                             );
                           }
@@ -1301,7 +1305,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                           if (subcats.length === 0) {
                             return (
                               <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                No subcategories found for this category
+                                {tForms("noSubcategoriesForCategory")}
                               </div>
                             );
                           }
@@ -1326,21 +1330,21 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
             {/* Description and Merchant row */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-sm font-medium">Description</label>
+                <label className="text-sm font-medium">{tForms("descriptionLabel")}</label>
                 <Input size="medium" {...form.register("description")} />
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  Merchant <span className="text-gray-400 text-[12px]">(optional)</span>
+                  {tForms("merchantOptional")} <span className="text-gray-400 text-[12px]">{tForms("optional")}</span>
                 </label>
-                <Input size="medium" {...form.register("merchant")} placeholder="Store name" />
+                <Input size="medium" {...form.register("merchant")} placeholder={tForms("storeNamePlaceholder")} />
               </div>
             </div>
 
             {/* Receipt Download Button */}
             {receiptUrl && (
               <div className="space-y-1">
-                <label className="text-sm font-medium">Receipt</label>
+                <label className="text-sm font-medium">{tForms("receiptLabel")}</label>
                 <Button
                   type="button"
                   variant="outline"
@@ -1350,7 +1354,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   }}
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Download Receipt
+                  {tForms("downloadReceipt")}
                 </Button>
               </div>
             )}
@@ -1361,14 +1365,14 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
             
             <Accordion type="single" collapsible defaultValue="">
               <AccordionItem value="more-options">
-                <AccordionTrigger>More Options</AccordionTrigger>
+                <AccordionTrigger>{tForms("moreOptions")}</AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-4">
                     {/* Expense Type (only for expense transactions) */}
                     {form.watch("type") === "expense" && (
                       <div className="space-y-3">
                         <label className="text-sm font-medium">
-                          Expense Type <span className="text-gray-400 text-[12px]">(optional)</span>
+                          {tForms("expenseTypeOptional")} <span className="text-gray-400 text-[12px]">{tForms("optional")}</span>
                         </label>
                         <div className="flex gap-6">
                           <label className="flex items-center space-x-2 cursor-pointer">
@@ -1382,7 +1386,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                               }}
                               className="w-4 h-4 --sentiment-positive border-border focus:ring-primary"
                             />
-                            <span className="text-sm">Variable</span>
+                            <span className="text-sm">{tForms("variable")}</span>
                           </label>
                           <label className="flex items-center space-x-2 cursor-pointer">
                             <input
@@ -1395,7 +1399,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                               }}
                               className="w-4 h-4 --sentiment-positive border-border focus:ring-primary"
                             />
-                            <span className="text-sm">Fixed</span>
+                            <span className="text-sm">{tForms("fixed")}</span>
                           </label>
                         </div>
                       </div>
@@ -1420,28 +1424,28 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                           htmlFor="recurring"
                           className="text-sm font-medium cursor-pointer flex items-center"
                         >
-                          Repeat this payment
+                          {tForms("repeatPayment")}
                         </label>
                       </div>
                       
                       {form.watch("recurring") && (() => {
-                        const frequencyOptions = {
-                          daily: { label: "Daily", description: "Daily repetition" },
-                          weekly: { label: "Weekly", description: "Every 7 days" },
-                          biweekly: { label: "Biweekly", description: "Every 14 days" },
-                          monthly: { label: "Monthly", description: "Once per month" },
-                          semimonthly: { label: "Semimonthly", description: "Twice per month" },
-                          quarterly: { label: "Quarterly", description: "Every 3 months" },
-                          semiannual: { label: "Semiannual", description: "Every 6 months" },
-                          annual: { label: "Annual", description: "Once per year" },
-                        } as const;
+                        const frequencyOptions = [
+                          { value: "daily", labelKey: "frequencyDaily", descKey: "frequencyDailyDescription" },
+                          { value: "weekly", labelKey: "frequencyWeekly", descKey: "frequencyWeeklyDescription" },
+                          { value: "biweekly", labelKey: "frequencyBiweekly", descKey: "frequencyBiweeklyDescription" },
+                          { value: "monthly", labelKey: "frequencyMonthly", descKey: "frequencyMonthlyDescription" },
+                          { value: "semimonthly", labelKey: "frequencySemimonthly", descKey: "frequencySemimonthlyDescription" },
+                          { value: "quarterly", labelKey: "frequencyQuarterly", descKey: "frequencyQuarterlyDescription" },
+                          { value: "semiannual", labelKey: "frequencySemiannual", descKey: "frequencySemiannualDescription" },
+                          { value: "annual", labelKey: "frequencyAnnual", descKey: "frequencyAnnualDescription" },
+                        ] as const;
 
                         const selectedFrequency = form.watch("recurringFrequency") || "monthly";
 
                         return (
                           <div className="space-y-2">
                             <label htmlFor="recurringFrequency" className="text-sm text-muted-foreground">
-                              Frequency
+                              {tForms("frequencyLabel")}
                             </label>
                             <Select
                               value={selectedFrequency}
@@ -1450,14 +1454,14 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                               }}
                             >
                               <SelectTrigger id="recurringFrequency">
-                                <SelectValue placeholder="Select frequency" />
+                                <SelectValue placeholder={tForms("selectFrequency")} />
                               </SelectTrigger>
                               <SelectContent>
-                                {Object.entries(frequencyOptions).map(([value, option]) => (
+                                {frequencyOptions.map(({ value, labelKey, descKey }) => (
                                   <SelectItem key={value} value={value}>
                                     <div className="flex items-center gap-2 w-full">
-                                      <span className="font-medium">{option.label}</span>
-                                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                                      <span className="font-medium">{tForms(labelKey)}</span>
+                                      <span className="text-xs text-muted-foreground">{tForms(descKey)}</span>
                                     </div>
                                   </SelectItem>
                                 ))}
@@ -1486,7 +1490,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   <Alert className="bg-interactive-primary/10 border-interactive-primary/30">
                     <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
-                      This transaction will be automatically saved as a <strong>Planned Payment</strong> and won&apos;t affect your current balance.
+                      {tForms("futureDatePlannedPaymentAlert")}
                     </AlertDescription>
                   </Alert>
                 );
@@ -1500,7 +1504,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
 
               <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 {!transaction && (
                   <Button 
@@ -1515,10 +1519,10 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
+                        {tCommon("saving")}
                       </>
                     ) : (
-                      "Save and New"
+                      tForms("saveAndNew")
                     )}
                   </Button>
                 )}
@@ -1529,10 +1533,10 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                      {tCommon("saving")}
                     </>
                   ) : (
-                    "Save"
+                    tCommon("save")
                   )}
                 </Button>
               </div>
@@ -1554,16 +1558,16 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Category</DialogTitle>
+            <DialogTitle>{tForms("addCategoryTitle")}</DialogTitle>
             <DialogDescription>
-              Create a new category for {form.watch("type") === "expense" ? "expenses" : "income"}
+              {tForms("createCategoryForType", { type: form.watch("type") === "expense" ? tForms("expenses") : tForms("incomeType") })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Category Name</label>
+              <label className="text-sm font-medium">{tForms("categoryName")}</label>
               <Input
-                placeholder="Enter category name"
+                placeholder={tForms("enterCategoryName")}
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 onKeyDown={(e) => {
@@ -1586,7 +1590,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
               }}
               disabled={isCreatingCategory}
             >
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button
               type="button"
@@ -1596,10 +1600,10 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
               {isCreatingCategory ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
+                  {tForms("creating")}
                 </>
               ) : (
-                "Create"
+                tForms("create")
               )}
             </Button>
           </DialogFooter>

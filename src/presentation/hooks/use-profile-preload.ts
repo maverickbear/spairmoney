@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { apiUrl } from "@/lib/utils/api-base-url";
 
 /**
  * Hook to preload profile data in background when app starts
@@ -12,7 +13,7 @@ export function useProfilePreload() {
     // The cache in settings/page.tsx will handle this efficiently
     const preloadProfile = async () => {
       try {
-        await fetch("/api/v2/profile");
+        await fetch(apiUrl("/api/v2/profile"));
       } catch (error) {
         // Silently fail - data will load when needed
         console.debug("Profile preload failed:", error);

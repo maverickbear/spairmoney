@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
 import { BaseLimitCheckResult } from "@/src/domain/subscriptions/subscriptions.types";
@@ -11,6 +12,7 @@ interface UsageChartProps {
 }
 
 export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChartProps) {
+  const t = useTranslations("billing");
   // Default values when data is loading
   const defaultTransactionLimit: BaseLimitCheckResult = { allowed: true, limit: 0, current: 0 };
   const defaultAccountLimit: BaseLimitCheckResult = { allowed: true, limit: 0, current: 0 };
@@ -35,20 +37,20 @@ export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChar
   const accountUsagePercentage = getAccountUsagePercentage();
 
   const formatLimit = (limit: number) => {
-    if (limit === -1) return "Unlimited";
+    if (limit === -1) return t("unlimited");
     return limit.toLocaleString();
   };
 
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg sm:text-xl">Usage</CardTitle>
+        <CardTitle className="text-lg sm:text-xl">{t("usage")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pl-6 pr-6 pb-6 pt-0">
         {/* Transactions Usage */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs sm:text-sm">
-            <span className="text-muted-foreground">Transactions (this month)</span>
+            <span className="text-muted-foreground">{t("transactionsThisMonth")}</span>
             <span className="text-muted-foreground">
               {txLimit.current.toLocaleString()} / {formatLimit(txLimit.limit)}
             </span>
@@ -66,7 +68,7 @@ export function UsageChart({ limits, transactionLimit, accountLimit }: UsageChar
         {/* Accounts Usage */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs sm:text-sm">
-            <span className="text-muted-foreground">Accounts</span>
+            <span className="text-muted-foreground">{t("accountsLabel")}</span>
             <span className="text-muted-foreground">
               {accLimit.current.toLocaleString()} / {formatLimit(accLimit.limit)}
             </span>

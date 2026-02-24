@@ -6,14 +6,26 @@
 import { BaseCategory, BaseSubcategory, CategoryWithRelations, SubcategoryWithRelations } from "../../domain/categories/categories.types";
 import { CategoryRow, SubcategoryRow } from "@/src/infrastructure/database/repositories/categories.repository";
 
+type Locale = "en" | "pt" | "es";
+
+function resolveLocalizedName(
+  row: { name: string; name_pt?: string | null; name_es?: string | null },
+  locale?: string
+): string {
+  if (!locale || locale === "en") return row.name;
+  if (locale === "pt" && row.name_pt) return row.name_pt;
+  if (locale === "es" && row.name_es) return row.name_es;
+  return row.name;
+}
+
 export class CategoriesMapper {
   /**
-   * Map repository row to domain entity
+   * Map repository row to domain entity (with optional locale for localized name)
    */
-  static categoryToDomain(row: CategoryRow): BaseCategory {
+  static categoryToDomain(row: CategoryRow, locale?: string): BaseCategory {
     return {
       id: row.id,
-      name: row.name,
+      name: resolveLocalizedName(row, locale),
       type: row.type || "expense",
       householdId: row.household_id ?? null,
       isSystem: row.is_system,
@@ -37,21 +49,21 @@ export class CategoriesMapper {
   }
 
   /**
-   * Map repository row to domain entity with relations
+   * Map repository row to domain entity with relations (with optional locale for localized name)
    */
-  static categoryToDomainWithRelations(row: CategoryRow): CategoryWithRelations {
+  static categoryToDomainWithRelations(row: CategoryRow, locale?: string): CategoryWithRelations {
     return {
-      ...this.categoryToDomain(row),
+      ...this.categoryToDomain(row, locale),
     };
   }
 
   /**
-   * Map repository row to domain entity
+   * Map repository row to domain entity (with optional locale for localized name)
    */
-  static subcategoryToDomain(row: SubcategoryRow): BaseSubcategory {
+  static subcategoryToDomain(row: SubcategoryRow, locale?: string): BaseSubcategory {
     return {
       id: row.id,
-      name: row.name,
+      name: resolveLocalizedName(row, locale),
       categoryId: row.category_id,
       householdId: row.household_id ?? null,
       isSystem: row.is_system,
@@ -77,15 +89,16 @@ export class CategoriesMapper {
   }
 
   /**
-   * Map repository row to domain entity with relations
+   * Map repository row to domain entity with relations (with optional locale for localized name)
    */
   static subcategoryToDomainWithRelations(
     row: SubcategoryRow,
-    category?: CategoryRow | null
+    category?: CategoryRow | null,
+    locale?: string
   ): SubcategoryWithRelations {
     return {
-      ...this.subcategoryToDomain(row),
-      category: category ? this.categoryToDomain(category) : null,
+      ...this.subcategoryToDomain(row, locale),
+      category: category ? this.categoryToDomain(category, locale) : null,
     };
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { ChartCard } from "./chart-card";
 import { formatMoney } from "@/components/common/money";
@@ -105,19 +106,20 @@ export function AccountsCompositionChart({
   }, [accounts, liabilities, debts]);
 
   const total = data.reduce((sum, item) => sum + item.value, 0);
+  const t = useTranslations("reports");
 
   return (
     <ChartCard
-      title="Accounts composition"
-      description="How your balances are distributed today"
+      title={t("accountsComposition")}
+      description={t("accountsCompositionDescription")}
     >
       {data.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-center">
           <p className="text-sm text-muted-foreground">
-            No account balances available yet
+            {t("noAccountBalancesAvailableYet")}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Add accounts to unlock balance insights
+            {t("addAccountsToUnlockBalanceInsights")}
           </p>
         </div>
       ) : (
@@ -127,7 +129,7 @@ export function AccountsCompositionChart({
               {formatMoney(total)}
             </span>
             <span className="text-xs text-muted-foreground">
-              total across accounts
+              {t("totalAcrossAccounts")}
             </span>
           </div>
           <ResponsiveContainer width="100%" height={220}>

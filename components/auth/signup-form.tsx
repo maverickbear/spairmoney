@@ -6,8 +6,9 @@ import { signUpSchema, SignUpFormData } from "@/src/domain/auth/auth.validations
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Mail, Lock, User, Loader2, AlertCircle, Eye, EyeOff, Check, Circle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
@@ -96,6 +97,7 @@ interface SignUpFormProps {
 export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("auth");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -118,11 +120,11 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
   const password = form.watch("password") ?? "";
 
   const passwordRequirements = [
-    { label: "At least 8 characters", met: password.length >= 8 },
-    { label: "One uppercase letter", met: /[A-Z]/.test(password) },
-    { label: "One lowercase letter", met: /[a-z]/.test(password) },
-    { label: "One number", met: /[0-9]/.test(password) },
-    { label: "One special character", met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) },
+    { labelKey: "reqMinChars" as const, met: password.length >= 8 },
+    { labelKey: "reqUppercase" as const, met: /[A-Z]/.test(password) },
+    { labelKey: "reqLowercase" as const, met: /[a-z]/.test(password) },
+    { labelKey: "reqNumber" as const, met: /[0-9]/.test(password) },
+    { labelKey: "reqSpecial" as const, met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) },
   ];
 
   async function onSubmit(data: SignUpFormData) {
@@ -141,7 +143,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       const result = await response.json();
       
       if (!response.ok) {
-        const errorMessage = result.error || "Failed to sign up";
+        const errorMessage = result.error || t("failedToSignUp");
         setError(errorMessage);
         setLoading(false);
         return;
@@ -165,7 +167,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
 
       // If no user and no email confirmation flag, this is an error
       if (!result.user) {
-        setError("Failed to sign up");
+        setError(t("failedToSignUp"));
         setLoading(false);
         return;
       }
@@ -176,7 +178,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
       router.push(`/auth/verify-otp?email=${encodeURIComponent(data.email)}${finalPlanId ? `&planId=${finalPlanId}&interval=${finalInterval}` : ""}${fromCheckout ? "&from_checkout=true" : ""}`);
     } catch (error) {
       console.error("Error during signup:", error);
-      setError("An unexpected error occurred");
+      setError(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -192,7 +194,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-background px-2 text-muted-foreground">
-            Or
+            {t("or")}
           </span>
         </div>
       </div>
@@ -201,14 +203,14 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>{t("error")}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-1">
           <label htmlFor="name" className="text-sm font-medium text-foreground">
-            Name
+            {t("name")}
           </label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -233,7 +235,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
 
         <div className="space-y-1">
           <label htmlFor="email" className="text-sm font-medium text-foreground">
-            Email
+            {t("email")}
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -258,7 +260,7 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
 
         <div className="space-y-1">
           <label htmlFor="password" className="text-sm font-medium text-foreground">
-            Password
+            {t("password")}
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -285,16 +287,16 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
             </button>
           </div>
           <div className="text-xs text-muted-foreground space-y-1 pt-1">
-            <p className="font-medium">Password requirements:</p>
+            <p className="font-medium">{t("passwordRequirements")}</p>
             <ul className="space-y-1">
-              {passwordRequirements.map(({ label, met }) => (
-                <li key={label} className="flex items-center gap-2">
+              {passwordRequirements.map(({ labelKey, met }) => (
+                <li key={labelKey} className="flex items-center gap-2">
                   {met ? (
                     <Check className="h-4 w-4 shrink-0 --sentiment-positive" aria-hidden />
                   ) : (
                     <Circle className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
                   )}
-                  <span className={met ? "text-foreground/90" : undefined}>{label}</span>
+                  <span className={met ? "text-foreground/90" : undefined}>{t(labelKey)}</span>
                 </li>
               ))}
             </ul>
@@ -316,21 +318,21 @@ export function SignUpForm({ planId, interval }: SignUpFormProps = {}) {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Signing up...
+              {t("signingUp")}
             </>
           ) : (
-            "Sign Up"
+            t("signUp")
           )}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
+        {t("alreadyHaveAccount")}{" "}
         <Link 
           href="/auth/login" 
           className="text-foreground hover:underline font-medium transition-colors"
         >
-          Sign in
+          {t("login")}
         </Link>
       </p>
     </div>

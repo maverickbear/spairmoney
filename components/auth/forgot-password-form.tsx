@@ -3,16 +3,17 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { forgotPasswordSchema, ForgotPasswordFormData } from "@/src/domain/auth/auth.validations";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Mail, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function ForgotPasswordForm() {
-  const router = useRouter();
+  const t = useTranslations("auth");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -30,7 +31,7 @@ export function ForgotPasswordForm() {
       setError(null);
       setSuccess(false);
 
-      const response = await fetch("/api/auth/forgot-password", {
+      const response = await fetch(apiUrl("/api/auth/forgot-password"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -41,7 +42,7 @@ export function ForgotPasswordForm() {
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result.error || "Failed to send reset email");
+        setError(result.error || t("failedToSendResetEmail"));
         setLoading(false);
         return;
       }
@@ -51,7 +52,7 @@ export function ForgotPasswordForm() {
       setLoading(false);
     } catch (error) {
       console.error("Error requesting password reset:", error);
-      setError("An unexpected error occurred");
+      setError(t("unexpectedError"));
       setLoading(false);
     }
   }
@@ -61,9 +62,9 @@ export function ForgotPasswordForm() {
       <div className="space-y-6">
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Check your email</AlertTitle>
+          <AlertTitle>{t("checkYourEmailTitle")}</AlertTitle>
           <AlertDescription>
-            If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and follow the instructions to reset your password.
+            {t("checkYourEmailDescription")}
           </AlertDescription>
         </Alert>
 
@@ -72,7 +73,7 @@ export function ForgotPasswordForm() {
             href="/auth/login"
             className="text-sm text-foreground hover:underline font-medium transition-colors"
           >
-            Back to login
+            {t("backToLogin")}
           </Link>
         </div>
       </div>
@@ -85,14 +86,14 @@ export function ForgotPasswordForm() {
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>{t("error")}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-1">
           <label htmlFor="email" className="text-sm font-medium text-foreground">
-            Email
+            {t("email")}
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -124,10 +125,10 @@ export function ForgotPasswordForm() {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Sending...
+              {t("sendingResetLink")}
             </>
           ) : (
-            "Send Reset Link"
+            t("sendResetLink")
           )}
         </Button>
       </form>
@@ -137,7 +138,7 @@ export function ForgotPasswordForm() {
           href="/auth/login"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          Back to login
+          {t("backToLogin")}
         </Link>
       </div>
     </div>

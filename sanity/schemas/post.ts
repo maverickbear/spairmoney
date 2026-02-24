@@ -1,3 +1,4 @@
+// @ts-nocheck — Sanity 3 typings don't match runtime API (rows, fields, of, etc.)
 /**
  * Sanity schema for blog posts (personal finance content).
  * Maps to domain BlogPost via infrastructure sanity-blog.repository.

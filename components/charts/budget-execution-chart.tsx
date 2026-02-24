@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ChartCard } from "./chart-card";
 
 interface BudgetExecutionData {
@@ -41,6 +42,7 @@ const getStatusLabel = (percentage: number) => {
 };
 
 export function BudgetExecutionChart({ data }: BudgetExecutionChartProps) {
+  const t = useTranslations("reports");
   // Sort by percentage descending
   const sortedData = [...data].sort((a, b) => b.percentage - a.percentage);
 
@@ -51,17 +53,17 @@ export function BudgetExecutionChart({ data }: BudgetExecutionChartProps) {
 
   return (
     <ChartCard 
-      title="Budget Used" 
-      description="Budget percentage by category"
+      title={t("budgetUsed")} 
+      description={t("budgetPercentageByCategory")}
       className="overflow-hidden"
     >
       {sortedData.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            No budgets found for this period
+            {t("noBudgetsAvailableYet")}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Create budgets to track your spending
+            {t("createBudgetsToCompare")}
           </p>
         </div>
       ) : (

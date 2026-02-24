@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { BlogPostCard } from "./blog-post-card";
 import type { BlogPostListItem } from "@/src/domain/blog/blog.types";
 
@@ -6,11 +7,12 @@ interface BlogListProps {
 }
 
 export function BlogList({ posts }: BlogListProps) {
+  const t = useTranslations("common");
   if (posts.length === 0) {
     return (
       <section aria-label="Blog posts" className="py-8">
         <p className="text-center text-muted-foreground">
-          No posts yet. Check back soon.
+          {t("noPostsYet")}
         </p>
       </section>
     );

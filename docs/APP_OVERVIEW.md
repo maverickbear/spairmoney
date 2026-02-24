@@ -78,6 +78,7 @@ docs/                   # App and feature documentation (markdown)
 - **Transfer display** – Use `formatTransferLabel(fromAccountName, toAccountName)` from `src/presentation/utils/format-transfer-label.ts` when showing transfer transactions as a single line (e.g. "Transfer From: X → To: Y").
 - **Resend segments** – Contact segment sync (active/trial vs cancelled) lives in `lib/utils/resend-segments.ts`. Used on signup, trial start, subscription lifecycle, and admin actions. Optional env: `RESEND_SEGMENT_ACTIVE`, `RESEND_SEGMENT_CANCELLED` (defaults exist); does not throw so signup/webhooks are not blocked.
 - **Investments** – The route `/investments` redirects to `/dashboard`; the investments feature was removed. No separate investments doc.
+- **i18n** – next-intl with locales `en`, `pt`, `es`. All routes under `app/[locale]/`. Use `Link`, `redirect`, `useRouter` from `@/i18n/navigation`; use `useTranslations` / `getTranslations` for strings. See [I18N](features/I18N.md).
 
 ## Where to Go Next
 
@@ -113,4 +114,7 @@ docs/                   # App and feature documentation (markdown)
 | [Receipts](features/RECEIPTS.md) | Upload, scan, extract |
 | [Taxes](features/TAXES.md) | Tax rates, federal brackets, calculate |
 | [Admin](features/ADMIN.md) | Admin-only: users, invites, promo codes, dashboard, plans |
+| [I18N](features/I18N.md) | Internationalization: en, pt, es; next-intl, messages, locale switcher |
+| [I18N – TODOs](features/I18N_TODO.md) | Checklist to complete full i18n (auth, nav, dashboard, dialogs, etc.) |
 | [Landing vs features](LANDING_VS_FEATURES.md) | What the landing page shows vs documented app features; unification notes |
+| [Production](PRODUCTION.md) | Production deployment checklist, env vars, build, Stripe webhook, Sentry |

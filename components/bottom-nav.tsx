@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Plus } from "lucide-react";
@@ -19,6 +19,7 @@ interface BottomNavProps {
 export function BottomNav({ hasSubscription = true }: BottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("nav");
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
@@ -47,32 +48,32 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
   const navItems: BottomNavItem[] = [
     {
       href: "/dashboard",
-      label: "Dashboard",
+      label: t("items.dashboard"),
       icon: LayoutDashboard,
       type: "link",
     },
     {
       href: "/transactions",
-      label: "Transactions",
+      label: t("items.transactions"),
       icon: Receipt,
       type: "link",
     },
     {
       href: "#",
-      label: "Add",
+      label: t("add"),
       icon: Plus,
       type: "button",
       onClick: () => setIsAddSheetOpen(true),
     },
     {
       href: "/planning/budgets",
-      label: "Budgets",
+      label: t("items.budgets"),
       icon: Target,
       type: "link",
     },
     {
       href: "#",
-      label: "More",
+      label: t("more"),
       icon: MoreHorizontal,
       type: "button",
       onClick: () => setIsMoreSheetOpen(true),

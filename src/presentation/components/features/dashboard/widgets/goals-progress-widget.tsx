@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { Target, Home, Car, Plane, ChevronRight, Plus } from "lucide-react";
@@ -17,16 +18,17 @@ interface GoalsProgressWidgetProps {
 }
 
 export function GoalsProgressWidget({ data, className }: GoalsProgressWidgetProps) {
+  const t = useTranslations("dashboard");
   if (!data) return null;
 
   if (data.goals.length === 0) {
     return (
-      <WidgetCard title="Goals" className={className}>
+      <WidgetCard title={t("goals")} className={className}>
         <WidgetEmptyState
-          title="Set goals"
-          description="Track your savings progress"
+          title={t("setGoalsTitle")}
+          description={t("setGoalsDescription")}
           primaryAction={{
-            label: "Create Goal",
+            label: t("createGoal"),
             href: "/planning/goals",
           }}
           icon={Target}
@@ -40,13 +42,13 @@ export function GoalsProgressWidget({ data, className }: GoalsProgressWidgetProp
       href="/planning/goals" 
       className="flex items-center text-sm font-medium hover:underline"
     >
-      See all <ChevronRight className="ml-1 h-4 w-4" />
+      {t("seeAll")} <ChevronRight className="ml-1 h-4 w-4" />
     </Link>
   );
 
   return (
     <WidgetCard
-      title="Goals"
+      title={t("goals")}
       headerAction={<SeeAllLink />}
       className={className}
     >

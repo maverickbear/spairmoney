@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ export function GoalWithdrawDialog({
   onConfirm,
   loading = false,
 }: GoalWithdrawDialogProps) {
+  const t = useTranslations("planning");
   const [amount, setAmount] = useState<string>("");
   const [toAccountId, setToAccountId] = useState<string>("");
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
@@ -112,24 +114,22 @@ export function GoalWithdrawDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Withdraw from Goal</DialogTitle>
+          <DialogTitle>{t("withdrawFromGoal")}</DialogTitle>
           <DialogDescription>
-            Withdraw money from {goal?.name || "this goal"}. When the goal is
-            linked to a savings account, this creates a transfer to the account
-            you choose.
+            {t("withdrawDescription", { name: goal?.name || t("thisGoal") })}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 px-6">
           {needsToAccount && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">To account</label>
+              <label className="text-sm font-medium">{t("toAccount")}</label>
               <Select
                 value={toAccountId}
                 onValueChange={setToAccountId}
                 disabled={loading}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select destination account (e.g. checking)" />
+                  <SelectValue placeholder={t("selectDestinationAccount")} />
                 </SelectTrigger>
                 <SelectContent>
                   {toAccountOptions.map((acc) => (
@@ -140,13 +140,12 @@ export function GoalWithdrawDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Money will be transferred from the goal&apos;s savings account to
-                this account.
+                {t("withdrawTransferNote")}
               </p>
             </div>
           )}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Amount</label>
+            <label className="text-sm font-medium">{t("amount")}</label>
             <Input
               type="text"
               inputMode="decimal"
@@ -157,23 +156,23 @@ export function GoalWithdrawDialog({
             />
             {goal && (
               <p className="text-xs text-muted-foreground">
-                Current balance: {formatMoney(goal.currentBalance)}
+                {t("currentBalanceLabel")}: {formatMoney(goal.currentBalance)}
               </p>
             )}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={loading}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={loading || !canSubmit}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Withdrawing...
+                {t("withdrawing")}
               </>
             ) : (
-              "Withdraw"
+              t("withdraw")
             )}
           </Button>
         </DialogFooter>

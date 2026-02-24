@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { Progress } from "@/components/ui/progress";
@@ -12,6 +13,7 @@ interface GoalsProgressSectionProps {
 }
 
 export function GoalsProgressSection({ goals }: GoalsProgressSectionProps) {
+  const t = useTranslations("reports");
   if (goals.length === 0) {
     return null;
   }
@@ -28,41 +30,41 @@ export function GoalsProgressSection({ goals }: GoalsProgressSectionProps) {
         <CardHeader>
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <Target className="h-5 w-5" />
-            Goals Progress
+            {t("goalsProgress")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {/* Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Active Goals</p>
+              <p className="text-sm text-muted-foreground">{t("activeGoals")}</p>
               <p className="text-2xl font-bold">{activeGoals.length}</p>
               <p className="text-xs text-muted-foreground">
-                {completedGoals.length} completed
+                {completedGoals.length} {t("completed")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Total Target</p>
+              <p className="text-sm text-muted-foreground">{t("totalTarget")}</p>
               <p className="text-2xl font-bold">{formatMoney(totalTargetAmount)}</p>
               <p className="text-xs text-muted-foreground">
-                {formatMoney(totalCurrentBalance)} saved
+                {formatMoney(totalCurrentBalance)} {t("saved")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Monthly Contribution</p>
+              <p className="text-sm text-muted-foreground">{t("monthlyContribution")}</p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {formatMoney(totalMonthlyContribution)}
               </p>
-              <p className="text-xs text-muted-foreground">across all goals</p>
+              <p className="text-xs text-muted-foreground">{t("acrossAllGoals")}</p>
             </div>
           </div>
 
           {/* Active Goals */}
           {activeGoals.length > 0 && (
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Active Goals</h3>
+              <h3 className="text-sm font-semibold">{t("activeGoals")}</h3>
               <div className="space-y-3">
                 {activeGoals.map((goal) => (
                   <GoalCard key={goal.id} goal={goal} />
@@ -74,7 +76,7 @@ export function GoalsProgressSection({ goals }: GoalsProgressSectionProps) {
           {/* Completed Goals */}
           {completedGoals.length > 0 && (
             <div className="space-y-4 mt-6">
-              <h3 className="text-sm font-semibold text-muted-foreground">Completed Goals</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground">{t("completedGoals")}</h3>
               <div className="space-y-3">
                 {completedGoals.map((goal) => (
                   <GoalCard key={goal.id} goal={goal} isCompleted />
@@ -89,6 +91,7 @@ export function GoalsProgressSection({ goals }: GoalsProgressSectionProps) {
 }
 
 function GoalCard({ goal, isCompleted = false }: { goal: GoalWithCalculations; isCompleted?: boolean }) {
+  const t = useTranslations("reports");
   const progress = goal.targetAmount > 0
     ? Math.min((goal.currentBalance / goal.targetAmount) * 100, 100)
     : 0;
@@ -101,12 +104,12 @@ function GoalCard({ goal, isCompleted = false }: { goal: GoalWithCalculations; i
             <p className="font-semibold">{goal.name}</p>
             {isCompleted && (
               <span className="text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900 text-sentiment-positive">
-                Completed
+                {t("completedLabel")}
               </span>
             )}
             {goal.isPaused && (
               <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">
-                Paused
+                {t("paused")}
               </span>
             )}
           </div>
@@ -117,25 +120,25 @@ function GoalCard({ goal, isCompleted = false }: { goal: GoalWithCalculations; i
         <div className="text-right">
           <p className="font-semibold">{formatMoney(goal.currentBalance)}</p>
           <p className="text-xs text-muted-foreground">
-            of {formatMoney(goal.targetAmount)}
+            {t("of")} {formatMoney(goal.targetAmount)}
           </p>
         </div>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Progress</span>
+          <span className="text-muted-foreground">{t("progress")}</span>
           <span className="font-medium">{progress.toFixed(1)}%</span>
         </div>
         <Progress value={progress} className="h-2" />
 
         <div className="grid grid-cols-2 gap-4 pt-2 text-sm">
           <div>
-            <p className="text-muted-foreground">Monthly Contribution</p>
+            <p className="text-muted-foreground">{t("monthlyContribution")}</p>
             <p className="font-medium">{formatMoney(goal.monthlyContribution)}</p>
             {goal.incomePercentage > 0 && (
               <p className="text-xs text-muted-foreground">
-                {goal.incomePercentage.toFixed(1)}% of income
+                {goal.incomePercentage.toFixed(1)}% {t("ofIncome")}
               </p>
             )}
           </div>
@@ -143,14 +146,14 @@ function GoalCard({ goal, isCompleted = false }: { goal: GoalWithCalculations; i
             <div>
               <p className="text-muted-foreground flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                ETA
+                {t("eta")}
               </p>
               <p className="font-medium">
                 {goal.monthsToGoal === 0
-                  ? "This month"
+                  ? t("thisMonth")
                   : goal.monthsToGoal === 1
-                  ? "1 month"
-                  : `${goal.monthsToGoal} months`}
+                  ? t("oneMonth")
+                  : t("months", { count: goal.monthsToGoal })}
               </p>
             </div>
           )}
@@ -158,7 +161,7 @@ function GoalCard({ goal, isCompleted = false }: { goal: GoalWithCalculations; i
 
         {goal.priority && (
           <div className="pt-2 border-t text-xs">
-            <span className="text-muted-foreground">Priority: </span>
+            <span className="text-muted-foreground">{t("priority")}: </span>
             <span
               className={cn(
                 "font-medium",

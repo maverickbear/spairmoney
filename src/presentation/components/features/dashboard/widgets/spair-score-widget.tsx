@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { 
   TrendingUp, 
@@ -22,9 +23,10 @@ interface SpairScoreWidgetProps {
 }
 
 export function SpairScoreWidget({ data, loading, error }: SpairScoreWidgetProps) {
+  const t = useTranslations("dashboard");
   if (loading) {
     return (
-      <WidgetCard title="Spair Score" subtitle="Monthly score">
+      <WidgetCard title={t("spairScore")} subtitle={t("monthlyScore")}>
         <div className="animate-pulse space-y-3">
           <div className="h-10 bg-muted rounded w-24" />
           <div className="h-4 bg-muted rounded w-32" />
@@ -35,11 +37,11 @@ export function SpairScoreWidget({ data, loading, error }: SpairScoreWidgetProps
 
   if (error) {
     return (
-      <WidgetCard title="Spair Score" subtitle="Monthly score">
+      <WidgetCard title={t("spairScore")} subtitle={t("monthlyScore")}>
         <div className="text-sm text-muted-foreground">
-          <p>Error: {error}</p>
+          <p>{t("errorLoadingDashboard")}: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
-            <Link href="/transactions/new">Add Transaction</Link>
+            <Link href="/transactions/new">{t("addTransaction")}</Link>
           </Button>
         </div>
       </WidgetCard>
@@ -48,12 +50,12 @@ export function SpairScoreWidget({ data, loading, error }: SpairScoreWidgetProps
 
   if (!data) {
     return (
-      <WidgetCard title="Spair Score" subtitle="Monthly score">
+      <WidgetCard title={t("spairScore")} subtitle={t("monthlyScore")}>
         <WidgetEmptyState
-          title="Start tracking your finances"
-          description="Get your Spair Score based on income, expenses, and savings"
+          title={t("startTrackingTitle")}
+          description={t("startTrackingDescription")}
           primaryAction={{
-            label: "Add Transaction",
+            label: t("addTransaction"),
             href: "/transactions/new",
           }}
           icon={TrendingUpIcon}
@@ -126,7 +128,7 @@ export function SpairScoreWidget({ data, loading, error }: SpairScoreWidgetProps
   const empty = data.details?.isEmptyState ?? false;
 
   return (
-    <WidgetCard title="Spair Score" subtitle="Monthly score" compact>
+    <WidgetCard title={t("spairScore")} subtitle={t("monthlyScore")} compact>
       {/* Score Display */}
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-2">
@@ -155,7 +157,7 @@ export function SpairScoreWidget({ data, loading, error }: SpairScoreWidgetProps
             empty ? "text-muted-foreground" : getClassificationColor(data.classification)
           )}>
             {!empty && data.classification === "Excellent" && <CheckCircle2 className="h-3 w-3" />}
-            {empty ? "No data" : data.classification}
+            {empty ? t("noData") : data.classification}
           </div>
         </div>
 

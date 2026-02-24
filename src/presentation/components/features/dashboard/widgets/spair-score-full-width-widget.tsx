@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -71,9 +72,11 @@ const GAUGE_ANIMATION_DELAY = 80;
 function GaugePlaceholder({
   isEmpty,
   classification,
+  noDataLabel = "No data",
 }: {
   isEmpty: boolean;
   classification: string;
+  noDataLabel?: string;
 }) {
   return (
     <div
@@ -118,7 +121,7 @@ function GaugePlaceholder({
           isEmpty ? "text-muted-foreground" : "text-foreground"
         )}
       >
-        {isEmpty ? "No data" : classification}
+        {isEmpty ? noDataLabel : classification}
       </p>
     </div>
   );
@@ -130,6 +133,7 @@ interface SpairScoreFullWidthWidgetProps {
 }
 
 export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFullWidthWidgetProps) {
+  const t = useTranslations("dashboard");
   const [infoOpen, setInfoOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   /** Value shown on gauge: start at 0 then animate to score so 0→100 animation runs */
@@ -176,25 +180,25 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
   const metrics = details
     ? [
         {
-          label: "Savings Rate",
+          label: t("savingsRate"),
           value: empty ? "—" : `${details.savingsRate.toFixed(1)}%`,
           hint: "of income saved",
           good: details.savingsRate >= 20,
         },
         {
-          label: "Emergency Fund",
+          label: t("emergencyFundLabel"),
           value: empty ? "—" : `${details.emergencyFundMonths.toFixed(1)} mo`,
-          hint: "months of expenses",
+          hint: t("monthsOfExpenses"),
           good: details.emergencyFundMonths >= 6,
         },
         {
-          label: "Debt",
+          label: t("debtLabel"),
           value: empty ? "—" : details.debtExposure,
           hint: "exposure level",
           good: details.debtExposure === "Low",
         },
         {
-          label: "Spending",
+          label: t("spendingLabel"),
           value: empty ? "—" : details.spendingDiscipline,
           hint: "vs budget",
           good: details.spendingDiscipline === "Excellent" || details.spendingDiscipline === "Good",
@@ -208,24 +212,24 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
         {/* Title with info + insight and Details on the right */}
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Spair Score</h2>
+            <h2 className="text-lg font-semibold">{t("spairScore")}</h2>
             <Popover open={infoOpen} onOpenChange={setInfoOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   className="inline-flex items-center justify-center rounded-full p-1 text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  aria-label="What is Spair Score?"
+                  aria-label={t("whatIsSpairScore")}
                 >
                   <Info className="h-4 w-4" />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-80 p-4 space-y-3" align="start">
-                <p className="text-sm font-medium">What is Spair Score?</p>
+                <p className="text-sm font-medium">{t("whatIsSpairScore")}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Spair Score is your financial health rating from 0 to 100. It reflects your ability to afford your lifestyle, absorb shocks, and keep healthy money habits — not how much you have. The score is coaching-oriented and action-driven: it helps you see what to improve and how.
+                  {t("whatIsSpairScoreDescription")}
                 </p>
                 <Button size="small" className="w-full" onClick={handleViewDetails}>
-                  View Details
+                  {t("viewDetails")}
                 </Button>
               </PopoverContent>
             </Popover>
@@ -237,7 +241,7 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
               </p>
             )}
             <Button variant="outline" size="small" onClick={onOpenDetails} className="shrink-0">
-              Details
+              {t("viewDetails")}
             </Button>
           </div>
         </div>
@@ -256,7 +260,7 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
             >
               <div className="flex flex-col items-center gap-1 w-full min-h-[120px]">
                 {!mounted ? (
-                  <GaugePlaceholder isEmpty={!hasScoreData} classification={classification} />
+                  <GaugePlaceholder isEmpty={!hasScoreData} classification={classification} noDataLabel={t("noData")} />
                 ) : (
                   <GaugeComponent
                     type="semicircle"
@@ -301,7 +305,7 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                   />
                 )}
                 <p className={cn("text-sm font-medium mt-0.5", !hasScoreData ? "text-muted-foreground" : "text-foreground")}>
-                  {!hasScoreData ? "No data" : classification}
+                  {!hasScoreData ? t("noData") : classification}
                 </p>
               </div>
             </div>
@@ -330,18 +334,18 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
           {/* Stats & Progress cards */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="rounded-lg border border-border bg-card p-3 sm:p-4 text-card-foreground min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Stats</p>
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t("stats")}</p>
               <p className="mt-1 text-xl sm:text-2xl font-bold tabular-nums">
                 {pointsToNextTier !== null ? pointsToNextTier : "—"}
               </p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Points to next tier</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">{t("pointsToNextTier")}</p>
             </div>
             <div className="rounded-lg border border-border bg-card p-3 sm:p-4 text-card-foreground min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Progress</p>
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t("progress")}</p>
               <p className="mt-1 text-xl sm:text-2xl font-bold tabular-nums">
                 {progressToNextLevel !== null ? `${progressToNextLevel}%` : "—"}
               </p>
-              <p className="text-xs sm:text-sm text-muted-foreground">To next level</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">{t("toNextLevel")}</p>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { WidgetCard } from "./widget-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,9 @@ interface Category {
 }
 
 export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidgetProps) {
+  const t = useTranslations("dashboard");
+  const tTx = useTranslations("transactions");
+  const tToasts = useTranslations("toasts");
   const router = useRouter();
   const { toast } = useToast();
   
@@ -101,8 +105,8 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
       if (!accountId) {
         toast({
           variant: "destructive",
-          title: "No account found",
-          description: "Please create an account first."
+          title: t("noAccountFound"),
+          description: t("createAccountFirst"),
         });
       }
       return;
@@ -111,8 +115,8 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
     if (type === "transfer" && !toAccountId) {
       toast({
         variant: "destructive",
-        title: "Destination account required",
-        description: "Please select a destination account for the transfer."
+        title: t("destinationAccountRequired"),
+        description: t("selectDestinationAccount"),
       });
       return;
     }
@@ -120,8 +124,8 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
     if (type === "transfer" && accountId === toAccountId) {
        toast({
         variant: "destructive",
-        title: "Invalid transfer",
-        description: "Source and destination accounts cannot be the same."
+        title: t("invalidTransfer"),
+        description: t("sameAccountTransfer"),
       });
       return;
     }
@@ -157,8 +161,8 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
 
       toast({
         variant: "success",
-        title: type === 'transfer' ? 'Transfer successful' : `${type === 'expense' ? 'Expense' : 'Income'} added`,
-        description: "Transaction created successfully"
+        title: type === "transfer" ? t("transferSuccessful") : type === "expense" ? t("expenseAdded") : t("incomeAdded"),
+        description: t("transactionCreated"),
       });
       
       setAmount("");
@@ -171,8 +175,8 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to add transaction"
+        title: tToasts("error"),
+        description: t("failedToAddTransaction"),
       });
       console.error(error);
     } finally {
@@ -191,19 +195,19 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
   };
 
   return (
-    <WidgetCard title="Quick Transaction" className="h-full">
+    <WidgetCard title={t("quickTransaction")} className="h-full">
       <form onSubmit={handleSubmit} className="space-y-3">
         <Tabs value={type} onValueChange={(v) => setType(v as "expense" | "income" | "transfer")} className="w-full">
           <TabsList className="grid w-full grid-cols-3 h-[fit-content]">
-            <TabsTrigger value="expense" className="text-xs">Expense</TabsTrigger>
-            <TabsTrigger value="income" className="text-xs">Income</TabsTrigger>
-            <TabsTrigger value="transfer" className="text-xs">Transfer</TabsTrigger>
+            <TabsTrigger value="expense" className="text-xs">{tTx("expense")}</TabsTrigger>
+            <TabsTrigger value="income" className="text-xs">{tTx("income")}</TabsTrigger>
+            <TabsTrigger value="transfer" className="text-xs">{tTx("transfer")}</TabsTrigger>
           </TabsList>
         </Tabs>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1.5">
-            <Label htmlFor="amount" className="text-xs text-muted-foreground">Amount</Label>
+            <Label htmlFor="amount" className="text-xs text-muted-foreground">{t("amountLabel")}</Label>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
               <Input
@@ -221,11 +225,11 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="account" className="text-xs text-muted-foreground">
-              {type === "transfer" ? "From" : "Account"}
+              {type === "transfer" ? t("from") : t("account")}
             </Label>
             <Select value={accountId} onValueChange={setAccountId} disabled={accounts.length === 0}>
               <SelectTrigger id="account" className="h-9 text-sm">
-                <SelectValue placeholder="Select account" />
+                <SelectValue placeholder={t("selectAccount")} />
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((acc) => (
@@ -240,10 +244,10 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
 
         {type === "transfer" && (
           <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-            <Label htmlFor="toAccount" className="text-xs text-muted-foreground">To Account</Label>
+            <Label htmlFor="toAccount" className="text-xs text-muted-foreground">{t("toAccount")}</Label>
             <Select value={toAccountId} onValueChange={setToAccountId} disabled={accounts.length < 2}>
               <SelectTrigger id="toAccount" className="h-9 text-sm">
-                <SelectValue placeholder="Select destination" />
+                <SelectValue placeholder={t("selectDestination")} />
               </SelectTrigger>
               <SelectContent>
                 {accounts
@@ -260,7 +264,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
 
         {type !== "transfer" && (
           <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-            <Label htmlFor="category" className="text-xs text-muted-foreground">Category</Label>
+            <Label htmlFor="category" className="text-xs text-muted-foreground">{t("categoryLabel")}</Label>
             <div className="flex flex-col sm:flex-row gap-2">
               <Select
                 value={categoryId}
@@ -268,7 +272,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
                 disabled={filteredCategories.length === 0}
               >
                 <SelectTrigger id="category" className="h-9 text-sm flex-1 min-w-0">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={t("selectCategory")} />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredCategories.map((cat) => (
@@ -283,8 +287,8 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
                   value={subcategoryId}
                   onValueChange={setSubcategoryId}
                 >
-                  <SelectTrigger id="subcategory" className="h-9 text-sm flex-1 min-w-0 sm:max-w-[180px]" aria-label="Subcategory">
-                    <SelectValue placeholder="Subcategory (optional)" />
+                  <SelectTrigger id="subcategory" className="h-9 text-sm flex-1 min-w-0 sm:max-w-[180px]" aria-label={t("categoryLabel")}>
+                    <SelectValue placeholder={t("subcategoryOptional")} />
                   </SelectTrigger>
                   <SelectContent>
                     {selectedCategory?.subcategories?.map((sub) => (
@@ -301,17 +305,17 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
 
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
           <div className="space-y-1.5 min-w-0">
-            <Label htmlFor="description" className="text-xs text-muted-foreground">Description</Label>
+            <Label htmlFor="description" className="text-xs text-muted-foreground">{t("descriptionLabel")}</Label>
             <Input
               id="description"
-              placeholder="What was it for?"
+              placeholder={t("descriptionPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="h-9 text-sm"
             />
           </div>
           <div className="space-y-1.5 sm:w-[140px]">
-            <Label className="text-xs text-muted-foreground">Date</Label>
+            <Label className="text-xs text-muted-foreground">{t("dateLabel")}</Label>
             <DatePicker
               date={transactionDate}
               onDateChange={(d) => setTransactionDate(d ?? new Date())}

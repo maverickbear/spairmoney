@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { Progress } from "@/components/ui/progress";
@@ -13,6 +14,7 @@ interface DebtAnalysisSectionProps {
 }
 
 export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
+  const t = useTranslations("reports");
   if (debts.length === 0) {
     return null;
   }
@@ -33,45 +35,45 @@ export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg md:text-xl">Debt Analysis</CardTitle>
+          <CardTitle className="text-lg md:text-xl">{t("debtAnalysis")}</CardTitle>
         </CardHeader>
         <CardContent>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Total Debt</p>
+              <p className="text-sm text-muted-foreground">{t("totalDebt")}</p>
               <p className="text-2xl font-bold">{formatMoney(totalDebt)}</p>
               <p className="text-xs text-muted-foreground">
-                {activeDebts.length} active debt{activeDebts.length !== 1 ? "s" : ""}
+                {activeDebts.length} {activeDebts.length === 1 ? t("activeDebts") : t("activeDebts_other")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Principal Paid</p>
+              <p className="text-sm text-muted-foreground">{t("principalPaid")}</p>
               <p className="text-2xl font-bold text-sentiment-positive">
                 {formatMoney(totalPrincipalPaid)}
               </p>
               <p className="text-xs text-muted-foreground">
                 {totalInitialAmount > 0
-                  ? `${((totalPrincipalPaid / totalInitialAmount) * 100).toFixed(1)}% of total`
+                  ? `${((totalPrincipalPaid / totalInitialAmount) * 100).toFixed(1)}% ${t("ofTotal")}`
                   : ""}
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Interest Paid</p>
+              <p className="text-sm text-muted-foreground">{t("interestPaid")}</p>
               <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {formatMoney(totalInterestPaid)}
               </p>
               <p className="text-xs text-muted-foreground">
                 {totalPaid > 0
-                  ? `${((totalInterestPaid / totalPaid) * 100).toFixed(1)}% of payments`
+                  ? `${((totalInterestPaid / totalPaid) * 100).toFixed(1)}% ${t("ofPayments")}`
                   : ""}
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Overall Progress</p>
+              <p className="text-sm text-muted-foreground">{t("overallProgress")}</p>
               <p className="text-2xl font-bold">{overallProgress.toFixed(1)}%</p>
               <Progress value={overallProgress} className="mt-2" />
             </div>
@@ -83,7 +85,7 @@ export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
               <div>
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  High Priority Debts
+                  {t("highPriorityDebts")}
                 </h3>
                 <div className="space-y-2">
                   {highPriorityDebts.map((debt) => (
@@ -97,7 +99,7 @@ export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
               <div>
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                   <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                  Medium Priority Debts
+                  {t("mediumPriorityDebts")}
                 </h3>
                 <div className="space-y-2">
                   {mediumPriorityDebts.map((debt) => (
@@ -111,7 +113,7 @@ export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
               <div>
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-sentiment-positive" />
-                  Low Priority Debts
+                  {t("lowPriorityDebts")}
                 </h3>
                 <div className="space-y-2">
                   {lowPriorityDebts.map((debt) => (
@@ -128,6 +130,7 @@ export function DebtAnalysisSection({ debts }: DebtAnalysisSectionProps) {
 }
 
 function DebtCard({ debt }: { debt: DebtWithCalculations }) {
+  const t = useTranslations("reports");
   const progress = debt.initialAmount - debt.downPayment > 0
     ? ((debt.principalPaid / (debt.initialAmount - debt.downPayment)) * 100)
     : 0;
@@ -141,13 +144,13 @@ function DebtCard({ debt }: { debt: DebtWithCalculations }) {
         </div>
         <div className="text-right">
           <p className="font-semibold">{formatMoney(debt.currentBalance)}</p>
-          <p className="text-xs text-muted-foreground">remaining</p>
+          <p className="text-xs text-muted-foreground">{t("remaining")}</p>
         </div>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Progress</span>
+          <span className="text-muted-foreground">{t("progress")}</span>
           <span className="font-medium">{progress.toFixed(1)}%</span>
         </div>
         <Progress value={progress} className="h-2" />
@@ -156,18 +159,18 @@ function DebtCard({ debt }: { debt: DebtWithCalculations }) {
           <div>
             <p className="text-muted-foreground">
               {debt.loanType === "credit_card" 
-                ? (debt.monthlyPayment > 0 ? "Minimum Payment" : "Payment")
-                : "Monthly Payment"}
+                ? (debt.monthlyPayment > 0 ? t("minimumPayment") : t("payment"))
+                : t("monthlyPayment")}
             </p>
             <p className="font-medium">
               {debt.loanType === "credit_card" && debt.monthlyPayment === 0
-                ? "Flexible"
+                ? t("flexible")
                 : formatMoney(debt.monthlyPayment)}
             </p>
           </div>
           {debt.monthsRemaining !== null && (
             <div>
-              <p className="text-muted-foreground">Months Remaining</p>
+              <p className="text-muted-foreground">{t("monthsRemaining")}</p>
               <p className="font-medium">{debt.monthsRemaining}</p>
             </div>
           )}
@@ -175,7 +178,7 @@ function DebtCard({ debt }: { debt: DebtWithCalculations }) {
 
         {debt.interestRate > 0 && (
           <div className="pt-2 border-t text-xs text-muted-foreground">
-            Interest Rate: {debt.interestRate.toFixed(2)}% | Interest Paid:{" "}
+            {t("interestRate")}: {debt.interestRate.toFixed(2)}% | {t("interestPaidLabel")}:{" "}
             {formatMoney(debt.interestPaid)}
           </div>
         )}

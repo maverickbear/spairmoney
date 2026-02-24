@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Plan, PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
 import { getFeaturePromotion } from "@/lib/utils/feature-promotions";
@@ -63,37 +64,16 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   BookOpen,
 };
 
-function getFeatureDisplayName(feature?: keyof PlanFeatures, featureName?: string): string {
-  if (featureName) return featureName;
-  
-  if (!feature) return "Feature";
-  
-  const names: Record<keyof PlanFeatures, string> = {
-    maxTransactions: "Unlimited Transactions",
-    maxAccounts: "Unlimited Accounts",
-    hasInvestments: "Investments",
-    hasAdvancedReports: "Advanced Reports",
-    hasCsvExport: "CSV Export",
-    hasCsvImport: "CSV Import",
-    hasDebts: "Debts",
-    hasGoals: "Goals",
-    hasBankIntegration: "Bank Integration",
-    hasHousehold: "Household Members",
-    hasBudgets: "Budgets",
-    hasReceiptScanner: "Receipt Scanner",
-  };
-
-  return names[feature] || "Feature";
-}
-
 export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
   const router = useRouter();
+  const t = useTranslations("billing.blockedFeature");
+  const tNames = useTranslations("billing.featureNames");
   const { plan: currentPlan, subscription } = useSubscription();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [upgradePlan, setUpgradePlan] = useState<Plan | null>(null);
 
-  const displayName = getFeatureDisplayName(feature, featureName);
+  const displayName = featureName || (feature ? tNames(feature) : tNames("default"));
   const promotion = getFeaturePromotion(displayName);
 
   useEffect(() => {
@@ -195,12 +175,12 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
             {!subscription?.stripeSubscriptionId && upgradePlan && price && (
               <div className="space-y-1 pt-2">
                 <p className="text-sm md:text-base text-muted-foreground">
-                  Free 30-day trial. After this period, you will be charged ${price.toFixed(2)}/month.{" "}
+                  {t("trialDisclaimer", { price: `$${price.toFixed(2)}` })}{" "}
                   <a 
                     href="/terms-of-service" 
                     className="text-foreground hover:underline"
                   >
-                    Terms of service
+                    {t("termsOfService")}
                   </a>
                 </p>
               </div>
@@ -214,8 +194,8 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
                 className="w-full sm:w-auto min-w-[220px] text-base"
               >
                 {subscription?.stripeSubscriptionId 
-                  ? "Upgrade Plan"
-                  : "Start 30-day free trial"}
+                  ? t("upgradePlan")
+                  : t("startTrial")}
               </Button>
               <Button
                 variant="outline"
@@ -223,18 +203,18 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
                 onClick={() => router.push("/dashboard?openPricingModal=true")}
                 className="w-full sm:w-auto text-base"
               >
-                See pricing details
+                {t("seePricingDetails")}
               </Button>
             </div>
 
             {/* Help Text */}
             <p className="text-sm md:text-base text-muted-foreground pt-2">
-              Need help getting started?{" "}
+              {t("needHelp")}{" "}
               <a 
                 href="/help-support" 
                 className="text-foreground hover:underline font-medium"
               >
-                Contact support
+                {t("contactSupport")}
               </a>
             </p>
           </div>
@@ -251,16 +231,16 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
         {/* Left Info Card */}
         <div className="bg-white dark:bg-card rounded-lg border border-border p-6 md:p-8">
           <h3 className="text-lg md:text-xl font-semibold mb-3 text-foreground">
-            Learn more about {displayName}
+            {t("learnMoreAbout", { featureName: displayName })}
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-4 leading-relaxed">
-            {promotion.preview?.description || `Discover how ${displayName} can help you manage your finances more effectively and make better financial decisions.`}
+            {promotion.preview?.description || t("discoverHow", { featureName: displayName })}
           </p>
           <a 
             href="/help-support" 
             className="text-sm md:text-base text-foreground hover:underline font-medium inline-flex items-center gap-1"
           >
-            View documentation
+            {t("viewDocumentation")}
             <ArrowRight className="h-4 w-4" />
           </a>
         </div>
@@ -268,16 +248,16 @@ export function BlockedFeature({ feature, featureName }: BlockedFeatureProps) {
         {/* Right Info Card */}
         <div className="bg-white dark:bg-card rounded-lg border border-border p-6 md:p-8">
           <h3 className="text-lg md:text-xl font-semibold mb-3 text-foreground">
-            Make better use of your data
+            {t("makeBetterUse")}
           </h3>
           <p className="text-sm md:text-base text-muted-foreground mb-4 leading-relaxed">
-            Get complete and accurate financial insights. Centralize your data and create the reports you need to make informed decisions.
+            {t("makeBetterUseDescription")}
           </p>
           <a 
             href="/reports" 
             className="text-sm md:text-base text-foreground hover:underline font-medium inline-flex items-center gap-1"
           >
-            View data schema
+            {t("viewDataSchema")}
             <ArrowRight className="h-4 w-4" />
           </a>
         </div>

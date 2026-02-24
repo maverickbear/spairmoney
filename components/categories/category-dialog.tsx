@@ -2,6 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { categorySchema, CategoryFormData } from "@/src/domain/categories/categories.validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,8 @@ export function CategoryDialog({
   existingCategories = [],
   onSuccess,
 }: CategoryDialogProps) {
+  const t = useTranslations("common");
+  const tForms = useTranslations("forms");
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subcategoryNames, setSubcategoryNames] = useState<string[]>([""]);
@@ -295,11 +298,11 @@ export function CategoryDialog({
         className="flex flex-col w-full sm:max-w-[35.7rem] !p-0 !gap-0"
       >
         <SheetHeader className="px-6 pt-6 pb-2">
-          <SheetTitle>{category ? "Edit" : "Add"} Category</SheetTitle>
+          <SheetTitle>{category ? t("edit") : t("add")} {tForms("category")}</SheetTitle>
           <SheetDescription>
             {category
-              ? "Update the category details below."
-              : "Create a new category by entering a name."}
+              ? tForms("updateCategoryDescription")
+              : tForms("createCategoryDescription")}
           </SheetDescription>
         </SheetHeader>
 
@@ -309,10 +312,10 @@ export function CategoryDialog({
           {(!category || !isSystemCategory) && (
             <>
               <div className="space-y-1">
-                <label className="text-sm font-medium">Category Name</label>
+                <label className="text-sm font-medium">{tForms("categoryName")}</label>
                 <Input
                   {...form.register("name")}
-                  placeholder="Enter category name"
+                  placeholder={tForms("enterCategoryName")}
                   size="medium"
                   disabled={!!category && isSystemCategory}
                 />
@@ -411,7 +414,7 @@ export function CategoryDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {t("saving")}
                   </>
                 ) : (
                   "Create"
@@ -423,7 +426,7 @@ export function CategoryDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {t("saving")}
                   </>
                 ) : (
                   "Update"
@@ -435,10 +438,10 @@ export function CategoryDialog({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {t("saving")}
                   </>
                 ) : (
-                  "Save"
+                  t("save")
                 )}
               </Button>
             )}

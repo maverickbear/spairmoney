@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { HouseholdMember } from "@/src/domain/members/members.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,12 +26,13 @@ function getInitials(name: string | null | undefined): string {
 }
 
 export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
+  const t = useTranslations("members");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(`Are you sure you want to remove ${member.name || member.email} from your household?`)) {
+    if (!confirm(t("removeMemberConfirm", { name: member.name || member.email }))) {
       return;
     }
 
@@ -66,7 +68,7 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
         throw new Error(errorData.error || "Failed to resend invitation");
       }
 
-      alert("Invitation email resent successfully!");
+      alert(t("invitationResentSuccess"));
     } catch (error) {
       console.error("Error resending invitation:", error);
       alert(error instanceof Error ? error.message : "Failed to resend invitation");
@@ -112,7 +114,7 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                   {member.isOwner && (
                     <Badge variant="default" className="flex items-center gap-1">
                       <Crown className="h-3 w-3" />
-                      Owner
+                      {t("owner")}
                     </Badge>
                   )}
                 </div>
@@ -126,17 +128,17 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
           <div className="space-y-2">
             {!member.isOwner && member.status === "pending" && member.invitedAt && (
               <p className="text-sm text-muted-foreground">
-                Invitation sent on {new Date(member.invitedAt).toLocaleDateString()}
+                {t("invitationSentOn", { date: new Date(member.invitedAt).toLocaleDateString() })}
               </p>
             )}
             {!member.isOwner && member.status === "active" && member.acceptedAt && (
               <p className="text-sm text-muted-foreground">
-                Joined on {new Date(member.acceptedAt).toLocaleDateString()}
+                {t("joinedOn", { date: new Date(member.acceptedAt).toLocaleDateString() })}
               </p>
             )}
             {member.isOwner && member.createdAt && (
               <p className="text-sm text-muted-foreground">
-                Account owner since {new Date(member.createdAt).toLocaleDateString()}
+                {t("accountOwnerSince", { date: new Date(member.createdAt).toLocaleDateString() })}
               </p>
             )}
             <div className="flex justify-end space-x-2 pt-2">
@@ -151,12 +153,12 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                       {isResending ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Resending...
+                          {t("resending")}
                         </>
                       ) : (
                         <>
                           <Mail className="mr-2 h-4 w-4" />
-                          Resend
+                          {t("resend")}
                         </>
                       )}
                     </Button>
@@ -167,7 +169,7 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                     disabled={isDeleting}
                   >
                     <Edit className="mr-2 h-4 w-4" />
-                    Edit
+                    {t("edit")}
                   </Button>
                   <Button
                     variant="outline"
@@ -178,12 +180,12 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
                     {isDeleting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Removing...
+                        {t("removing")}
                       </>
                     ) : (
                       <>
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Remove
+                        {t("remove")}
                       </>
                     )}
                   </Button>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { SpendingWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { ChevronDown, PieChart, TrendingUp } from "lucide-react";
@@ -20,6 +21,7 @@ interface SpendingWidgetProps {
 type ViewType = 'trend' | 'categories';
 
 export function SpendingWidget({ data, className }: SpendingWidgetProps) {
+  const t = useTranslations("dashboard");
   const [view, setView] = useState<ViewType>('trend');
 
   if (!data) return null;
@@ -38,7 +40,7 @@ export function SpendingWidget({ data, className }: SpendingWidgetProps) {
 
   return (
     <WidgetCard
-      title="Spending this month"
+      title={t("spendingThisMonth")}
       headerAction={
         <div className="flex bg-muted rounded-lg p-0.5">
           <Button 
@@ -49,7 +51,7 @@ export function SpendingWidget({ data, className }: SpendingWidgetProps) {
               view === 'trend' && "bg-background shadow-sm"
             )}
             onClick={() => setView('trend')}
-            title="Trend View"
+            title={t("trendView")}
           >
             <TrendingUp className="h-4 w-4" />
           </Button>
@@ -61,7 +63,7 @@ export function SpendingWidget({ data, className }: SpendingWidgetProps) {
                view === 'categories' && "bg-background shadow-sm"
              )}
              onClick={() => setView('categories')}
-             title="Category View"
+             title={t("categoryView")}
           >
             <PieChart className="h-4 w-4" />
           </Button>
@@ -82,11 +84,11 @@ export function SpendingWidget({ data, className }: SpendingWidgetProps) {
             <div className="flex items-center gap-4 mb-4 text-xs">
                <div className="flex items-center gap-1.5">
                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-                 <span>This month</span>
+                 <span>{t("thisMonth")}</span>
                </div>
                <div className="flex items-center gap-1.5">
                  <span className="w-2.5 h-2.5 rounded-full bg-gray-500" />
-                 <span>Last month</span>
+                 <span>{t("lastMonth")}</span>
                </div>
             </div>
 

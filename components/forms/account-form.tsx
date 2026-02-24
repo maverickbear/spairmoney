@@ -2,6 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { accountSchema, AccountFormData } from "@/src/domain/accounts/accounts.validations";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,8 @@ function normalizeTypeForDefaults(t: unknown): (typeof VALID_ACCOUNT_TYPES)[numb
 }
 
 export function AccountForm({ open, onOpenChange, account, onSuccess, initialAccountLimit, variant = "dialog" }: AccountFormProps) {
+  const t = useTranslations("common");
+  const tForms = useTranslations("forms");
   const { toast } = useToast();
   const [households, setHouseholds] = useState<Household[]>([]);
   const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
@@ -582,10 +585,10 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                      {t("saving")}
                     </>
                   ) : (
-                    "Save"
+                    t("save")
                   )}
                 </Button>
               )}
@@ -602,9 +605,9 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
-          <DialogTitle>{account ? "Edit" : "Add"} Account</DialogTitle>
+          <DialogTitle>{account ? t("edit") : t("add")} {tForms("account")}</DialogTitle>
           <DialogDescription>
-            {account ? "Update the account details" : "Create a new account"}
+            {account ? tForms("updateAccountDescription") : tForms("createAccountDescription")}
           </DialogDescription>
         </DialogHeader>
         {formContent}

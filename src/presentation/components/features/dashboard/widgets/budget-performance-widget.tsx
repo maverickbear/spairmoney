@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight, Target, AlertTriangle } from "lucide-react";
@@ -18,11 +19,12 @@ interface BudgetPerformanceWidgetProps {
 }
 
 export function BudgetPerformanceWidget({ data, loading, error }: BudgetPerformanceWidgetProps) {
+  const t = useTranslations("dashboard");
   const router = useRouter();
 
   if (loading) {
     return (
-      <WidgetCard title="Budget Performance">
+      <WidgetCard title={t("budgetPerformance")}>
         <div className="animate-pulse space-y-3">
           <div className="h-4 bg-muted rounded" />
           <div className="h-4 bg-muted rounded" />
@@ -33,11 +35,11 @@ export function BudgetPerformanceWidget({ data, loading, error }: BudgetPerforma
 
   if (error) {
     return (
-      <WidgetCard title="Budget Performance">
+      <WidgetCard title={t("budgetPerformance")}>
         <div className="text-xs text-muted-foreground">
-          <p>Error: {error}</p>
+          <p>{t("errorLoadingDashboard")}: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
-            <Link href="/budgets/new">Create Budget</Link>
+            <Link href="/budgets/new">{t("createBudget")}</Link>
           </Button>
         </div>
       </WidgetCard>
@@ -46,12 +48,12 @@ export function BudgetPerformanceWidget({ data, loading, error }: BudgetPerforma
 
   if (!data || data.categories.length === 0) {
     return (
-      <WidgetCard title="Budget Performance">
+      <WidgetCard title={t("budgetPerformance")}>
         <WidgetEmptyState
-          title="Create budgets"
-          description="Track your spending by category"
+          title={t("createBudgetsTitle")}
+          description={t("createBudgetsDescription")}
           primaryAction={{
-            label: "Create Budget",
+            label: t("createBudget"),
             href: "/budgets/new",
           }}
           icon={Target}
@@ -64,13 +66,13 @@ export function BudgetPerformanceWidget({ data, loading, error }: BudgetPerforma
   const topOverspending = overspendingCategories.slice(0, 3);
 
   return (
-    <WidgetCard title="Budget Performance">
+    <WidgetCard title={t("budgetPerformance")}>
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-2.5">
           {/* Summary - Compact */}
           <div className="flex items-center justify-between p-2 rounded border bg-muted/30">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Spent</span>
+              <span className="text-xs text-muted-foreground">{t("spentLabel")}</span>
               <span className={cn(
                 "text-sm",
                 data.totalDifference > 0 ? "text-sentiment-negative" : "text-sentiment-positive"

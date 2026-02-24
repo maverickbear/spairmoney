@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { memberInviteSchema, MemberInviteFormData, memberUpdateSchema, MemberUpdateFormData } from "@/src/domain/members/members.validations";
@@ -32,6 +33,7 @@ interface MemberFormProps {
 }
 
 export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberFormProps) {
+  const t = useTranslations("members");
   const isEditing = !!member;
   const schema = isEditing ? memberUpdateSchema : memberInviteSchema;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,27 +109,27 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit" : "Invite"} Member</DialogTitle>
+          <DialogTitle>{isEditing ? t("editMember") : t("inviteMemberTitle")}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update the member's information"
-              : "Invite a new household member by email"}
+              ? t("updateMemberInfo")
+              : t("inviteNewMemberDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Email</label>
+            <label className="text-sm font-medium">{t("email")}</label>
             <Input
               type="email"
-              placeholder="member@example.com"
+              placeholder={t("emailPlaceholder")}
               {...form.register("email")}
               size="medium"
             />
             {isEditing && member?.status === "active" && (
               <p className="text-xs text-muted-foreground">
-                Changing email will also update the user's account email.
+                {t("changingEmailNote")}
               </p>
             )}
             {form.formState.errors.email && (
@@ -138,8 +140,8 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Name</label>
-            <Input {...form.register("name")} placeholder="Member name" size="medium" />
+            <label className="text-sm font-medium">{t("name")}</label>
+            <Input {...form.register("name")} placeholder={t("memberNamePlaceholder")} size="medium" />
             {form.formState.errors.name && (
               <p className="text-sm text-destructive">
                 {form.formState.errors.name?.message}
@@ -148,21 +150,21 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Role</label>
+            <label className="text-sm font-medium">{t("role")}</label>
             <Select
               value={form.watch("role") || "member"}
               onValueChange={(value) => form.setValue("role", value as "admin" | "member")}
             >
               <SelectTrigger size="medium">
-                <SelectValue placeholder="Select role" />
+                <SelectValue placeholder={t("selectRole")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="member">{t("member")}</SelectItem>
+                <SelectItem value="admin">{t("admin")}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Admin has full access based on the plan. Member cannot remove household members or invite others.
+              {t("roleDescription")}
             </p>
             {form.formState.errors.role && (
               <p className="text-sm text-destructive">
@@ -175,16 +177,16 @@ export function MemberForm({ open, onOpenChange, member, onSuccess }: MemberForm
 
           <DialogFooter>
             <Button type="button" variant="outline" size="medium" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" size="medium" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEditing ? "Updating..." : "Inviting..."}
+                  {isEditing ? t("updating") : t("inviting")}
                 </>
               ) : (
-                isEditing ? "Update" : "Invite"
+                isEditing ? t("update") : t("invite")
               )}
             </Button>
           </DialogFooter>

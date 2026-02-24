@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { SubscriptionsWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { WidgetEmptyState } from "./widget-empty-state";
@@ -14,16 +15,17 @@ interface SubscriptionsWidgetProps {
 }
 
 export function SubscriptionsWidget({ data, className }: SubscriptionsWidgetProps) {
+  const t = useTranslations("dashboard");
   if (!data) return null;
 
   if (data.items.length === 0) {
     return (
-      <WidgetCard title="Subscriptions" className={className}>
+      <WidgetCard title={t("subscriptions")} className={className}>
         <WidgetEmptyState
-          title="Track subscriptions"
-          description="See your recurring costs in one place"
+          title={t("trackSubscriptionsTitle")}
+          description={t("trackSubscriptionsDescription")}
           primaryAction={{
-            label: "Go to Subscriptions",
+            label: t("goToSubscriptions"),
             href: "/subscriptions",
           }}
           icon={CreditCard}
@@ -37,19 +39,19 @@ export function SubscriptionsWidget({ data, className }: SubscriptionsWidgetProp
       href="/subscriptions" 
       className="flex items-center text-sm font-medium hover:underline"
     >
-      See all <ChevronRight className="ml-1 h-4 w-4" />
+      {t("seeAll")} <ChevronRight className="ml-1 h-4 w-4" />
     </Link>
   );
 
   return (
     <WidgetCard
-      title="Subscriptions"
+      title={t("subscriptions")}
       headerAction={<SeeAllLink />} 
       className={className}
     >
       <div className="space-y-4">
         <div className="flex items-baseline justify-between border-b border-border pb-3">
-             <span className="text-sm text-muted-foreground">Monthly Total</span>
+             <span className="text-sm text-muted-foreground">{t("monthlyTotal")}</span>
              <span className="text-2xl font-bold">{formatMoney(data.totalMonthly)}</span>
         </div>
 

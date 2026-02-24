@@ -7,10 +7,10 @@ import { join } from "path";
 /**
  * GET /api/v2/admin/docs?path=APP_OVERVIEW.md | path=features/AUTH.md | path=LANDING_VS_FEATURES.md
  * Returns raw markdown content for a doc file. Admin-only (super_admin).
- * Path must be under docs/ (no path traversal). Allowed: APP_OVERVIEW.md, LANDING_VS_FEATURES.md, features/UPPER_SNAKE_CASE.md.
+ * Path must be under docs/ (no path traversal). Allowed: APP_OVERVIEW.md, LANDING_VS_FEATURES.md, PRODUCTION.md, features/UPPER_SNAKE_CASE.md.
  * When adding a new doc, update ALLOWED_PATH_REGEX if the path pattern changes; see docs/APP_OVERVIEW.md "Keeping /admin/docs in sync".
  */
-const ALLOWED_PATH_REGEX = /^(?:APP_OVERVIEW\.md|LANDING_VS_FEATURES\.md|features\/[A-Z0-9_]+\.md)$/;
+const ALLOWED_PATH_REGEX = /^(?:APP_OVERVIEW\.md|LANDING_VS_FEATURES\.md|PRODUCTION\.md|features\/[A-Z0-9_]+\.md)$/;
 
 export async function GET(request: NextRequest) {
   try {

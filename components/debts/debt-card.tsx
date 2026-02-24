@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,22 +55,21 @@ export interface DebtCardProps {
   onPayment: (id: string) => void;
 }
 
-const loanTypeLabels: Record<string, string> = {
-  mortgage: "Mortgage",
-  car_loan: "Car Loan",
-  personal_loan: "Personal Loan",
-  credit_card: "Credit Card",
-  student_loan: "Student Loan",
-  business_loan: "Business Loan",
-  other: "Other",
+const loanTypeKeyMap: Record<string, string> = {
+  mortgage: "mortgage",
+  car_loan: "car_loan",
+  personal_loan: "personal_loan",
+  credit_card: "credit_card",
+  student_loan: "student_loan",
+  business_loan: "business_loan",
+  other: "other",
 };
-
-const paymentFrequencyLabels: Record<string, string> = {
-  monthly: "Monthly",
-  biweekly: "Biweekly",
-  weekly: "Weekly",
-  semimonthly: "Semimonthly",
-  daily: "Daily",
+const paymentFreqKeyMap: Record<string, string> = {
+  monthly: "monthly",
+  biweekly: "biweekly",
+  weekly: "weekly",
+  semimonthly: "semimonthly",
+  daily: "daily",
 };
 
 export function DebtCard({
@@ -79,7 +79,8 @@ export function DebtCard({
   onPause,
   onPayment,
 }: DebtCardProps) {
-  const loanTypeLabel = loanTypeLabels[debt.loanType] || debt.loanType;
+  const t = useTranslations("debts");
+  const loanTypeLabel = debt.loanType && loanTypeKeyMap[debt.loanType] ? t(loanTypeKeyMap[debt.loanType] as keyof typeof loanTypeKeyMap) : debt.loanType;
 
   // Calculate payments left based on payment frequency
   const calculatePaymentsLeft = (): number | null => {
@@ -172,12 +173,12 @@ export function DebtCard({
                   <CardTitle className="text-base font-semibold truncate">{debt.name}</CardTitle>
                   {debt.isPaidOff && (
                     <Badge variant="default" className="bg-sentiment-positive dark:bg-sentiment-positive text-white text-xs">
-                      Paid Off
+                      {t("paidOff")}
                     </Badge>
                   )}
                   {debt.isPaused && (
                     <Badge variant="outline" className="border-sentiment-warning dark:border-sentiment-warning text-sentiment-warning dark:text-sentiment-warning text-xs">
-                      Paused
+                      {t("paused")}
                     </Badge>
                   )}
                 </div>
@@ -196,7 +197,7 @@ export function DebtCard({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => onEdit(debt)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {t("edit")}
                 </DropdownMenuItem>
                 {!debt.isPaidOff && (
                   <>
@@ -206,18 +207,18 @@ export function DebtCard({
                       {debt.isPaused ? (
                         <>
                           <Play className="mr-2 h-4 w-4" />
-                          Resume
+                          {t("resume")}
                         </>
                       ) : (
                         <>
                           <Pause className="mr-2 h-4 w-4" />
-                          Pause
+                          {t("pause")}
                         </>
                       )}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onPayment(debt.id)}>
                       <DollarSign className="mr-2 h-4 w-4" />
-                      Record Payment
+                      {t("recordPayment")}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -226,7 +227,7 @@ export function DebtCard({
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {t("delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -235,50 +236,50 @@ export function DebtCard({
           {/* Main Metrics */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Current Balance</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{t("currentBalance")}</p>
               <p className="font-semibold text-base">{formatMoney(debt.currentBalance)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">
-                {debt.loanType === "credit_card" 
-                  ? (debt.monthlyPayment > 0 ? "Minimum Payment" : "Flexible Payment")
+{debt.loanType === "credit_card"
+                  ? (debt.monthlyPayment > 0 ? t("minimumPayment") : t("flexiblePayment"))
                   : debt.paymentFrequency && debt.paymentFrequency !== "monthly"
-                  ? `${paymentFrequencyLabels[debt.paymentFrequency] || debt.paymentFrequency} Payment`
-                  : "Monthly Payment"}
+                  ? (paymentFreqKeyMap[debt.paymentFrequency] ? t(paymentFreqKeyMap[debt.paymentFrequency] as "monthly" | "biweekly" | "weekly" | "semimonthly" | "daily") : debt.paymentFrequency) + " " + t("payment")
+                  : t("monthlyPaymentLabel")}
               </p>
               <p className="font-semibold text-base">
                 {debt.loanType === "credit_card" && debt.monthlyPayment === 0
-                  ? "Any amount"
+                  ? t("anyAmount")
                   : debt.paymentAmount && debt.paymentAmount > 0
                   ? formatMoney(debt.paymentAmount)
                   : formatMoney(debt.monthlyPayment)}
               </p>
               {debt.loanType === "credit_card" && debt.monthlyPayment > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  You can pay any amount (minimum, partial, full, or more)
+                  {t("youCanPayAnyAmount")}
                 </p>
               )}
               {debt.paymentFrequency && debt.paymentFrequency !== "monthly" && debt.paymentAmount && debt.loanType !== "credit_card" && (
                 <p className="text-xs text-muted-foreground">
-                  {formatMoney(debt.monthlyPayment)}/mo
+                  {formatMoney(debt.monthlyPayment)}{t("perMonth")}
                 </p>
               )}
             </div>
             {showMonthsRemaining && (
               <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Months Remaining</p>
+                <p className="text-xs text-muted-foreground mb-0.5">{t("monthsRemaining")}</p>
                 <p className="font-semibold">
                   {monthsRemaining === 0
-                    ? "Paid off!"
+                    ? t("paidOffBadge")
                     : monthsRemaining < 12
-                    ? `${monthsRemaining} months`
-                    : `${Math.floor(monthsRemaining / 12)} years ${monthsRemaining % 12} months`}
+                    ? t("monthsLabel", { months: monthsRemaining })
+                    : t("yearsMonths", { years: Math.floor(monthsRemaining / 12), months: monthsRemaining % 12 })}
                 </p>
               </div>
             )}
             {paymentsLeft !== null && (
               <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Payments Left</p>
+                <p className="text-xs text-muted-foreground mb-0.5">{t("paymentsLeft")}</p>
                 <p className="font-semibold">{paymentsLeft}</p>
               </div>
             )}
@@ -287,23 +288,23 @@ export function DebtCard({
           {/* Additional Info */}
           <div className="pt-4 border-t grid grid-cols-2 gap-4 text-xs">
             <div>
-              <p className="text-muted-foreground">Principal Paid</p>
+              <p className="text-muted-foreground">{t("principalPaid")}</p>
               <p className="font-medium">{formatMoney(debt.principalPaid)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Interest Paid</p>
+              <p className="text-muted-foreground">{t("interestPaid")}</p>
               <p className="font-medium">{formatMoney(debt.interestPaid)}</p>
             </div>
             {debt.totalInterestRemaining !== undefined && (
               <div>
-                <p className="text-muted-foreground">Interest Remaining</p>
+                <p className="text-muted-foreground">{t("interestRemaining")}</p>
                 <p className="font-medium">{formatMoney(debt.totalInterestRemaining)}</p>
               </div>
             )}
             {debt.additionalContributions && debt.additionalContributionAmount && (
               <div>
-                <p className="text-muted-foreground">Extra Payment</p>
-                <p className="font-medium">{formatMoney(debt.additionalContributionAmount)}/mo</p>
+                <p className="text-muted-foreground">{t("extraPayment")}</p>
+                <p className="font-medium">{formatMoney(debt.additionalContributionAmount)}{t("perMonth")}</p>
               </div>
             )}
           </div>

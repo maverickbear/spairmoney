@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { Button } from "@/components/ui/button";
 import { FeatureGuard } from "@/components/common/feature-guard";
 import {
@@ -49,6 +51,7 @@ export interface HouseholdModuleProps {
 }
 
 export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange }: HouseholdModuleProps = {}) {
+  const t = useTranslations("members");
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess, canWrite } = useWriteGuard();
   const [members, setMembers] = useState<HouseholdMember[]>([]);
@@ -65,7 +68,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
     async function fetchMembers() {
       setLoading(true);
       try {
-        const response = await fetch("/api/v2/members");
+        const response = await fetch(apiUrl("/api/v2/members"));
         if (cancelled) return;
         if (!response.ok) throw new Error("Failed to fetch members data");
         const { members: data } = await response.json();
@@ -94,7 +97,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
   async function loadData() {
     try {
       setLoading(true);
-      const response = await fetch("/api/v2/members");
+      const response = await fetch(apiUrl("/api/v2/members"));
       if (!response.ok) throw new Error("Failed to fetch members data");
       const { members: data } = await response.json();
       setMembers(data ?? []);
@@ -109,10 +112,10 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
     if (!checkWriteAccess()) return;
     openDialog(
       {
-        title: "Remove Member",
-        description: `Are you sure you want to remove ${member.name || member.email} from your household?`,
+        title: t("removeMember"),
+        description: t("removeMemberConfirm", { name: member.name || member.email }),
         variant: "destructive",
-        confirmLabel: "Remove",
+        confirmLabel: t("remove"),
       },
       async () => {
         setDeletingId(member.id);
@@ -147,7 +150,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
         throw new Error(errorData.error || "Failed to resend invitation");
       }
 
-      alert("Invitation email resent successfully!");
+      alert(t("invitationResentSuccess"));
     } catch (error) {
       console.error("Error resending invitation:", error);
       alert(error instanceof Error ? error.message : "Failed to resend invitation");
@@ -174,7 +177,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
   return (
     <FeatureGuard 
       feature="hasHousehold"
-      headerTitle="Household Members"
+      headerTitle={t("householdMembers")}
     >
       <div>
         <div className="hidden lg:flex items-center justify-end mb-4">
@@ -191,7 +194,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Invite Member
+              {t("inviteMember")}
             </Button>
           )}
         </div>
@@ -210,8 +213,8 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
           <div className="w-full h-full min-h-[400px]">
             <EmptyState
               icon={Users}
-              title="No members yet"
-              description="Invite household members to share access to your financial data."
+              title={t("noMembersYet")}
+              description={t("noMembersYetDescription")}
             />
           </div>
         ) : (
@@ -256,19 +259,19 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                             {member.isOwner && (
                               <Badge variant="default" className="flex shrink-0 items-center gap-1">
                                 <Crown className="h-3 w-3" />
-                                Owner
+                                {t("owner")}
                               </Badge>
                             )}
                             {member.isOwner ? (
                               <Badge variant="default" className="rounded-full border-border bg-white text-gray-900 hover:bg-gray-50 text-xs shrink-0">
-                                Admin
+                                {t("admin")}
                               </Badge>
                             ) : (
                               <Badge
                                 variant={member.role === "admin" ? "default" : "secondary"}
                                 className={`text-xs shrink-0 ${member.role === "admin" ? "rounded-full border-border bg-white text-gray-900 hover:bg-gray-50" : ""}`}
                               >
-                                {member.role === "admin" ? "Admin" : "Member"}
+                                {member.role === "admin" ? t("admin") : t("member")}
                               </Badge>
                             )}
                           </div>
@@ -277,10 +280,10 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                             {member.isOwner ? (
                               <>
                                 <Badge variant="secondary" className="rounded-full bg-primary text-primary-foreground border-transparent text-xs">
-                                  Active
+                                  {t("active")}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
-                                  Since {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}
+                                  {t("since")} {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}
                                 </span>
                               </>
                             ) : (
@@ -288,9 +291,9 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                                 <InvitationStatus status={member.status} />
                                 <span className="text-xs text-muted-foreground">
                                   {member.status === "pending"
-                                    ? `Invited ${member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}`
+                                    ? `${t("invited")} ${member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}`
                                     : member.acceptedAt
-                                      ? `Joined ${new Date(member.acceptedAt).toLocaleDateString()}`
+                                      ? `${t("joined")} ${new Date(member.acceptedAt).toLocaleDateString()}`
                                       : "—"}
                                 </span>
                               </>
@@ -311,12 +314,12 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                               {member.status === "pending" && (
                                 <DropdownMenuItem onClick={() => handleResend(member)}>
                                   <Mail className="h-4 w-4 mr-2" />
-                                  Resend
+                                  {t("resend")}
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={() => handleEdit(member)}>
                                 <EditIcon className="h-4 w-4 mr-2" />
-                                Edit
+                                {t("edit")}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDelete(member)}
@@ -328,7 +331,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                                 ) : (
                                   <Trash2 className="h-4 w-4 mr-2" />
                                 )}
-                                Delete
+                                {t("delete")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -344,12 +347,12 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs md:text-sm">Member</TableHead>
-                    <TableHead className="text-xs md:text-sm">Email</TableHead>
-                    <TableHead className="text-xs md:text-sm">Role</TableHead>
-                    <TableHead className="text-xs md:text-sm">Status</TableHead>
-                    <TableHead className="text-xs md:text-sm">Date</TableHead>
-                    <TableHead className="text-xs md:text-sm">Actions</TableHead>
+                    <TableHead className="text-xs md:text-sm">{t("memberLabel")}</TableHead>
+                    <TableHead className="text-xs md:text-sm">{t("email")}</TableHead>
+                    <TableHead className="text-xs md:text-sm">{t("role")}</TableHead>
+                    <TableHead className="text-xs md:text-sm">{t("statusLabel")}</TableHead>
+                    <TableHead className="text-xs md:text-sm">{t("date")}</TableHead>
+                    <TableHead className="text-xs md:text-sm">{t("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -386,10 +389,10 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                             <div className="flex items-center gap-2">
                               <span>{member.name || member.email}</span>
                               {member.isOwner && (
-                                <Badge variant="default" className="flex items-center gap-1">
-                                  <Crown className="h-3 w-3" />
-                                  Owner
-                                </Badge>
+<Badge variant="default" className="flex items-center gap-1">
+                                <Crown className="h-3 w-3" />
+                                {t("owner")}
+                              </Badge>
                               )}
                             </div>
                           </div>
@@ -401,28 +404,28 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                       <TableCell className="text-xs md:text-sm">
                         {member.isOwner ? (
                           <Badge variant="default" className="rounded-full border-border bg-white text-gray-900 hover:bg-gray-50">
-                            Admin
+                            {t("admin")}
                           </Badge>
                         ) : (
                           <Badge variant={member.role === "admin" ? "default" : "secondary"} className={member.role === "admin" ? "rounded-full border-border bg-white text-gray-900 hover:bg-gray-50" : ""}>
-                            {member.role === "admin" ? "Admin" : "Member"}
+                            {member.role === "admin" ? t("admin") : t("member")}
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-xs md:text-sm">
                         {member.isOwner ? (
-                          <Badge variant="secondary" className="rounded-full bg-primary text-primary-foreground border-transparent hover:bg-primary">Active</Badge>
+                          <Badge variant="secondary" className="rounded-full bg-primary text-primary-foreground border-transparent hover:bg-primary">{t("active")}</Badge>
                         ) : (
                           <InvitationStatus status={member.status} />
                         )}
                       </TableCell>
                       <TableCell className="text-xs md:text-sm text-muted-foreground">
                         {member.isOwner ? (
-                          <span>Since {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}</span>
+                          <span>{t("since")} {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}</span>
                         ) : member.status === "pending" ? (
-                          <span>Invited {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}</span>
+                          <span>{t("invited")} {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}</span>
                         ) : member.acceptedAt ? (
-                          <span>Joined {new Date(member.acceptedAt).toLocaleDateString()}</span>
+                          <span>{t("joined")} {new Date(member.acceptedAt).toLocaleDateString()}</span>
                         ) : (
                           <span>-</span>
                         )}
@@ -436,7 +439,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                                 size="icon"
                                 className="h-7 w-7 md:h-10 md:w-10"
                                 onClick={() => handleResend(member)}
-                                title="Resend invitation email"
+                                title={t("resendInvitationEmail")}
                               >
                                 <Mail className="h-3 w-3 md:h-4 md:w-4" />
                               </Button>

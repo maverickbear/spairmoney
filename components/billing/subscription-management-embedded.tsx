@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.val
 import { format } from "date-fns";
 import { CreditCard, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import {
   Alert,
   AlertDescription,
@@ -35,6 +37,8 @@ export function SubscriptionManagementEmbedded({
   householdInfo: initialHouseholdInfo,
   onSubscriptionUpdated,
 }: SubscriptionManagementEmbeddedProps) {
+  const tToasts = useTranslations("toasts");
+  const t = useTranslations("billing");
   const breakpoint = useBreakpoint();
   const isMobile = !breakpoint || breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [loading, setLoading] = useState(false);
@@ -49,7 +53,7 @@ export function SubscriptionManagementEmbedded({
     
     async function loadHouseholdInfo() {
       try {
-        const response = await fetch("/api/v2/household/info");
+        const response = await fetch(apiUrl("/api/v2/household/info"));
         if (response.ok) {
           const data = await response.json();
           setHouseholdInfo(data);
@@ -65,7 +69,7 @@ export function SubscriptionManagementEmbedded({
   async function handleOpenStripePortal() {
     try {
       setLoading(true);
-      const response = await fetch("/api/stripe/portal", {
+      const response = await fetch(apiUrl("/api/stripe/portal"), {
         method: "POST",
       });
 
@@ -75,16 +79,16 @@ export function SubscriptionManagementEmbedded({
         window.open(data.url, '_blank');
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to open Stripe portal",
+          title: tToasts("error"),
+          description: data.error || t("failedToOpenPortalRetry"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error opening portal:", error);
       toast({
-        title: "Error",
-        description: "Failed to open Stripe portal. Please try again.",
+        title: tToasts("error"),
+        description: t("failedToOpenPortalRetry"),
         variant: "destructive",
       });
     } finally {
@@ -98,9 +102,9 @@ export function SubscriptionManagementEmbedded({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
-            Subscription
+            {t("subscriptionCardTitle")}
           </CardTitle>
-          <CardDescription>You don't have an active subscription. Please select a plan to continue.</CardDescription>
+          <CardDescription>{t("noActiveSubscriptionDescription")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -110,7 +114,7 @@ export function SubscriptionManagementEmbedded({
   const displayPrice = subscription.currentPeriodStart && subscription.currentPeriodEnd
     ? (isYearly ? plan.priceYearly : plan.priceMonthly)
     : 0;
-  const priceLabel = isYearly ? "per year" : "per month";
+  const priceLabel = isYearly ? t("perYearLabel") : t("perMonthLabel");
   const isCancelled = subscription.cancelAtPeriodEnd || subscription.status === "cancelled";
   const isFullyCancelled = subscription.status === "cancelled";
 
@@ -125,10 +129,10 @@ export function SubscriptionManagementEmbedded({
               </CardTitle>
               <CardDescription className="mt-1">
                 {interval === "year"
-                  ? "Yearly Subscription"
+                  ? t("yearlySubscription")
                   : interval === "month"
-                  ? "Monthly Subscription"
-                  : "Subscription"}
+                  ? t("monthlySubscription")
+                  : t("subscriptionLabel")}
               </CardDescription>
             </div>
             {displayPrice > 0 && (
@@ -147,7 +151,7 @@ export function SubscriptionManagementEmbedded({
 
             if (subscription.status === "trialing" && subscription.trialEndDate) {
               dateToShow = new Date(subscription.trialEndDate);
-              label = "Your trial period ends on";
+              label = t("yourTrialEndsOn");
               isValidDate = !isNaN(dateToShow.getTime()) && dateToShow.getFullYear() > 1970;
             } else if (subscription.currentPeriodEnd) {
               dateToShow = new Date(subscription.currentPeriodEnd);
@@ -155,11 +159,11 @@ export function SubscriptionManagementEmbedded({
               
               if (isValidDate) {
                 if (isFullyCancelled) {
-                  label = "Access ended on";
+                  label = t("accessEndedOn");
                 } else if (isCancelled) {
-                  label = "Subscription ends on";
+                  label = t("subscriptionEndsOn");
                 } else {
-                  label = "Renews on";
+                  label = t("renewsOn");
                 }
               }
             }
@@ -178,8 +182,8 @@ export function SubscriptionManagementEmbedded({
             if (isFullyCancelled) {
               return (
                 <div>
-                  <p className="text-sm text-muted-foreground">Subscription Status</p>
-                  <p className="font-medium text-muted-foreground">Cancelled</p>
+                  <p className="text-sm text-muted-foreground">{t("subscriptionStatusLabel")}</p>
+                  <p className="font-medium text-muted-foreground">{t("cancelled")}</p>
                 </div>
               );
             }
@@ -192,15 +196,16 @@ export function SubscriptionManagementEmbedded({
               <AlertDescription>
                 {isFullyCancelled ? (
                   <>
-                    <strong>Subscription Cancelled:</strong> Your subscription is cancelled. You can still view your data, but you cannot add, edit, or remove information. To reactivate your subscription and regain full functionality, click the button below.
+                    <strong>{t("subscriptionCancelledTitle")}</strong> {t("subscriptionCancelledDescription")}
                   </>
                 ) : (
                   <>
-                    <strong>Subscription Will Be Cancelled:</strong> Your subscription will be cancelled on{" "}
-                    {subscription.currentPeriodEnd
-                      ? format(new Date(subscription.currentPeriodEnd), "PPP")
-                      : "the end of your billing period"}
-                    . You can reactivate it anytime.
+                    <strong>{t("subscriptionWillBeCancelledTitle")}</strong>{" "}
+                    {t("subscriptionWillBeCancelledDescription", {
+                      date: subscription.currentPeriodEnd
+                        ? format(new Date(subscription.currentPeriodEnd), "PPP")
+                        : t("endOfBillingPeriod"),
+                    })}
                   </>
                 )}
               </AlertDescription>
@@ -210,7 +215,7 @@ export function SubscriptionManagementEmbedded({
           {subscription.status === "past_due" && (
             <Alert variant="destructive">
               <AlertDescription>
-                <strong>Payment Failed:</strong> Please update your payment method to continue using the service.
+                <strong>{t("paymentFailedTitle")}</strong> {t("paymentFailedDescription")}
               </AlertDescription>
             </Alert>
           )}
@@ -218,9 +223,9 @@ export function SubscriptionManagementEmbedded({
           {householdInfo?.isMember && !householdInfo?.isOwner && (
             <Alert>
               <AlertDescription>
-                {householdInfo.ownerName 
-                  ? `You are viewing the subscription managed by ${householdInfo.ownerName}. Only the account owner can manage the subscription.`
-                  : "You are viewing the subscription as a household member. Only the account owner can manage the subscription."}
+                {householdInfo.ownerName
+                  ? t("viewingSubscriptionManagedBy", { name: householdInfo.ownerName })
+                  : t("viewingSubscriptionAsMember")}
               </AlertDescription>
             </Alert>
           )}
@@ -237,12 +242,12 @@ export function SubscriptionManagementEmbedded({
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
+                    {t("upgradeDialog.loading")}
                   </>
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    Manage Subscription
+                    {t("manageSubscription")}
                   </>
                 )}
               </Button>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,24 +28,15 @@ export interface SubscriptionCardProps {
   onResume: (id: string) => void;
 }
 
-const billingFrequencyLabels: Record<string, string> = {
-  monthly: "Monthly",
-  yearly: "Yearly",
-  biweekly: "Biweekly",
-  weekly: "Weekly",
-  semimonthly: "Semimonthly",
-  daily: "Daily",
+const freqKeyMap: Record<string, string> = {
+  monthly: "monthly",
+  yearly: "yearly",
+  biweekly: "biweekly",
+  weekly: "weekly",
+  semimonthly: "semimonthly",
+  daily: "daily",
 };
-
-const dayOfWeekLabels: Record<number, string> = {
-  0: "Sunday",
-  1: "Monday",
-  2: "Tuesday",
-  3: "Wednesday",
-  4: "Thursday",
-  5: "Friday",
-  6: "Saturday",
-};
+const dayKeys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
 
 export function SubscriptionCard({
   subscription,
@@ -53,15 +45,18 @@ export function SubscriptionCard({
   onPause,
   onResume,
 }: SubscriptionCardProps) {
-  const frequencyLabel = billingFrequencyLabels[subscription.billingFrequency] || subscription.billingFrequency;
+  const t = useTranslations("subscriptions");
+  const frequencyLabel = subscription.billingFrequency && freqKeyMap[subscription.billingFrequency]
+    ? t(freqKeyMap[subscription.billingFrequency])
+    : subscription.billingFrequency;
 
-  const getBillingDayLabel = () => {
+  const getBillingDayLabel = (): string | null => {
     if (!subscription.billingDay) return null;
-    
     if (subscription.billingFrequency === "monthly" || subscription.billingFrequency === "yearly" || subscription.billingFrequency === "semimonthly") {
-      return `Day ${subscription.billingDay}`;
-    } else if (subscription.billingFrequency === "weekly" || subscription.billingFrequency === "biweekly") {
-      return dayOfWeekLabels[subscription.billingDay] || `Day ${subscription.billingDay}`;
+      return t("day", { n: subscription.billingDay });
+    }
+    if (subscription.billingFrequency === "weekly" || subscription.billingFrequency === "biweekly") {
+      return subscription.billingDay >= 0 && subscription.billingDay <= 6 ? t(dayKeys[subscription.billingDay]) : t("day", { n: subscription.billingDay });
     }
     return null;
   };
@@ -93,7 +88,7 @@ export function SubscriptionCard({
                 </CardTitle>
                 {!subscription.isActive && (
                   <Badge variant="outline" className="border-yellow-500 dark:border-yellow-400 text-yellow-600 dark:text-yellow-400 text-xs">
-                    Paused
+                    {t("paused")}
                   </Badge>
                 )}
               </div>
@@ -118,17 +113,17 @@ export function SubscriptionCard({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => onEdit(subscription)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {t("edit")}
                 </DropdownMenuItem>
                 {subscription.isActive ? (
                   <DropdownMenuItem onClick={() => onPause(subscription.id)}>
                     <Pause className="mr-2 h-4 w-4" />
-                    Pause
+                    {t("pause")}
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem onClick={() => onResume(subscription.id)}>
                     <Play className="mr-2 h-4 w-4" />
-                    Resume
+                    {t("resume")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
@@ -136,7 +131,7 @@ export function SubscriptionCard({
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {t("delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -145,11 +140,11 @@ export function SubscriptionCard({
           {/* Main Metrics */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Amount</p>
-              <p className="font-semibold text-base">{formatMoney(subscription.amount)}</p>
+<p className="text-xs text-muted-foreground mb-0.5">{t("amount")}</p>
+            <p className="font-semibold text-base">{formatMoney(subscription.amount)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Account</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{t("account")}</p>
               <p className="font-semibold text-base truncate">
                 {subscription.account?.name || "N/A"}
               </p>
@@ -159,14 +154,14 @@ export function SubscriptionCard({
           {/* Additional Info */}
           {subscription.description && (
             <div className="pt-2 border-t">
-              <p className="text-xs text-muted-foreground mb-1">Description</p>
+              <p className="text-xs text-muted-foreground mb-1">{t("description")}</p>
               <p className="text-sm">{subscription.description}</p>
             </div>
           )}
 
           <div className="pt-2 border-t text-xs">
             <p className="text-muted-foreground">
-              First billing: {(() => {
+              {t("firstBillingLabel")}: {(() => {
                 if (!subscription.firstBillingDate) return "—";
                 const date = new Date(subscription.firstBillingDate);
                 return isNaN(date.getTime()) ? "—" : date.toLocaleDateString();

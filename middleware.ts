@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import createIntlMiddleware from "next-intl/middleware";
+import { routing } from "@/i18n/routing";
 import { SecurityLogger } from "@/lib/utils/security-logging";
 import { createServiceRoleClient } from "@/src/infrastructure/database/supabase-server";
 import { createServerClient as createSSRServerClient } from "@supabase/ssr";
 import { generateCorrelationId } from "@/src/infrastructure/utils/structured-logger";
+
+const intlMiddleware = createIntlMiddleware(routing);
+
+/** Cookie name used by next-intl for locale (used when redirecting old /pt, /es URLs). */
+const LOCALE_COOKIE_NAME = "NEXT_LOCALE";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 // New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
@@ -200,9 +207,29 @@ function isMaliciousRequest(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  // Run next-intl first (locale detection, redirect/rewrite). Return redirects immediately.
+  const intlResponse = intlMiddleware(request);
+  if (intlResponse && !intlResponse.ok) {
+    return intlResponse;
+  }
+
   // Generate correlation ID for request tracking
   const correlationId = request.headers.get('x-correlation-id') || generateCorrelationId();
   const { pathname } = request.nextUrl;
+
+  // Redirect old /pt and /es URLs to same path without prefix and set locale cookie
+  if (pathname === "/pt" || pathname.startsWith("/pt/")) {
+    const targetPath = pathname === "/pt" ? "/" : pathname.slice("/pt".length) || "/";
+    const response = NextResponse.redirect(new URL(targetPath, request.url));
+    response.cookies.set(LOCALE_COOKIE_NAME, "pt", { path: "/" });
+    return response;
+  }
+  if (pathname === "/es" || pathname.startsWith("/es/")) {
+    const targetPath = pathname === "/es" ? "/" : pathname.slice("/es".length) || "/";
+    const response = NextResponse.redirect(new URL(targetPath, request.url));
+    response.cookies.set(LOCALE_COOKIE_NAME, "es", { path: "/" });
+    return response;
+  }
 
   // Block malicious requests immediately (before any other processing)
   if (isMaliciousRequest(pathname)) {
@@ -463,9 +490,9 @@ export async function middleware(request: NextRequest) {
   // Note: Account deletion is now immediate, so no need to check for deletedAt
   // If a user is deleted, they won't exist in auth.users and won't be authenticated
 
-  // Only apply rate limiting to API routes
+  // Only apply rate limiting to API routes. For non-API routes, return next-intl's response (rewrite/headers).
   if (!pathname.startsWith("/api")) {
-    return NextResponse.next();
+    return intlResponse ?? NextResponse.next();
   }
 
   // Get rate limit config for this path

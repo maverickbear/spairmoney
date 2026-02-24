@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ export function SubscriptionManagement({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   // OPTIMIZED: Use provided householdInfo or load it if not provided
   const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(initialHouseholdInfo ?? null);
+  const t = useTranslations("toasts");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -109,16 +111,16 @@ export function SubscriptionManagement({
         window.open(data.url, '_blank');
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to open Stripe portal",
+          title: t("error"),
+          description: data.error || t("failedToOpenPortal"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error opening portal:", error);
       toast({
-        title: "Error",
-        description: "Failed to open Stripe portal. Please try again.",
+        title: t("error"),
+        description: t("failedToOpenPortal"),
         variant: "destructive",
       });
     } finally {

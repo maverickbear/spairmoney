@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -180,11 +181,12 @@ export function TransactionsMobileCard({
   onRejectSuggestion,
   processingSuggestion,
 }: TransactionsMobileCardProps) {
-  const description = transaction.description || "Transaction";
+  const t = useTranslations("transactions");
+  const description = transaction.description || t("transactionFallbackLabel");
   const displayName =
     transaction.type === "transfer" && transaction.transferToId && transaction.account?.name && transaction.toAccount?.name
       ? formatTransferLabel(transaction.account.name, transaction.toAccount.name)
-      : (transaction.description || transaction.category?.name || "Transaction");
+      : (transaction.description || transaction.category?.name || t("transactionFallbackLabel"));
   const date = formatTransactionDate(transaction.date);
   const isIncome = transaction.type === "income";
   const isExpense = transaction.type === "expense";
@@ -231,7 +233,7 @@ export function TransactionsMobileCard({
         {transaction.suggestedCategoryId && (
           <div className="flex items-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
             <span className="text-xs text-muted-foreground italic flex-1">
-              Suggested: {transaction.suggestedCategory?.name || "category"}
+              {t("suggestedLabel", { name: transaction.suggestedCategory?.name || t("suggestedCategory") })}
               </span>
             <div className="flex items-center gap-1">
                   {onRejectSuggestion && (

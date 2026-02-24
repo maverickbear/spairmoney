@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { CreditCard, ArrowRight, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,9 +17,10 @@ interface DebtOverviewWidgetProps {
 }
 
 export function DebtOverviewWidget({ data, loading, error }: DebtOverviewWidgetProps) {
+  const t = useTranslations("dashboard");
   if (loading) {
     return (
-      <WidgetCard title="Debt" compact>
+      <WidgetCard title={t("debt")} compact>
         <div className="animate-pulse space-y-3">
           <div className="h-4 bg-muted rounded" />
           <div className="h-4 bg-muted rounded" />
@@ -29,11 +31,11 @@ export function DebtOverviewWidget({ data, loading, error }: DebtOverviewWidgetP
 
   if (error) {
     return (
-      <WidgetCard title="Debt" compact>
+      <WidgetCard title={t("debt")} compact>
         <div className="text-xs text-muted-foreground">
-          <p>Error: {error}</p>
+          <p>{t("errorLoadingDashboard")}: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
-            <a href="/debts/new">Add Debt</a>
+            <a href="/debts/new">{t("addDebt")}</a>
           </Button>
         </div>
       </WidgetCard>
@@ -42,22 +44,22 @@ export function DebtOverviewWidget({ data, loading, error }: DebtOverviewWidgetP
 
   if (!data) {
     return (
-      <WidgetCard title="Debt" compact>
+      <WidgetCard title={t("debt")} compact>
         <div className="flex flex-col items-center justify-center py-6 text-center">
           <CheckCircle2 className="h-8 w-8 text-sentiment-positive mb-2" />
-          <p className="text-xs text-muted-foreground">Debt-free!</p>
+          <p className="text-xs text-muted-foreground">{t("debtFree")}</p>
         </div>
       </WidgetCard>
     );
   }
 
   return (
-    <WidgetCard title="Debt" compact>
+    <WidgetCard title={t("debt")} compact>
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-2">
           {/* Total Debt */}
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Total</p>
+            <p className="text-xs text-muted-foreground mb-0.5">{t("total")}</p>
             <p className="text-xl text-sentiment-negative">
               {formatMoney(data.totalDebt)}
             </p>
@@ -65,14 +67,14 @@ export function DebtOverviewWidget({ data, loading, error }: DebtOverviewWidgetP
 
           {/* Monthly Payments */}
           <div className="p-2 rounded border bg-muted/30">
-            <p className="text-xs text-muted-foreground mb-0.5">Monthly</p>
+            <p className="text-xs text-muted-foreground mb-0.5">{t("monthly")}</p>
             <p className="text-sm">{formatMoney(data.monthlyPayments)}</p>
           </div>
 
           {/* Payoff Timeline */}
           {data.payoffTimeline > 0 && (
             <div className="p-2 rounded border">
-              <p className="text-xs text-muted-foreground mb-0.5">Payoff</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{t("payoffLabel")}</p>
               <p className="text-sm font-semibold">
                 {data.payoffTimeline} month{data.payoffTimeline !== 1 ? 's' : ''}
               </p>
@@ -84,7 +86,7 @@ export function DebtOverviewWidget({ data, loading, error }: DebtOverviewWidgetP
             <div className="p-2 rounded border bg-primary/5 border-primary/20">
               <div className="flex items-center gap-1.5 mb-1">
                 <CreditCard className="h-3 w-3 --sentiment-positive" />
-                <p className="text-xs font-semibold --sentiment-positive">Next</p>
+                <p className="text-xs font-semibold --sentiment-positive">{t("nextLabel")}</p>
               </div>
               <p className="text-xs font-medium mb-0.5 truncate">{data.nextMilestone.milestoneDescription}</p>
               <p className="text-xs text-muted-foreground">

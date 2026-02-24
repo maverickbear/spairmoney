@@ -1,8 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/src/domain/transactions/transactions.types";
@@ -21,6 +22,7 @@ export function FinancialOverviewCard({
   financialHealth,
   now,
 }: FinancialOverviewCardProps) {
+  const t = useTranslations("reports");
   // Calculate current month totals
   const currentIncome = currentMonthTransactions
     .filter((t) => t.type === "income")
@@ -57,14 +59,14 @@ export function FinancialOverviewCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg md:text-xl">Financial Overview</CardTitle>
+        <CardTitle className="text-lg md:text-xl">{t("financialOverview")}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total Income */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Total Income</p>
+              <p className="text-sm text-muted-foreground">{t("totalIncome")}</p>
               <DollarSign className="h-4 w-4 text-sentiment-positive" />
             </div>
             <p className="text-2xl font-bold">{formatMoney(currentIncome)}</p>
@@ -83,7 +85,7 @@ export function FinancialOverviewCard({
                   )}
                 >
                   {incomeChange >= 0 ? "+" : ""}
-                  {incomeChange.toFixed(1)}% vs {lastMonthName}
+                  {incomeChange.toFixed(1)}% {t("vsLastMonth", { month: lastMonthName })}
                 </span>
               </div>
             )}
@@ -92,7 +94,7 @@ export function FinancialOverviewCard({
           {/* Total Expenses */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Total Expenses</p>
+              <p className="text-sm text-muted-foreground">{t("totalExpenses")}</p>
               <DollarSign className="h-4 w-4 text-red-600 dark:text-red-400" />
             </div>
             <p className="text-2xl font-bold">{formatMoney(currentExpenses)}</p>
@@ -111,7 +113,7 @@ export function FinancialOverviewCard({
                   )}
                 >
                   {expensesChange >= 0 ? "+" : ""}
-                  {expensesChange.toFixed(1)}% vs {lastMonthName}
+                  {expensesChange.toFixed(1)}% {t("vsLastMonth", { month: lastMonthName })}
                 </span>
               </div>
             )}
@@ -120,7 +122,7 @@ export function FinancialOverviewCard({
           {/* Net Amount */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Net Amount</p>
+              <p className="text-sm text-muted-foreground">{t("netAmount")}</p>
               <DollarSign
                 className={cn(
                   "h-4 w-4",
@@ -155,7 +157,7 @@ export function FinancialOverviewCard({
                   )}
                 >
                   {netChange >= 0 ? "+" : ""}
-                  {netChange.toFixed(1)}% vs {lastMonthName}
+                  {netChange.toFixed(1)}% {t("vsLastMonth", { month: lastMonthName })}
                 </span>
               </div>
             )}
@@ -164,7 +166,7 @@ export function FinancialOverviewCard({
           {/* Savings Rate */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Savings Rate</p>
+              <p className="text-sm text-muted-foreground">{t("savingsRate")}</p>
               <PiggyBank className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             <p
@@ -206,7 +208,7 @@ export function FinancialOverviewCard({
           <div className="mt-6 pt-6 border-t">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Spair Score</p>
+                <p className="text-sm font-medium">{t("spairScore")}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {financialHealth.message}
                 </p>
@@ -224,7 +226,7 @@ export function FinancialOverviewCard({
                 >
                   {financialHealth.score}
                 </p>
-                <p className="text-xs text-muted-foreground">out of 100</p>
+                <p className="text-xs text-muted-foreground">{t("outOf100")}</p>
               </div>
             </div>
           </div>

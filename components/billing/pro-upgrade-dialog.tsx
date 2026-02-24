@@ -2,23 +2,12 @@
 
 import { useState, useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { Check, Loader2, Tag, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const FEATURES = [
-  "Unlimited transactions and accounts",
-  "Dashboard and Spair Score",
-  "Budgets",
-  "Goals",
-  "Advanced reports",
-  "Receipt scanning",
-  "Household sharing",
-  "CSV import and export",
-  "Debt tracking",
-];
 
 export type UpgradeDialogSubscriptionStatus = "no_subscription" | "cancelled" | "past_due" | "unpaid" | null;
 
@@ -34,54 +23,48 @@ interface ProUpgradeDialogProps {
   loading?: boolean;
 }
 
-function getCopy(subscriptionStatus: UpgradeDialogSubscriptionStatus) {
+function getCopy(
+  subscriptionStatus: UpgradeDialogSubscriptionStatus,
+  t: ReturnType<typeof useTranslations<"billing.upgradeDialog">>
+) {
   const isNoPlan = !subscriptionStatus || subscriptionStatus === "no_subscription";
-  const isReactivation =
-    subscriptionStatus === "cancelled" || subscriptionStatus === "past_due" || subscriptionStatus === "unpaid";
 
   if (isNoPlan) {
     return {
-      title: "Subscribe to Pro",
-      description:
-        "Get full control of your money with the Pro plan. Start your 30-day free trial.",
-      primaryButton: "Start 30-day trial",
+      title: t("subscribeTitle"),
+      description: t("subscribeDescription"),
+      primaryButton: t("startTrial"),
       secondaryButton: null as string | null,
     };
   }
-
   if (subscriptionStatus === "cancelled") {
     return {
-      title: "Reactivate your subscription",
-      description:
-        "Your subscription has been cancelled. Reactivate to regain full access, or choose a new plan below.",
-      primaryButton: "Reactivate",
-      secondaryButton: "Maybe later",
+      title: t("reactivateTitle"),
+      description: t("reactivateDescription"),
+      primaryButton: t("reactivate"),
+      secondaryButton: t("maybeLater"),
     };
   }
   if (subscriptionStatus === "past_due") {
     return {
-      title: "Payment past due",
-      description:
-        "Your payment is past due. Update your payment method to avoid losing access, or choose a new plan below.",
-      primaryButton: "Update payment",
-      secondaryButton: "Maybe later",
+      title: t("pastDueTitle"),
+      description: t("pastDueDescription"),
+      primaryButton: t("updatePayment"),
+      secondaryButton: t("maybeLater"),
     };
   }
   if (subscriptionStatus === "unpaid") {
     return {
-      title: "Payment required",
-      description:
-        "Your subscription is unpaid. Update your payment method to continue, or choose a new plan below.",
-      primaryButton: "Update payment",
-      secondaryButton: "Maybe later",
+      title: t("unpaidTitle"),
+      description: t("unpaidDescription"),
+      primaryButton: t("updatePayment"),
+      secondaryButton: t("maybeLater"),
     };
   }
-
   return {
-    title: "Subscribe to Pro",
-    description:
-      "Get full control of your money with the Pro plan. Start your 30-day free trial.",
-    primaryButton: "Start 30-day trial",
+    title: t("subscribeTitle"),
+    description: t("subscribeDescription"),
+    primaryButton: t("startTrial"),
     secondaryButton: null as string | null,
   };
 }
@@ -97,11 +80,24 @@ export function ProUpgradeDialog({
   canClose = false,
   loading = false,
 }: ProUpgradeDialogProps) {
+  const t = useTranslations("billing.upgradeDialog");
   const [plan, setPlan] = useState<Plan | null>(null);
   const [plansLoading, setPlansLoading] = useState(true);
   const [interval, setInterval] = useState<"month" | "year">("year");
   const [promoCode, setPromoCode] = useState("");
   const [showPromoInput, setShowPromoInput] = useState(false);
+
+  const features = [
+    t("feature1"),
+    t("feature2"),
+    t("feature3"),
+    t("feature4"),
+    t("feature5"),
+    t("feature6"),
+    t("feature7"),
+    t("feature8"),
+    t("feature9"),
+  ];
 
   useEffect(() => {
     if (!open) return;
@@ -140,7 +136,7 @@ export function ProUpgradeDialog({
     }
   }, [open]);
 
-  const copy = getCopy(subscriptionStatus);
+  const copy = getCopy(subscriptionStatus, t);
   const needsReactivation =
     subscriptionStatus === "cancelled" || subscriptionStatus === "past_due" || subscriptionStatus === "unpaid";
   const priceMonthly = plan?.priceMonthly ?? 8;
@@ -194,7 +190,7 @@ export function ProUpgradeDialog({
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{copy.description}</p>
 
               <ul className="mt-6 space-y-3">
-                {FEATURES.map((feature) => (
+                {features.map((feature) => (
                   <li key={feature} className="flex items-center gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground">
                       <Check className="h-3.5 w-3.5" />
@@ -221,7 +217,7 @@ export function ProUpgradeDialog({
             {/* Right panel – Pro plan, two option cards, and primary CTA */}
             <div className="flex shrink-0 flex-col justify-end bg-background px-6 py-8 sm:w-1/2 sm:rounded-r-2xl sm:px-8 sm:py-10 order-2 sm:order-2">
               <h3 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
-                Choose your Billing Period
+                {t("chooseBillingPeriod")}
               </h3>
 
               {/* Two plan options as cards – selected uses plan.id + interval for price ID */}
@@ -244,10 +240,10 @@ export function ProUpgradeDialog({
                       )}
                     >
                       <p className="text-lg font-bold text-gray-900 sm:text-xl">
-                        ${priceMonthly.toFixed(2)} / month
+                        {t("perMonth", { amount: `$${priceMonthly.toFixed(2)}` })}
                       </p>
                       <p className="mt-0.5 text-sm text-gray-900/90">
-                        Annual cost ${(priceMonthly * 12).toFixed(2)}
+                        {t("annualCost", { amount: `$${(priceMonthly * 12).toFixed(2)}` })}
                       </p>
                     </button>
                     <button
@@ -262,16 +258,16 @@ export function ProUpgradeDialog({
                     >
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-lg font-bold text-gray-900 sm:text-xl">
-                          ${priceYearly.toFixed(2)} / year
+                          {t("perYear", { amount: `$${priceYearly.toFixed(2)}` })}
                         </span>
                         {yearlySavingsPct > 0 && (
                           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium --sentiment-positive">
-                            Save {yearlySavingsPct}%
+                            {t("savePct", { pct: yearlySavingsPct })}
                           </span>
                         )}
                       </div>
                       <p className="mt-0.5 text-sm text-gray-900/90">
-                        Monthly cost ${yearlyMonthly.toFixed(2)}
+                        {t("perMonth", { amount: `$${yearlyMonthly.toFixed(2)}` })}
                       </p>
                     </button>
                   </>
@@ -287,14 +283,14 @@ export function ProUpgradeDialog({
                     className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
                   >
                     <Tag className="h-3.5 w-3.5" />
-                    Have a promo code?
+                    {t("havePromoCode")}
                   </button>
                 ) : (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <Input
                         type="text"
-                        placeholder="Enter code"
+                        placeholder={t("enterCode")}
                         value={promoCode}
                         onChange={(e) => setPromoCode(e.target.value)}
                         className="font-mono text-sm h-9"
@@ -303,7 +299,7 @@ export function ProUpgradeDialog({
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="small"
                         className="shrink-0 h-9 px-2 text-muted-foreground hover:text-foreground"
                         onClick={() => {
                           setPromoCode("");
@@ -316,7 +312,7 @@ export function ProUpgradeDialog({
                     </div>
                     {promoCode.trim() && (
                       <p className="text-xs text-muted-foreground">
-                        Applied: <span className="font-mono font-medium text-foreground">{promoCode.trim()}</span>
+                        {t("applied")} <span className="font-mono font-medium text-foreground">{promoCode.trim()}</span>
                       </p>
                     )}
                   </div>
@@ -334,7 +330,7 @@ export function ProUpgradeDialog({
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
+                      {t("loading")}
                     </>
                   ) : (
                     copy.primaryButton
@@ -344,7 +340,7 @@ export function ProUpgradeDialog({
 
               {/* Footer disclaimer */}
               <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
-                You will be charged after the trial ends. You can cancel at any time. Your plan will remain active until the end of the billing cycle.
+                {t("footerDisclaimer")}
               </p>
             </div>
           </div>

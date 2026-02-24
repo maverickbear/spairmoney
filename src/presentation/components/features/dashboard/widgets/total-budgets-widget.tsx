@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { TotalBudgetsWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { WidgetEmptyState } from "./widget-empty-state";
@@ -12,18 +13,19 @@ interface TotalBudgetsWidgetProps {
 }
 
 export function TotalBudgetsWidget({ data, className }: TotalBudgetsWidgetProps) {
+  const t = useTranslations("dashboard");
   if (!data) return null;
 
   const hasBudgets = data.categories.length > 0 && data.totalAmount > 0;
 
   if (!hasBudgets) {
     return (
-      <WidgetCard title="Total budgets" className={className}>
+      <WidgetCard title={t("totalBudgets")} className={className}>
         <WidgetEmptyState
-          title="Set budgets"
-          description="Track your spending limits."
+          title={t("setBudgetsTitle")}
+          description={t("setBudgetsDescription")}
           primaryAction={{
-            label: "Create Budget",
+            label: t("createBudget"),
             href: "/planning/budgets",
           }}
           icon={Wallet}
@@ -40,13 +42,13 @@ export function TotalBudgetsWidget({ data, className }: TotalBudgetsWidgetProps)
       href="/planning/budgets"
       className="flex items-center text-sm font-medium hover:underline"
     >
-      See all <ChevronRight className="ml-1 h-4 w-4" />
+      {t("seeAll")} <ChevronRight className="ml-1 h-4 w-4" />
     </Link>
   );
 
   return (
     <WidgetCard
-      title="Total budgets"
+      title={t("totalBudgets")}
       className={className}
       headerAction={<SeeAllLink />}
     >

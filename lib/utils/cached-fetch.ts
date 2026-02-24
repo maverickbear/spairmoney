@@ -2,7 +2,10 @@
  * Cached Fetch Utility
  * Wrapper around fetch() that respects Cache-Control headers from the server
  * Implements stale-while-revalidate pattern when supported by server
+ * On the client, API paths are resolved with apiUrl() so requests hit the correct origin.
  */
+
+import { apiUrl } from "@/lib/utils/api-base-url";
 
 interface CachedFetchOptions extends RequestInit {
   /**
@@ -124,8 +127,11 @@ export async function cachedFetch<T = any>(
     }
   }
   
+  // On client, resolve /api/* to absolute URL so the request hits the correct origin
+  const requestUrl = typeof window !== "undefined" && url.startsWith("/api") ? apiUrl(url) : url;
+
   // Make fetch request
-  const response = await fetch(url, {
+  const response = await fetch(requestUrl, {
     ...fetchOptions,
     // Add cache control to request if forcing refresh
     cache: forceRefresh ? 'no-store' : 'default',

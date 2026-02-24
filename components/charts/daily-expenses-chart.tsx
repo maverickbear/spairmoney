@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartCard } from "./chart-card";
 import { sentiment } from "@/lib/design-system/colors";
@@ -14,8 +15,9 @@ interface DailyExpensesChartProps {
 }
 
 export function DailyExpensesChart({ data }: DailyExpensesChartProps) {
+  const t = useTranslations("reports");
   return (
-    <ChartCard title="Daily Expenses" description="Expenses by day for current month">
+    <ChartCard title={t("dailyExpenses")} description={t("expensesByDayCurrentMonth")}>
       <ResponsiveContainer width="100%" height={250}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />

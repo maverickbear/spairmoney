@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/common/logo";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -10,17 +10,20 @@ import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthSafe } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabase";
+import { LocaleSwitcher } from "@/components/common/locale-switcher";
+import { apiUrl } from "@/lib/utils/api-base-url";
 
-const NAV_LINKS = [
-  { label: "Home", href: "/" },
-  { label: "Features", href: "/#features" },
-  { label: "Pricing", href: "/#pricing" },
-  { label: "Blog", href: "/blog" },
+const NAV_LINK_KEYS = [
+  { key: "home" as const, href: "/" },
+  { key: "features" as const, href: "/#features" },
+  { key: "pricing" as const, href: "/#pricing" },
+  { key: "blog" as const, href: "/blog" },
 ];
 
 export function LandingHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const t = useTranslations("landing");
   const { isAuthenticated, role } = useAuthSafe();
   const router = useRouter();
   // Show Dashboard/Logout only for Consumer users (in users table). Portal admins (super_admin) use /admin only.
@@ -28,7 +31,7 @@ export function LandingHeader() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/v2/auth/sign-out", { method: "POST" });
+      await fetch(apiUrl("/api/v2/auth/sign-out"), { method: "POST" });
       await supabase.auth.signOut();
       router.push("/");
       router.refresh();
@@ -66,14 +69,14 @@ export function LandingHeader() {
 
             <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2">
               <ul className="flex items-center gap-8">
-                {NAV_LINKS.map((item) => (
-                  <li key={item.label}>
+                {NAV_LINK_KEYS.map((item) => (
+                  <li key={item.key}>
                     <Link
                       href={item.href}
                       className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                       onClick={() => setMobileOpen(false)}
                     >
-                      {item.label}
+                      {t(`nav.${item.key}`)}
                     </Link>
                   </li>
                 ))}
@@ -81,22 +84,23 @@ export function LandingHeader() {
             </div>
 
             <div className="flex items-center gap-3">
+              <LocaleSwitcher variant="short" />
               {isConsumer ? (
                 <>
                   <Button asChild variant="ghost" size="medium" className="hidden sm:inline-flex text-muted-foreground">
-                    <Link href="/dashboard">Dashboard</Link>
+                    <Link href="/dashboard">{t("dashboard")}</Link>
                   </Button>
                   <Button variant="ghost" size="medium" onClick={handleLogout}>
-                    Log out
+                    {t("logOut")}
                   </Button>
                 </>
               ) : (
                 <>
                   <Button asChild variant="outline" size="medium" className="hidden sm:inline-flex">
-                    <Link href="/auth/login">Sign in</Link>
+                    <Link href="/auth/login">{t("signIn")}</Link>
                   </Button>
                   <Button asChild size="medium" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform">
-                    <Link href="/auth/signup">Start 30-day free trial</Link>
+                    <Link href="/auth/signup">{t("startTrial")}</Link>
                   </Button>
                 </>
               )}
@@ -118,34 +122,39 @@ export function LandingHeader() {
         <SheetContent side="right" className="w-[280px]">
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <ul className="flex flex-col gap-4 pt-8">
-            {NAV_LINKS.map((item) => (
-              <li key={item.label}>
+            {NAV_LINK_KEYS.map((item) => (
+              <li key={item.key}>
                 <Link
                   href={item.href}
                   className="text-base font-medium text-foreground"
                   onClick={() => setMobileOpen(false)}
                 >
-                  {item.label}
+                  {t(`nav.${item.key}`)}
                 </Link>
               </li>
             ))}
+            <li className="pt-4 border-t border-border">
+              <div className="pb-4">
+                <LocaleSwitcher variant="short" />
+              </div>
+            </li>
             <li className="pt-4 border-t border-border flex flex-col gap-2">
               {isConsumer ? (
                 <>
                   <Button asChild variant="outline" size="medium" className="w-full">
-                    <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                    <Link href="/dashboard" onClick={() => setMobileOpen(false)}>{t("dashboard")}</Link>
                   </Button>
                   <Button variant="outline" size="medium" className="w-full" onClick={() => { setMobileOpen(false); handleLogout(); }}>
-                    Log out
+                    {t("logOut")}
                   </Button>
                 </>
               ) : (
                 <>
                   <Button asChild variant="outline" size="medium" className="w-full">
-                    <Link href="/auth/login" onClick={() => setMobileOpen(false)}>Sign in</Link>
+                    <Link href="/auth/login" onClick={() => setMobileOpen(false)}>{t("signIn")}</Link>
                   </Button>
                   <Button asChild size="medium" className="w-full bg-primary text-primary-foreground">
-                    <Link href="/auth/signup" onClick={() => setMobileOpen(false)}>Start 30-day free trial</Link>
+                    <Link href="/auth/signup" onClick={() => setMobileOpen(false)}>{t("startTrial")}</Link>
                   </Button>
                 </>
               )}

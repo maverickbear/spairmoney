@@ -1,0 +1,64 @@
+import { getTranslations } from "next-intl/server";
+import { LandingHeader } from "@/components/landing/landing-header";
+import { Wrench, Clock } from "lucide-react";
+import { makeAuthService } from "@/src/application/auth/auth.factory";
+import { unstable_noStore as noStore } from "next/cache";
+
+export async function generateMetadata() {
+  const t = await getTranslations("maintenance");
+  return {
+    title: `${t("title")} - Spair Money`,
+    description: t("description"),
+  };
+}
+
+export default async function MaintenancePage() {
+  const t = await getTranslations("maintenance");
+  // Opt out of static generation - this page uses dynamic data
+  noStore();
+
+  // Check authentication status on server to show correct buttons in header
+  const authService = makeAuthService();
+  const user = await authService.getCurrentUser();
+  const isAuthenticated = !!user;
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <LandingHeader />
+      <div className="flex-1 flex items-center justify-center p-4 pt-24 md:pt-28">
+        <div className="max-w-md w-full space-y-8 text-center">
+
+          {/* Maintenance Icon */}
+          <div className="flex justify-center">
+            <div className="p-6 bg-primary/10 rounded-full">
+              <Wrench className="w-12 h-12 --sentiment-positive" />
+            </div>
+          </div>
+
+          {/* Title */}
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold">{t("title")}</h1>
+            <p className="text-muted-foreground">{t("description")}</p>
+          </div>
+
+          {/* Info Card */}
+          <div className="bg-muted/50 rounded-lg p-6 space-y-4 border">
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="text-left space-y-1">
+                <p className="font-medium">{t("whatsHappening")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("whatsHappeningDescription")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <p className="text-sm text-muted-foreground">{t("thankYou")}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+

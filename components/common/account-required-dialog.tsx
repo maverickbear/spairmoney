@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ export function AccountRequiredDialog({
   onOpenChange,
   onAccountCreated,
 }: AccountRequiredDialogProps) {
+  const t = useTranslations("dialogs");
   const [hasAccount, setHasAccount] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
@@ -68,17 +70,17 @@ export function AccountRequiredDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Account Required</DialogTitle>
+              <DialogTitle>{t("accountRequired.title")}</DialogTitle>
               <DialogDescription>
-                You need to create at least one account before creating transactions, budgets, goals, debts, or investments.
+                {t("accountRequired.description")}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" size="medium" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button size="medium" onClick={handleCreateAccount}>
-                Create Account
+                {t("accountRequired.createAccount")}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ export function PricingDialog({
   currentInterval,
   onTrialStarted,
 }: PricingDialogProps) {
+  const t = useTranslations("toasts");
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -73,15 +75,15 @@ export function PricingDialog({
       }
 
       toast({
-        title: "Error",
-        description: data.error || "Failed to start checkout",
+        title: t("error"),
+        description: data.error || t("failedToStartCheckout"),
         variant: "destructive",
       });
     } catch (error) {
       console.error("Error starting checkout:", error);
       toast({
-        title: "Error",
-        description: "Failed to start checkout. Please try again.",
+        title: t("error"),
+        description: t("failedToStartCheckoutRetry"),
         variant: "destructive",
       });
     } finally {

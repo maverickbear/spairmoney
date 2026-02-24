@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,11 +20,12 @@ interface UpcomingPaymentsWidgetProps {
 }
 
 export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPaymentsWidgetProps) {
+  const t = useTranslations("dashboard");
   const router = useRouter();
 
   if (loading) {
     return (
-      <WidgetCard title="Upcoming Payments">
+      <WidgetCard title={t("upcomingPayments")}>
         <div className="animate-pulse space-y-3">
           <div className="h-4 bg-muted rounded" />
           <div className="h-4 bg-muted rounded" />
@@ -34,11 +36,11 @@ export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPayment
 
   if (error) {
     return (
-      <WidgetCard title="Upcoming Payments">
+      <WidgetCard title={t("upcomingPayments")}>
         <div className="text-xs text-muted-foreground">
           <p>Error: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
-            <a href="/planned-payments/new">Add Payment</a>
+            <a href="/planned-payments/new">{t("addPayment")}</a>
           </Button>
         </div>
       </WidgetCard>
@@ -47,12 +49,12 @@ export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPayment
 
   if (!data || data.payments.length === 0) {
     return (
-      <WidgetCard title="Upcoming Payments">
+      <WidgetCard title={t("upcomingPayments")}>
         <WidgetEmptyState
-          title="Add payments"
-          description="Track upcoming bills"
+          title={t("addPaymentsTitle")}
+          description={t("addPaymentsDescription")}
           primaryAction={{
-            label: "Add Payment",
+            label: t("addPayment"),
             href: "/planned-payments/new",
           }}
           icon={Calendar}
@@ -63,13 +65,13 @@ export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPayment
 
   return (
     <WidgetCard 
-      title="Upcoming Payments"
+      title={t("upcomingPayments")}
       headerAction={
         <Link 
           href="/planning/planned-payments" 
           className="flex items-center text-sm font-medium hover:underline"
         >
-          See all <ArrowRight className="ml-1 h-4 w-4" />
+          {t("seeAll")} <ArrowRight className="ml-1 h-4 w-4" />
         </Link>
       }
     >
@@ -126,7 +128,7 @@ export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPayment
           onClick={() => router.push("/planned-payments/new")}
         >
           <Plus className="h-3 w-3 mr-1.5" />
-          Add Payment
+          {t("addPayment")}
         </Button>
       </div>
     </WidgetCard>

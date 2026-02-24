@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,8 @@ export function CancelSubscriptionDialog({
   onOpenChange,
   onSuccess,
 }: CancelSubscriptionDialogProps) {
+  const t = useTranslations("dialogs.cancelSubscription");
+  const tToasts = useTranslations("toasts");
   const [cancelImmediately, setCancelImmediately] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -48,26 +51,24 @@ export function CancelSubscriptionDialog({
 
       if (response.ok && data.success) {
         toast({
-          title: "Subscription Cancelled",
-          description: cancelImmediately
-            ? "Your subscription has been cancelled immediately."
-            : "Your subscription will be cancelled at the end of the billing period.",
+          title: t("toastCancelled"),
+          description: cancelImmediately ? t("toastCancelledImmediately") : t("toastCancelledAtEnd"),
           variant: "success",
         });
         onOpenChange(false);
         onSuccess?.();
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to cancel subscription",
+          title: tToasts("error"),
+          description: data.error || t("failedToCancel"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error cancelling subscription:", error);
       toast({
-        title: "Error",
-        description: "Failed to cancel subscription. Please try again.",
+        title: tToasts("error"),
+        description: t("failedToCancelRetry"),
         variant: "destructive",
       });
     } finally {
@@ -79,9 +80,9 @@ export function CancelSubscriptionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Cancel Subscription</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to cancel your subscription? You can reactivate it anytime.
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -94,10 +95,10 @@ export function CancelSubscriptionDialog({
             <RadioGroupItem value="end" id="end" className="mt-1" />
             <div className="flex-1">
               <Label htmlFor="end" className="font-medium cursor-pointer">
-                Cancel at end of billing period
+                {t("cancelAtEnd")}
               </Label>
               <p className="text-sm text-muted-foreground mt-1">
-                You'll continue to have access until the end of your current billing period.
+                {t("cancelAtEndDescription")}
               </p>
             </div>
           </div>
@@ -105,10 +106,10 @@ export function CancelSubscriptionDialog({
             <RadioGroupItem value="immediately" id="immediately" className="mt-1" />
             <div className="flex-1">
               <Label htmlFor="immediately" className="font-medium cursor-pointer">
-                Cancel immediately
+                {t("cancelImmediately")}
               </Label>
               <p className="text-sm text-muted-foreground mt-1">
-                Your subscription will be cancelled right away. You'll lose access immediately.
+                {t("cancelImmediatelyDescription")}
               </p>
             </div>
           </div>
@@ -120,7 +121,7 @@ export function CancelSubscriptionDialog({
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
-            Keep Subscription
+            {t("keepSubscription")}
           </Button>
           <Button
             variant="destructive"
@@ -130,10 +131,10 @@ export function CancelSubscriptionDialog({
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Cancelling...
+                {t("cancelling")}
               </>
             ) : (
-              "Cancel Subscription"
+              t("cancelButton")
             )}
           </Button>
         </DialogFooter>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loadDashboardData } from "@/app/(protected)/dashboard/data-loader";
+import { loadDashboardData } from "@/app/[locale]/(protected)/dashboard/data-loader";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
 import { startOfMonth, endOfMonth, subMonths, subDays } from "date-fns";

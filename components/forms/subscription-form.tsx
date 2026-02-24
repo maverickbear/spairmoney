@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ export function SubscriptionForm({
   onOpenChange,
   onSuccess,
 }: SubscriptionFormProps) {
+  const t = useTranslations("subscriptions");
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -483,7 +485,7 @@ export function SubscriptionForm({
         savedSubscription = await response.json();
         toast({
           title: "Success",
-          description: "Subscription updated successfully",
+          description: t("subscriptionUpdated"),
           variant: "success",
         });
       } else {
@@ -501,7 +503,7 @@ export function SubscriptionForm({
         savedSubscription = await response.json();
         toast({
           title: "Success",
-          description: "Subscription created successfully",
+          description: t("subscriptionCreated"),
           variant: "success",
         });
       }
@@ -525,12 +527,12 @@ export function SubscriptionForm({
       <SheetContent side="right" className="flex flex-col w-full !p-0 !gap-0 sm:max-w-xl overflow-hidden">
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-border text-left">
           <SheetTitle>
-            {subscription ? "Edit Subscription" : "Create Subscription"}
+            {subscription ? t("editSubscription") : t("createSubscriptionTitle")}
           </SheetTitle>
           <SheetDescription>
             {subscription
-              ? "Update your subscription details"
-              : "Create a new subscription to track recurring payments"}
+              ? t("updateSubscriptionDetails")
+              : t("createSubscriptionDescription")}
           </SheetDescription>
         </SheetHeader>
 
@@ -539,7 +541,7 @@ export function SubscriptionForm({
           {/* Service Name / Subcategory */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Subscription Category</label>
+              <label className="text-sm font-medium">{t("subscriptionCategory")}</label>
               <Select
                 value={selectedCategoryFilter || ""}
                 onValueChange={(value) => {
@@ -553,7 +555,7 @@ export function SubscriptionForm({
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder={t("selectCategory")} />
                 </SelectTrigger>
                 <SelectContent>
                   {getSubscriptionCategories().map((category) => (
@@ -566,9 +568,9 @@ export function SubscriptionForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Service Name</label>
+              <label className="text-sm font-medium">{t("serviceName")}</label>
               <Input
-                placeholder="e.g. Netflix, Spotify, Gym"
+                placeholder={t("serviceNamePlaceholder")}
                 disabled={!selectedCategoryFilter}
                 {...form.register("serviceName")}
               />
@@ -578,7 +580,7 @@ export function SubscriptionForm({
           {/* Amount and Account */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Amount</label>
+              <label className="text-sm font-medium">{t("amount")}</label>
               <DollarAmountInput
                 value={form.watch("amount")}
                 onChange={(value) => form.setValue("amount", value ?? 0)}
@@ -586,13 +588,13 @@ export function SubscriptionForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Account</label>
+              <label className="text-sm font-medium">{t("account")}</label>
               <Select
                 value={form.watch("accountId")}
                 onValueChange={(value) => form.setValue("accountId", value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={t("selectAccount")} />
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
@@ -608,7 +610,7 @@ export function SubscriptionForm({
           {/* Billing Frequency and First Billing Date */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Billing Frequency</label>
+              <label className="text-sm font-medium">{t("billingFrequency")}</label>
               <Tabs
                 value={form.watch("billingFrequency")}
                 onValueChange={(value) => {
@@ -624,7 +626,7 @@ export function SubscriptionForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">First Billing Date</label>
+              <label className="text-sm font-medium">{t("firstBillingDate")}</label>
               <DatePicker
                 date={(() => {
                   const value = form.watch("firstBillingDate");
@@ -637,7 +639,7 @@ export function SubscriptionForm({
                     form.setValue("firstBillingDate", date);
                   }
                 }}
-                placeholder="Select first billing date"
+                placeholder={t("selectFirstBillingDate")}
                 required
               />
             </div>
@@ -651,16 +653,16 @@ export function SubscriptionForm({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {subscription ? "Updating..." : "Creating..."}
+                  {subscription ? t("updating") : t("creating")}
                 </>
               ) : (
-                subscription ? "Update" : "Create"
+                subscription ? t("update") : t("create")
               )}
             </Button>
           </SheetFooter>

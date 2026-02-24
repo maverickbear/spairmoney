@@ -1,19 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link as I18nLink } from "@/i18n/navigation";
 
 const FOOTER_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "FAQ", href: "#faq" },
-  { label: "Contact", href: "/contact" },
-  { label: "Privacy", href: "/privacy-policy" },
-  { label: "Terms", href: "/terms-of-service" },
-  { label: "Help", href: "/faq" },
+  { key: "features" as const, href: "#features" },
+  { key: "pricing" as const, href: "#pricing" },
+  { key: "faq" as const, href: "#faq" },
+  { key: "contact" as const, href: "/contact" },
+  { key: "privacy" as const, href: "/privacy-policy" },
+  { key: "terms" as const, href: "/terms-of-service" },
+  { key: "help" as const, href: "/faq" },
 ];
 
 export function LandingFooter() {
+  const t = useTranslations("landing.footer");
   const [year, setYear] = useState(2025);
   useEffect(() => setYear(new Date().getFullYear()), []);
 
@@ -22,22 +25,32 @@ export function LandingFooter() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-sm text-white">
-            Spair Money — Clarity over chaos.
+            Spair Money — {t("tagline")}
           </p>
           <nav className="flex flex-wrap items-center justify-center gap-6">
-            {FOOTER_LINKS.map(({ label, href }) => (
-              <Link
-                key={label}
-                href={href}
-                className="text-sm text-white hover:underline transition-colors"
-              >
-                {label}
-              </Link>
+            {FOOTER_LINKS.map(({ key, href }) => (
+              <Fragment key={key}>
+                {href.startsWith("#") ? (
+                  <Link
+                    href={href}
+                    className="text-sm text-white hover:underline transition-colors"
+                  >
+                    {t(key)}
+                  </Link>
+                ) : (
+                  <I18nLink
+                    href={href}
+                    className="text-sm text-white hover:underline transition-colors"
+                  >
+                    {t(key)}
+                  </I18nLink>
+                )}
+              </Fragment>
             ))}
           </nav>
         </div>
         <div className="mt-8 pt-8 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-white">© {year} Spair Money. All rights reserved.</p>
+          <p className="text-sm text-white">© {year} Spair Money. {t("allRightsReserved")}</p>
         </div>
       </div>
     </footer>

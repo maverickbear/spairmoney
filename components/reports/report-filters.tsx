@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Select,
@@ -25,6 +26,7 @@ export interface ReportFiltersProps {
 }
 
 export function ReportFilters({ period }: ReportFiltersProps) {
+  const t = useTranslations("reports");
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -83,17 +85,17 @@ export function ReportFilters({ period }: ReportFiltersProps) {
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
       <div className="flex items-center gap-2">
         <Calendar className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Period:</span>
+        <span className="text-sm font-medium">{t("period")}:</span>
         <Select value={period} onValueChange={(value) => handlePeriodChange(value as ReportPeriod)}>
           <SelectTrigger className="w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="current-month">Current Month</SelectItem>
-            <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-            <SelectItem value="last-6-months">Last 6 Months</SelectItem>
-            <SelectItem value="last-12-months">Last 12 Months</SelectItem>
-            <SelectItem value="year-to-date">Year to Date</SelectItem>
+            <SelectItem value="current-month">{t("currentMonth")}</SelectItem>
+            <SelectItem value="last-3-months">{t("last3Months")}</SelectItem>
+            <SelectItem value="last-6-months">{t("last6Months")}</SelectItem>
+            <SelectItem value="last-12-months">{t("last12Months")}</SelectItem>
+            <SelectItem value="year-to-date">{t("yearToDate")}</SelectItem>
           </SelectContent>
         </Select>
       </div>

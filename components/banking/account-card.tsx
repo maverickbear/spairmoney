@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ export function AccountCard({
   canDelete = true,
   canEdit = true,
 }: AccountCardProps) {
+  const t = useTranslations("accounts");
   const isCreditCard = account.type === "credit" && account.creditLimit;
   const available = isCreditCard 
     ? (account.creditLimit! + account.balance) 
@@ -69,7 +71,7 @@ export function AccountCard({
                   e.stopPropagation();
                   onSetDefault(account.id);
                 }}
-                title={account.isDefault ? "Default account" : "Set as default"}
+                title={account.isDefault ? t("defaultAccount") : t("setAsDefault")}
                 className={cn(
                   account.isDefault ? "text-yellow-500 hover:text-yellow-600" : "text-muted-foreground hover:text-yellow-500"
                 )}
@@ -86,7 +88,7 @@ export function AccountCard({
                   e.stopPropagation();
                   onEdit(account.id);
                 }}
-                title="Edit account"
+                title={t("editAccount")}
               >
                 <Edit className="h-3.5 w-3.5" />
               </Button>
@@ -101,7 +103,7 @@ export function AccountCard({
                   onDelete(account.id);
                 }}
                 disabled={deletingId === account.id}
-                title="Delete account"
+                title={t("deleteAccount")}
               >
                 {deletingId === account.id ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

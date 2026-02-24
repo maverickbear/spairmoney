@@ -6,6 +6,16 @@ import { AppError } from "@/src/application/shared/app-error";
 import { getCacheHeaders } from "@/src/infrastructure/utils/cache-headers";
 import { revalidateTag } from 'next/cache';
 
+function getLocaleFromRequest(request: NextRequest): string | undefined {
+  const queryLocale = request.nextUrl.searchParams.get("locale");
+  if (queryLocale === "en" || queryLocale === "pt" || queryLocale === "es") return queryLocale;
+  const acceptLanguage = request.headers.get("accept-language");
+  if (!acceptLanguage) return undefined;
+  const first = acceptLanguage.split(",")[0]?.trim().slice(0, 2).toLowerCase();
+  if (first === "pt" || first === "es") return first;
+  return undefined;
+}
+
 /**
  * GET /api/v2/categories/[id]
  * Returns a single category with subcategories. Used when editing to load fresh data from DB.
@@ -22,8 +32,9 @@ export async function GET(
     }
 
     const { id } = await params;
+    const locale = getLocaleFromRequest(request);
     const service = makeCategoriesService();
-    const category = await service.getCategoryById(id);
+    const category = await service.getCategoryById(id, locale);
 
     if (!category) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
@@ -37,7 +48,7 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const subcategories = await service.getSubcategoriesByCategory(id);
+    const subcategories = await service.getSubcategoriesByCategory(id, locale);
     const categoryWithSubcategories = {
       ...category,
       subcategories: subcategories.map((s) => ({ id: s.id, name: s.name, logo: s.logo ?? null })),

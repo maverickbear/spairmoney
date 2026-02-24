@@ -1,44 +1,30 @@
 "use client";
 
 import { useInView } from "@/hooks/use-in-view";
+import { useTranslations } from "next-intl";
 import { Search, Sliders, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const GROUPS = [
+const GROUP_KEYS = [
   {
     icon: Search,
-    title: "Clarity Tools",
-    items: [
-      "Smart transaction categorization",
-      "Recurring subscription tracking",
-      "Advanced reports",
-      "Spending trends",
-    ],
+    titleKey: "clarityTools" as const,
+    itemKeys: ["smartCategorization", "recurringTracking", "advancedReports", "spendingTrends"] as const,
   },
   {
     icon: Sliders,
-    title: "Control Tools",
-    items: [
-      "Budgets that match your real habits",
-      "Goal tracking with progress visualization",
-      "Planned payments (see the next 90 days clearly)",
-      "Debt tracking with payoff visibility",
-    ],
+    titleKey: "controlTools" as const,
+    itemKeys: ["budgetsHabits", "goalTracking", "plannedPayments", "debtTracking"] as const,
   },
   {
     icon: TrendingUp,
-    title: "Growth Tools",
-    items: [
-      "Spair Score (financial health index)",
-      "Household sharing",
-      "Receipt scanning",
-      "CSV import/export",
-      "Tax bracket & rate helper",
-    ],
+    titleKey: "growthTools" as const,
+    itemKeys: ["spairScore", "householdSharing", "receiptScanning", "csvImport", "taxHelper"] as const,
   },
 ];
 
 export function FeaturesStructuredSection() {
+  const t = useTranslations("landing.featuresSection");
   const { ref, inView } = useInView();
 
   return (
@@ -53,30 +39,30 @@ export function FeaturesStructuredSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-            Features
+            {t("title")}
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            Structured clearly — clarity, control, and growth.
+            {t("subtitle")}
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
-          {GROUPS.map(({ icon: Icon, title, items }) => (
+          {GROUP_KEYS.map(({ icon: Icon, titleKey, itemKeys }) => (
             <div
-              key={title}
+              key={titleKey}
               className="rounded-[32px] border border-border bg-card p-6 shadow-sm"
             >
               <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/20 --sentiment-positive">
                 <Icon className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 text-lg font-bold text-foreground">{title}</h3>
+              <h3 className="mt-4 text-lg font-bold text-foreground">{t(titleKey)}</h3>
               <ul className="mt-4 space-y-2">
-                {items.map((item) => (
+                {itemKeys.map((key) => (
                   <li
-                    key={item}
+                    key={key}
                     className="text-sm text-muted-foreground leading-relaxed flex items-start gap-2"
                   >
                     <span className="--sentiment-positive mt-0.5 shrink-0">•</span>
-                    <span>{item}</span>
+                    <span>{t(key)}</span>
                   </li>
                 ))}
               </ul>

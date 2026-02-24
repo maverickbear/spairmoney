@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, ArrowRight, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,9 +17,10 @@ interface NetWorthWidgetProps {
 }
 
 export function NetWorthWidget({ data, loading, error }: NetWorthWidgetProps) {
+  const t = useTranslations("dashboard");
   if (loading) {
     return (
-      <WidgetCard title="Net Worth" compact>
+      <WidgetCard title={t("netWorth")} compact>
         <div className="animate-pulse space-y-3">
           <div className="h-8 bg-muted rounded w-32" />
           <div className="h-4 bg-muted rounded w-24" />
@@ -29,11 +31,11 @@ export function NetWorthWidget({ data, loading, error }: NetWorthWidgetProps) {
 
   if (error) {
     return (
-      <WidgetCard title="Net Worth" compact>
+      <WidgetCard title={t("netWorth")} compact>
         <div className="text-xs text-muted-foreground">
-          <p>Error: {error}</p>
+          <p>{t("errorLoadingDashboard")}: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
-            <Link href="/accounts/new">Add Account</Link>
+            <Link href="/accounts/new">{t("addAccount")}</Link>
           </Button>
         </div>
       </WidgetCard>
@@ -42,12 +44,12 @@ export function NetWorthWidget({ data, loading, error }: NetWorthWidgetProps) {
 
   if (!data) {
     return (
-      <WidgetCard title="Net Worth" compact>
+      <WidgetCard title={t("netWorth")} compact>
         <WidgetEmptyState
-          title="Add accounts"
-          description="See your total assets minus liabilities"
+          title={t("addAccountsTitle")}
+          description={t("addAccountsDescription")}
           primaryAction={{
-            label: "Add Account",
+            label: t("addAccount"),
             href: "/accounts/new",
           }}
           icon={Wallet}
@@ -60,7 +62,7 @@ export function NetWorthWidget({ data, loading, error }: NetWorthWidgetProps) {
   const changeIsPositive = data.change >= 0;
 
   return (
-    <WidgetCard title="Net Worth" compact>
+    <WidgetCard title={t("netWorth")} compact>
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-2">
           <div className="flex items-baseline gap-2">

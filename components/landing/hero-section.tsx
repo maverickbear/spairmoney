@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { LandingImage } from "./landing-image";
 import { useInView } from "@/hooks/use-in-view";
 import { cn } from "@/lib/utils";
 
 export function HeroSection() {
+  const t = useTranslations("landing.hero");
   const { ref: headlineRef, inView: headlineInView } = useInView();
   const { ref: imageRef, inView: imageInView } = useInView();
 
@@ -16,11 +18,10 @@ export function HeroSection() {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div ref={headlineRef} className={cn("order-2 lg:order-1 text-center lg:text-left transition-all duration-700 ease-out", headlineInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6")}>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
-              Your money isn’t disappearing — it’s just hiding.
+              {t("headline")}
             </h1>
             <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-xl leading-relaxed mx-auto lg:mx-0">
-              Small daily purchases add up fast. Coffee. Lunch. Subscriptions. Delivery.
-              Spair shows you exactly where your money goes — so you can take control.
+              {t("subheadline")}
             </p>
             <div className="mt-10 flex flex-wrap gap-4 justify-center lg:justify-start">
               <Button
@@ -28,10 +29,10 @@ export function HeroSection() {
                 size="large"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform"
               >
-                <Link href="/auth/signup">Reveal My Spending</Link>
+                <Link href="/auth/signup">{t("ctaReveal")}</Link>
               </Button>
               <Button asChild variant="outline" size="large">
-                <Link href="#features">See How It Works</Link>
+                <Link href="#features">{t("ctaHowItWorks")}</Link>
               </Button>
             </div>
           </div>

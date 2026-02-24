@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ export function CategoryBudgetSlider({
   maxAmount = 2000,
   step = 50,
 }: CategoryBudgetSliderProps) {
+  const t = useTranslations("planning");
   const { toast } = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
   const [value, setValue] = useState(budget?.amount || 0);
@@ -219,7 +221,7 @@ export function CategoryBudgetSlider({
         
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to update budget",
+          description: error instanceof Error ? error.message : t("failedToUpdateBudget"),
           variant: "destructive",
         });
       } finally {
@@ -330,7 +332,7 @@ export function CategoryBudgetSlider({
         console.error(`Error updating subcategory budget:`, error);
         toast({
           title: "Error",
-          description: "Failed to update subcategory budget",
+          description: t("failedToUpdateSubcategoryBudget"),
           variant: "destructive",
         });
       }
@@ -351,7 +353,7 @@ export function CategoryBudgetSlider({
                   {formatMoney(localValue)}
                   {hasSubcategories && totalSubcategoryBudget > 0 && (
                     <span className="ml-2">
-                      ({formatMoney(totalSubcategoryBudget)} in subcategories)
+                      ({formatMoney(totalSubcategoryBudget)} {t("inSubcategories")})
                     </span>
                   )}
                 </p>
@@ -393,7 +395,7 @@ export function CategoryBudgetSlider({
           {/* Subcategories */}
           {hasSubcategories && isExpanded && (
             <div className="pt-4 border-t space-y-4">
-              <h4 className="text-xs font-medium text-muted-foreground">Subcategories</h4>
+              <h4 className="text-xs font-medium text-muted-foreground">{t("subcategories")}</h4>
               {category.subcategories?.map((subcat) => {
                 const subcatBudget = subcategoryBudgets.find((b) => b.subcategoryId === subcat.id);
                 const subcatValue = subcategoryValues.get(subcat.id) || subcatBudget?.amount || 0;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, Info, Lightbulb } from "lucide-react";
@@ -11,6 +12,7 @@ interface FinancialHealthInsightsProps {
 }
 
 export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsightsProps) {
+  const t = useTranslations("reports");
   if (!financialHealth) {
     return null;
   }
@@ -54,14 +56,14 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
         <CardHeader>
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <Lightbulb className="h-5 w-5" />
-            Spair Score Insights
+            {t("spairScoreInsights")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {/* Alerts */}
           {financialHealth.alerts.length > 0 && (
             <div className="space-y-3 mb-6">
-              <h3 className="text-sm font-semibold">Alerts</h3>
+              <h3 className="text-sm font-semibold">{t("alerts")}</h3>
               {financialHealth.alerts.map((alert) => (
                 <Alert
                   key={alert.id}
@@ -87,7 +89,7 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
             <div className="space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
-                Suggestions for Improvement
+                {t("suggestionsForImprovement")}
               </h3>
               <div className="space-y-2">
                 {financialHealth.suggestions.map((suggestion) => (
@@ -109,7 +111,7 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
                                 : "bg-green-100 dark:bg-green-900 text-sentiment-positive"
                             )}
                           >
-                            {suggestion.impact} impact
+                            {suggestion.impact} {t("impact")}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -127,9 +129,9 @@ export function FinancialHealthInsights({ financialHealth }: FinancialHealthInsi
           {financialHealth.alerts.length === 0 && financialHealth.suggestions.length === 0 && (
             <div className="text-center py-8">
               <CheckCircle2 className="h-12 w-12 text-sentiment-positive mx-auto mb-3" />
-              <p className="text-sm font-medium">Great job!</p>
+              <p className="text-sm font-medium">{t("greatJob")}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Your Spair Score looks good. Keep up the excellent work!
+                {t("spairScoreLooksGood")}
               </p>
             </div>
           )}

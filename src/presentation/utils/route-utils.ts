@@ -1,7 +1,13 @@
 /**
  * Route Type Utilities
- * Determines route types for layout rendering decisions
+ * Determines route types for layout rendering decisions.
+ * Locale is not in the URL (cookie-based); pathname is the logical path as-is.
  */
+
+/** Pathname for logical route checks. With localePrefix: 'never', pathname has no locale segment. */
+function getPathnameWithoutLocale(pathname: string): string {
+  return pathname;
+}
 
 export interface RouteInfo {
   isApiRoute: boolean;
@@ -29,21 +35,22 @@ export function getRouteInfo(pathname: string | null): RouteInfo {
     };
   }
 
-  const isAdminRoute = pathname.startsWith("/admin");
+  const logical = getPathnameWithoutLocale(pathname);
 
+  const isAdminRoute = logical.startsWith("/admin");
   const isApiRoute = pathname.startsWith("/api");
-  const isAuthPage = pathname.startsWith("/auth");
-  const isAcceptPage = pathname.startsWith("/members/accept");
-  const isWelcomePage = pathname === "/welcome";
-  const isLandingPage = pathname === "/";
-  const isPrivacyPolicyPage = pathname === "/privacy-policy";
-  const isTermsOfServicePage = pathname === "/terms-of-service";
-  const isFAQPage = pathname === "/faq";
-  const isContactPage = pathname === "/contact";
-  const isSubscriptionSuccessPage = pathname === "/subscription/success";
-  const isMaintenancePage = pathname === "/maintenance";
-  const isDesignPage = pathname.startsWith("/design");
-  const isBlogPage = pathname === "/blog" || pathname.startsWith("/blog/");
+  const isAuthPage = logical.startsWith("/auth");
+  const isAcceptPage = logical.startsWith("/members/accept");
+  const isWelcomePage = logical === "/welcome";
+  const isLandingPage = logical === "/";
+  const isPrivacyPolicyPage = logical === "/privacy-policy";
+  const isTermsOfServicePage = logical === "/terms-of-service";
+  const isFAQPage = logical === "/faq";
+  const isContactPage = logical === "/contact";
+  const isSubscriptionSuccessPage = logical === "/subscription/success";
+  const isMaintenancePage = logical === "/maintenance";
+  const isDesignPage = logical.startsWith("/design");
+  const isBlogPage = logical === "/blog" || logical.startsWith("/blog/");
   const isPublicPage =
     isAuthPage ||
     isAcceptPage ||
@@ -56,7 +63,7 @@ export function getRouteInfo(pathname: string | null): RouteInfo {
     isMaintenancePage ||
     isDesignPage ||
     isBlogPage;
-  
+
   const isDashboardRoute = !isPublicPage && !isApiRoute && !isWelcomePage && !isAdminRoute;
 
   return {

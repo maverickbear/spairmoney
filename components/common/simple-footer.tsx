@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import { LocaleSwitcher } from "@/components/common/locale-switcher";
 
 export function SimpleFooter() {
   const [currentYear, setCurrentYear] = useState(2024);
+  const t = useTranslations("landing.footer");
   
   useEffect(() => {
     // Only access Date on client side after mount
@@ -16,20 +19,22 @@ export function SimpleFooter() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © {currentYear} Spair Money. All rights reserved.
+            © {currentYear} Spair Money. {t("allRightsReserved")}
           </p>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <LocaleSwitcher variant="short" className="text-muted-foreground" />
+            <div className="flex items-center gap-6">
             <Link
               href="/blog"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Blog
+              {t("blog")}
             </Link>
             <Link
               href="/faq"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              FAQ
+              {t("faq")}
             </Link>
             <Link
               href="/terms-of-service"
@@ -37,7 +42,7 @@ export function SimpleFooter() {
               rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Terms of Service
+              {t("termsOfService")}
             </Link>
             <Link
               href="/privacy-policy"
@@ -45,8 +50,9 @@ export function SimpleFooter() {
               rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Privacy Policy
+              {t("privacyPolicy")}
             </Link>
+            </div>
           </div>
         </div>
       </div>

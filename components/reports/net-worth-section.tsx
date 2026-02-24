@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { TrendingUp, TrendingDown, Wallet, CreditCard, PiggyBank } from "lucide-react";
@@ -15,12 +16,13 @@ interface NetWorthSectionProps {
 }
 
 export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
+  const t = useTranslations("reports");
   if (!netWorth) {
     return (
       <Card>
         <CardContent className="py-8">
           <div className="text-center text-muted-foreground">
-            <p>Net Worth data is not available</p>
+            <p>{t("netWorthNotAvailable")}</p>
           </div>
         </CardContent>
       </Card>
@@ -50,7 +52,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
         <CardHeader>
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <PiggyBank className="h-5 w-5" />
-            Net Worth Summary
+            {t("netWorthSummary")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -59,7 +61,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Wallet className="h-4 w-4 text-sentiment-positive" />
-                <p className="text-sm text-muted-foreground">Total Assets</p>
+                <p className="text-sm text-muted-foreground">{t("totalAssets")}</p>
               </div>
               <p className="text-2xl font-bold text-sentiment-positive">
                 {formatMoney(totalAssets)}
@@ -70,7 +72,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <CreditCard className="h-4 w-4 text-sentiment-negative" />
-                <p className="text-sm text-muted-foreground">Total Liabilities</p>
+                <p className="text-sm text-muted-foreground">{t("totalLiabilities")}</p>
               </div>
               <p className="text-2xl font-bold text-sentiment-negative">
                 {formatMoney(totalLiabilities)}
@@ -81,7 +83,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <PiggyBank className="h-4 w-4" />
-                <p className="text-sm text-muted-foreground">Net Worth</p>
+                <p className="text-sm text-muted-foreground">{t("netWorthLabel")}</p>
               </div>
               <p
                 className={cn(
@@ -119,7 +121,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
 
           {/* Net Worth Chart */}
           {chartData.length > 0 && (
-            <ChartCard title="Net Worth Trend" description="Evolution over the last 6 months">
+            <ChartCard title={t("netWorthTrend")} description={t("evolutionLast6Months")}>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
                   <CartesianGrid
@@ -172,7 +174,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
                     stroke={sentiment.positive}
                     strokeWidth={2}
                     dot={{ r: 4 }}
-                    name="Net Worth"
+                    name={t("netWorthLabel")}
                   />
                   <Line
                     type="monotone"
@@ -181,7 +183,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={{ r: 3 }}
-                    name="Assets"
+                    name={t("assets")}
                   />
                   <Line
                     type="monotone"
@@ -190,7 +192,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={{ r: 3 }}
-                    name="Liabilities"
+                    name={t("liabilities")}
                   />
                 </LineChart>
               </ResponsiveContainer>

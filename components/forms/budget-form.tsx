@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { budgetSchema, BudgetFormData } from "@/src/domain/budgets/budgets.validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +73,9 @@ export function BudgetForm({
   onOpenChange,
   onSuccess,
 }: BudgetFormProps) {
+  const t = useTranslations("toasts");
+  const tCommon = useTranslations("common");
+  const tForms = useTranslations("forms");
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subcategoriesMap, setSubcategoriesMap] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
@@ -216,8 +220,8 @@ export function BudgetForm({
         }
 
         toast({
-          title: "Budget updated",
-          description: "Your budget has been updated successfully.",
+          title: t("budgetUpdated"),
+          description: t("saved"),
           variant: "success",
         });
         return; // Exit early for update case
@@ -260,8 +264,8 @@ export function BudgetForm({
       form.reset();
 
       toast({
-        title: "Budget created",
-        description: "Your budget has been created successfully.",
+        title: t("budgetCreated"),
+        description: t("saved"),
         variant: "success",
       });
 
@@ -272,8 +276,8 @@ export function BudgetForm({
     } catch (error) {
       console.error("Error saving budget:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save budget",
+        title: t("error"),
+        description: error instanceof Error ? error.message : t("failedToSaveBudget"),
         variant: "destructive",
       });
       // Reload on error to revert optimistic update
@@ -304,7 +308,7 @@ export function BudgetForm({
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent side="right" className="sm:max-w-[600px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l">
             <SheetHeader className="p-6 pb-4 border-b shrink-0">
-              <SheetTitle className="text-xl">{budget ? "Edit" : "Add"} Budget</SheetTitle>
+              <SheetTitle className="text-xl">{budget ? tCommon("edit") : tCommon("add")} {tForms("budget")}</SheetTitle>
               <SheetDescription>
                 {budget
                   ? "Update the budget details"
@@ -464,16 +468,16 @@ export function BudgetForm({
 
               <div className="p-4 border-t flex justify-end gap-2 shrink-0 bg-background">
                 <Button type="button" variant="outline" size="medium" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button type="submit" size="medium" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                      {tCommon("saving")}
                     </>
                   ) : (
-                    "Save"
+                    tCommon("save")
                   )}
                 </Button>
               </div>

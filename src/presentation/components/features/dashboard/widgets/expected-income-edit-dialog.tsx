@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -65,6 +66,8 @@ export function ExpectedIncomeEditDialog({
   onOpenChange,
   onSuccess,
 }: ExpectedIncomeEditDialogProps) {
+  const t = useTranslations("dashboard");
+  const tCommon = useTranslations("common");
   const { toast } = useToast();
   const [members, setMembers] = useState<MemberOption[]>([]);
   const [memberIncomes, setMemberIncomes] = useState<Record<string, number>>({});
@@ -268,10 +271,9 @@ export function ExpectedIncomeEditDialog({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-[483px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l">
         <SheetHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0 text-left">
-          <SheetTitle className="text-xl font-semibold">Income</SheetTitle>
+          <SheetTitle className="text-xl font-semibold">{t("incomeSheetTitle")}</SheetTitle>
           <SheetDescription className="mt-1.5 text-sm text-muted-foreground">
-            Used to compare your spending with what you expect to earn this month. Enter each
-            member&apos;s annual income; the total is used for the household.
+            {t("incomeSheetDescription")}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -283,9 +285,9 @@ export function ExpectedIncomeEditDialog({
             <div className="space-y-4">
               {/* Location for tax calculation */}
               <div className="space-y-3">
-                <Label className="text-sm font-semibold">Country</Label>
+                <Label className="text-sm font-semibold">{t("countryLabel")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Select your country and state/province so we can calculate monthly after-tax income.
+                  {t("selectCountryAndState")}
                 </p>
                 <Tabs
                   value={country}
@@ -296,20 +298,20 @@ export function ExpectedIncomeEditDialog({
                   className="w-full"
                 >
                   <TabsList className="w-full grid grid-cols-2">
-                    <TabsTrigger value="US" className="w-full">United States</TabsTrigger>
-                    <TabsTrigger value="CA" className="w-full">Canada</TabsTrigger>
+                    <TabsTrigger value="US" className="w-full">{t("unitedStates")}</TabsTrigger>
+                    <TabsTrigger value="CA" className="w-full">{t("canada")}</TabsTrigger>
                   </TabsList>
                 </Tabs>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">
-                    {country === "US" ? "State" : "Province / Territory"}
+                    {country === "US" ? t("stateLabel") : t("provinceLabel")}
                   </Label>
                   <Select
                     value={stateOrProvince ?? ""}
                     onValueChange={(v) => setStateOrProvince(v || null)}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder={`Select ${country === "US" ? "state" : "province"}`} />
+                      <SelectValue placeholder={country === "US" ? t("selectState") : t("selectProvince")} />
                     </SelectTrigger>
                     <SelectContent>
                       {(country === "US" ? US_STATES : CANADIAN_PROVINCES).map((opt) => (
@@ -324,13 +326,13 @@ export function ExpectedIncomeEditDialog({
 
               {members.map((member) => {
                 const key = member.memberId ?? member.id;
-                const label = member.name || member.email || "Member";
+                const label = member.name || member.email || t("memberLabel");
                 return (
                   <div key={key} className="space-y-2">
                     <Label htmlFor={`income-${key}`} className="text-sm font-medium">
                       {label}
                     </Label>
-                    <p className="text-xs text-muted-foreground">Annual Income Before Tax</p>
+                    <p className="text-xs text-muted-foreground">{t("annualIncomeBeforeTax")}</p>
                     <DollarAmountInput
                       id={`income-${key}`}
                       value={memberIncomes[key] || undefined}
@@ -343,21 +345,21 @@ export function ExpectedIncomeEditDialog({
               })}
               {members.length === 0 && !loading && (
                 <p className="text-sm text-muted-foreground">
-                  No household members found. Add members in settings to enter their income.
+                  {t("noHouseholdMembersFound")}
                 </p>
               )}
               <div className="space-y-2 pt-2 border-t">
-                <Label className="text-sm font-semibold">Total household income</Label>
+                <Label className="text-sm font-semibold">{t("totalHouseholdIncome")}</Label>
                 <div className="flex flex-col gap-1">
                   <div className="flex items-baseline justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">Annual (gross)</span>
+                    <span className="text-sm text-muted-foreground">{t("annualGross")}</span>
                     <span className="font-medium tabular-nums">
                       {formatMoney(totalHouseholdIncome)}
                     </span>
                   </div>
                   {(stateOrProvince && totalHouseholdIncome > 0) && (
                     <div className="flex items-baseline justify-between gap-4">
-                      <span className="text-sm text-muted-foreground">Monthly after tax</span>
+                      <span className="text-sm text-muted-foreground">{t("monthlyAfterTax")}</span>
                       {loadingAfterTax ? (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                       ) : monthlyAfterTax != null ? (
@@ -407,7 +409,7 @@ export function ExpectedIncomeEditDialog({
         </div>
         <SheetFooter className="px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {tCommon("cancel")}
           </Button>
           <Button
             onClick={handleSave}
@@ -421,12 +423,12 @@ export function ExpectedIncomeEditDialog({
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                {tCommon("saving")}
               </>
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Save
+                {tCommon("save")}
               </>
             )}
           </Button>

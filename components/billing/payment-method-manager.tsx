@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CreditCard, Trash2, Star } from "lucide-react";
@@ -22,6 +24,9 @@ interface PaymentMethodManagerProps {
 }
 
 export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) {
+  const t = useTranslations("billing");
+  const tAccounts = useTranslations("accounts");
+  const tToasts = useTranslations("toasts");
   const { toast } = useToast();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +39,7 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
   async function loadPaymentMethods() {
     try {
       setLoading(true);
-      const response = await fetch("/api/stripe/payment-methods");
+      const response = await fetch(apiUrl("/api/stripe/payment-methods"));
       if (response.ok) {
         const data = await response.json();
         setPaymentMethods(data.paymentMethods || []);
@@ -49,7 +54,7 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
   async function handleAddPaymentMethod() {
     try {
       setLoading(true);
-      const response = await fetch("/api/stripe/portal", {
+      const response = await fetch(apiUrl("/api/stripe/portal"), {
         method: "POST",
       });
 
@@ -59,16 +64,16 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
         window.open(data.url, '_blank');
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to open Stripe portal",
+          title: tToasts("error"),
+          description: data.error || t("failedToOpenPortalRetry"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error opening portal:", error);
       toast({
-        title: "Error",
-        description: "Failed to open Stripe portal. Please try again.",
+        title: tToasts("error"),
+        description: t("failedToOpenPortalRetry"),
         variant: "destructive",
       });
     } finally {
@@ -78,13 +83,13 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
 
 
   async function handleDelete(paymentMethodId: string) {
-    if (!confirm("Are you sure you want to remove this payment method?")) {
+    if (!confirm(t("removePaymentMethodConfirm"))) {
       return;
     }
 
     try {
       setDeletingId(paymentMethodId);
-      const response = await fetch("/api/stripe/payment-methods", {
+      const response = await fetch(apiUrl("/api/stripe/payment-methods"), {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -96,23 +101,23 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
 
       if (response.ok && data.success) {
         toast({
-          title: "Success",
-          description: "Payment method removed successfully",
+          title: tToasts("success"),
+          description: t("paymentMethodRemoved"),
           variant: "success",
         });
         loadPaymentMethods();
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to remove payment method",
+          title: tToasts("error"),
+          description: data.error || t("failedToRemovePaymentMethod"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error deleting payment method:", error);
       toast({
-        title: "Error",
-        description: "Failed to remove payment method. Please try again.",
+        title: tToasts("error"),
+        description: t("failedToRemovePaymentMethodRetry"),
         variant: "destructive",
       });
     } finally {
@@ -122,7 +127,7 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
 
   async function handleSetDefault(paymentMethodId: string) {
     try {
-      const response = await fetch("/api/stripe/payment-methods", {
+      const response = await fetch(apiUrl("/api/stripe/payment-methods"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -134,23 +139,23 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
 
       if (response.ok && data.success) {
         toast({
-          title: "Success",
-          description: "Default payment method updated",
+          title: tToasts("success"),
+          description: t("defaultPaymentMethodUpdated"),
           variant: "success",
         });
         loadPaymentMethods();
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to set default payment method",
+          title: tToasts("error"),
+          description: data.error || t("failedToSetDefaultPaymentMethod"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error setting default payment method:", error);
       toast({
-        title: "Error",
-        description: "Failed to set default payment method. Please try again.",
+        title: tToasts("error"),
+        description: t("failedToSetDefaultPaymentMethodRetry"),
         variant: "destructive",
       });
     }
@@ -160,7 +165,7 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Payment Methods</CardTitle>
+          <CardTitle>{t("paymentMethodsTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center p-8">
@@ -177,11 +182,11 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <CardTitle>Payment Methods</CardTitle>
-              <CardDescription>Your payment methods are safely managed by Stripe</CardDescription>
+              <CardTitle>{t("paymentMethodsTitle")}</CardTitle>
+              <CardDescription>{t("paymentMethodsDescription")}</CardDescription>
             </div>
             <Button onClick={handleAddPaymentMethod} size="medium" className="w-full md:w-auto">
-              Add Payment Method
+              {t("addPaymentMethod")}
             </Button>
           </div>
         </CardHeader>
@@ -202,12 +207,12 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
                             {pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1)} •••• {pm.card.last4}
                           </>
                         ) : (
-                          "Payment Method"
+                          t("paymentMethodLabel")
                         )}
                       </div>
                       {pm.card && (
                         <div className="text-sm text-muted-foreground">
-                          Expires {pm.card.expMonth}/{pm.card.expYear}
+                          {t("expiresLabel", { month: pm.card.expMonth, year: pm.card.expYear })}
                         </div>
                       )}
                     </div>
@@ -217,7 +222,7 @@ export function PaymentMethodManager({ customerId }: PaymentMethodManagerProps) 
                       variant="ghost"
                       size="medium"
                       onClick={() => handleSetDefault(pm.id)}
-                      title="Set as default"
+                      title={tAccounts("setAsDefault")}
                     >
                       <Star className="h-4 w-4" />
                     </Button>

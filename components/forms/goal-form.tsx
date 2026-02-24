@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { goalSchema, GoalFormData } from "@/src/domain/goals/goals.validations";
@@ -58,6 +59,7 @@ export function GoalForm({
   onOpenChange,
   onSuccess,
 }: GoalFormProps) {
+  const t = useTranslations("planning");
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forecast, setForecast] = useState<{
@@ -384,7 +386,7 @@ export function GoalForm({
       setIsSubmitting(true);
       if (forecast?.allocationError) {
         toast({
-          title: "Validation Error",
+          title: t("validationError"),
           description: forecast.allocationError,
           variant: "destructive",
         });
@@ -453,8 +455,8 @@ export function GoalForm({
       }
 
       toast({
-        title: goal ? "Goal updated" : "Goal created",
-        description: goal ? "Your goal has been updated successfully." : "Your goal has been created successfully.",
+        title: goal ? t("goalUpdated") : t("goalCreated"),
+        description: goal ? t("goalUpdatedDescription") : t("goalCreatedDescription"),
         variant: "success",
       });
     } catch (error) {
@@ -488,11 +490,11 @@ export function GoalForm({
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent side="right" className="sm:max-w-[600px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l">
             <SheetHeader className="p-6 pb-4 border-b shrink-0">
-              <SheetTitle className="text-xl">{goal ? "Edit" : "Create"} Goal</SheetTitle>
+              <SheetTitle className="text-xl">{goal ? t("editGoal") : t("createGoalTitle")}</SheetTitle>
               <SheetDescription>
                 {goal
-                  ? "Update your savings goal details"
-                  : "Create a new savings goal and set how much of your income to allocate"}
+                  ? t("editGoalDescription")
+                  : t("createGoalDescription")}
               </SheetDescription>
             </SheetHeader>
 
@@ -506,23 +508,23 @@ export function GoalForm({
                   <div className="rounded-lg border bg-muted/50 p-5">
                     {forecast ? (
                       <div className="space-y-4">
-                        <h4 className="text-sm font-semibold">Goal Forecast</h4>
+                        <h4 className="text-sm font-semibold">{t("goalForecast")}</h4>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">Monthly savings</p>
+                            <p className="text-xs text-muted-foreground mb-1">{t("monthlySavings")}</p>
                             <p className="text-base font-semibold">{formatMoney(forecast.monthlyContribution)}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">Progress</p>
+                            <p className="text-xs text-muted-foreground mb-1">{t("progress")}</p>
                             <p className="text-base font-semibold">{forecast.progressPct.toFixed(1)}%</p>
                           </div>
                           <div className="col-span-2">
-                            <p className="text-xs text-muted-foreground mb-1">Estimated time to goal</p>
+                            <p className="text-xs text-muted-foreground mb-1">{t("estimatedTimeToGoal")}</p>
                             <p className="text-base font-semibold">
                               {forecast.monthsToGoal === 0
-                                ? "Goal reached! 🎉"
+                                ? t("goalReached")
                                 : forecast.monthsToGoal !== null && forecast.monthsToGoal < 12
-                                ? `${Math.round(forecast.monthsToGoal)} month${Math.round(forecast.monthsToGoal) !== 1 ? "s" : ""}`
+                                ? t("monthsLabel", { count: Math.round(forecast.monthsToGoal) })
                                 : forecast.monthsToGoal != null
                                 ? `${Math.floor(forecast.monthsToGoal / 12)}y ${Math.round(forecast.monthsToGoal % 12)}mo`
                                 : "—"}
@@ -531,18 +533,18 @@ export function GoalForm({
                         </div>
                         {forecast.incomeBasis > 0 ? (
                           <p className="text-xs text-muted-foreground pt-2 border-t">
-                            Based on {formatMoney(forecast.incomeBasis)}/mo · {forecast.totalAllocation.toFixed(1)}% of income
+                            {t("basedOnIncome", { amount: formatMoney(forecast.incomeBasis), percent: forecast.totalAllocation.toFixed(1) })}
                           </p>
                         ) : (
                           <p className="text-xs text-amber-600 dark:text-amber-400 pt-2 border-t">
-                            ⚠️ Add income transactions or set household expected income in Settings for accurate forecasts.
+                            ⚠️ {t("addIncomeForForecast")}
                           </p>
                         )}
                       </div>
                     ) : (
                       <div>
                         <h4 className="text-sm font-semibold mb-1">Goal Forecast</h4>
-                        <p className="text-xs text-muted-foreground">Enter goal details to see when you'll reach your target.</p>
+                        <p className="text-xs text-muted-foreground">{t("enterGoalDetailsForForecast")}</p>
                       </div>
                     )}
                   </div>
@@ -551,11 +553,11 @@ export function GoalForm({
                   <div className="space-y-5">
           <div className="space-y-2">
             <label className="text-sm font-medium">
-              Goal Name
+              {t("goalName")}
             </label>
             <Input
               {...form.register("name")}
-              placeholder="e.g., Emergency Fund, Down Payment"
+              placeholder={t("goalNamePlaceholder")}
               size="medium"
               required
             />
@@ -568,7 +570,7 @@ export function GoalForm({
 
           <div className="space-y-1">
             <label className="text-sm font-medium">
-              Track Balance From Account (Optional)
+              {t("trackBalanceFromAccount")}
             </label>
             <Select
               value={form.watch("accountId") || undefined}
@@ -580,12 +582,12 @@ export function GoalForm({
               }}
             >
               <SelectTrigger size="medium">
-                <SelectValue placeholder="Select an account (optional)" />
+                <SelectValue placeholder={t("selectAccountOptional")} />
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
-                    {account.name} ({account.type === "investment" ? "Investment" : "Savings"}) - {formatMoney(account.balance)}
+                    {account.name} ({account.type === "investment" ? t("investment") : t("savings")}) - {formatMoney(account.balance)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -595,7 +597,7 @@ export function GoalForm({
           {accountId && accounts.find(acc => acc.id === accountId)?.type === "investment" && (
             <div className="space-y-1">
               <label className="text-sm font-medium">
-                Track Specific Holding (Optional)
+                {t("trackSpecificHolding")}
               </label>
               <Select
                 value={form.watch("holdingId") || "all"}
@@ -605,10 +607,10 @@ export function GoalForm({
                 disabled={loadingHoldings}
               >
                 <SelectTrigger size="medium">
-                  <SelectValue placeholder={loadingHoldings ? "Loading..." : "All Holdings"} />
+                  <SelectValue placeholder={loadingHoldings ? t("loading") : t("allHoldings")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Holdings</SelectItem>
+                  <SelectItem value="all">{t("allHoldings")}</SelectItem>
                   {holdings.map((holding) => (
                     <SelectItem key={holding.securityId} value={holding.securityId}>
                       {holding.symbol} - {holding.name} ({formatMoney(holding.marketValue)})
@@ -622,7 +624,7 @@ export function GoalForm({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-sm font-medium">
-                Target Amount
+                {t("targetAmount")}
               </label>
               <DollarAmountInput
                 value={form.watch("targetAmount") || undefined}
@@ -640,7 +642,7 @@ export function GoalForm({
 
             <div className="space-y-1">
               <label className="text-sm font-medium">
-                Starting Balance
+                {t("startingBalance")}
               </label>
               <DollarAmountInput
                 value={form.watch("currentBalance") || undefined}
@@ -656,7 +658,7 @@ export function GoalForm({
               )}
               {accountId && (
                 <p className="text-xs text-muted-foreground">
-                  Balance is automatically updated from the selected account
+                  {t("balanceFromAccount")}
                 </p>
               )}
             </div>
@@ -664,7 +666,7 @@ export function GoalForm({
 
           <div className="space-y-1">
             <label className="text-sm font-medium">
-              Target Months
+              {t("targetMonths")}
             </label>
             <Select
               value={form.watch("targetMonths") ? form.watch("targetMonths")!.toString() : undefined}
@@ -674,7 +676,7 @@ export function GoalForm({
               required
             >
               <SelectTrigger size="medium">
-                <SelectValue placeholder="Select months" />
+                <SelectValue placeholder={t("selectMonths")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="3">3 months</SelectItem>
@@ -711,7 +713,7 @@ export function GoalForm({
 
           <div className="space-y-1">
             <label className="text-sm font-medium">
-              Priority
+              {t("priority")}
             </label>
             <Select
               value={form.watch("priority")}
@@ -724,9 +726,9 @@ export function GoalForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="High">High</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="Low">Low</SelectItem>
+                <SelectItem value="High">{t("high")}</SelectItem>
+                <SelectItem value="Medium">{t("medium")}</SelectItem>
+                <SelectItem value="Low">{t("low")}</SelectItem>
               </SelectContent>
             </Select>
             {form.formState.errors.priority && (
@@ -737,10 +739,10 @@ export function GoalForm({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Description (optional)</label>
+            <label className="text-sm font-medium">{t("descriptionOptional")}</label>
             <Textarea
               {...form.register("description")}
-              placeholder="Add notes about this goal..."
+              placeholder={t("addNotesPlaceholder")}
               size="medium"
               rows={3}
             />
@@ -758,17 +760,17 @@ export function GoalForm({
                   onClick={() => onOpenChange(false)}
                   disabled={isSubmitting}
                 >
-                  Cancel
+                  {t("cancel")}
                 </Button>
                 <Button type="submit" size="medium" disabled={isSubmitting || !!forecast?.allocationError}>
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {goal ? "Updating..." : "Creating..."}
+                      {goal ? t("updating") : t("creating")}
                     </>
                   ) : (
-                    goal ? "Update" : "Create"
-                  )} Goal
+                    `${goal ? t("update") : t("create")} ${t("goalLabel")}`
+                  )}
                 </Button>
               </div>
             </form>

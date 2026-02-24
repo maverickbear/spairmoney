@@ -64,8 +64,7 @@ export function FeatureGuard({
       return <>{fallback}</>;
     }
 
-    // Subscription not active - show blocked screen
-    const displayName = featureName || getFeatureName(feature);
+    // Subscription not active - show blocked screen (BlockedFeature translates feature name via billing.featureNames)
     return (
       <>
         {/* Show only title when blocked */}
@@ -75,30 +74,11 @@ export function FeatureGuard({
           // Try to extract title from header if headerTitle not provided
           header
         ) : null}
-        <BlockedFeature feature={feature} featureName={displayName} />
+        <BlockedFeature feature={feature} featureName={featureName || undefined} />
       </>
     );
   }
 
   return <>{children}</>;
-}
-
-function getFeatureName(feature: keyof PlanFeatures): string {
-  const names: Record<keyof PlanFeatures, string> = {
-    maxTransactions: "Unlimited Transactions",
-    maxAccounts: "Unlimited Accounts",
-    hasInvestments: "Investments",
-    hasAdvancedReports: "Advanced Reports",
-    hasCsvExport: "CSV Export",
-    hasCsvImport: "CSV Import",
-    hasDebts: "Debts",
-    hasGoals: "Goals",
-    hasBankIntegration: "Bank Integration",
-    hasHousehold: "Household Members",
-    hasBudgets: "Budgets",
-    hasReceiptScanner: "Receipt Scanner",
-  };
-
-  return names[feature] || feature;
 }
 

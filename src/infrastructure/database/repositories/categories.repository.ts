@@ -12,6 +12,8 @@ import { ICategoriesRepository } from "./interfaces/categories.repository.interf
 export interface CategoryRow {
   id: string;
   name: string;
+  name_pt?: string | null;
+  name_es?: string | null;
   type: "income" | "expense" | "transfer" | null;
   household_id: string | null;
   is_system: boolean;
@@ -22,6 +24,8 @@ export interface CategoryRow {
 export interface SubcategoryRow {
   id: string;
   name: string;
+  name_pt?: string | null;
+  name_es?: string | null;
   category_id: string;
   household_id: string | null;
   is_system: boolean;

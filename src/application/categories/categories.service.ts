@@ -24,10 +24,13 @@ async function canUserWrite(userId: string): Promise<boolean> {
 import { AppError } from "../shared/app-error";
 
 // Cached helper functions (must be standalone, not class methods)
-// Cache is keyed by householdId so each household gets correct categories.
-async function getAllCategoriesCached(householdId?: string | null): Promise<CategoryWithRelations[]> {
+// Cache is keyed by householdId and locale so each household/locale gets correct localized names.
+async function getAllCategoriesCached(
+  householdId?: string | null,
+  locale?: string
+): Promise<CategoryWithRelations[]> {
   'use cache: private'
-  cacheTag('categories', householdId ? `categories-household-${householdId}` : 'categories-global')
+  cacheTag('categories', householdId ? `categories-household-${householdId}` : 'categories-global', locale ? `locale-${locale}` : 'locale-en')
   cacheLife('hours')
 
   const repository = new CategoriesRepository();
@@ -45,8 +48,8 @@ async function getAllCategoriesCached(householdId?: string | null): Promise<Cate
     const subcategories = allSubcategories.filter(s => s.categoryId === categoryRow.id);
 
     return {
-      ...CategoriesMapper.categoryToDomainWithRelations(categoryRow),
-      subcategories: subcategories.map(s => CategoriesMapper.subcategoryToDomain(s)),
+      ...CategoriesMapper.categoryToDomainWithRelations(categoryRow, locale),
+      subcategories: subcategories.map(s => CategoriesMapper.subcategoryToDomain(s, locale)),
     };
   });
 
@@ -55,10 +58,11 @@ async function getAllCategoriesCached(householdId?: string | null): Promise<Cate
 
 async function getSubcategoriesByCategoryCached(
   categoryId: string,
-  householdId?: string | null
+  householdId?: string | null,
+  locale?: string
 ): Promise<SubcategoryWithRelations[]> {
   'use cache: private'
-  cacheTag('categories', `category-${categoryId}`, householdId ? `categories-household-${householdId}` : 'categories-global')
+  cacheTag('categories', `category-${categoryId}`, householdId ? `categories-household-${householdId}` : 'categories-global', locale ? `locale-${locale}` : 'locale-en')
   cacheLife('hours')
 
   const repository = new CategoriesRepository();
@@ -71,7 +75,7 @@ async function getSubcategoriesByCategoryCached(
   const subcategoryRows = await repository.findSubcategoriesByCategoryId(categoryId, householdId ?? undefined);
 
   return subcategoryRows.map(row =>
-    CategoriesMapper.subcategoryToDomainWithRelations(row, category)
+    CategoriesMapper.subcategoryToDomainWithRelations(row, category, locale)
   );
 }
 
@@ -83,29 +87,32 @@ export class CategoriesService {
 
   /**
    * Get all categories with relations (system + current user's active household).
+   * @param locale Optional locale (en, pt, es) for localized category/subcategory names from name_pt, name_es columns.
    */
-  async getAllCategories(): Promise<CategoryWithRelations[]> {
+  async getAllCategories(locale?: string): Promise<CategoryWithRelations[]> {
     const userId = await getCurrentUserId();
     const householdId = userId ? await getActiveHouseholdId(userId) : null;
-    return getAllCategoriesCached(householdId);
+    return getAllCategoriesCached(householdId, locale);
   }
 
   /**
    * Get subcategories by category (system + current user's active household).
+   * @param locale Optional locale (en, pt, es) for localized names from name_pt, name_es columns.
    */
-  async getSubcategoriesByCategory(categoryId: string): Promise<SubcategoryWithRelations[]> {
+  async getSubcategoriesByCategory(categoryId: string, locale?: string): Promise<SubcategoryWithRelations[]> {
     const userId = await getCurrentUserId();
     const householdId = userId ? await getActiveHouseholdId(userId) : null;
-    return getSubcategoriesByCategoryCached(categoryId, householdId);
+    return getSubcategoriesByCategoryCached(categoryId, householdId, locale);
   }
 
   /**
    * Get category by ID (returns null if not found).
    * Used by callers that need to resolve or validate a category id before creating subcategories.
+   * @param locale Optional locale for localized name.
    */
-  async getCategoryById(id: string): Promise<BaseCategory | null> {
+  async getCategoryById(id: string, locale?: string): Promise<BaseCategory | null> {
     const row = await this.repository.findCategoryById(id);
-    return row ? CategoriesMapper.categoryToDomain(row) : null;
+    return row ? CategoriesMapper.categoryToDomain(row, locale) : null;
   }
 
   /**

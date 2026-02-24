@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Sheet,
   SheetContent,
@@ -32,6 +33,7 @@ export function SpairScoreDetailsDialog({
   onOpenChange,
   data,
 }: SpairScoreDetailsDialogProps) {
+  const t = useTranslations("dashboard");
   if (!data) return null;
 
   const empty = data.isEmptyState ?? false; // No transactions this month — show "—" instead of 0
@@ -87,9 +89,9 @@ export function SpairScoreDetailsDialog({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-[40vw] w-full p-0 flex flex-col gap-0 bg-background border-l">
         <SheetHeader className="p-6 pb-4 border-b">
-          <SheetTitle className="text-xl">Spair Score Details</SheetTitle>
+          <SheetTitle className="text-xl">{t("spairScoreDetailsTitle")}</SheetTitle>
           <SheetDescription>
-            Your financial health score and insights
+            {t("spairScoreDetailsDescription")}
           </SheetDescription>
         </SheetHeader>
         
@@ -101,12 +103,12 @@ export function SpairScoreDetailsDialog({
               <Card>
                 <CardContent className="pt-6 p-4">
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">Current</p>
+                    <p className="text-xs font-medium text-muted-foreground">{t("current")}</p>
                     <div className="flex items-baseline gap-2">
                        <span className="text-3xl font-bold">{empty ? "—" : data.score}</span>
                     </div>
                     <p className={cn("text-xs font-medium truncate", empty ? "text-muted-foreground" : "--sentiment-positive")}>
-                      {empty ? "No data" : data.classification}
+                      {empty ? t("noData") : data.classification}
                     </p>
                   </div>
                 </CardContent>
@@ -114,12 +116,12 @@ export function SpairScoreDetailsDialog({
               <Card>
                 <CardContent className="pt-6 p-4">
                    <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">Stats</p>
+                    <p className="text-xs font-medium text-muted-foreground">{t("stats")}</p>
                     <div className="flex items-baseline gap-2">
                        <span className="text-3xl font-bold">{empty ? "—" : (pointsNeeded > 0 ? pointsNeeded : 0)}</span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      {empty ? "Add transactions to see score" : "Points to next tier"}
+                      {empty ? t("addTransactionsToSeeScore") : t("pointsToNextTier")}
                     </p>
                   </div>
                 </CardContent>
@@ -127,11 +129,11 @@ export function SpairScoreDetailsDialog({
               <Card>
                 <CardContent className="pt-6 p-4">
                    <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">Progress</p>
+                    <p className="text-xs font-medium text-muted-foreground">{t("progress")}</p>
                     <div className="flex items-baseline gap-2">
                        <span className="text-3xl font-bold">{empty ? "—" : `${Math.round(progressToNext)}%`}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{empty ? "No data" : "To next level"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{empty ? t("noData") : t("toNextLevel")}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -140,7 +142,7 @@ export function SpairScoreDetailsDialog({
             {/* Score Progress Bar */}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <p className="text-sm font-medium">Score Progress</p>
+                <p className="text-sm font-medium">{t("scoreProgress")}</p>
                 <p className="text-sm font-bold">{empty ? "— / 100" : `${data.score} / 100`}</p>
               </div>
               <div className="relative h-3 w-full rounded-full bg-secondary overflow-visible">
@@ -157,18 +159,18 @@ export function SpairScoreDetailsDialog({
               </div>
               <div className="flex justify-between text-[10px] text-muted-foreground px-1">
                 <span>0</span>
-                <span>Critical</span>
-                <span>Fragile</span>
-                <span>Fair</span>
-                <span>Strong</span>
-                <span>Excellent</span>
+                <span>{t("critical")}</span>
+                <span>{t("fragile")}</span>
+                <span>{t("fair")}</span>
+                <span>{t("strong")}</span>
+                <span>{t("excellent")}</span>
                 <span>100</span>
               </div>
             </div>
 
             {/* Insights */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-base">Insights</h3>
+              <h3 className="font-semibold text-base">{t("insights")}</h3>
               <div className="grid grid-cols-1 gap-3">
                  {data.alerts.map((alert) => (
                     <Card key={alert.id} className="w-full">

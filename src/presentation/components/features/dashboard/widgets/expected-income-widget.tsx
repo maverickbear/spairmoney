@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { ExpectedIncomeOverview } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export function ExpectedIncomeWidget({
   className,
   onCardClick,
 }: ExpectedIncomeWidgetProps) {
+  const t = useTranslations("dashboard");
   const [editOpen, setEditOpen] = useState(false);
 
   const handleEditSuccess = () => {
@@ -34,7 +36,7 @@ export function ExpectedIncomeWidget({
   return (
     <>
       <WidgetCard
-        title="Income"
+        title={t("income")}
         className={cn("min-h-0 h-auto", className)}
         onClick={onCardClick}
         headerAction={
@@ -43,9 +45,9 @@ export function ExpectedIncomeWidget({
             size="small"
             onClick={() => setEditOpen(true)}
             className="h-auto p-0 text-sm font-normal text-muted-foreground hover:text-foreground"
-            aria-label="Adjust income"
+            aria-label={t("adjustIncome")}
           >
-            Adjust
+            {t("adjust")}
           </Button>
         }
       >

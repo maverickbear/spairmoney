@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { debtSchema, DebtFormData } from "@/src/domain/debts/debts.validations";
@@ -110,6 +112,7 @@ export function DebtForm({
   onOpenChange,
   onSuccess,
 }: DebtFormProps) {
+  const t = useTranslations("debts");
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forecast, setForecast] = useState<{
@@ -188,10 +191,10 @@ export function DebtForm({
       showPaymentFrequency: true,
       paymentFrequencyLocked: false,
       paymentFrequencyDefault: "monthly",
-      initialAmountLabel: "Original Amount",
-      startDateLabel: "Start Date",
-      firstPaymentDateLabel: "First Payment Date",
-      paymentAmountLabel: "Payment Amount",
+      initialAmountLabel: t("originalAmount"),
+      startDateLabel: t("startDate"),
+      firstPaymentDateLabel: t("firstPaymentDate"),
+      paymentAmountLabel: t("paymentAmount"),
       totalMonthsPresets: [12, 24, 36, 48, 60, 72, 84, 96, 120, 180, 240, 300, 360],
     };
     
@@ -205,10 +208,10 @@ export function DebtForm({
         showPaymentFrequency: true,
         paymentFrequencyLocked: true,
         paymentFrequencyDefault: "monthly",
-        initialAmountLabel: "Current Balance",
-        startDateLabel: "Statement Start Date",
-        firstPaymentDateLabel: "Next Due Date",
-        paymentAmountLabel: "Planned Monthly Payment",
+        initialAmountLabel: t("currentBalance"),
+        startDateLabel: t("statementStartDate"),
+        firstPaymentDateLabel: t("nextDueDate"),
+        paymentAmountLabel: t("plannedMonthlyPayment"),
         totalMonthsPresets: [],
       };
     }
@@ -594,7 +597,7 @@ export function DebtForm({
   async function loadDebtsCategories() {
     try {
       // Fetch all categories from API
-      const response = await fetch("/api/v2/categories?all=true");
+      const response = await fetch(apiUrl("/api/v2/categories?all=true"));
       if (!response.ok) {
         throw new Error("Failed to fetch categories data");
       }
@@ -676,7 +679,7 @@ export function DebtForm({
   async function checkAccountsAndShowForm() {
     try {
       // OPTIMIZED: Skip investment balances calculation (not needed for debt form)
-      const accountsRes = await fetch("/api/v2/accounts?includeHoldings=false");
+      const accountsRes = await fetch(apiUrl("/api/v2/accounts?includeHoldings=false"));
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json().catch(() => []);
         if (accountsData.length === 0) {
@@ -704,7 +707,7 @@ export function DebtForm({
   async function loadAccounts() {
     try {
       // OPTIMIZED: Skip investment balances calculation (not needed for debt form)
-      const res = await fetch("/api/v2/accounts?includeHoldings=false");
+      const res = await fetch(apiUrl("/api/v2/accounts?includeHoldings=false"));
       const data = await res.json();
       setAccounts(data || []);
     } catch (error) {
@@ -885,7 +888,7 @@ export function DebtForm({
         }
       } else {
         // Create new debt
-        const res = await fetch("/api/v2/debts", {
+        const res = await fetch(apiUrl("/api/v2/debts"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -921,15 +924,15 @@ export function DebtForm({
       onSuccess?.();
 
       toast({
-        title: debt ? "Debt updated" : "Debt created",
-        description: debt ? "Your debt has been updated successfully." : "Your debt has been created successfully.",
+        title: debt ? t("debtUpdated") : t("debtCreated"),
+        description: debt ? t("debtUpdated") : t("debtCreated"),
         variant: "success",
       });
     } catch (error) {
       console.error("Error saving debt:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save debt",
+        description: error instanceof Error ? error.message : t("failedToUpdateDebt"),
         variant: "destructive",
       });
       // Reload on error to revert optimistic update
@@ -958,7 +961,7 @@ export function DebtForm({
         <Dialog open={open} onOpenChange={onOpenChange}>
           <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
         <DialogHeader>
-          <DialogTitle>{debt ? "Edit" : "Create"} Debt</DialogTitle>
+          <DialogTitle>{debt ? t("editDebt") : t("createDebtTitle")}</DialogTitle>
         </DialogHeader>
 
         <form
@@ -976,7 +979,7 @@ export function DebtForm({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium">
-                    Category
+                    {t("category")}
                   </label>
                   <Select
                     value={selectedCategoryId}
@@ -993,7 +996,7 @@ export function DebtForm({
                     required
                   >
                     <SelectTrigger size="medium">
-                      <SelectValue placeholder="Select Category" />
+                      <SelectValue placeholder={t("selectCategory")} />
                     </SelectTrigger>
                     <SelectContent>
                       {debtsCategories.map((category) => (
@@ -1013,7 +1016,7 @@ export function DebtForm({
                 {selectedCategoryId && debtsCategories.find(c => c.id === selectedCategoryId)?.subcategories && debtsCategories.find(c => c.id === selectedCategoryId)!.subcategories!.length > 0 && (
                   <div className="space-y-1">
                     <label className="text-sm font-medium">
-                      Subcategory (optional)
+                      {t("subcategoryOptional")}
                     </label>
                     <Select
                       value={selectedSubcategoryId || undefined}
@@ -1055,7 +1058,7 @@ export function DebtForm({
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  Debt Name
+                  {t("debtName")}
                 </label>
                 <Input
                   {...form.register("name")}
@@ -1092,7 +1095,7 @@ export function DebtForm({
               {fieldConfig.showDownPayment && (
                 <div className="space-y-1">
                   <label className="text-sm font-medium">
-                    Down Payment
+                    {t("downPayment")}
                   </label>
                   <DollarAmountInput
                     value={form.watch("downPayment") || undefined}
@@ -1111,7 +1114,7 @@ export function DebtForm({
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  Interest Rate (APR)
+                  {t("interestRate")} (APR)
                 </label>
                 <PercentageInput
                   value={form.watch("interestRate") || undefined}
@@ -1138,7 +1141,7 @@ export function DebtForm({
               {fieldConfig.showTotalMonths && (
                 <div className="space-y-1">
                   <label className="text-sm font-medium">
-                    Total Months
+                    {t("loanTerm")}
                   </label>
                   <Select
                     value={form.watch("totalMonths") ? form.watch("totalMonths")!.toString() : undefined}
@@ -1148,7 +1151,7 @@ export function DebtForm({
                     required={fieldConfig.totalMonthsRequired}
                   >
                     <SelectTrigger size="medium">
-                      <SelectValue placeholder="Select months" />
+                      <SelectValue placeholder={t("selectMonths")} />
                     </SelectTrigger>
                     <SelectContent>
                       {getTotalMonthsOptions().map((months) => {
@@ -1178,7 +1181,7 @@ export function DebtForm({
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  Payment Frequency
+                  {t("paymentFrequency")}
                 </label>
                 <Select
                   value={form.watch("paymentFrequency")}
@@ -1259,7 +1262,7 @@ export function DebtForm({
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  Account
+                  {t("account")}
                 </label>
                 <Select
                   value={form.watch("accountId") || ""}
@@ -1267,7 +1270,7 @@ export function DebtForm({
                   required
                 >
                   <SelectTrigger size="medium">
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t("selectAccount")} />
                   </SelectTrigger>
                   <SelectContent>
                     {accounts.map((account) => (
@@ -1293,7 +1296,7 @@ export function DebtForm({
                   onDateChange={(date) => {
                     form.setValue("startDate", date || new Date(), { shouldValidate: true });
                   }}
-                  placeholder="Select start date"
+                  placeholder={t("selectStartDate")}
                   size="medium"
                   required={!((loanType || "").toLowerCase().includes("credit") || (loanType || "").toLowerCase().includes("card"))}
                 />
@@ -1313,7 +1316,7 @@ export function DebtForm({
                   onDateChange={(date) => {
                     form.setValue("firstPaymentDate", date || new Date(), { shouldValidate: true });
                   }}
-                  placeholder="Select first payment date"
+                  placeholder={t("selectFirstPaymentDate")}
                   size="medium"
                   required
                 />
@@ -1328,7 +1331,7 @@ export function DebtForm({
             {startDate && totalMonths && totalMonths > 0 && (
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">Finish Date (calculated)</label>
+                  <label className="text-sm font-medium">{t("finishDateCalculated")}</label>
                   <Input
                     type="text"
                     value={(() => {
@@ -1353,7 +1356,7 @@ export function DebtForm({
           {debt && (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-sm font-medium">Principal Paid</label>
+                <label className="text-sm font-medium">{t("principalPaid")}</label>
                 <DollarAmountInput
                   value={form.watch("principalPaid") || undefined}
                   onChange={(value) => {
@@ -1371,7 +1374,7 @@ export function DebtForm({
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium">Interest Paid</label>
+                <label className="text-sm font-medium">{t("interestPaid")}</label>
                 <DollarAmountInput
                   value={form.watch("interestPaid") || undefined}
                   onChange={(value) => form.setValue("interestPaid", value ?? 0, { shouldValidate: true })}
@@ -1429,17 +1432,17 @@ export function DebtForm({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" size="medium" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {debt ? "Updating..." : "Creating..."}
+                  {debt ? t("updating") : t("creating")}
                 </>
               ) : (
-                debt ? "Update" : "Create"
-              )} Debt
+                debt ? t("update") : t("create")
+              )} {t("debtLabel")}
             </Button>
           </DialogFooter>
         </form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -145,6 +146,7 @@ export function CsvImportDialog({
   accounts,
   categories,
 }: CsvImportDialogProps) {
+  const t = useTranslations("csvImport");
   const [files, setFiles] = useState<File[]>([]);
   const [filesData, setFilesData] = useState<Map<number, FileData>>(new Map());
   const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -784,9 +786,9 @@ export function CsvImportDialog({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col w-full sm:max-w-[640px] p-0 gap-0 overflow-hidden bg-background border-l">
         <SheetHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0 bg-background text-left">
-          <SheetTitle className="text-xl font-semibold">Import Transactions from CSV</SheetTitle>
+          <SheetTitle className="text-xl font-semibold">{t("sheetTitle")}</SheetTitle>
           <SheetDescription className="mt-1.5 text-sm text-muted-foreground">
-            Upload your CSV files and map columns to transaction fields
+            {t("sheetDescription")}
           </SheetDescription>
         </SheetHeader>
 
@@ -810,7 +812,7 @@ export function CsvImportDialog({
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    CSV import is not available in your current plan.
+                    {t("csvNotAvailableInPlan")}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -820,11 +822,11 @@ export function CsvImportDialog({
               {/* Step 1: Upload Files */}
               <section className="space-y-4">
                 <div className="space-y-1">
-                  <h3 className="text-lg font-semibold">1. Upload CSV Files</h3>
+                  <h3 className="text-lg font-semibold">{t("step1Upload")}</h3>
                   <p className="text-sm text-muted-foreground">
                     {files.length > 0 
-                      ? `${files.length} file${files.length !== 1 ? "s" : ""} uploaded` 
-                      : "Drag and drop CSV files or click to browse"}
+                      ? t("filesUploaded", { count: files.length }) 
+                      : t("dragAndDropOrBrowse")}
                   </p>
                 </div>
                 <div className="space-y-4">
@@ -874,8 +876,8 @@ export function CsvImportDialog({
                           handleFilesChange(syntheticEvent);
                         } else if (e.dataTransfer.files.length > 0) {
                           toast({
-                            title: "Invalid file type",
-                            description: "Please upload CSV files only",
+                            title: t("invalidFileType"),
+                            description: t("uploadCsvOnly"),
                             variant: "destructive",
                           });
                         }
@@ -901,7 +903,7 @@ export function CsvImportDialog({
                           )} />
                         </div>
                         <p className="text-sm font-medium mb-1">
-                          {isDragging ? "Drop CSV files here" : "Drag and drop CSV files here"}
+                          {isDragging ? t("dropCsvHere") : t("dragAndDropCsvHere")}
                         </p>
                         <p className="text-xs text-muted-foreground mb-2">
                           or click to browse
@@ -997,7 +999,7 @@ export function CsvImportDialog({
                           onValueChange={setDefaultAccountId}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select account (optional)" />
+                            <SelectValue placeholder={t("selectAccountOptional")} />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">None (account must be in CSV)</SelectItem>
@@ -1199,7 +1201,7 @@ export function CsvImportDialog({
                                   "flex-1 max-w-[300px]",
                                   hasSuggestion && "border-primary/50"
                                 )}>
-                                  <SelectValue placeholder={hasSuggestion ? `Suggested: ${suggestion}` : "Select transaction type"} />
+                                  <SelectValue placeholder={hasSuggestion ? `Suggested: ${suggestion}` : t("selectTransactionType")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="expense">Expense</SelectItem>
@@ -1254,7 +1256,7 @@ export function CsvImportDialog({
                                 }}
                               >
                                 <SelectTrigger className="flex-1 max-w-[300px]">
-                                  <SelectValue placeholder="Select account" />
+                                  <SelectValue placeholder={t("selectAccount")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {accounts.map((account) => (
@@ -1343,7 +1345,7 @@ export function CsvImportDialog({
                   Importing...
                 </>
               ) : (
-                "Import Transactions"
+                t("importTransactions")
               )}
             </Button>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ChartCard } from "./chart-card";
 import { formatMoney } from "@/components/common/money";
@@ -59,18 +60,19 @@ export function BudgetVsActualChart({ budgets }: BudgetVsActualChartProps) {
       .slice(0, 6);
   }, [budgets]);
 
+  const t = useTranslations("reports");
   return (
     <ChartCard
-      title="Budget vs actual"
-      description="Over/under budget by category"
+      title={t("budgetVsActual")}
+      description={t("overUnderBudgetByCategory")}
     >
       {chartData.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-center">
           <p className="text-sm text-muted-foreground">
-            No budgets available yet
+            {t("noBudgetsAvailableYet")}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Create budgets to compare planned vs actual spend
+            {t("createBudgetsToCompare")}
           </p>
         </div>
       ) : (

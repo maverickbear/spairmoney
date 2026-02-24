@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -15,7 +16,8 @@ interface SpendingPatternsSectionProps {
 }
 
 export function SpendingPatternsSection({ transactions }: SpendingPatternsSectionProps) {
-  const expenses = transactions.filter((t) => t.type === "expense");
+  const t = useTranslations("reports");
+  const expenses = transactions.filter((tx) => tx.type === "expense");
 
   if (expenses.length === 0) {
     return null;
@@ -79,13 +81,13 @@ export function SpendingPatternsSection({ transactions }: SpendingPatternsSectio
         <CardHeader>
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Spending Patterns
+            {t("spendingPatterns")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Spending by Day of Week */}
-            <ChartCard title="Spending by Day of Week" description="Average spending per day">
+            <ChartCard title={t("spendingByDayOfWeek")} description={t("averageSpendingPerDay")}>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={dayOfWeekData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
                   <CartesianGrid
@@ -135,7 +137,7 @@ export function SpendingPatternsSection({ transactions }: SpendingPatternsSectio
             </ChartCard>
 
             {/* Spending by Account */}
-            <ChartCard title="Top 5 Accounts by Spending" description="Total spending per account">
+            <ChartCard title={t("top5AccountsBySpending")} description={t("totalSpendingPerAccount")}>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart
                   data={accountData}
@@ -196,15 +198,15 @@ export function SpendingPatternsSection({ transactions }: SpendingPatternsSectio
             <div className="mt-6 pt-6 border-t">
               <div className="flex items-center gap-2 mb-4">
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold">Recurring Transactions</h3>
+                <h3 className="text-sm font-semibold">{t("recurringTransactions")}</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Total Recurring Expenses</p>
+                  <p className="text-sm text-muted-foreground">{t("totalRecurringExpenses")}</p>
                   <p className="text-2xl font-bold">{formatMoney(recurringTotal)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Number of Recurring Items</p>
+                  <p className="text-sm text-muted-foreground">{t("numberOfRecurringItems")}</p>
                   <p className="text-2xl font-bold">{recurringTransactions.length}</p>
                 </div>
               </div>

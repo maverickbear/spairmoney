@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, ArrowRight, PieChart } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,11 +17,12 @@ interface TopSpendingCategoriesWidgetProps {
 }
 
 export function TopSpendingCategoriesWidget({ data, loading, error }: TopSpendingCategoriesWidgetProps) {
+  const t = useTranslations("dashboard");
   const router = useRouter();
 
   if (loading) {
     return (
-      <WidgetCard title="Top Categories">
+      <WidgetCard title={t("topCategories")}>
         <div className="animate-pulse space-y-3">
           <div className="h-4 bg-muted rounded" />
           <div className="h-4 bg-muted rounded" />
@@ -31,11 +33,11 @@ export function TopSpendingCategoriesWidget({ data, loading, error }: TopSpendin
 
   if (error) {
     return (
-      <WidgetCard title="Top Categories">
+      <WidgetCard title={t("topCategories")}>
         <div className="text-xs text-muted-foreground">
-          <p>Error: {error}</p>
+          <p>{t("errorLoadingDashboard")}: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
-            <a href="/transactions/new">Add Transaction</a>
+            <a href="/transactions/new">{t("addTransaction")}</a>
           </Button>
         </div>
       </WidgetCard>
@@ -44,12 +46,12 @@ export function TopSpendingCategoriesWidget({ data, loading, error }: TopSpendin
 
   if (!data || data.categories.length === 0) {
     return (
-      <WidgetCard title="Top Categories">
+      <WidgetCard title={t("topCategories")}>
         <WidgetEmptyState
-          title="Add expenses"
-          description="See where your money goes"
+          title={t("addExpensesTitle")}
+          description={t("addExpensesDescription")}
           primaryAction={{
-            label: "Add Expense",
+            label: t("addExpense"),
             href: "/transactions/new?type=expense",
           }}
           icon={PieChart}
@@ -61,7 +63,7 @@ export function TopSpendingCategoriesWidget({ data, loading, error }: TopSpendin
   const maxAmount = Math.max(...data.categories.map(c => c.amount));
 
   return (
-    <WidgetCard title="Top Categories">
+    <WidgetCard title={t("topCategories")}>
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-1.5">
           {data.categories.map((category) => {

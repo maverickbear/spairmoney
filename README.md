@@ -547,6 +547,8 @@ describe('Transactions Service', () => {
 
 ## 🚀 Deployment
 
+For a full production checklist, environment variables, and Stripe/Sentry setup, see **[docs/PRODUCTION.md](docs/PRODUCTION.md)**.
+
 ### Vercel Deployment (Recommended)
 
 1. **Connect your repository** to Vercel

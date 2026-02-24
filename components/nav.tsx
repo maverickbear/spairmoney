@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useState, useEffect, createContext, useContext, memo, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
@@ -40,6 +40,7 @@ export const useSidebar = () => useContext(SidebarContext);
  */
 function NavComponent() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -121,6 +122,7 @@ function NavComponent() {
               isCollapsed ? "overflow-visible" : "overflow-y-auto"
             )}>
               {navSections.map((section) => {
+                const sectionTitle = t(section.titleKey);
                 const isSectionCollapsed = collapsedSections.has(section.title);
                 return (
                   <div key={section.title} className="space-y-1">
@@ -139,7 +141,7 @@ function NavComponent() {
                         }}
                         className="flex items-center justify-between w-full px-3 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
                       >
-                        <span>{section.title}</span>
+                        <span>{sectionTitle}</span>
                         <ChevronDown
                           className={cn(
                             "h-3.5 w-3.5 transition-transform duration-200",
@@ -163,6 +165,7 @@ function NavComponent() {
                           (basePath !== "/" && pathname.startsWith(basePath));
 
                         // Handle "soon" items - render as disabled button instead of link
+                        const itemLabel = t(item.labelKey);
                         if (item.soon) {
                           const soonElement = (
                             <div
@@ -175,11 +178,11 @@ function NavComponent() {
                             >
                               <div className="flex items-center space-x-3">
                                 <Icon className="h-4 w-4 flex-shrink-0" />
-                                {!isCollapsed && <span>{item.label}</span>}
+                                {!isCollapsed && <span>{itemLabel}</span>}
                               </div>
                               {!isCollapsed && (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-                                  SOON
+                                  {t("soon")}
                                 </span>
                               )}
                             </div>
@@ -192,7 +195,7 @@ function NavComponent() {
                                   <div className="relative">
                                     {soonElement}
                                     <TooltipContent side="right">
-                                      {item.label} (SOON)
+                                      {itemLabel} ({t("soon")})
                                     </TooltipContent>
                                   </div>
                                 </TooltipTrigger>
@@ -218,7 +221,7 @@ function NavComponent() {
                             )}
                           >
                             <Icon className="h-4 w-4 flex-shrink-0" />
-                            {!isCollapsed && <span>{item.label}</span>}
+                            {!isCollapsed && <span>{itemLabel}</span>}
                           </Link>
                         );
 
@@ -229,7 +232,7 @@ function NavComponent() {
                                 <div className="relative">
                                   {linkElement}
                                   <TooltipContent side="right">
-                                    {item.label}
+                                    {itemLabel}
                                   </TooltipContent>
                                 </div>
                               </TooltipTrigger>
@@ -272,7 +275,7 @@ function NavComponent() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side={isCollapsed ? "right" : "bottom"}>
-              {isCollapsed ? "Expand menu" : "Collapse menu"}
+              {isCollapsed ? t("expandMenu") : t("collapseMenu")}
             </TooltipContent>
           </Tooltip>
         )}

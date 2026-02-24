@@ -6,14 +6,16 @@ import { resetPasswordSchema, ResetPasswordFormData } from "@/src/domain/auth/au
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Lock, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 function ResetPasswordFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("auth");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -100,7 +102,7 @@ function ResetPasswordFormContent() {
       const result = await response.json();
 
       if (!response.ok || result.error) {
-        setError(result.error || "Failed to reset password");
+        setError(result.error || t("failedToResetPassword"));
         setLoading(false);
         return;
       }
@@ -114,7 +116,7 @@ function ResetPasswordFormContent() {
       }, 2000);
     } catch (error) {
       console.error("Error resetting password:", error);
-      setError("An unexpected error occurred");
+      setError(t("unexpectedError"));
       setLoading(false);
     }
   }
@@ -134,9 +136,9 @@ function ResetPasswordFormContent() {
       <div className="space-y-6">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Invalid or expired reset link</AlertTitle>
+          <AlertTitle>{t("invalidResetLink")}</AlertTitle>
           <AlertDescription>
-              This password reset link is invalid or has expired. Please request a new one.
+            {t("invalidResetLinkDescription")}
           </AlertDescription>
         </Alert>
 
@@ -145,13 +147,13 @@ function ResetPasswordFormContent() {
             href="/auth/forgot-password"
             className="text-sm text-foreground hover:underline font-medium transition-colors block"
           >
-            Request new reset link
+            {t("requestNewResetLink")}
           </Link>
           <Link
             href="/auth/login"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors block"
           >
-            Back to login
+            {t("backToLogin")}
           </Link>
         </div>
       </div>
@@ -163,8 +165,8 @@ function ResetPasswordFormContent() {
       <div className="space-y-6">
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Password reset successfully!</AlertTitle>
-          <AlertDescription>Redirecting to login...</AlertDescription>
+          <AlertTitle>{t("passwordResetSuccess")}</AlertTitle>
+          <AlertDescription>{t("redirectingToLogin")}</AlertDescription>
         </Alert>
       </div>
     );
@@ -176,14 +178,14 @@ function ResetPasswordFormContent() {
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>{t("error")}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-1">
           <label htmlFor="password" className="text-sm font-medium text-foreground">
-            New Password
+            {t("newPassword")}
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -191,7 +193,7 @@ function ResetPasswordFormContent() {
               id="password"
               type={showPassword ? "text" : "password"}
               {...form.register("password")}
-              placeholder="Enter your new password"
+              placeholder={t("enterNewPassword")}
               disabled={loading}
               size="medium"
               className="pl-10 pr-10"
@@ -220,7 +222,7 @@ function ResetPasswordFormContent() {
 
         <div className="space-y-1">
           <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
-            Confirm Password
+            {t("confirmPassword")}
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -228,7 +230,7 @@ function ResetPasswordFormContent() {
               id="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
               {...form.register("confirmPassword")}
-              placeholder="Confirm your new password"
+              placeholder={t("confirmNewPasswordPlaceholder")}
               disabled={loading}
               size="medium"
               className="pl-10 pr-10"
@@ -264,10 +266,10 @@ function ResetPasswordFormContent() {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Resetting...
+              {t("resettingPassword")}
             </>
           ) : (
-            "Reset Password"
+            t("setNewPassword")
           )}
         </Button>
       </form>
@@ -277,7 +279,7 @@ function ResetPasswordFormContent() {
           href="/auth/login"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          Back to login
+          {t("backToLogin")}
         </Link>
       </div>
     </div>

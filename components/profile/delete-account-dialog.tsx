@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,22 +24,24 @@ interface DeleteAccountDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const DELETE_CONFIRMATION_TEXT = "DELETE";
-
 export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogProps) {
+  const t = useTranslations("dialogs.deleteAccount");
+  const tDialogs = useTranslations("dialogs");
+  const tCommon = useTranslations("common");
   const [confirmationText, setConfirmationText] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const confirmationWord = t("confirmationWord");
 
   async function handleDelete() {
-    if (confirmationText !== DELETE_CONFIRMATION_TEXT) {
-      setError(`Please type "${DELETE_CONFIRMATION_TEXT}" to confirm`);
+    if (confirmationText !== confirmationWord) {
+      setError(t("errorTypeToConfirm", { text: confirmationWord }));
       return;
     }
     if (!confirmed) {
-      setError("Please confirm that you understand this action cannot be undone");
+      setError(t("errorConfirmCheckbox"));
       return;
     }
 
@@ -50,14 +53,13 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || result.message || "Failed to delete account");
+        throw new Error(result.error || result.message || t("failedToDelete"));
       }
 
       if (result.success) {
         toast({
-          title: "Account deleted",
-          description:
-            "Your account has been removed. You will be redirected to the home page.",
+          title: t("toastSuccess"),
+          description: t("toastSuccessDescription"),
           variant: "success",
         });
         onOpenChange(false);
@@ -72,10 +74,10 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
       }
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to delete account";
+        err instanceof Error ? err.message : t("failedToDelete");
       setError(errorMessage);
       toast({
-        title: "Error",
+        title: tCommon("error"),
         description: errorMessage,
         variant: "destructive",
       });
@@ -99,29 +101,29 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <DialogTitle>Delete Account</DialogTitle>
+            <DialogTitle>{t("title")}</DialogTitle>
           </div>
           <DialogDescription>
-            This action cannot be undone. Your account will be permanently deactivated and your personal information will be anonymized immediately.
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4 px-6">
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Warning: This will permanently delete your account</AlertTitle>
+            <AlertTitle>{t("warningTitle")}</AlertTitle>
             <AlertDescription>
               <ul className="list-disc list-inside space-y-1 mt-2">
-                <li><strong>Your account will be removed completely</strong> from Supabase and Stripe</li>
-                <li><strong>Personal data will be anonymized or removed;</strong> your subscription will be cancelled and the Stripe customer deleted</li>
-                <li><strong>This action cannot be undone</strong></li>
+                <li><strong>{t("bullet1")}</strong></li>
+                <li><strong>{t("bullet2")}</strong></li>
+                <li><strong>{t("bullet3")}</strong></li>
               </ul>
             </AlertDescription>
           </Alert>
 
           <div className="space-y-2">
             <Label htmlFor="delete-confirmation">
-              Type <span className="font-mono font-semibold">{DELETE_CONFIRMATION_TEXT}</span> to confirm
+              {t("typeToConfirm", { text: confirmationWord })}
             </Label>
             <Input
               id="delete-confirmation"
@@ -134,6 +136,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
               size="medium"
               disabled={loading}
               className="font-mono"
+              placeholder={confirmationWord}
             />
           </div>
 
@@ -151,7 +154,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
               htmlFor="confirm-deletion"
               className="text-sm leading-relaxed cursor-pointer"
             >
-              I understand that my account will be removed completely and this cannot be undone.
+              {t("checkboxLabel")}
             </label>
           </div>
 
@@ -165,20 +168,20 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={loading}>
-            Cancel
+            {tDialogs("cancel")}
           </Button>
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={loading || confirmationText !== DELETE_CONFIRMATION_TEXT || !confirmed}
+            disabled={loading || confirmationText !== confirmationWord || !confirmed}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
+                {t("deleting")}
               </>
             ) : (
-              "Delete Account"
+              t("deleteButton")
             )}
           </Button>
         </DialogFooter>

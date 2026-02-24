@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,8 @@ export function CategorySelectionDialog({
   saving = false,
   clearTrigger,
 }: CategorySelectionDialogProps) {
+  const t = useTranslations("common");
+  const tForms = useTranslations("forms");
   const handleClear = () => {
     onClear();
     onOpenChange(false);
@@ -51,10 +54,10 @@ export function CategorySelectionDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {transaction?.category?.name ? "Change Category" : "Add Category"}
+            {transaction?.category?.name ? tForms("changeCategory") : tForms("addCategory")}
           </DialogTitle>
           <DialogDescription>
-            Select a category for this transaction
+            {tForms("selectCategoryForTransaction")}
           </DialogDescription>
         </DialogHeader>
         <CategorySelectionModal
@@ -66,16 +69,16 @@ export function CategorySelectionDialog({
         />
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClear} disabled={saving}>
-            Clear
+            {t("clear")}
           </Button>
           <Button type="button" onClick={onSave} disabled={saving}>
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
-                Saving
+                {t("saving")}
               </>
             ) : (
-              "Save"
+              t("save")
             )}
           </Button>
         </DialogFooter>

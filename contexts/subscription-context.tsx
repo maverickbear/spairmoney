@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { logger } from "@/lib/utils/logger";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import type { Subscription, Plan, PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
 import { getDefaultFeatures } from "@/lib/utils/plan-features";
 
@@ -74,9 +75,25 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     subscriptionRef.current = subscription;
   }, [subscription]);
 
+  // Sync state when initialData changes (e.g. after locale switch via cookie update and refresh).
+  // React may reuse the same provider instance and only update props; useState does not re-run.
+  useEffect(() => {
+    const nextSub = initialData?.subscription ?? null;
+    const nextPlan = initialData?.plan ?? null;
+    setSubscription(nextSub);
+    setPlan(nextPlan);
+    setLimits(nextPlan?.features ?? getDefaultFeatures());
+    subscriptionRef.current = nextSub;
+    planRef.current = nextPlan;
+    if (nextSub || nextPlan) {
+      hasInitialDataRef.current = true;
+      lastFetchRef.current = Date.now();
+    }
+  }, [initialData?.subscription, initialData?.plan]);
+
   const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null; interval: "month" | "year" | null }> => {
     try {
-      const response = await fetch("/api/billing/subscription");
+      const response = await fetch(apiUrl("/api/v2/billing/subscription"));
       
       if (!response.ok) {
         if (response.status === 401) {

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,11 +17,12 @@ interface FinancialAlertsWidgetProps {
 }
 
 export function FinancialAlertsWidget({ data, loading, error }: FinancialAlertsWidgetProps) {
+  const t = useTranslations("dashboard");
   const router = useRouter();
 
   if (loading) {
     return (
-      <WidgetCard title="Alerts" compact>
+      <WidgetCard title={t("alerts")} compact>
         <div className="animate-pulse space-y-3">
           <div className="h-4 bg-muted rounded" />
           <div className="h-4 bg-muted rounded" />
@@ -31,9 +33,9 @@ export function FinancialAlertsWidget({ data, loading, error }: FinancialAlertsW
 
   if (error) {
     return (
-      <WidgetCard title="Alerts" compact>
+      <WidgetCard title={t("alerts")} compact>
         <div className="text-xs text-muted-foreground">
-          <p>Error: {error}</p>
+          <p>{t("errorLoadingDashboard")}: {error}</p>
         </div>
       </WidgetCard>
     );
@@ -41,10 +43,10 @@ export function FinancialAlertsWidget({ data, loading, error }: FinancialAlertsW
 
   if (!data.hasAlerts || data.alerts.length === 0) {
     return (
-      <WidgetCard title="Alerts" compact>
+      <WidgetCard title={t("alerts")} compact>
         <div className="flex flex-col items-center justify-center py-6 text-center">
           <CheckCircle2 className="h-8 w-8 text-sentiment-positive mb-2" />
-          <p className="text-xs text-muted-foreground">All good!</p>
+          <p className="text-xs text-muted-foreground">{t("allGood")}</p>
         </div>
       </WidgetCard>
     );
@@ -73,7 +75,7 @@ export function FinancialAlertsWidget({ data, loading, error }: FinancialAlertsW
   };
 
   return (
-    <WidgetCard title="Alerts" compact>
+    <WidgetCard title={t("alerts")} compact>
       <div className="space-y-1.5">
         {data.alerts.slice(0, 3).map((alert) => (
           <div

@@ -3,6 +3,9 @@ import { withSentryConfig } from "@sentry/nextjs";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import bundleAnalyzer from "@next/bundle-analyzer";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 // Bundle analyzer
 const withBundleAnalyzer = bundleAnalyzer({
@@ -92,8 +95,9 @@ const nextConfig: NextConfig = {
     }
   },
   
-  // Turbopack configuration (Next.js 16 uses Turbopack by default)
-  turbopack: {},
+  // Turbopack: avoid resolveAlias with absolute paths — Turbopack does not support
+  // server-relative resolution of those and fails with "Module not found" for next-intl.
+  // Standard node resolution works when dev runs from project root.
   
   // Performance optimizations
   compress: true, // Enable gzip compression
@@ -315,9 +319,12 @@ const nextConfig: NextConfig = {
   },
 };
 
+// Wrap with next-intl for i18n (en, pt, es)
+const configWithIntl = withNextIntl(nextConfig);
+
 // Wrap with Sentry if DSN is configured
 const configWithSentry = process.env.NEXT_PUBLIC_SENTRY_DSN
-  ? withSentryConfig(nextConfig, {
+  ? withSentryConfig(configWithIntl, {
       // For all available options, see:
       // https://github.com/getsentry/sentry-webpack-plugin#options
 
@@ -326,7 +333,7 @@ const configWithSentry = process.env.NEXT_PUBLIC_SENTRY_DSN
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
     })
-  : nextConfig;
+  : configWithIntl;
 
 // Wrap with bundle analyzer if enabled
 export default withBundleAnalyzer(configWithSentry);

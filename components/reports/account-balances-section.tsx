@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
@@ -19,6 +20,7 @@ export function AccountBalancesSection({
   historicalTransactions,
   now,
 }: AccountBalancesSectionProps) {
+  const t = useTranslations("reports");
   if (accounts.length === 0) {
     return null;
   }
@@ -83,22 +85,22 @@ export function AccountBalancesSection({
         <CardHeader>
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            Account Balances
+            {t("accountBalances")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {/* Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Total Balance</p>
+              <p className="text-sm text-muted-foreground">{t("totalBalance")}</p>
               <p className="text-2xl font-bold">{formatMoney(totalBalance)}</p>
               <p className="text-xs text-muted-foreground">
-                {relevantAccounts.length} account{relevantAccounts.length !== 1 ? "s" : ""}
+                {relevantAccounts.length} {relevantAccounts.length === 1 ? t("account") : t("account_other")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Balance Change</p>
+              <p className="text-sm text-muted-foreground">{t("balanceChange")}</p>
               <p
                 className={cn(
                   "text-2xl font-bold flex items-center gap-2",
@@ -123,22 +125,22 @@ export function AccountBalancesSection({
                 )}
               >
                 {balanceChangePercent >= 0 ? "+" : ""}
-                {balanceChangePercent.toFixed(1)}% vs last month
+                {balanceChangePercent.toFixed(1)}% {t("vsLastMonthShort")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Average Balance</p>
+              <p className="text-sm text-muted-foreground">{t("averageBalance")}</p>
               <p className="text-2xl font-bold">
                 {formatMoney(totalBalance / relevantAccounts.length)}
               </p>
-              <p className="text-xs text-muted-foreground">per account</p>
+              <p className="text-xs text-muted-foreground">{t("perAccount")}</p>
             </div>
           </div>
 
           {/* Account List */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold">Account Details</h3>
+            <h3 className="text-sm font-semibold">{t("accountDetails")}</h3>
             {relevantAccounts.map((account) => (
               <div
                 key={account.id}
@@ -152,7 +154,7 @@ export function AccountBalancesSection({
                   <p className="font-semibold">{formatMoney(account.balance || 0)}</p>
                   {account.initialBalance !== undefined && (
                     <p className="text-xs text-muted-foreground">
-                      Initial: {formatMoney(account.initialBalance)}
+                      {t("initial")}: {formatMoney(account.initialBalance)}
                     </p>
                   )}
                 </div>

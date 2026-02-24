@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,10 @@ export function CategoriesModule({
   isCreateDialogOpen: externalIsCreateDialogOpen,
   onCreateDialogChange: externalOnCreateDialogChange 
 }: CategoriesModuleProps = {}) {
+  const tCommon = useTranslations("common");
+  const tForms = useTranslations("forms");
+  const tToasts = useTranslations("toasts");
+  const tSettings = useTranslations("settings");
   const { toast } = useToast();
   const { checkWriteAccess, canWrite } = useWriteGuard();
   const { openDialog: openDeleteCategoryDialog, ConfirmDialog: DeleteCategoryConfirmDialog } = useConfirmDialog();
@@ -98,7 +103,8 @@ export function CategoriesModule({
 
   async function loadCurrentUser() {
     try {
-      const response = await fetch("/api/v2/user");
+      const { apiUrl } = await import("@/lib/utils/api-base-url");
+      const response = await fetch(apiUrl("/api/v2/user"));
       if (!response.ok) {
         throw new Error("Failed to fetch user data");
       }
@@ -156,10 +162,10 @@ export function CategoriesModule({
     if (!checkWriteAccess()) return;
     openDeleteCategoryDialog(
       {
-        title: "Delete Category",
-        description: "Are you sure you want to delete this category? This will also delete all associated subcategories.",
+        title: tForms("deleteCategoryTitle"),
+        description: tForms("deleteCategoryDescription"),
         variant: "destructive",
-        confirmLabel: "Delete",
+        confirmLabel: tCommon("delete"),
       },
       async (close) => {
         const categoryToDelete = categories.find(c => c.id === id);
@@ -176,12 +182,12 @@ export function CategoriesModule({
 
           if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || "Failed to delete category");
+            throw new Error(error.error || tForms("failedToDeleteCategory"));
           }
           
           toast({
-            title: "Category deleted",
-            description: "Your category has been deleted successfully.",
+            title: tForms("categoryDeleted"),
+            description: tForms("categoryDeletedDescription"),
             variant: "success",
           });
           // Do not call loadData() — it would refetch from cache and bring the deleted category back.
@@ -192,9 +198,9 @@ export function CategoriesModule({
           if (categoryToDelete) {
             setCategories(prev => [...prev, categoryToDelete]);
           }
-          const errorMessage = error instanceof Error ? error.message : "Failed to delete category";
+          const errorMessage = error instanceof Error ? error.message : tForms("failedToDeleteCategory");
           toast({
-            title: "Error",
+            title: tToasts("error"),
             description: errorMessage,
             variant: "destructive",
           });
@@ -209,10 +215,10 @@ export function CategoriesModule({
     if (!checkWriteAccess()) return;
     openDeleteSubcategoryDialog(
       {
-        title: "Delete Subcategory",
-        description: "Are you sure you want to delete this subcategory?",
+        title: tForms("deleteSubcategoryTitle"),
+        description: tForms("deleteSubcategoryDescription"),
         variant: "destructive",
-        confirmLabel: "Delete",
+        confirmLabel: tCommon("delete"),
       },
       async (close) => {
         const subcategoryToRestore = (() => {
@@ -238,12 +244,12 @@ export function CategoriesModule({
 
           if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || "Failed to delete subcategory");
+            throw new Error(error.error || tForms("failedToDeleteSubcategory"));
           }
 
           toast({
-            title: "Subcategory deleted",
-            description: "Your subcategory has been deleted successfully.",
+            title: tForms("subcategoryDeleted"),
+            description: tForms("subcategoryDeletedDescription"),
             variant: "success",
           });
           // Do not call loadData() — cache would bring the deleted subcategory back.
@@ -259,9 +265,9 @@ export function CategoriesModule({
                 : cat
             ));
           }
-          const errorMessage = error instanceof Error ? error.message : "Failed to delete subcategory";
+          const errorMessage = error instanceof Error ? error.message : tForms("failedToDeleteSubcategory");
           toast({
-            title: "Error",
+            title: tToasts("error"),
             description: errorMessage,
             variant: "destructive",
           });
@@ -487,7 +493,7 @@ export function CategoriesModule({
             <div className="rounded-lg border p-12">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  No household categories yet. Create one to share with everyone in your household.
+                  {tSettings("noHouseholdCategoriesYet")}
                 </p>
               </div>
             </div>

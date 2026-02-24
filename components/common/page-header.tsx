@@ -1,7 +1,8 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,7 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, description, children, className }: PageHeaderProps) {
+  const t = useTranslations("nav");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(80); // Default height in pixels
   const [isMounted, setIsMounted] = useState(false);
@@ -127,8 +129,8 @@ export function PageHeader({ title, description, children, className }: PageHead
               {children}
               <Button asChild variant="outline" size="medium" className="shrink-0">
                 <Link href="/feedback">
-                  <span className="md:hidden">Feedback</span>
-                  <span className="hidden md:inline">Give Your Feedback</span>
+                  <span className="md:hidden">{t("feedback")}</span>
+                  <span className="hidden md:inline">{t("giveFeedback")}</span>
                 </Link>
               </Button>
             </div>

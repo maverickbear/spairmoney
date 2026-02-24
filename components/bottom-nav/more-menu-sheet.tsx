@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthSafe } from "@/contexts/auth-context";
 import { useSubscriptionSafe } from "@/contexts/subscription-context";
@@ -55,53 +56,52 @@ interface NavCategory {
   items: NavItem[];
 }
 
-// Helper function to build nav categories for the consumer app
-function buildNavCategories(): NavCategory[] {
+// Helper function to build nav categories for the consumer app (uses nav namespace)
+function buildNavCategories(t: (key: string) => string): NavCategory[] {
   const categories: NavCategory[] = [
     {
-      title: "Overview",
+      title: t("sections.overview"),
       items: [
-        { href: "/reports", label: "Reports", icon: FileText },
-        { href: "/insights", label: "Insights", icon: Lightbulb },
+        { href: "/reports", label: t("items.reports"), icon: FileText },
+        { href: "/insights", label: t("items.insights"), icon: Lightbulb },
       ],
     },
     {
-      title: "Money Management",
+      title: t("sections.moneyManagement"),
       items: [
-        { href: "/accounts", label: "Bank Accounts", icon: Wallet },
-        { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
-        { href: "/planned-payment", label: "Planned Payments", icon: Calendar },
-        { href: "/settings/categories", label: "Categories", icon: FolderTree },
-        { href: "/settings/household", label: "Household", icon: Users },
+        { href: "/accounts", label: t("items.bankAccounts"), icon: Wallet },
+        { href: "/subscriptions", label: t("items.subscriptions"), icon: Repeat },
+        { href: "/planned-payment", label: t("items.plannedPayments"), icon: Calendar },
+        { href: "/settings/categories", label: t("items.categories"), icon: FolderTree },
+        { href: "/settings/household", label: t("items.household"), icon: Users },
       ],
     },
     {
-      title: "Planning",
+      title: t("sections.planning"),
       items: [
-        { href: "/planning/budgets", label: "Budgets", icon: Target },
-        { href: "/planning/goals", label: "Goals", icon: PiggyBank },
-        { href: "/debts", label: "Debts", icon: CreditCard },
+        { href: "/planning/budgets", label: t("items.budgets"), icon: Target },
+        { href: "/planning/goals", label: t("items.goals"), icon: PiggyBank },
+        { href: "/debts", label: t("items.debts"), icon: CreditCard },
       ],
     },
     {
-      title: "Account & Settings",
+      title: t("sections.accountSettings"),
       items: [
-        { href: "/settings/myaccount", label: "My Account", icon: User },
-        { href: "/settings/billing", label: "Billing", icon: DollarSign },
-        { href: "/help-support", label: "Help & Support", icon: HelpCircle },
-        { href: "/feedback", label: "Feedback", icon: MessageSquare },
+        { href: "/settings/myaccount", label: t("items.myAccount"), icon: User },
+        { href: "/settings/billing", label: t("items.billing"), icon: DollarSign },
+        { href: "/help-support", label: t("helpSupport"), icon: HelpCircle },
+        { href: "/feedback", label: t("feedback"), icon: MessageSquare },
       ],
     },
   ];
 
-  // Add Legal & Preferences section
   const legalItems: NavItem[] = [
-    { href: "/privacy-policy", label: "Privacy Policy", icon: Shield },
-    { href: "/terms-of-service", label: "Terms of Service", icon: FileText },
+    { href: "/privacy-policy", label: t("privacyPolicy"), icon: Shield },
+    { href: "/terms-of-service", label: t("termsOfService"), icon: FileText },
   ];
 
   categories.push({
-    title: "Legal & Preferences",
+    title: t("sections.legalPreferences"),
     items: legalItems,
   });
 
@@ -174,7 +174,8 @@ export function MoreMenuSheet({
   const log = logger.withPrefix("MORE-MENU");
   
   // Build nav categories for consumer app
-  const navCategories = buildNavCategories();
+  const tNav = useTranslations("nav");
+  const navCategories = buildNavCategories(tNav);
   
   // Build userProfile from Context
   const userProfile: UserProfile | null = user ? {
@@ -219,7 +220,7 @@ export function MoreMenuSheet({
   const handleLogout = async () => {
     try {
       onOpenChange(false);
-      const response = await fetch("/api/v2/auth/sign-out", {
+      const response = await fetch(apiUrl("/api/v2/auth/sign-out"), {
         method: "POST",
       });
 
@@ -247,7 +248,7 @@ export function MoreMenuSheet({
         side="left"
         className="w-[80vw] max-w-[400px] h-full flex flex-col p-0"
       >
-        <SheetTitle className="sr-only">More Menu</SheetTitle>
+        <SheetTitle className="sr-only">{tNav("moreMenuTitle")}</SheetTitle>
 
         {/* Fixed header: avatar + profile */}
         <div className="flex-shrink-0 border-b border-border px-6 pt-6 pb-4">
@@ -256,7 +257,7 @@ export function MoreMenuSheet({
               {userProfile?.avatarUrl ? (
                 <img
                   src={userProfile.avatarUrl}
-                  alt={userProfile.name || "User"}
+                  alt={userProfile.name || tNav("userFallback")}
                   className="w-16 h-16 rounded-full object-cover border-2 border-border"
                 />
               ) : (
@@ -274,7 +275,7 @@ export function MoreMenuSheet({
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold text-foreground truncate">
-                {userProfile?.name || "User"}
+                {userProfile?.name || tNav("userFallback")}
               </h2>
               <p className="text-sm text-muted-foreground truncate">
                 {userProfile?.email || ""}
@@ -328,10 +329,10 @@ export function MoreMenuSheet({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white">
-                    Update your profile now!
+                    {tNav("updateProfileNow")}
                   </p>
                   <p className="text-xs text-white/90">
-                    Complete your profile for better experience
+                    {tNav("completeProfileForBetterExperience")}
                   </p>
                 </div>
                 <Button
@@ -381,7 +382,7 @@ export function MoreMenuSheet({
                           {item.label}
                         </span>
                         <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-                          SOON
+                          {tNav("soon")}
                         </span>
                       </div>
                     );
@@ -497,7 +498,7 @@ export function MoreMenuSheet({
                   <LogOut className="h-4 w-4 text-destructive" />
                 </div>
                 <span className="text-sm font-medium flex-1 text-left">
-                  Log out
+                  {tNav("logOut")}
                 </span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </button>

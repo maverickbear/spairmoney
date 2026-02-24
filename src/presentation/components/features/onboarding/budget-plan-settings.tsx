@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,6 +15,8 @@ import { BudgetRuleType, BudgetRuleProfile } from "@/src/domain/budgets/budget-r
 
 export function BudgetPlanSettings() {
   const { toast } = useToast();
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const [selectedBudgetRule, setSelectedBudgetRule] = useState<BudgetRuleType | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,8 +45,8 @@ export function BudgetPlanSettings() {
   async function handleSave() {
     if (!selectedBudgetRule) {
       toast({
-        title: "Please select a budget plan",
-        description: "Select a budget rule to update your settings.",
+        title: t("pleaseSelectBudgetPlan"),
+        description: t("pleaseSelectBudgetPlanDescription"),
         variant: "destructive",
       });
       return;
@@ -62,19 +65,19 @@ export function BudgetPlanSettings() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to save budget rule");
+        throw new Error(error.error || t("failedToSaveBudgetRule"));
       }
 
       toast({
-        title: "Budget plan updated",
-        description: "Your budget plan has been updated successfully.",
+        title: t("budgetPlanUpdated"),
+        description: t("budgetPlanUpdatedDescription"),
         variant: "success",
       });
     } catch (error) {
       console.error("Error saving budget rule:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save budget plan. Please try again.",
+        title: tCommon("error"),
+        description: error instanceof Error ? error.message : t("failedToSaveBudgetPlan"),
         variant: "destructive",
       });
     } finally {
@@ -100,9 +103,9 @@ export function BudgetPlanSettings() {
       <CardContent className="space-y-6">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-sm font-semibold">Expenses Rule</Label>
+            <Label className="text-sm font-semibold">{t("expensesRuleLabel")}</Label>
             <p className="text-xs text-muted-foreground">
-              Choose a budget rule that best fits your financial goals and lifestyle.
+              {t("expensesRuleDescription")}
             </p>
           </div>
           <BudgetRuleSelector
@@ -121,12 +124,12 @@ export function BudgetPlanSettings() {
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                {tCommon("saving")}
               </>
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Save Changes
+                {t("saveChanges")}
               </>
             )}
           </Button>

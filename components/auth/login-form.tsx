@@ -3,11 +3,13 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signInSchema, SignInFormData } from "@/src/domain/auth/auth.validations";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
@@ -64,7 +66,7 @@ async function preloadUserData() {
       })(),
       // Preload subscription/billing data (without limits - loaded later when needed)
       // Optimized: Stripe API call is now opt-in (includeStripe=true) for faster loading
-      fetch("/api/v2/billing/subscription", { cache: "no-store" }).then(async (r) => {
+      fetch(apiUrl("/api/v2/billing/subscription"), { cache: "no-store" }).then(async (r) => {
         if (!r.ok) return null;
         const subData = await r.json();
         if (!subData) return null;
@@ -99,6 +101,7 @@ interface LoginFormProps {
 function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("auth");
   const invitationToken = searchParams.get("invitation_token");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,15 +122,15 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
     }
     
     if (oauthError === "oauth_cancelled") {
-      setError("Sign in with Google was cancelled. Please try again.");
+      setError(t("oauthCancelled"));
     } else if (oauthError === "oauth_error") {
-      setError(errorDescription || "An error occurred during sign in with Google. Please try again.");
+      setError(errorDescription || t("oauthError"));
     } else if (oauthError === "pending_invitation") {
-      setError(errorDescription || "This email has a pending household invitation. Please accept the invitation from your email or use the invitation link to create your account.");
+      setError(errorDescription || t("pendingInvitation"));
     } else if (oauthError === "profile_creation_failed") {
-      setError(errorDescription || "We couldn't create your account. Please try again or use email sign up.");
+      setError(errorDescription || t("profileCreationFailed"));
     } else if (oauthError === "exchange_failed" || oauthError === "no_code" || oauthError === "unexpected_error") {
-      setError("Failed to complete sign in. Please try again.");
+      setError(t("signInFailed"));
     }
     
     // Clean up URL params after showing error
@@ -137,13 +140,13 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
       newUrl.searchParams.delete("error_description");
       window.history.replaceState({}, "", newUrl.toString());
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, t]);
 
 
   // Load invitation info if token is present
   useEffect(() => {
     if (invitationToken) {
-      fetch(`/api/members/invite/validate?token=${encodeURIComponent(invitationToken)}`)
+      fetch(apiUrl(`/api/members/invite/validate?token=${encodeURIComponent(invitationToken)}`))
         .then(res => res.json())
         .then(data => {
           if (data.invitation && data.owner) {
@@ -179,7 +182,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         // Browser is trusted - sign in directly without OTP
         console.log("[LOGIN] Trusted browser detected, signing in directly");
         
-        const response = await fetch("/api/auth/login-trusted", {
+        const response = await fetch(apiUrl("/api/auth/login-trusted"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -193,7 +196,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         const result = await response.json();
 
         if (!response.ok) {
-          setError(result.error || "Failed to sign in");
+          setError(result.error || t("failedToSignIn"));
           setLoading(false);
           return;
         }
@@ -201,7 +204,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         // Sign in successful - sync session and redirect
         try {
           // Sync session with server
-          await fetch("/api/auth/sync-session", {
+          await fetch(apiUrl("/api/auth/sync-session"), {
             method: "POST",
             credentials: "include",
             headers: {
@@ -215,7 +218,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
           // Check maintenance mode
           let isMaintenanceMode = false;
           try {
-            const maintenanceResponse = await fetch("/api/system-settings/public");
+            const maintenanceResponse = await fetch(apiUrl("/api/system-settings/public"));
             if (maintenanceResponse.ok) {
               const maintenanceData = await maintenanceResponse.json();
               isMaintenanceMode = maintenanceData.maintenanceMode || false;
@@ -226,7 +229,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
 
           // If maintenance mode is active, check if user is super_admin
           if (isMaintenanceMode) {
-            const response = await fetch("/api/v2/members");
+            const response = await fetch(apiUrl("/api/v2/members"));
             if (!response.ok) {
               throw new Error("Failed to fetch user role");
             }
@@ -241,7 +244,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
           // Handle invitation if present
           if (invitationToken) {
             try {
-              const acceptResponse = await fetch("/api/v2/members/accept", {
+              const acceptResponse = await fetch(apiUrl("/api/v2/members/accept"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token: invitationToken }),
@@ -264,7 +267,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
           let target = redirectTo;
           if (!target) {
             try {
-              const res = await fetch("/api/v2/members");
+              const res = await fetch(apiUrl("/api/v2/members"));
               if (res.ok) {
                 const { userRole } = await res.json();
                 target = userRole === "super_admin" ? "/admin" : "/dashboard";
@@ -282,7 +285,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
           let target = redirectTo;
           if (!target) {
             try {
-              const res = await fetch("/api/v2/members");
+              const res = await fetch(apiUrl("/api/v2/members"));
               if (res.ok) {
                 const { userRole } = await res.json();
                 target = userRole === "super_admin" ? "/admin" : "/dashboard";
@@ -298,7 +301,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         }
       } else {
         // Browser is not trusted - proceed with OTP flow
-        const response = await fetch("/api/auth/send-login-otp", {
+        const response = await fetch(apiUrl("/api/auth/send-login-otp"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -353,8 +356,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <strong>{invitationInfo.ownerName}</strong> invited you to join their household. 
-            Sign in to accept the invitation.
+            {t("invitedToHousehold", { ownerName: invitationInfo.ownerName })}
           </AlertDescription>
         </Alert>
       )}
@@ -367,7 +369,7 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-background px-2 text-muted-foreground">
-            Or
+            {t("or")}
           </span>
         </div>
       </div>
@@ -376,14 +378,14 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>{t("error")}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-1">
           <label htmlFor="email" className="text-sm font-medium text-foreground">
-            Email
+            {t("email")}
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -409,13 +411,13 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
         <div className="space-y-1">
           <div className="flex items-center justify-between">
             <label htmlFor="password" className="text-sm font-medium text-foreground">
-              Password
+              {t("password")}
             </label>
             <Link
               href="/auth/forgot-password"
               className="text-sm text-foreground hover:underline font-medium transition-colors"
             >
-              Forgot password?
+              {t("forgotPassword")}
             </Link>
           </div>
           <div className="relative">
@@ -459,21 +461,21 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Signing in...
+              {t("signingIn")}
             </>
           ) : (
-            "Sign In"
+            t("signInButton")
           )}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
-        Don't have an account?{" "}
+        {t("noAccount")}{" "}
         <Link 
           href="/auth/signup" 
           className="text-foreground hover:underline font-medium transition-colors"
         >
-          Sign up
+          {t("signUpLink")}
         </Link>
       </p>
     </div>

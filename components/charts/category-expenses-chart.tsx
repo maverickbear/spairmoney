@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { ChartCard } from "./chart-card";
 import { formatMoney } from "@/components/common/money";
@@ -17,6 +18,7 @@ interface CategoryExpensesChartProps {
 }
 
 export function CategoryExpensesChart({ data, totalIncome = 0 }: CategoryExpensesChartProps) {
+  const t = useTranslations("reports");
   const router = useRouter();
   
   // Sort data by value descending and limit to top 10
@@ -41,14 +43,14 @@ export function CategoryExpensesChart({ data, totalIncome = 0 }: CategoryExpense
   };
 
   return (
-    <ChartCard title="Top 10 expenses" description="Top 10 expenses by category">
+    <ChartCard title={t("top10ExpensesByCategory")} description={t("top10ExpensesByCategoryDescription")}>
       {chartData.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            No expenses found for this period
+            {t("noExpensesThisPeriod")}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Add transactions to see your spending breakdown
+            {t("addTransactionsToSeeBreakdown")}
           </p>
         </div>
       ) : (

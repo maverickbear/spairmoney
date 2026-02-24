@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, ArrowRight, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,9 +17,10 @@ interface CashFlowWidgetProps {
 }
 
 export function CashFlowWidget({ data, loading, error }: CashFlowWidgetProps) {
+  const t = useTranslations("dashboard");
   if (loading) {
     return (
-      <WidgetCard title="Cash Flow" compact>
+      <WidgetCard title={t("cashFlow")} compact>
         <div className="animate-pulse space-y-3">
           <div className="h-8 bg-muted rounded w-32" />
           <div className="h-4 bg-muted rounded w-24" />
@@ -29,11 +31,11 @@ export function CashFlowWidget({ data, loading, error }: CashFlowWidgetProps) {
 
   if (error) {
     return (
-      <WidgetCard title="Cash Flow" compact>
+      <WidgetCard title={t("cashFlow")} compact>
         <div className="text-xs text-muted-foreground">
           <p>Error: {error}</p>
           <Button asChild variant="outline" size="small" className="mt-3">
-            <Link href="/transactions/new">Add Transaction</Link>
+            <Link href="/transactions/new">{t("addTransaction")}</Link>
           </Button>
         </div>
       </WidgetCard>
@@ -42,12 +44,12 @@ export function CashFlowWidget({ data, loading, error }: CashFlowWidgetProps) {
 
   if (!data) {
     return (
-      <WidgetCard title="Cash Flow" compact>
+      <WidgetCard title={t("cashFlow")} compact>
         <WidgetEmptyState
-          title="Add transactions"
-          description="See income vs expenses"
+          title={t("addTransactionsTitle")}
+          description={t("seeIncomeVsExpenses")}
           primaryAction={{
-            label: "Add Transaction",
+            label: t("addTransaction"),
             href: "/transactions/new",
           }}
           icon={ArrowUpDown}
@@ -65,7 +67,7 @@ export function CashFlowWidget({ data, loading, error }: CashFlowWidgetProps) {
     : 0;
 
   return (
-    <WidgetCard title="Cash Flow" compact>
+    <WidgetCard title={t("cashFlow")} compact>
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-3">
           {/* Net Amount - Prominent */}

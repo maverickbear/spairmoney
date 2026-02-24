@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import type { BaseUser } from "@/src/domain/auth/auth.types";
+import { apiUrl } from "@/lib/utils/api-base-url";
 
 interface AuthContextValue {
   user: BaseUser | null;
@@ -51,8 +52,8 @@ export function AuthProvider({ children, initialData }: AuthProviderProps) {
   const fetchUser = useCallback(async (): Promise<{ user: BaseUser | null; isAuthenticated: boolean; role: typeof role }> => {
     try {
       const [userResponse, roleResponse] = await Promise.all([
-        fetch("/api/v2/user"),
-        fetch("/api/v2/user/role").catch(() => null), // Role is optional, don't fail if it errors
+        fetch(apiUrl("/api/v2/user")),
+        fetch(apiUrl("/api/v2/user/role")).catch(() => null), // Role is optional, don't fail if it errors
       ]);
       
       if (!userResponse.ok) {

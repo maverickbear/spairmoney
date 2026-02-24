@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { AlertCircle, RotateCcw, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ interface CancelledSubscriptionBannerProps {
 }
 
 export function CancelledSubscriptionBanner({ isSidebarCollapsed = false }: CancelledSubscriptionBannerProps) {
+  const t = useTranslations("toasts");
   const contextData = useSubscriptionSafe();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -34,7 +37,7 @@ export function CancelledSubscriptionBanner({ isSidebarCollapsed = false }: Canc
     async function fetchSubscription() {
       setChecking(true);
       try {
-        const response = await fetch("/api/v2/billing/subscription");
+        const response = await fetch(apiUrl("/api/v2/billing/subscription"));
         if (response.ok) {
           const data = await response.json();
           setSubscription(data.subscription);
@@ -71,7 +74,7 @@ export function CancelledSubscriptionBanner({ isSidebarCollapsed = false }: Canc
   async function handleReactivate() {
     try {
       setLoading(true);
-      const response = await fetch("/api/stripe/portal", {
+      const response = await fetch(apiUrl("/api/stripe/portal"), {
         method: "POST",
       });
 
@@ -81,16 +84,16 @@ export function CancelledSubscriptionBanner({ isSidebarCollapsed = false }: Canc
         window.open(data.url, "_blank");
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to open Stripe portal",
+          title: t("error"),
+          description: data.error || t("failedToOpenPortal"),
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error opening portal:", error);
       toast({
-        title: "Error",
-        description: "Failed to open Stripe portal. Please try again.",
+        title: t("error"),
+        description: t("failedToOpenPortal"),
         variant: "destructive",
       });
     } finally {

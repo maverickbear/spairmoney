@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ProgressRing } from "@/components/goals/progress-ring";
 import { formatMoney } from "@/components/common/money";
@@ -25,19 +26,20 @@ interface GoalsOverviewProps {
 }
 
 export function GoalsOverview({ goals }: GoalsOverviewProps) {
+  const t = useTranslations("dashboard");
   if (!goals || goals.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Goals Overview</CardTitle>
-          <CardDescription>Track your financial goals</CardDescription>
+          <CardTitle className="text-lg font-semibold">{t("goalsOverviewTitle")}</CardTitle>
+          <CardDescription>{t("goalsOverviewDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Target className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-4">No goals yet</p>
+            <p className="text-muted-foreground mb-4">{t("noGoalsYet")}</p>
             <Link href="/planning/budgets?tab=goals">
-              <Button variant="outline" size="medium">Create Your First Goal</Button>
+              <Button variant="outline" size="medium">{t("createYourFirstGoal")}</Button>
             </Link>
           </div>
         </CardContent>

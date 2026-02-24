@@ -2,6 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { DashboardLayout } from "./dashboard-layout";
 import { TotalBudgetsWidget } from "./widgets/total-budgets-widget";
 import { SpendingWidget } from "./widgets/spending-widget";
@@ -44,6 +46,7 @@ interface DashboardWidgetsClientProps {
  * No independent data fetching; Refresh button forces version check and refetch only if version changed.
  */
 export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientProps) {
+  const t = useTranslations("dashboard");
   const {
     data,
     loading,
@@ -58,7 +61,7 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
   const [members, setMembers] = useState<HouseholdMemberOption[]>([]);
 
   useEffect(() => {
-    fetch("/api/v2/members", { cache: "no-store" })
+    fetch(apiUrl("/api/v2/members"), { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { members: [] }))
       .then((body: { members?: HouseholdMemberOption[] }) => setMembers(body.members ?? []))
       .catch(() => setMembers([]));
@@ -91,9 +94,9 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
     return (
       <div className="w-full p-4 lg:p-8">
         <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">Error loading dashboard: {error}</p>
+          <p className="text-muted-foreground mb-4">{t("errorLoadingDashboard")}: {error}</p>
           <Button onClick={handleRefresh} variant="default">
-            Retry
+            {t("retry")}
           </Button>
         </div>
       </div>
@@ -108,13 +111,13 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
     ? members.find((m) => (m.memberId ?? m.id) === selectedMemberId)
     : null;
   const selectedDisplayName = selectedMemberId === null
-    ? "Family"
-    : (selectedMember?.name || selectedMember?.email || "Member");
+    ? t("family")
+    : (selectedMember?.name || selectedMember?.email || t("member"));
 
   return (
     <div className="w-full p-4 sm:p-5 xl:p-6 min-w-0 overflow-hidden">
       <div className="flex flex-row items-center justify-between gap-3 mb-4 xl:mb-6 min-w-0">
-        <h1 className="text-lg sm:text-xl xl:text-2xl font-bold tracking-normal min-w-0 flex-1 flex items-baseline gap-x-1 overflow-hidden" title={`${selectedDisplayName}'s finances at a glance`}>
+        <h1 className="text-lg sm:text-xl xl:text-2xl font-bold tracking-normal min-w-0 flex-1 flex items-baseline gap-x-1 overflow-hidden" title={`${selectedDisplayName}'s ${t("financesAtAGlance")}`}>
           <Select
             value={selectedMemberId ?? "everyone"}
             onValueChange={(value) => setSelectedMemberId(value === "everyone" ? null : value)}
@@ -122,15 +125,15 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
             <SelectTrigger
               className="inline-flex w-auto max-w-[50%] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal text-sentiment-positive hover:text-sentiment-positive cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate min-w-0"
               size="medium"
-              aria-label="Change whose finances to view"
+              aria-label={t("changeWhoseFinances")}
             >
               <span className="text-sentiment-positive font-bold truncate" title={selectedDisplayName}>{selectedDisplayName}&apos;s </span>
             </SelectTrigger>
             <SelectContent align="start">
-              <SelectItem value="everyone">Family</SelectItem>
+              <SelectItem value="everyone">{t("family")}</SelectItem>
               {members.map((m) => {
                 const value = m.memberId ?? m.id;
-                const label = m.name || m.email || "Member";
+                const label = m.name || m.email || t("member");
                 return (
                   <SelectItem key={value} value={value}>
                     {label}
@@ -139,18 +142,18 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
               })}
             </SelectContent>
           </Select>
-          <span className="text-foreground truncate min-w-0">finances at a glance</span>
+          <span className="text-foreground truncate min-w-0">{t("financesAtAGlance")}</span>
         </h1>
-        <Button variant="outline" size="small" onClick={handleRefresh} disabled={loading || isRefreshing} className="gap-2 shrink-0 min-h-[44px] min-w-[44px] md:min-w-0 md:min-h-0 p-0 md:px-3 md:py-2" aria-label="Refresh">
+        <Button variant="outline" size="small" onClick={handleRefresh} disabled={loading || isRefreshing} className="gap-2 shrink-0 min-h-[44px] min-w-[44px] md:min-w-0 md:min-h-0 p-0 md:px-3 md:py-2" aria-label={t("refresh")}>
           <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          <span className="hidden md:inline">Refresh</span>
+          <span className="hidden md:inline">{t("refresh")}</span>
         </Button>
       </div>
 
       <DashboardLayout>
         {/* Stats Section: 2 cols until xl, then 4 - avoids cramping on 1024px (768px content) */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 xl:gap-6 mb-4 xl:mb-6 [&>*]:min-w-0">
-           <WidgetCard title="Available" className="min-h-0 h-auto" onClick={() => setBreakdownCard("available")}>
+           <WidgetCard title={t("available")} className="min-h-0 h-auto" onClick={() => setBreakdownCard("available")}>
               {(() => {
                 const available = data.accountStats?.totalAvailable ??
                   (data.accountStats?.totalChecking ?? 0);
@@ -161,10 +164,10 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                       {formatMoney(available)}
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={card?.freeToSpend != null ? formatMoney(card.freeToSpend) : undefined}>
-                      Free <span className="font-semibold text-foreground">{card?.freeToSpend != null ? formatMoney(card.freeToSpend) : "—"}</span>
+                      {t("free")} <span className="font-semibold text-foreground">{card?.freeToSpend != null ? formatMoney(card.freeToSpend) : "—"}</span>
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={card?.projectedEndOfMonth != null ? formatMoney(card.projectedEndOfMonth) : undefined}>
-                      End of month <span className="font-semibold text-foreground">{card?.projectedEndOfMonth != null ? formatMoney(card.projectedEndOfMonth) : "—"}</span>
+                      {t("endOfMonth")} <span className="font-semibold text-foreground">{card?.projectedEndOfMonth != null ? formatMoney(card.projectedEndOfMonth) : "—"}</span>
                     </p>
                   </div>
                 );
@@ -176,7 +179,7 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
              className="min-h-0 h-auto"
              onCardClick={() => setBreakdownCard("income")}
            />
-           <WidgetCard title="Savings" className="min-h-0 h-auto" onClick={() => setBreakdownCard("savings")}>
+           <WidgetCard title={t("savings")} className="min-h-0 h-auto" onClick={() => setBreakdownCard("savings")}>
               {(() => {
                 const savings = data.accountStats?.totalSavings ?? 0;
                 const card = data.accountStats?.savingsCard;
@@ -187,19 +190,19 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">
                       {card?.savingPercentOfIncome != null
-                        ? <>Saved <span className="font-semibold text-foreground">{card.savingPercentOfIncome}%</span> this month</>
+                        ? <>{t("savedThisMonth", { percent: card.savingPercentOfIncome })}</>
                         : <span className="font-semibold text-foreground">—</span>}
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">
                       {card?.emergencyFundMonths != null
-                        ? <>Emergency fund <span className="font-semibold text-foreground">{card.emergencyFundMonths} months</span></>
-                        : <>Emergency fund <span className="font-semibold text-foreground">—</span></>}
+                        ? <>{t("emergencyFund")} <span className="font-semibold text-foreground">{card.emergencyFundMonths} {t("months")}</span></>
+                        : <>{t("emergencyFund")} <span className="font-semibold text-foreground">—</span></>}
                     </p>
                   </div>
                 );
               })()}
            </WidgetCard>
-           <WidgetCard title="Net Worth" className="min-h-0 h-auto" onClick={() => setBreakdownCard("net-worth")}>
+           <WidgetCard title={t("netWorth")} className="min-h-0 h-auto" onClick={() => setBreakdownCard("net-worth")}>
               {(() => {
                 const nw = data.netWorth;
                 const hasData = nw != null;
@@ -213,10 +216,10 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
                       {netWorthStr}
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={hasData ? formatMoney(assets) : undefined}>
-                      Assets <span className="font-semibold text-foreground">{hasData ? formatMoney(assets) : "—"}</span>
+                      {t("assets")} <span className="font-semibold text-foreground">{hasData ? formatMoney(assets) : "—"}</span>
                     </p>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate" title={hasData ? formatMoney(liabilities) : undefined}>
-                      Debt <span className="font-semibold text-foreground">{hasData ? formatMoney(liabilities) : "—"}</span>
+                      {t("debt")} <span className="font-semibold text-foreground">{hasData ? formatMoney(liabilities) : "—"}</span>
                     </p>
                   </div>
                 );

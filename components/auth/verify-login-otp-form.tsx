@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -105,6 +106,7 @@ async function preloadUserData() {
 }
 
 export function VerifyLoginOtpForm({ email, invitationToken, onBack, redirectTo }: VerifyLoginOtpFormProps) {
+  const t = useTranslations("auth");
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -723,7 +725,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack, redirectTo 
                   <HelpCircle className="w-4 h-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" title="Trusted browser" className="max-w-[280px] whitespace-normal">
+              <TooltipContent side="right" title={t("trustedBrowser")} className="max-w-[280px] whitespace-normal">
                 Only enable this on personal or trusted devices. We&apos;ll still ask for your password on future logins, but we won&apos;t require a verification code on this browser for a while.
               </TooltipContent>
             </Tooltip>

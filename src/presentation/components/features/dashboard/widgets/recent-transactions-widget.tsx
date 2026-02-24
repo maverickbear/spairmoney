@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { RecentTransactionsWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { WidgetEmptyState } from "./widget-empty-state";
@@ -14,16 +15,17 @@ interface RecentTransactionsWidgetProps {
 }
 
 export function RecentTransactionsWidget({ data, className }: RecentTransactionsWidgetProps) {
+  const t = useTranslations("dashboard");
   if (!data) return null;
 
   if (data.transactions.length === 0) {
     return (
-      <WidgetCard title="Transactions" className={className}>
+      <WidgetCard title={t("transactions")} className={className}>
         <WidgetEmptyState
-          title="Add transactions"
-          description="Record income and expenses to track your spending"
+          title={t("addTransactionsTitle")}
+          description={t("addTransactionsDescription")}
           primaryAction={{
-            label: "Add Transaction",
+            label: t("addTransaction"),
             href: "/transactions/new",
           }}
           icon={Receipt}
@@ -37,13 +39,13 @@ export function RecentTransactionsWidget({ data, className }: RecentTransactions
       href="/transactions" 
       className="flex items-center text-sm font-medium hover:underline"
     >
-      See all <ChevronRight className="ml-1 h-4 w-4" />
+      {t("seeAll")} <ChevronRight className="ml-1 h-4 w-4" />
     </Link>
   );
 
   return (
     <WidgetCard
-      title="Transactions"
+      title={t("transactions")}
       headerAction={<SeeAllLink />}
       className={className}
     >

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Sheet,
   SheetContent,
@@ -55,16 +56,17 @@ export function DashboardCardBreakdownSheet({
   cardType,
   data,
 }: DashboardCardBreakdownSheetProps) {
+  const t = useTranslations("dashboard");
   if (!cardType) return null;
 
   const title =
     cardType === "available"
-      ? "Available"
+      ? t("available")
       : cardType === "income"
-        ? "Income"
+        ? t("income")
         : cardType === "savings"
-          ? "Savings"
-          : "Net Worth";
+          ? t("savings")
+          : t("netWorth");
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -74,9 +76,9 @@ export function DashboardCardBreakdownSheet({
         aria-describedby={undefined}
       >
         <SheetHeader className="text-left pb-4 px-6 border-b border-border shrink-0">
-          <SheetTitle>{title} breakdown</SheetTitle>
+          <SheetTitle>{title} {t("breakdownSuffix")}</SheetTitle>
           <SheetDescription id={`${cardType}-breakdown-desc`}>
-            Understand where these numbers come from and what they mean.
+            {t("breakdownDescription")}
           </SheetDescription>
         </SheetHeader>
 

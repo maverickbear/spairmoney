@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,9 +25,11 @@ interface Invoice {
 
 interface PaymentHistoryProps {
   className?: string;
+  title?: string;
 }
 
-export function PaymentHistory({ className }: PaymentHistoryProps) {
+export function PaymentHistory({ className, title }: PaymentHistoryProps) {
+  const t = useTranslations("billing");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,12 +46,12 @@ export function PaymentHistory({ className }: PaymentHistoryProps) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/stripe/invoices?page=1&limit=10`, {
+      const response = await fetch(apiUrl("/api/stripe/invoices?page=1&limit=10"), {
         cache: "no-store",
       });
       
       if (!response.ok) {
-        throw new Error("Failed to fetch invoices");
+        throw new Error(t("failedToFetchInvoices"));
       }
 
       const data = await response.json();
@@ -55,11 +59,11 @@ export function PaymentHistory({ className }: PaymentHistoryProps) {
       setHasLoaded(true);
     } catch (err) {
       console.error("Error loading invoices:", err);
-      setError(err instanceof Error ? err.message : "Failed to load invoices");
+      setError(err instanceof Error ? err.message : t("failedToLoadInvoices"));
     } finally {
       setLoading(false);
     }
-  }, [hasLoaded, loading]);
+  }, [hasLoaded, loading, t]);
 
   // Load invoices when component becomes visible (lazy loading)
   useEffect(() => {
@@ -92,18 +96,24 @@ export function PaymentHistory({ className }: PaymentHistoryProps) {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      paid: { label: "Paid", variant: "default" },
-      open: { label: "Open", variant: "secondary" },
-      void: { label: "Void", variant: "outline" },
-      uncollectible: { label: "Uncollectible", variant: "destructive" },
+    const statusMap: Record<string, { labelKey: keyof typeof statusLabels; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+      paid: { labelKey: "invoiceStatusPaid", variant: "default" },
+      open: { labelKey: "invoiceStatusOpen", variant: "secondary" },
+      void: { labelKey: "invoiceStatusVoid", variant: "outline" },
+      uncollectible: { labelKey: "invoiceStatusUncollectible", variant: "destructive" },
     };
-
-    const statusInfo = statusMap[status] || { label: status, variant: "outline" as const };
+    const statusLabels = {
+      invoiceStatusPaid: t("invoiceStatusPaid"),
+      invoiceStatusOpen: t("invoiceStatusOpen"),
+      invoiceStatusVoid: t("invoiceStatusVoid"),
+      invoiceStatusUncollectible: t("invoiceStatusUncollectible"),
+    };
+    const statusInfo = statusMap[status] || { labelKey: "invoiceStatusPaid" as const, variant: "outline" as const };
+    const label = statusMap[status] ? statusLabels[statusInfo.labelKey] : status;
     
     return (
       <Badge variant={statusInfo.variant} className="text-xs bg-sentiment-positive text-white hover:bg-sentiment-positive">
-        {statusInfo.label}
+        {label}
       </Badge>
     );
   };
@@ -111,7 +121,7 @@ export function PaymentHistory({ className }: PaymentHistoryProps) {
   return (
     <Card ref={cardRef} className={className}>
       <CardHeader>
-        <CardTitle>Billing History</CardTitle>
+        <CardTitle>{title ?? t("billingHistoryDefault")}</CardTitle>
       </CardHeader>
       <CardContent>
         {!hasLoaded && !loading ? (
@@ -139,7 +149,7 @@ export function PaymentHistory({ className }: PaymentHistoryProps) {
         ) : invoices.length === 0 ? (
           <div className="flex items-center justify-center min-h-[400px] w-full">
             <div className="text-center text-muted-foreground">
-              <p>No billing history found</p>
+              <p>{t("noBillingHistoryFound")}</p>
             </div>
           </div>
         ) : (
@@ -168,7 +178,7 @@ export function PaymentHistory({ className }: PaymentHistoryProps) {
                         window.open(invoice.invoice_pdf!, "_blank");
                       }}
                       className="h-8 w-8 p-0"
-                      title="Download invoice PDF"
+                      title={t("downloadInvoicePdf")}
                     >
                       <Download className="h-4 w-4" />
                     </Button>

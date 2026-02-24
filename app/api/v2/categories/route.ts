@@ -7,11 +7,23 @@ import { getCacheHeaders } from "@/src/infrastructure/utils/cache-headers";
 import { revalidateTag } from 'next/cache';
 
 
+/** Parse locale from Accept-Language header or query (e.g. ?locale=pt). Values: en, pt, es. */
+function getLocaleFromRequest(request: NextRequest): string | undefined {
+  const queryLocale = request.nextUrl.searchParams.get("locale");
+  if (queryLocale === "en" || queryLocale === "pt" || queryLocale === "es") return queryLocale;
+  const acceptLanguage = request.headers.get("accept-language");
+  if (!acceptLanguage) return undefined;
+  const first = acceptLanguage.split(",")[0]?.trim().slice(0, 2).toLowerCase();
+  if (first === "pt" || first === "es") return first;
+  return undefined; // en or any other: use default (name column)
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const categoryId = searchParams.get("categoryId");
     const all = searchParams.get("all");
+    const locale = getLocaleFromRequest(request);
 
     const service = makeCategoriesService();
 
@@ -19,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     // If "all" parameter is present, return all categories
     if (all === "true" || all === "") {
-      const categories = await service.getAllCategories();
+      const categories = await service.getAllCategories(locale);
       return NextResponse.json(categories, { 
         status: 200,
         headers: cacheHeaders,
@@ -28,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     // If categoryId is provided, return subcategories
     if (categoryId) {
-      const subcategories = await service.getSubcategoriesByCategory(categoryId);
+      const subcategories = await service.getSubcategoriesByCategory(categoryId, locale);
       return NextResponse.json(subcategories, { 
         status: 200,
         headers: cacheHeaders,
@@ -36,7 +48,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Default: return all categories
-    const categories = await service.getAllCategories();
+    const categories = await service.getAllCategories(locale);
     return NextResponse.json(categories, { 
       status: 200,
       headers: cacheHeaders,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { RecurringWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { WidgetEmptyState } from "./widget-empty-state";
@@ -18,10 +19,10 @@ interface RecurringWidgetProps {
   className?: string;
 }
 
-const PLANNED_PAYMENTS_EMPTY_DESCRIPTION =
-  "A planned payment is a future expense or income you schedule—for example a bill, a transfer, or a one-off payment—so you can see what's coming up.";
-
 export function RecurringWidget({ data, className }: RecurringWidgetProps) {
+  const t = useTranslations("dashboard");
+  const tTx = useTranslations("transactions");
+  const tToasts = useTranslations("toasts");
   const { refresh } = useDashboardSnapshot();
   const { toast } = useToast();
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
@@ -32,10 +33,10 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
 
   if (data.items.length === 0) {
     return (
-      <WidgetCard title="Planned Payments" className={className}>
+      <WidgetCard title={t("plannedPayments")} className={className}>
         <WidgetEmptyState
-          title="No planned payments"
-          description={PLANNED_PAYMENTS_EMPTY_DESCRIPTION}
+          title={t("noPlannedPayments")}
+          description={t("plannedPaymentsEmptyDescription")}
           icon={CalendarClock}
         />
       </WidgetCard>
@@ -47,7 +48,7 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
       href="/planned-payment" 
       className="flex items-center text-sm font-medium hover:underline"
     >
-      See all <ChevronRight className="ml-1 h-4 w-4" />
+      {t("seeAll")} <ChevronRight className="ml-1 h-4 w-4" />
     </Link>
   );
 
@@ -65,7 +66,7 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
 
   return (
     <WidgetCard
-      title="Planned Payments"
+      title={t("plannedPayments")}
       headerAction={<SeeAllLink />} 
       className={className}
     >
@@ -88,8 +89,8 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
 
         <div className="space-y-4">
         {data.items.map((item) => {
-          const dueLabel = formatFriendlyDueDate(item.nextDate);
-          const isDueTomorrow = dueLabel === "Tomorrow";
+          const dueLabel = formatFriendlyDueDate(item.nextDate, t);
+          const isDueTomorrow = dueLabel === t("tomorrow");
           return (
             <Link
               key={item.id}
@@ -104,7 +105,7 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    {item.type === "income" ? "Income" : item.type === "expense" ? "Expense" : "Transfer"}
+                    {item.type === "income" ? tTx("income") : item.type === "expense" ? tTx("expense") : tTx("transfer")}
                   </TooltipContent>
                 </Tooltip>
                 <div className="flex flex-col">
@@ -139,21 +140,21 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                           }
                           await refresh(true);
                           toast({
-                            title: "Marked as paid",
-                            description: "Transaction was created.",
+                            title: t("markedAsPaid"),
+                            description: t("transactionCreatedToast"),
                             variant: "success",
                           });
                         } catch (err) {
                           toast({
-                            title: "Error",
-                            description: err instanceof Error ? err.message : "Failed to mark as paid",
+                            title: tToasts("error"),
+                            description: err instanceof Error ? err.message : t("failedToMarkAsPaid"),
                             variant: "destructive",
                           });
                         } finally {
                           setMarkingPaidId(null);
                         }
                       }}
-                      aria-label="Mark as paid"
+                      aria-label={t("markedAsPaidAria")}
                     >
                       {markingPaidId === item.id ? (
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -164,7 +165,7 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                   </TooltipTrigger>
                   <TooltipContent
                     side="left"
-                    title="Mark as paid"
+                    title={t("markedAsPaid")}
                   >
                     Creates a transaction with this payment&apos;s date, amount and account, and marks the planned payment as paid.
                   </TooltipContent>
@@ -189,21 +190,21 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                           }
                           await refresh(true);
                           toast({
-                            title: "Skipped",
-                            description: "Payment skipped. No transaction was created.",
+                            title: t("skipped"),
+                            description: t("paymentSkipped"),
                             variant: "success",
                           });
                         } catch (err) {
                           toast({
-                            title: "Error",
-                            description: err instanceof Error ? err.message : "Failed to skip",
+                            title: tToasts("error"),
+                            description: err instanceof Error ? err.message : t("failedToSkip"),
                             variant: "destructive",
                           });
                         } finally {
                           setSkippingId(null);
                         }
                       }}
-                      aria-label="Skip"
+                      aria-label={t("skipAria")}
                     >
                       {skippingId === item.id ? (
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -214,7 +215,7 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                   </TooltipTrigger>
                   <TooltipContent
                     side="left"
-                    title="Skip"
+                    title={t("skipAria")}
                   >
                     Marks this occurrence as skipped. No transaction is created. Use when you&apos;re not paying this time (e.g. skipping a month).
                   </TooltipContent>
@@ -239,21 +240,21 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                           }
                           await refresh(true);
                           toast({
-                            title: "Cancelled",
-                            description: "Payment has been cancelled.",
+                            title: t("cancelled"),
+                            description: t("paymentCancelled"),
                             variant: "success",
                           });
                         } catch (err) {
                           toast({
-                            title: "Error",
-                            description: err instanceof Error ? err.message : "Failed to cancel",
+                            title: tToasts("error"),
+                            description: err instanceof Error ? err.message : t("failedToCancel"),
                             variant: "destructive",
                           });
                         } finally {
                           setCancellingId(null);
                         }
                       }}
-                      aria-label="Cancel"
+                      aria-label={t("cancelAria")}
                     >
                       {cancellingId === item.id ? (
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -264,7 +265,7 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
                   </TooltipTrigger>
                   <TooltipContent
                     side="left"
-                    title="Cancel"
+                    title={t("cancelAria")}
                   >
                     Cancels the planned payment. No transaction is created. Use when the payment should no longer exist (e.g. subscription ended).
                   </TooltipContent>
@@ -304,26 +305,28 @@ function parseDueDate(dateStr: string): Date | null {
 
 /**
  * Format a date string (YYYY-MM-DD or "dd MMM") as user-friendly relative text.
+ * Uses t for all user-visible strings.
  */
-function formatFriendlyDueDate(dateStr: string): string {
+function formatFriendlyDueDate(
+  dateStr: string,
+  t: (key: string, values?: { count?: number }) => string
+): string {
   const due = parseDueDate(dateStr);
   if (!due) return dateStr;
   const today = new Date();
   today.setHours(12, 0, 0, 0);
   due.setHours(12, 0, 0, 0);
   const days = differenceInCalendarDays(due, today);
-  if (days < 0) return "Overdue";
-  if (isToday(due)) return "Today";
-  if (isTomorrow(due)) return "Tomorrow";
-  if (days >= 2 && days <= 6) return `In ${days} days`;
-  if (days >= 7 && days <= 13) return "Next week";
-  if (days >= 14 && days <= 20) return "In 2 weeks";
-  if (days >= 21 && days <= 27) return "In 3 weeks";
-  if (days >= 28 && days <= 60) return "In 1 month";
-  // Fallback: "28 Feb"
-  const d = due.getDate();
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${d} ${months[due.getMonth()]}`;
+  if (days < 0) return t("overdue");
+  if (isToday(due)) return t("today");
+  if (isTomorrow(due)) return t("tomorrow");
+  if (days >= 2 && days <= 6) return t("inXDays", { count: days });
+  if (days >= 7 && days <= 13) return t("nextWeek");
+  if (days >= 14 && days <= 20) return t("in2Weeks");
+  if (days >= 21 && days <= 27) return t("in3Weeks");
+  if (days >= 28 && days <= 60) return t("in1Month");
+  // Fallback: "28 Feb" (use format from date-fns - month names stay in locale via format)
+  return format(due, "d MMM");
 }
 
 function TransactionTypeIcon({ type }: { type: "income" | "expense" | "transfer" }) {

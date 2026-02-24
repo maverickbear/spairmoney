@@ -1,9 +1,11 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
 import { ChartCard } from "./chart-card";
 import { formatMoney } from "@/components/common/money";
+import { sentiment, interactive } from "@/lib/design-system/colors";
 
 interface MonthlyData {
   month: string;
@@ -16,81 +18,29 @@ interface IncomeExpensesChartProps {
   headerActions?: React.ReactNode;
 }
 
-import { sentiment, interactive } from "@/lib/design-system/colors";
-
-// Use design system colors for income (positive) and expenses (negative sentiment)
-const INCOME_COLOR = sentiment.positive; // #2F5711
-const EXPENSES_COLOR = sentiment.negative; // #A8200D
-// Lighter variants for alternating bars
-const INCOME_COLOR_LIGHT = interactive.primary; // #94DD78 - lighter green
-// Use a lighter variant of negative sentiment - mix with white for lighter red
-const EXPENSES_COLOR_LIGHT = interactive.accent; // Use accent as lighter variant, or create a lighter red
-
-// Custom tooltip component
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-lg bg-card p-3 backdrop-blur-sm">
-        <p className="mb-2 text-sm font-medium text-foreground">
-          {payload[0].payload.month}
-        </p>
-        <div className="space-y-1">
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center gap-2">
-              <div
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-xs text-muted-foreground">
-                {entry.name}:
-              </span>
-              <span className="text-sm font-semibold text-foreground">
-                {formatMoney(entry.value)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
-
-// Custom legend component
-const CustomLegend = ({ payload }: any) => {
-  const getColor = (name: string, fallbackColor: string) => {
-    if (name === "Income") return INCOME_COLOR;
-    if (name === "Expenses") return EXPENSES_COLOR;
-    return fallbackColor;
-  };
-
-  return (
-    <div className="flex items-center justify-center gap-4 pt-2">
-      {payload?.map((entry: any, index: number) => {
-        const color = getColor(entry.value, entry.color);
-        return (
-          <div key={index} className="flex items-center gap-1.5">
-            <div
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: color }}
-            />
-            <span className="text-xs text-muted-foreground">{entry.value}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+const INCOME_COLOR = sentiment.positive;
+const EXPENSES_COLOR = sentiment.negative;
+const INCOME_COLOR_LIGHT = interactive.primary;
+const EXPENSES_COLOR_LIGHT = interactive.accent;
 
 export function IncomeExpensesChart({ data, headerActions }: IncomeExpensesChartProps) {
+  const t = useTranslations("reports");
+  const incomeLabel = t("income");
+  const expensesLabel = t("expenses");
   const totalIncome = data.reduce((sum, item) => sum + item.income, 0);
   const totalExpenses = data.reduce((sum, item) => sum + item.expenses, 0);
   const netCashFlow = totalIncome - totalExpenses;
 
+  const getLegendColor = (name: string) => {
+    if (name === incomeLabel) return INCOME_COLOR;
+    if (name === expensesLabel) return EXPENSES_COLOR;
+    return "";
+  };
+
   return (
     <ChartCard 
-      title="Cash Flow" 
-      description="Income vs Expenses comparison"
+      title={t("cashFlow")} 
+      description={t("incomeVsExpenses")}
       className="overflow-hidden"
       headerActions={headerActions}
     >
@@ -100,7 +50,7 @@ export function IncomeExpensesChart({ data, headerActions }: IncomeExpensesChart
             {formatMoney(netCashFlow)}
           </div>
           <div className="text-xs font-medium text-muted-foreground">
-            Net Cash Flow
+            {t("netCashFlow")}
           </div>
         </div>
       </div>
@@ -132,11 +82,57 @@ export function IncomeExpensesChart({ data, headerActions }: IncomeExpensesChart
               return `$${value}`;
             }}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend content={<CustomLegend />} />
+          <Tooltip
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                return (
+                  <div className="rounded-lg bg-card p-3 backdrop-blur-sm">
+                    <p className="mb-2 text-sm font-medium text-foreground">
+                      {payload[0].payload.month}
+                    </p>
+                    <div className="space-y-1">
+                      {payload.map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <div
+                            className="h-3 w-3 rounded-full"
+                            style={{ backgroundColor: entry.color }}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {entry.name}:
+                          </span>
+                          <span className="text-sm font-semibold text-foreground">
+                            {formatMoney(entry.value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            }}
+          />
+          <Legend
+            content={({ payload }) => (
+              <div className="flex items-center justify-center gap-4 pt-2">
+                {payload?.map((entry: any, index: number) => {
+                  const color = getLegendColor(entry.value) || entry.color;
+                  return (
+                    <div key={index} className="flex items-center gap-1.5">
+                      <div
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-xs text-muted-foreground">{entry.value}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          />
           <Bar 
             dataKey="income" 
-            name="Income" 
+            name={incomeLabel} 
             radius={[4, 4, 0, 0]}
           >
             {data.map((entry, index) => (
@@ -148,7 +144,7 @@ export function IncomeExpensesChart({ data, headerActions }: IncomeExpensesChart
           </Bar>
           <Bar 
             dataKey="expenses" 
-            name="Expenses" 
+            name={expensesLabel} 
             radius={[4, 4, 0, 0]}
           >
             {data.map((entry, index) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
 import { getCategoryColor } from "@/lib/utils/category-colors";
@@ -16,7 +17,7 @@ export function ExpensesPieChartWidget({
   lastMonthTransactions = [],
   className,
 }: ExpensesPieChartWidgetProps) {
-  const { items, totalExpenses, insight } = useMemo(() => {
+  const { items, totalExpenses, topCategory } = useMemo(() => {
     const toCategoryTotals = (transactions: any[]) => {
       return transactions
         .filter((t) => t && t.type === "expense")
@@ -68,12 +69,13 @@ export function ExpensesPieChartWidget({
       });
 
     const topCategory = normalized[0];
-    const insightText = topCategory
-      ? `${topCategory.name} accounts for ${Math.round(topCategory.percentage)}% of your spending`
-      : "No expenses recorded yet";
-
-    return { items: normalized, totalExpenses: total, insight: insightText };
+    return { items: normalized, totalExpenses: total, topCategory };
   }, [selectedMonthTransactions, lastMonthTransactions]);
+
+  const t = useTranslations("dashboard");
+  const insightText = items.length > 0 && topCategory
+    ? t("categoryAccountsForPct", { name: topCategory.name, percent: Math.round(topCategory.percentage) })
+    : t("noExpensesRecordedYet");
 
   return (
     <Card className={`w-full max-w-full h-full ${className ?? ""}`}>
@@ -81,10 +83,10 @@ export function ExpensesPieChartWidget({
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-2">
             <CardTitle className="text-lg font-semibold">
-              Expenses by category
+              {t("expensesByCategory")}
             </CardTitle>
             <CardDescription className="text-sm">
-              Top spending areas this month
+              {t("topSpendingAreasThisMonth")}
             </CardDescription>
           </div>
         </div>
@@ -141,7 +143,7 @@ export function ExpensesPieChartWidget({
               ))}
             </div>
             <div className="text-xs text-muted-foreground">
-              {insight}
+              {insightText}
             </div>
           </div>
         )}

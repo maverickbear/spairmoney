@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Sheet,
   SheetContent,
@@ -15,10 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AccountForm } from "@/components/forms/account-form";
-import { Wallet, Loader2 } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
-import { cn } from "@/lib/utils";
 
 interface AddAccountSheetProps {
   open: boolean;
@@ -33,6 +33,7 @@ export function AddAccountSheet({
   onSuccess,
   canWrite = true,
 }: AddAccountSheetProps) {
+  const tAcc = useTranslations("accounts");
   const { toast } = useToast();
   const breakpoint = useBreakpoint();
   const isDesktop = breakpoint === "lg" || breakpoint === "xl" || breakpoint === "2xl";
@@ -41,12 +42,11 @@ export function AddAccountSheet({
   const handleManualAccountSuccess = () => {
     setShowManualForm(false);
     onOpenChange(false);
-    // Dispatch custom event to notify other components (e.g., OnboardingWidget)
     window.dispatchEvent(new CustomEvent("account-created"));
     onSuccess?.();
     toast({
-      title: "Account added",
-      description: "Your account has been added successfully.",
+      title: tAcc("accountAdded"),
+      description: tAcc("accountAddedDescription"),
       variant: "success",
     });
   };
@@ -80,9 +80,9 @@ export function AddAccountSheet({
           <Wallet className="h-5 w-5" />
         </div>
         <div className="flex-1 text-left">
-          <div className="font-semibold">Add Account Manually</div>
+          <div className="font-semibold">{tAcc("addAccountManually")}</div>
           <div className="text-sm text-muted-foreground">
-            Manually add an account
+            {tAcc("addAccountManuallyDescription")}
           </div>
         </div>
       </Button>
@@ -103,7 +103,7 @@ export function AddAccountSheet({
             className="max-w-md"
           >
             <DialogHeader>
-              <DialogTitle>Add Account</DialogTitle>
+              <DialogTitle>{tAcc("addAccount")}</DialogTitle>
             </DialogHeader>
             <div className="px-6 py-6 space-y-3">
               {content}
@@ -125,7 +125,7 @@ export function AddAccountSheet({
             </div>
 
             <SheetHeader className="text-left pb-4 border-b px-6 flex-shrink-0">
-              <SheetTitle>Add Account</SheetTitle>
+              <SheetTitle>{tAcc("addAccount")}</SheetTitle>
             </SheetHeader>
 
             <div className="px-6 py-6 space-y-3 overflow-y-auto flex-1">

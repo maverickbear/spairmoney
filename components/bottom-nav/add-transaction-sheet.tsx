@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +24,7 @@ export function AddTransactionSheet({
   open,
   onOpenChange,
 }: AddTransactionSheetProps) {
+  const t = useTranslations("transactions");
   const { limits } = useSubscriptionSafe();
   const breakpoint = useBreakpoint();
   const [isReceiptScannerOpen, setIsReceiptScannerOpen] = React.useState(false);
@@ -72,7 +74,7 @@ export function AddTransactionSheet({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="rounded-t-[20px] p-0">
           <SheetHeader className="px-6 pt-6 pb-4 border-b">
-            <SheetTitle>Add Transaction</SheetTitle>
+            <SheetTitle>{t("addTransaction")}</SheetTitle>
           </SheetHeader>
           <div className="px-6 py-4">
             <div className={showReceiptScanner ? "grid grid-cols-3 gap-3" : "grid grid-cols-1 gap-3"}>
@@ -88,9 +90,9 @@ export function AddTransactionSheet({
                       <Camera className="h-5 w-5" />
                     </div>
                     <div className="text-center">
-                      <div className="font-semibold text-xs">Take a Picture</div>
+                      <div className="font-semibold text-xs">{t("takePicture")}</div>
                       <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                        Scan receipt
+                        {t("scanReceipt")}
                       </div>
                     </div>
                   </Button>
@@ -104,9 +106,9 @@ export function AddTransactionSheet({
                       <Upload className="h-5 w-5" />
                     </div>
                     <div className="text-center">
-                      <div className="font-semibold text-xs">Upload Receipt</div>
+                      <div className="font-semibold text-xs">{t("uploadReceipt")}</div>
                       <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                        Upload image
+                        {t("uploadImage")}
                       </div>
                     </div>
                   </Button>
@@ -122,9 +124,9 @@ export function AddTransactionSheet({
                   <Plus className="h-5 w-5" />
                 </div>
                 <div className="text-center">
-                  <div className="font-semibold text-xs">Add New</div>
+                  <div className="font-semibold text-xs">{t("addNew")}</div>
                   <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                    Manual entry
+                    {t("manualEntry")}
                   </div>
                 </div>
               </Button>

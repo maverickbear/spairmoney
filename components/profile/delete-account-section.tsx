@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,6 +13,7 @@ import { DeleteAccountDialog } from "./delete-account-dialog";
 
 export function DeleteAccountSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const t = useTranslations("settings");
 
   return (
     <>
@@ -20,7 +22,7 @@ export function DeleteAccountSection() {
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Once you delete your account, there is no going back. All your data including transactions, accounts, budgets, and goals will be permanently deleted immediately. This action cannot be undone.
+              {t("deleteAccountWarning")}
             </AlertDescription>
           </Alert>
           <Button
@@ -28,7 +30,7 @@ export function DeleteAccountSection() {
             onClick={() => setDialogOpen(true)}
             className="w-full sm:w-auto"
           >
-            Delete Account
+            {t("deleteAccountButton")}
           </Button>
         </CardContent>
       </Card>

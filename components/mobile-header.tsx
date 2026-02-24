@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { apiUrl } from "@/lib/utils/api-base-url";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useState, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { LayoutDashboard, Receipt, Target, FolderTree, TrendingUp, FileText, Moon, Sun, Settings, LogOut, CreditCard, PiggyBank, Users, HelpCircle, Shield, FileText as FileTextIcon, Settings2, MessageSquare, Wallet, Calendar, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ interface MobileHeaderProps {
 export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const tNav = useTranslations("nav");
   const { theme, setTheme } = useTheme();
   
   // Use Context instead of local state and fetch
@@ -136,7 +138,7 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch("/api/v2/auth/sign-out", {
+      const response = await fetch(apiUrl("/api/v2/auth/sign-out"), {
         method: "POST",
       });
 
@@ -179,8 +181,8 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
       "/settings/billing": "Billing",
       "/settings/household": "Household",
       "/settings/categories": "Categories",
-      "/feedback": "Feedback",
-      "/help-support": "Help & Support",
+      "/feedback": tNav("feedback"),
+      "/help-support": tNav("helpSupport"),
       "/admin": "Admin",
       "/admin/dashboard": "Admin Dashboard",
       "/admin/users": "Users",

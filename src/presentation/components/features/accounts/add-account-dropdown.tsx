@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, cloneElement, isValidElement } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { AccountForm } from "@/components/forms/account-form";
 import {
@@ -23,6 +24,7 @@ export function AddAccountDropdown({
   canWrite = true,
   trigger,
 }: AddAccountDropdownProps) {
+  const tAcc = useTranslations("accounts");
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
@@ -31,8 +33,8 @@ export function AddAccountDropdown({
     window.dispatchEvent(new CustomEvent("account-created"));
     onSuccess?.();
     toast({
-      title: "Account added",
-      description: "Your account has been added successfully.",
+      title: tAcc("accountAdded"),
+      description: tAcc("accountAddedDescription"),
       variant: "success",
     });
   };
@@ -40,7 +42,7 @@ export function AddAccountDropdown({
   const defaultTrigger = (
     <Button size="medium" disabled={!canWrite} onClick={() => setOpen(true)}>
       <Plus className="h-4 w-4 mr-1.5" />
-      Add Account
+      {tAcc("addAccount")}
     </Button>
   );
 
@@ -58,7 +60,7 @@ export function AddAccountDropdown({
           className="flex flex-col w-full sm:max-w-[32.2rem] !p-0 h-full"
         >
           <SheetHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border text-left">
-            <SheetTitle>Add Account</SheetTitle>
+            <SheetTitle>{tAcc("addAccount")}</SheetTitle>
           </SheetHeader>
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <AccountForm

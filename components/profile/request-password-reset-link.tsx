@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mail, Loader2, CheckCircle2 } from "lucide-react";
@@ -14,6 +15,9 @@ export function RequestPasswordResetLink() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const { toast } = useToast();
+  const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
+  const tAuth = useTranslations("auth");
 
   async function handleSendLink() {
     try {
@@ -29,8 +33,8 @@ export function RequestPasswordResetLink() {
 
       if (!response.ok) {
         toast({
-          title: "Error",
-          description: result.error || "Failed to send the link",
+          title: tCommon("error"),
+          description: result.error || t("failedToSendPasswordLink"),
           variant: "destructive",
         });
         setLoading(false);
@@ -39,14 +43,14 @@ export function RequestPasswordResetLink() {
 
       setSent(true);
       toast({
-        title: "Check your email",
-        description: "We sent you a link to change your password. Open the link and set a new password.",
+        title: t("checkEmailForPasswordLink"),
+        description: t("passwordLinkSentDescription"),
         variant: "success",
       });
     } catch {
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
+        title: tCommon("error"),
+        description: tAuth("unexpectedError"),
         variant: "destructive",
       });
     } finally {
@@ -58,7 +62,7 @@ export function RequestPasswordResetLink() {
     <Card className="h-fit border-0">
       <CardContent className="pt-0 space-y-4">
         <p className="text-sm text-muted-foreground">
-          We will send a secure link to your email. Open the link and set your new password there—no need to enter your current password.
+          {t("passwordResetLinkDescription")}
         </p>
         <Button
           type="button"
@@ -71,17 +75,17 @@ export function RequestPasswordResetLink() {
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Sending...
+              {t("sendingLink")}
             </>
           ) : sent ? (
             <>
               <CheckCircle2 className="mr-2 h-4 w-4" />
-              Link sent
+              {t("linkSent")}
             </>
           ) : (
             <>
               <Mail className="mr-2 h-4 w-4" />
-              Send me a link to change my password
+              {t("sendPasswordResetLink")}
             </>
           )}
         </Button>

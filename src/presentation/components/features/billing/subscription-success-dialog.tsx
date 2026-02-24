@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,8 @@ export function SubscriptionSuccessDialog({
   onSuccess,
 }: SubscriptionSuccessDialogProps) {
   const router = useRouter();
+  const t = useTranslations("subscriptionSuccess");
+  const locale = useLocale();
   const { subscription, refetch, checking } = useSubscriptionContext();
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -186,18 +189,18 @@ export function SubscriptionSuccessDialog({
             </div>
           </div>
           <DialogTitle className="text-2xl mb-2">
-            {isLoading 
-              ? "Confirming your subscription..." 
-              : subscriptionStatus === "trialing" 
-                ? "Trial Started Successfully!" 
-                : "Subscription Successful!"}
+            {isLoading
+              ? t("titleConfirming")
+              : subscriptionStatus === "trialing"
+                ? t("titleTrial")
+                : t("titleSuccess")}
           </DialogTitle>
           <DialogDescription className="text-base">
-            {isLoading 
-              ? "Please wait while we confirm your subscription."
-              : subscriptionStatus === "trialing" 
-                ? "Your 30-day trial has started. Start exploring all pro features!"
-                : "Thank you for subscribing. Your account has been upgraded."}
+            {isLoading
+              ? t("descriptionConfirming")
+              : subscriptionStatus === "trialing"
+                ? t("descriptionTrial")
+                : t("descriptionSuccess")}
           </DialogDescription>
         </DialogHeader>
 
@@ -205,48 +208,50 @@ export function SubscriptionSuccessDialog({
           <Card className="border-0 shadow-none">
             <CardContent className="space-y-6 pt-0">
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <h3 className="font-semibold text-sm">What&apos;s next?</h3>
+                <h3 className="font-semibold text-sm">{t("whatsNext")}</h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   {subscriptionStatus === "trialing" ? (
                     <>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
-                        <span>Your 30-day trial is active and you have access to all pro features</span>
+                        <span>{t("trialBullet1")}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
-                        <span>You'll only be charged after your trial ends. Cancel anytime—your plan stays active until the end of your billing cycle.</span>
+                        <span>{t("trialBullet2")}</span>
                       </li>
                       {trialEndDate && (
                         <li className="flex items-start gap-2">
                           <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                           <span>
-                            Your trial ends on {new Date(trialEndDate).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
+                            {t("trialEndsOn", {
+                              date: new Date(trialEndDate).toLocaleDateString(locale, {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              }),
                             })}
                           </span>
                         </li>
                       )}
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
-                        <span>You can add a payment method anytime from your billing settings</span>
+                        <span>{t("trialBullet4")}</span>
                       </li>
                     </>
                   ) : (
                     <>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
-                        <span>Your subscription is now active and you have access to all pro features</span>
+                        <span>{t("subBullet1")}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
-                        <span>You can manage your subscription anytime from your billing settings</span>
+                        <span>{t("subBullet2")}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
-                        <span>A confirmation email has been sent to your email address</span>
+                        <span>{t("subBullet3")}</span>
                       </li>
                     </>
                   )}
@@ -259,7 +264,7 @@ export function SubscriptionSuccessDialog({
                   className="flex-1 w-full"
                   size="medium"
                 >
-                  Go to Dashboard
+                  {t("goToDashboard")}
                 </Button>
                 <Button
                   onClick={handleGoToBilling}
@@ -267,12 +272,12 @@ export function SubscriptionSuccessDialog({
                   className="flex-1 w-full"
                   size="medium"
                 >
-                  View Billing
+                  {t("viewBilling")}
                 </Button>
               </div>
 
               <p className="text-xs text-center text-muted-foreground">
-                If you have any questions, please contact our support team.
+                {t("contactSupport")}
               </p>
             </CardContent>
           </Card>
