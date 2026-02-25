@@ -10,6 +10,7 @@ import { useInView } from "@/hooks/use-in-view";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiUrl } from "@/lib/utils/api-base-url";
+import { trackLandingClick } from "@/lib/analytics/landing-events";
 
 const INCLUDED_KEYS = [
   "unlimitedAccounts",
@@ -93,7 +94,10 @@ export function PricingSection() {
                   type="button"
                   variant={interval === "month" ? "default" : "ghost"}
                   size="medium"
-                  onClick={() => setInterval("month")}
+                  onClick={() => {
+                    setInterval("month");
+                    trackLandingClick({ section: "pricing", link_id: "pricing_toggle_monthly" });
+                  }}
                   className={interval === "month" ? "shadow-sm" : ""}
                 >
                   {t("monthly")}
@@ -102,7 +106,10 @@ export function PricingSection() {
                   type="button"
                   variant={interval === "year" ? "default" : "ghost"}
                   size="medium"
-                  onClick={() => setInterval("year")}
+                  onClick={() => {
+                    setInterval("year");
+                    trackLandingClick({ section: "pricing", link_id: "pricing_toggle_yearly" });
+                  }}
                   className={cn("flex items-center gap-2", interval === "year" && "shadow-sm")}
                 >
                   {t("yearly")}
@@ -147,6 +154,7 @@ export function PricingSection() {
               size="large"
               className="mt-8 w-full bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => {
+                trackLandingClick({ section: "pricing", link_id: "cta_start_trial", destination: "/auth/signup", interval });
                 setLandingPlan(PRO_PLAN_ID, interval);
                 router.push(`/auth/signup?planId=${PRO_PLAN_ID}&interval=${interval}`);
               }}

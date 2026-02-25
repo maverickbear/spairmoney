@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useInView } from "@/hooks/use-in-view";
 import { cn } from "@/lib/utils";
+import { trackLandingClick } from "@/lib/analytics/landing-events";
 
 export function CTASection() {
   const { ref, inView } = useInView();
@@ -28,7 +29,12 @@ export function CTASection() {
           size="large"
           className="mt-8 bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform"
         >
-          <Link href="/auth/signup">Reveal My Spending Today</Link>
+          <Link
+            href="/auth/signup"
+            onClick={() => trackLandingClick({ section: "cta", link_id: "cta_reveal_spending", destination: "/auth/signup" })}
+          >
+            Reveal My Spending Today
+          </Link>
         </Button>
       </div>
     </section>

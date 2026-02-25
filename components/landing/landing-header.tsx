@@ -12,6 +12,7 @@ import { useAuthSafe } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabase";
 import { LocaleSwitcher } from "@/components/common/locale-switcher";
 import { apiUrl } from "@/lib/utils/api-base-url";
+import { trackLandingClick } from "@/lib/analytics/landing-events";
 
 const NAV_LINK_KEYS = [
   { key: "home" as const, href: "/" },
@@ -62,7 +63,12 @@ export function LandingHeader() {
       >
         <nav className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
           <div className="flex items-center justify-between h-16 md:h-[72px]">
-            <Link href="/" className="flex items-center shrink-0" aria-label="Spair Money home">
+            <Link
+              href="/"
+              className="flex items-center shrink-0"
+              aria-label="Spair Money home"
+              onClick={() => trackLandingClick({ section: "header", link_id: "nav_home", destination: "/" })}
+            >
               <Logo variant="icon" color="auto" width={32} height={32} className="md:hidden" />
               <Logo variant="full" color="auto" width={140} height={32} className="hidden md:block" />
             </Link>
@@ -74,7 +80,10 @@ export function LandingHeader() {
                     <Link
                       href={item.href}
                       className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setMobileOpen(false)}
+                      onClick={() => {
+                        setMobileOpen(false);
+                        trackLandingClick({ section: "header", link_id: `nav_${item.key}`, destination: item.href });
+                      }}
                     >
                       {t(`nav.${item.key}`)}
                     </Link>
@@ -88,19 +97,32 @@ export function LandingHeader() {
               {isConsumer ? (
                 <>
                   <Button asChild variant="ghost" size="medium" className="hidden sm:inline-flex text-muted-foreground">
-                    <Link href="/dashboard">{t("dashboard")}</Link>
+                    <Link href="/dashboard" onClick={() => trackLandingClick({ section: "header", link_id: "header_dashboard", destination: "/dashboard" })}>
+                      {t("dashboard")}
+                    </Link>
                   </Button>
-                  <Button variant="ghost" size="medium" onClick={handleLogout}>
+                  <Button
+                    variant="ghost"
+                    size="medium"
+                    onClick={() => {
+                      trackLandingClick({ section: "header", link_id: "header_logout" });
+                      handleLogout();
+                    }}
+                  >
                     {t("logOut")}
                   </Button>
                 </>
               ) : (
                 <>
                   <Button asChild variant="outline" size="medium" className="hidden sm:inline-flex">
-                    <Link href="/auth/login">{t("signIn")}</Link>
+                    <Link href="/auth/login" onClick={() => trackLandingClick({ section: "header", link_id: "header_sign_in", destination: "/auth/login" })}>
+                      {t("signIn")}
+                    </Link>
                   </Button>
                   <Button asChild size="medium" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform">
-                    <Link href="/auth/signup">{t("startTrial")}</Link>
+                    <Link href="/auth/signup" onClick={() => trackLandingClick({ section: "header", link_id: "header_start_trial", destination: "/auth/signup" })}>
+                      {t("startTrial")}
+                    </Link>
                   </Button>
                 </>
               )}
@@ -127,7 +149,10 @@ export function LandingHeader() {
                 <Link
                   href={item.href}
                   className="text-base font-medium text-foreground"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={() => {
+                    setMobileOpen(false);
+                    trackLandingClick({ section: "header", link_id: `nav_${item.key}`, destination: item.href });
+                  }}
                 >
                   {t(`nav.${item.key}`)}
                 </Link>
@@ -142,19 +167,52 @@ export function LandingHeader() {
               {isConsumer ? (
                 <>
                   <Button asChild variant="outline" size="medium" className="w-full">
-                    <Link href="/dashboard" onClick={() => setMobileOpen(false)}>{t("dashboard")}</Link>
+                    <Link
+                      href="/dashboard"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        trackLandingClick({ section: "header", link_id: "header_dashboard", destination: "/dashboard" });
+                      }}
+                    >
+                      {t("dashboard")}
+                    </Link>
                   </Button>
-                  <Button variant="outline" size="medium" className="w-full" onClick={() => { setMobileOpen(false); handleLogout(); }}>
+                  <Button
+                    variant="outline"
+                    size="medium"
+                    className="w-full"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      trackLandingClick({ section: "header", link_id: "header_logout" });
+                      handleLogout();
+                    }}
+                  >
                     {t("logOut")}
                   </Button>
                 </>
               ) : (
                 <>
                   <Button asChild variant="outline" size="medium" className="w-full">
-                    <Link href="/auth/login" onClick={() => setMobileOpen(false)}>{t("signIn")}</Link>
+                    <Link
+                      href="/auth/login"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        trackLandingClick({ section: "header", link_id: "header_sign_in", destination: "/auth/login" });
+                      }}
+                    >
+                      {t("signIn")}
+                    </Link>
                   </Button>
                   <Button asChild size="medium" className="w-full bg-primary text-primary-foreground">
-                    <Link href="/auth/signup" onClick={() => setMobileOpen(false)}>{t("startTrial")}</Link>
+                    <Link
+                      href="/auth/signup"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        trackLandingClick({ section: "header", link_id: "header_start_trial", destination: "/auth/signup" });
+                      }}
+                    >
+                      {t("startTrial")}
+                    </Link>
                   </Button>
                 </>
               )}

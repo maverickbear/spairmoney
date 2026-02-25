@@ -4,6 +4,7 @@ import { useState, useEffect, Fragment } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Link as I18nLink } from "@/i18n/navigation";
+import { trackLandingClick } from "@/lib/analytics/landing-events";
 
 const FOOTER_LINKS = [
   { key: "features" as const, href: "#features" },
@@ -34,6 +35,7 @@ export function LandingFooter() {
                   <Link
                     href={href}
                     className="text-sm text-white hover:underline transition-colors"
+                    onClick={() => trackLandingClick({ section: "footer", link_id: `footer_${key}`, destination: href })}
                   >
                     {t(key)}
                   </Link>
@@ -41,6 +43,7 @@ export function LandingFooter() {
                   <I18nLink
                     href={href}
                     className="text-sm text-white hover:underline transition-colors"
+                    onClick={() => trackLandingClick({ section: "footer", link_id: `footer_${key}`, destination: href })}
                   >
                     {t(key)}
                   </I18nLink>

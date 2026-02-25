@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { LandingImage } from "./landing-image";
 import { useInView } from "@/hooks/use-in-view";
 import { cn } from "@/lib/utils";
+import { trackLandingClick } from "@/lib/analytics/landing-events";
 
 export function HeroSection() {
   const t = useTranslations("landing.hero");
@@ -29,10 +30,20 @@ export function HeroSection() {
                 size="large"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform"
               >
-                <Link href="/auth/signup">{t("ctaReveal")}</Link>
+                <Link
+                  href="/auth/signup"
+                  onClick={() => trackLandingClick({ section: "hero", link_id: "cta_start_trial", destination: "/auth/signup" })}
+                >
+                  {t("ctaReveal")}
+                </Link>
               </Button>
               <Button asChild variant="outline" size="large">
-                <Link href="#features">{t("ctaHowItWorks")}</Link>
+                <Link
+                  href="#features"
+                  onClick={() => trackLandingClick({ section: "hero", link_id: "cta_how_it_works", destination: "#features" })}
+                >
+                  {t("ctaHowItWorks")}
+                </Link>
               </Button>
             </div>
           </div>
