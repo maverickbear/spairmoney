@@ -44,12 +44,7 @@ export function FeatureSpotlightSection({
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           <div className={cn("relative w-full", reverse && "lg:order-2")}>
-            <div
-              className={cn(
-                "relative mx-auto rounded-[32px] bg-[#f8f4f1] overflow-hidden",
-                fullView ? "aspect-video max-w-2xl w-full" : "aspect-[4/3] max-w-lg w-full"
-              )}
-            >
+            <div className="relative mx-auto rounded-[32px] bg-[#f8f4f1] overflow-hidden aspect-[4/3] max-w-lg w-full">
               <LandingImage
                 src={image}
                 alt={imageAlt}
