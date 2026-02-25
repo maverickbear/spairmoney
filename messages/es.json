@@ -1445,6 +1445,23 @@
       "makeBetterUseDescription": "Obtén información financiera completa y precisa. Centraliza tus datos y crea los informes que necesitas.",
       "viewDataSchema": "Ver esquema de datos"
     },
+    "trialBanner": {
+      "onTrial": "Estás en la prueba Pro de 30 días.",
+      "daysLeft": "{count} días restantes",
+      "urgencyMessage": "Solo quedan {count} días de tu prueba.",
+      "urgencySubtext": "Suscríbete ahora para mantener el acceso completo.",
+      "subscribeNow": "Suscribirse ahora",
+      "trialEnded": "Tu prueba ha terminado.",
+      "chooseBillingPeriod": "Elige el periodo de facturación y suscríbete para mantener el acceso.",
+      "monthly": "Mensual",
+      "annual": "Anual",
+      "subscribe": "Suscribirse",
+      "manageBilling": "Gestionar facturación",
+      "loading": "Cargando...",
+      "error": "Error",
+      "noPlans": "No hay planes disponibles.",
+      "checkoutFailed": "No se pudo iniciar el checkout."
+    },
     "upgradeDialog": {
       "subscribeTitle": "Suscríbete a Pro",
       "subscribeDescription": "Control total de tu dinero con el plan Pro. Empieza tu prueba gratuita de 30 días.",

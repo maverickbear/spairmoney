@@ -6,9 +6,8 @@ import { unstable_noStore as noStore } from "next/cache";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { makeAdminService } from "@/src/application/admin/admin.factory";
 import { verifyUserExists } from "@/lib/utils/verify-user-exists";
-import { SubscriptionGuard } from "@/components/subscription-guard";
-import { SubscriptionProvider } from "@/contexts/subscription-context";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { ProtectedDashboardShell } from "@/src/presentation/components/layout/protected-dashboard-shell";
 import type { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 // CRITICAL: Use static import to ensure React cache() works correctly
 import { getDashboardSubscription } from "@/src/application/subscriptions/get-dashboard-subscription";
@@ -44,11 +43,11 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // PERFORMANCE OPTIMIZATION: Combine user verification and data fetching into single query
-  let userData: { id: string; isBlocked: boolean; role: string } | null = null;
+  let userData: { id: string; isBlocked: boolean; role: string; trialEndsAt: string | null } | null = null;
   try {
     let { data, error: userError } = await supabase
       .from("users")
-      .select("id, is_blocked, role")
+      .select("id, is_blocked, role, trial_ends_at")
       .eq("id", currentUser.id)
       .single();
 
@@ -68,7 +67,7 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
         if (profileResult.success) {
           const { data: newUser, error: refetchError } = await supabase
             .from("users")
-            .select("id, is_blocked, role")
+            .select("id, is_blocked, role, trial_ends_at")
             .eq("id", currentUser.id)
             .single();
           if (!refetchError && newUser) {
@@ -98,6 +97,7 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
       id: data!.id,
       isBlocked: data!.is_blocked,
       role: data!.role,
+      trialEndsAt: (data as { trial_ends_at?: string | null }).trial_ends_at ?? null,
     };
   } catch (error) {
     log.error("Error fetching user data:", error);
@@ -157,9 +157,10 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
     
     // Note: SubscriptionsService already handles household member subscription inheritance
     // No need for manual retry - the service checks household membership internally
-    // If no subscription, require user to choose a plan (pricing modal blocks access)
+    // If no subscription (new user, trial active, or trial ended): never open blocking modal;
+    // the trial banner handles the CTA (Subscribe Now or choose monthly/annual when trial ended).
     if (!subscription) {
-      shouldOpenModal = true;
+      shouldOpenModal = false;
       reason = "no_subscription";
     } else {
       // Check if subscription status allows access
@@ -212,17 +213,21 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
         ? (subscription.status as "cancelled" | "past_due" | "unpaid")
         : null;
 
+  const trialEndsAt = userData?.trialEndsAt ?? null;
+
   return (
-    <SubscriptionProvider initialData={{ subscription, plan }}>
+    <ProtectedDashboardShell
+      subscription={subscription}
+      plan={plan}
+      trialEndsAt={trialEndsAt}
+      shouldOpenModal={shouldOpenModal}
+      reason={reason}
+      currentPlanId={currentPlanId}
+      currentInterval={currentInterval}
+      subscriptionStatus={subscriptionStatus}
+    >
       {children}
-      <SubscriptionGuard 
-        shouldOpenModal={shouldOpenModal} 
-        reason={reason}
-        currentPlanId={currentPlanId}
-        currentInterval={currentInterval}
-        subscriptionStatus={subscriptionStatus}
-      />
-    </SubscriptionProvider>
+    </ProtectedDashboardShell>
   );
 }
 

@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getNavSections, type NavSection } from "@/src/presentation/config/navigation.config";
+import { ProTrialBanner } from "@/src/presentation/components/features/billing/pro-trial-banner";
 
 // Context for sidebar collapsed state
 const SidebarContext = createContext<{
@@ -247,6 +248,13 @@ function NavComponent() {
                 );
               })}
             </nav>
+
+            {/* Trial banner card - above user avatar, only when sidebar expanded */}
+            {!isCollapsed && (
+              <div className="shrink-0 px-3 pb-0">
+                <ProTrialBanner variant="sidebar" />
+              </div>
+            )}
 
             {/* User Menu Client Island - handles all user/subscription UI */}
             <UserMenuClient isCollapsed={isCollapsed} />

@@ -7,10 +7,8 @@ import { usePathnameSafe } from "@/hooks/use-pathname-safe";
 import { logger } from "@/src/infrastructure/utils/logger";
 import { getRouteInfo } from "@/src/presentation/utils/route-utils";
 import { useLayoutFixed } from "@/src/presentation/hooks/use-layout-fixed";
-import { useSidebarState } from "@/src/presentation/hooks/use-sidebar-state";
 import { useProfilePreload } from "@/src/presentation/hooks/use-profile-preload";
 import { PublicLayout } from "@/src/presentation/components/layout/public-layout";
-import { DashboardLayout } from "@/src/presentation/components/layout/dashboard-layout";
 
 export const LayoutWrapper = memo(function LayoutWrapper({
   children,
@@ -35,9 +33,6 @@ export const LayoutWrapper = memo(function LayoutWrapper({
   // Determine route types using centralized utility
   const routeInfo = useMemo(() => getRouteInfo(pathname), [pathname]);
   const { isApiRoute, isPublicPage, isWelcomePage, isDashboardRoute, isAdminRoute } = routeInfo;
-  
-  // Manage sidebar state
-  const { isSidebarCollapsed } = useSidebarState();
   
   // Headers scroll with the page; body is allowed to scroll (no layout-fixed).
   useLayoutFixed(false);
@@ -96,16 +91,8 @@ export const LayoutWrapper = memo(function LayoutWrapper({
     return <PublicLayout hasSubscription={false}>{children}</PublicLayout>;
   }
 
-  // Normal dashboard layout for users with subscription or optimistically for dashboard routes
-  const showNav = hasSubscription || isDashboardRoute;
-
-  return (
-    <DashboardLayout
-      isSidebarCollapsed={isSidebarCollapsed}
-      hasSubscription={showNav}
-    >
-      {children}
-    </DashboardLayout>
-  );
+  // Protected dashboard: layout already renders ProtectedDashboardShell
+  // (trial banner above everything + DashboardLayout), so just pass through.
+  return <>{children}</>;
 });
 

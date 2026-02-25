@@ -6,18 +6,19 @@ Manages the app’s **paid subscription** via Stripe: plans, checkout, customer 
 
 ## User Flows
 
+- **New users:** After signup, users get a 30-day **app trial** (stored in `users.trial_ends_at`). No Stripe subscription is created until they click **Subscribe Now**. They can use the app immediately; a small **trial banner** at the top shows days left and a Subscribe Now button. When 2 days or less remain, the banner shows an urgency message. When the trial ends (or for existing users with no subscription), the same banner shows **billing period choice** (Monthly/Annual) and a Subscribe button that creates a Stripe Checkout Session. The blocking "Subscribe to Pro" dialog is shown only for **reactivation** (cancelled, past_due, unpaid), not for new users or trial-ended users.
 - View current plan and billing status on settings/billing.
 - Upgrade or change plan (redirect to Stripe Checkout or use Stripe Elements).
 - Manage subscription (update payment method, cancel, etc.) via Stripe Customer Portal (link from app).
 - Revalidate: after Stripe webhook or portal return, app revalidates subscription state.
 - Pause subscription (Stripe); resume when ready.
-- See trial celebration or paywall when applicable (dashboard, settings).
+- See trial celebration when applicable (dashboard, settings).
 
 ## Behavior / Logic
 
 - **Subscription state:** The app keeps a local copy of subscription state (user_subscriptions); Stripe is the source of truth. Webhooks and the revalidate endpoint update local state after checkout, portal, or lifecycle events (e.g. cancelled, paused).
 - **Feature access:** SubscriptionContext exposes plan and status; plan-features-service and decision services determine what’s allowed (e.g. account limit, reports, goals). Components use selectors from context; no business logic in UI.
-- **Trial:** Trial start/end is handled in trial service and Stripe; trial celebration and paywalls are shown based on subscription state. Pause/resume (Stripe subscription) is exposed via subscriptions API; Resend segments are updated on lifecycle (active vs cancelled).
+- **Trial:** New users receive a 30-day local trial (`users.trial_ends_at` set on signup); no Stripe subscription until they click Subscribe Now in the trial banner. The **Pro trial banner** (`ProTrialBanner`) shows: active trial (days left + Subscribe Now), urgency when ≤2 days left, or trial-ended/no-subscription state with Monthly/Annual choice and Subscribe. After subscribing via the banner, Stripe Checkout creates the subscription and webhooks update local state. Stripe trialing and trial celebration are shown based on subscription state. Pause/resume (Stripe subscription) is exposed via subscriptions API; Resend segments are updated on lifecycle (active vs cancelled).
 
 ## Key Routes / Pages
 
@@ -25,7 +26,7 @@ Manages the app’s **paid subscription** via Stripe: plans, checkout, customer 
 - `app/subscription/success/page.tsx` – Post-checkout success.
 - `contexts/subscription-context.tsx` – Subscription state; components use selectors.
 - `src/presentation/components/features/billing/subscription-success-dialog.tsx`.
-- Components: `BlockedFeature`, `CancelledSubscriptionBanner`, `PausedSubscriptionBanner` (from subscriptions feature).
+- Components: `BlockedFeature`, `CancelledSubscriptionBanner`, `PausedSubscriptionBanner` (from subscriptions feature), `ProTrialBanner` (trial banner with Subscribe Now / billing period choice).
 
 ## API
 

@@ -30,5 +30,6 @@ export const mockUserRow: UserRow = {
   role: "admin",
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
+  trial_ends_at: null,
 };
 

@@ -1582,6 +1582,23 @@
       "makeBetterUseDescription": "Get complete and accurate financial insights. Centralize your data and create the reports you need to make informed decisions.",
       "viewDataSchema": "View data schema"
     },
+    "trialBanner": {
+      "onTrial": "You're on a 30-day Pro trial.",
+      "daysLeft": "{count} days left",
+      "urgencyMessage": "Only {count} days left in your trial.",
+      "urgencySubtext": "Subscribe now to keep full access.",
+      "subscribeNow": "Subscribe Now",
+      "trialEnded": "Your trial has ended.",
+      "chooseBillingPeriod": "Choose your billing period and subscribe to keep access.",
+      "monthly": "Monthly",
+      "annual": "Annual",
+      "subscribe": "Subscribe",
+      "manageBilling": "Manage billing",
+      "loading": "Loading...",
+      "error": "Error",
+      "noPlans": "No plans available.",
+      "checkoutFailed": "Could not start checkout."
+    },
     "upgradeDialog": {
       "subscribeTitle": "Subscribe to Pro",
       "subscribeDescription": "Get full control of your money with the Pro plan. Start your 30-day free trial.",

@@ -141,9 +141,9 @@ export function LandingHeader() {
       </header>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="right" className="w-[280px]">
+        <SheetContent side="right" className="w-[280px] p-4 flex flex-col">
           <SheetTitle className="sr-only">Menu</SheetTitle>
-          <ul className="flex flex-col gap-4 pt-8">
+          <ul className="flex flex-col gap-4 pt-8 flex-1">
             {NAV_LINK_KEYS.map((item) => (
               <li key={item.key}>
                 <Link
@@ -163,61 +163,61 @@ export function LandingHeader() {
                 <LocaleSwitcher variant="short" />
               </div>
             </li>
-            <li className="pt-4 border-t border-border flex flex-col gap-2">
-              {isConsumer ? (
-                <>
-                  <Button asChild variant="outline" size="medium" className="w-full">
-                    <Link
-                      href="/dashboard"
-                      onClick={() => {
-                        setMobileOpen(false);
-                        trackLandingClick({ section: "header", link_id: "header_dashboard", destination: "/dashboard" });
-                      }}
-                    >
-                      {t("dashboard")}
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="medium"
-                    className="w-full"
+          </ul>
+          <footer className="pt-4 mt-auto border-t border-border flex flex-col gap-2">
+            {isConsumer ? (
+              <>
+                <Button asChild variant="outline" size="medium" className="w-full">
+                  <Link
+                    href="/dashboard"
                     onClick={() => {
                       setMobileOpen(false);
-                      trackLandingClick({ section: "header", link_id: "header_logout" });
-                      handleLogout();
+                      trackLandingClick({ section: "header", link_id: "header_dashboard", destination: "/dashboard" });
                     }}
                   >
-                    {t("logOut")}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button asChild variant="outline" size="medium" className="w-full">
-                    <Link
-                      href="/auth/login"
-                      onClick={() => {
-                        setMobileOpen(false);
-                        trackLandingClick({ section: "header", link_id: "header_sign_in", destination: "/auth/login" });
-                      }}
-                    >
-                      {t("signIn")}
-                    </Link>
-                  </Button>
-                  <Button asChild size="medium" className="w-full bg-primary text-primary-foreground">
-                    <Link
-                      href="/auth/signup"
-                      onClick={() => {
-                        setMobileOpen(false);
-                        trackLandingClick({ section: "header", link_id: "header_start_trial", destination: "/auth/signup" });
-                      }}
-                    >
-                      {t("startTrial")}
-                    </Link>
-                  </Button>
-                </>
-              )}
-            </li>
-          </ul>
+                    {t("dashboard")}
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="medium"
+                  className="w-full"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    trackLandingClick({ section: "header", link_id: "header_logout" });
+                    handleLogout();
+                  }}
+                >
+                  {t("logOut")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="outline" size="medium" className="w-full">
+                  <Link
+                    href="/auth/login"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      trackLandingClick({ section: "header", link_id: "header_sign_in", destination: "/auth/login" });
+                    }}
+                  >
+                    {t("signIn")}
+                  </Link>
+                </Button>
+                <Button asChild size="medium" className="w-full bg-primary text-primary-foreground">
+                  <Link
+                    href="/auth/signup"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      trackLandingClick({ section: "header", link_id: "header_start_trial", destination: "/auth/signup" });
+                    }}
+                  >
+                    {t("startTrial")}
+                  </Link>
+                </Button>
+              </>
+            )}
+          </footer>
         </SheetContent>
       </Sheet>
     </>

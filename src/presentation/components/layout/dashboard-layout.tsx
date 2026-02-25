@@ -25,7 +25,7 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar - Fixed Left (full height, desktop only) */}
+      {/* Sidebar - Fixed Left (trial banner lives inside nav above user avatar) */}
       <Suspense fallback={<div className="w-64 lg:w-16 border-r bg-card" />}>
         <Nav />
       </Suspense>

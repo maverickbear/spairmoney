@@ -1582,6 +1582,23 @@
       "makeBetterUseDescription": "Obtenha insights financeiros completos e precisos. Centralize seus dados e crie os relatórios que você precisa.",
       "viewDataSchema": "Ver esquema de dados"
     },
+    "trialBanner": {
+      "onTrial": "Você está no trial Pro de 30 dias.",
+      "daysLeft": "{count} dias restantes",
+      "urgencyMessage": "Só restam {count} dias do seu trial.",
+      "urgencySubtext": "Assine agora para manter o acesso completo.",
+      "subscribeNow": "Assinar agora",
+      "trialEnded": "Seu trial terminou.",
+      "chooseBillingPeriod": "Escolha o período de cobrança e assine para manter o acesso.",
+      "monthly": "Mensal",
+      "annual": "Anual",
+      "subscribe": "Assinar",
+      "manageBilling": "Gerenciar assinatura",
+      "loading": "Carregando...",
+      "error": "Erro",
+      "noPlans": "Nenhum plano disponível.",
+      "checkoutFailed": "Não foi possível iniciar o checkout."
+    },
     "upgradeDialog": {
       "subscribeTitle": "Assine o Pro",
       "subscribeDescription": "Controle total do seu dinheiro com o plano Pro. Comece seu teste grátis de 30 dias.",

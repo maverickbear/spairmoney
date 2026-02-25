@@ -14,6 +14,8 @@ interface SubscriptionContextValue {
   limits: PlanFeatures;
   checking: boolean;
   refetch: () => Promise<void>;
+  /** End of 30-day local trial (no Stripe until Subscribe Now). From users.trial_ends_at. */
+  trialEndsAt: string | null;
   // Helper methods for common checks
   isActive: () => boolean;
   isTrialing: () => boolean;
@@ -25,6 +27,7 @@ const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(
 interface InitialData {
   subscription: Subscription | null;
   plan: Plan | null;
+  trialEndsAt?: string | null;
 }
 
 interface SubscriptionProviderProps {
@@ -41,6 +44,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     initialData?.subscription ?? null
   );
   const [plan, setPlan] = useState<Plan | null>(initialData?.plan ?? null);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(initialData?.trialEndsAt ?? null);
   const [billingInterval, setBillingInterval] = useState<"month" | "year" | null>(null);
   const [limits, setLimits] = useState<PlanFeatures>(
     initialData?.plan?.features ?? getDefaultFeatures()
@@ -80,8 +84,10 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
   useEffect(() => {
     const nextSub = initialData?.subscription ?? null;
     const nextPlan = initialData?.plan ?? null;
+    const nextTrialEndsAt = initialData?.trialEndsAt ?? null;
     setSubscription(nextSub);
     setPlan(nextPlan);
+    setTrialEndsAt(nextTrialEndsAt);
     setLimits(nextPlan?.features ?? getDefaultFeatures());
     subscriptionRef.current = nextSub;
     planRef.current = nextPlan;
@@ -89,7 +95,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       hasInitialDataRef.current = true;
       lastFetchRef.current = Date.now();
     }
-  }, [initialData?.subscription, initialData?.plan]);
+  }, [initialData?.subscription, initialData?.plan, initialData?.trialEndsAt]);
 
   const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null; interval: "month" | "year" | null }> => {
     try {
@@ -318,6 +324,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
         limits,
         checking,
         refetch,
+        trialEndsAt,
         isActive,
         isTrialing,
         hasSubscription,
@@ -351,6 +358,7 @@ export function useSubscriptionSafe() {
       limits: getDefaultFeatures(),
       checking: false,
       refetch: async () => {},
+      trialEndsAt: null,
       isActive: () => false,
       isTrialing: () => false,
       hasSubscription: () => false,

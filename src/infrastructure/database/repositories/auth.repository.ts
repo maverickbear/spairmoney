@@ -18,6 +18,7 @@ export interface UserRow {
   role: string | null;
   created_at: string;
   updated_at: string;
+  trial_ends_at: string | null;
 }
 
 export class AuthRepository implements IAuthRepository {
@@ -59,6 +60,9 @@ export class AuthRepository implements IAuthRepository {
     const { createServiceRoleClient } = await import("../supabase-server");
     const serviceRoleClient = createServiceRoleClient();
     const now = formatTimestamp(new Date());
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+    const trialEndsAtStr = formatTimestamp(trialEndsAt);
 
     // Retry logic to handle timing issues with auth.users synchronization
     const maxRetries = 5;
@@ -104,6 +108,7 @@ export class AuthRepository implements IAuthRepository {
           role: data.role,
           created_at: now,
           updated_at: now,
+          trial_ends_at: trialEndsAtStr,
         })
         .select()
         .single();
