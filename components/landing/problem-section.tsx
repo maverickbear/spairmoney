@@ -3,15 +3,17 @@
 import { useInView } from "@/hooks/use-in-view";
 import { cn } from "@/lib/utils";
 
-const BREAKDOWN_ITEMS = [
-  { label: "$7 coffee", amount: 7 },
-  { label: "$15 lunch", amount: 15 },
-  { label: "$18 delivery", amount: 18 },
-  { label: "$12 subscription", amount: 12 },
+const DAILY_ITEMS = [
+  { label: "Coffee & pastry", amount: 6 },
+  { label: "Lunch out", amount: 14 },
+  { label: "Snacks & drinks", amount: 6 },
+  { label: "Takeout / delivery", amount: 20 },
 ];
 
-const DAY_TOTAL = BREAKDOWN_ITEMS.reduce((sum, { amount }) => sum + amount, 0);
-const MONTH_ESTIMATE = DAY_TOTAL * 30;
+const UNUSED_SUBSCRIPTIONS_MONTHLY = 50;
+
+const DAY_TOTAL = DAILY_ITEMS.reduce((sum, { amount }) => sum + amount, 0);
+const MONTH_ESTIMATE = DAY_TOTAL * 30 + UNUSED_SUBSCRIPTIONS_MONTHLY;
 
 export function ProblemSection() {
   const { ref, inView } = useInView();
@@ -38,7 +40,7 @@ export function ProblemSection() {
             Here&apos;s how &ldquo;just a few small things&rdquo; add up.
           </p>
           <ul className="space-y-2.5">
-            {BREAKDOWN_ITEMS.map(({ label, amount }) => (
+            {DAILY_ITEMS.map(({ label, amount }) => (
               <li
                 key={label}
                 className="flex items-center justify-between text-sm text-foreground"
@@ -47,6 +49,10 @@ export function ProblemSection() {
                 <span className="font-medium tabular-nums">${amount}</span>
               </li>
             ))}
+            <li className="flex items-center justify-between text-sm text-foreground pt-1">
+              <span>Unused subscriptions</span>
+              <span className="font-medium tabular-nums text-muted-foreground">${UNUSED_SUBSCRIPTIONS_MONTHLY}/mo</span>
+            </li>
           </ul>
           <div className="mt-5 pt-5 border-t border-border">
             <p className="text-center">
