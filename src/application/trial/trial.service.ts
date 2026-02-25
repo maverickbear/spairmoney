@@ -330,7 +330,6 @@ export class TrialService {
           await sendWelcomeEmail({
             to: authUser.email,
             userName: "", // Not used anymore, but keeping for interface compatibility
-            founderName: "Naor Tartarotti",
             appUrl: appUrl,
           });
           

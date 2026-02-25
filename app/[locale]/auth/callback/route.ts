@@ -187,7 +187,6 @@ export async function GET(request: NextRequest) {
             await sendWelcomeEmail({
               to: userEmail,
               userName: "",
-              founderName: "Naor Tartarotti",
               appUrl,
             });
             console.log("[OAUTH-CALLBACK] Welcome email sent to", userEmail);

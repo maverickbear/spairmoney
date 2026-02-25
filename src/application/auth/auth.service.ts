@@ -202,7 +202,6 @@ export class AuthService {
               await sendWelcomeEmail({
                 to: authData.user.email,
                 userName: "",
-                founderName: "Naor Tartarotti",
                 appUrl,
               });
               logger.info(`[AuthService] Welcome email sent to ${authData.user.email}`);

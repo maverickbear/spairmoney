@@ -75,7 +75,12 @@ export async function POST(request: NextRequest) {
             ? 404
             : result.error?.includes("not configured in Stripe") || result.error?.includes("Stripe Price")
               ? 503
-              : 500;
+              : result.error?.includes("email is required") || result.error?.includes("account profile")
+                ? 400
+                : 500;
+      if (statusCode === 500) {
+        console.error("[BILLING/CHECKOUT-SESSION] Service error (500):", result.error);
+      }
       return NextResponse.json(
         { error: result.error || "Failed to create checkout session" },
         { status: statusCode }
@@ -84,9 +89,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: result.url });
   } catch (error) {
-    console.error("[BILLING/CHECKOUT-SESSION] Error:", error);
+    const message = error instanceof Error ? error.message : "Failed to create checkout session";
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error("[BILLING/CHECKOUT-SESSION] Unhandled error:", message, stack ?? String(error));
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create checkout session" },
+      { error: message },
       { status: 500 }
     );
   }

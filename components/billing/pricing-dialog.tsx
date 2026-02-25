@@ -67,7 +67,13 @@ export function PricingDialog({
         }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: { url?: string; error?: string } = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { error: text || t("failedToStartCheckout") };
+      }
 
       if (response.ok && data.url) {
         window.location.href = data.url;

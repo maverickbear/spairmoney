@@ -742,12 +742,15 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
     return;
   }
 
+  // Sender display name (From header) – always "Naor from Spair Money"
+  const senderDisplayName = "Naor from Spair Money";
+  // Name used in email body and signature – default "Naor Tartarotti"
   const founderName = data.founderName || "Naor Tartarotti";
-  
+
   // Use founder's email as the sender so replies go directly to the founder
   // Default to naor@spair.co if FOUNDER_EMAIL is not configured
   const founderEmail = process.env.FOUNDER_EMAIL || "naor@spair.co";
-  const finalFromEmail = `${founderName} <${founderEmail}>`;
+  const finalFromEmail = `${senderDisplayName} <${founderEmail}>`;
 
   console.log("[EMAIL] Welcome email - Final from email value:", JSON.stringify(finalFromEmail));
 

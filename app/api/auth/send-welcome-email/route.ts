@@ -52,7 +52,6 @@ export async function POST(request: NextRequest) {
         await sendWelcomeEmail({
           to: email,
           userName: "", // Not used anymore
-          founderName: "Naor Tartarotti",
         });
 
         console.log("[SEND-WELCOME-EMAIL] Welcome email sent to (test mode):", email);
@@ -84,7 +83,6 @@ export async function POST(request: NextRequest) {
       await sendWelcomeEmail({
         to: user.email,
         userName: "", // Not used anymore
-        founderName: "Naor Tartarotti",
       });
 
       console.log("[SEND-WELCOME-EMAIL] Welcome email sent to:", user.email);
@@ -126,7 +124,6 @@ export async function POST(request: NextRequest) {
         sendWelcomeEmail({
           to: user.email,
           userName: "", // Not used anymore
-          founderName: "Naor Tartarotti",
         })
       )
     );

@@ -96,7 +96,6 @@ export async function POST(request: NextRequest) {
         await sendWelcomeEmail({
           to: authData.user.email,
           userName: "", // Not used anymore, but keeping for interface compatibility
-          founderName: "Naor Tartarotti",
           appUrl: appUrl,
         });
         

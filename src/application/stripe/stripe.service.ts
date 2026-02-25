@@ -409,9 +409,16 @@ export class StripeService {
           .select("name, email")
           .eq("id", userId)
           .single();
+        const customerEmail = userData?.email ?? authUser.email ?? undefined;
+        if (!customerEmail || typeof customerEmail !== "string" || !customerEmail.trim()) {
+          return {
+            url: null,
+            error: "User email is required for checkout. Please complete your account profile.",
+          };
+        }
         const customer = await stripe.customers.create({
-          email: userData?.email || authUser.email || undefined,
-          name: userData?.name || undefined,
+          email: customerEmail,
+          name: userData?.name ?? undefined,
           metadata: { userId },
         });
         customerId = customer.id;
@@ -726,7 +733,6 @@ export class StripeService {
         await sendWelcomeEmail({
           to: authUser.user.email,
           userName: "",
-          founderName: "Naor Tartarotti",
           appUrl,
         });
         logger.info("[StripeService] Welcome email sent after checkout.session.completed to:", authUser.user.email);

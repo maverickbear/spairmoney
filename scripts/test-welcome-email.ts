@@ -27,7 +27,6 @@ async function testWelcomeEmail() {
     await sendWelcomeEmail({
       to: email,
       userName: "", // Não usado mais
-      founderName: "Naor Tartarotti",
       appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://spair.co",
     });
 
