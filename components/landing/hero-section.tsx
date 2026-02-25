@@ -37,14 +37,6 @@ export function HeroSection() {
                   {t("ctaReveal")}
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="large">
-                <Link
-                  href="#features"
-                  onClick={() => trackLandingClick({ section: "hero", link_id: "cta_how_it_works", destination: "#features" })}
-                >
-                  {t("ctaHowItWorks")}
-                </Link>
-              </Button>
             </div>
           </div>
 

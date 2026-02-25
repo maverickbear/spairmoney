@@ -73,7 +73,7 @@ export function LandingHeader() {
               <Logo variant="full" color="auto" width={140} height={32} className="hidden md:block" />
             </Link>
 
-            <div className="hidden md:flex items-center justify-center absolute left-1/2 -translate-x-1/2">
+            <div className="hidden lg:flex items-center justify-center absolute left-1/2 -translate-x-1/2">
               <ul className="flex items-center gap-8">
                 {NAV_LINK_KEYS.map((item) => (
                   <li key={item.key}>
@@ -92,11 +92,11 @@ export function LandingHeader() {
               </ul>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <LocaleSwitcher variant="short" />
               {isConsumer ? (
                 <>
-                  <Button asChild variant="ghost" size="medium" className="hidden sm:inline-flex text-muted-foreground">
+                  <Button asChild variant="ghost" size="medium" className="hidden lg:inline-flex text-muted-foreground">
                     <Link href="/dashboard" onClick={() => trackLandingClick({ section: "header", link_id: "header_dashboard", destination: "/dashboard" })}>
                       {t("dashboard")}
                     </Link>
@@ -104,6 +104,7 @@ export function LandingHeader() {
                   <Button
                     variant="ghost"
                     size="medium"
+                    className="hidden lg:inline-flex"
                     onClick={() => {
                       trackLandingClick({ section: "header", link_id: "header_logout" });
                       handleLogout();
@@ -114,12 +115,12 @@ export function LandingHeader() {
                 </>
               ) : (
                 <>
-                  <Button asChild variant="outline" size="medium" className="hidden sm:inline-flex">
+                  <Button asChild variant="outline" size="medium" className="hidden lg:inline-flex">
                     <Link href="/auth/login" onClick={() => trackLandingClick({ section: "header", link_id: "header_sign_in", destination: "/auth/login" })}>
                       {t("signIn")}
                     </Link>
                   </Button>
-                  <Button asChild size="medium" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform">
+                  <Button asChild size="medium" className="hidden lg:inline-flex bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform">
                     <Link href="/auth/signup" onClick={() => trackLandingClick({ section: "header", link_id: "header_start_trial", destination: "/auth/signup" })}>
                       {t("startTrial")}
                     </Link>
@@ -129,7 +130,7 @@ export function LandingHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
+                className="lg:hidden shrink-0"
                 onClick={() => setMobileOpen(true)}
                 aria-label="Open menu"
               >
