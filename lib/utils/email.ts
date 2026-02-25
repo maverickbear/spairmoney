@@ -885,7 +885,7 @@ export async function sendAccountRemovedEmail(data: AccountRemovedEmailData): Pr
     const emailPayload = {
       from: finalFromEmail,
       to: data.to,
-      subject: "Your Spair Money account has been removed",
+      subject: "We're sad to see you go 💚",
       html: getAccountRemovedEmailTemplate({
         userName: data.userName,
         email: data.to,
@@ -914,25 +914,76 @@ function getAccountRemovedEmailTemplate(data: {
     let html = fs.readFileSync(templatePath, "utf-8");
 
     const userName = data.userName?.trim() || "there";
+    const logoUrl = getLogoUrl();
 
     html = html.replace(/\{\{ \.UserName \}\}/g, userName);
     html = html.replace(/\{\{ \.Email \}\}/g, data.email);
     html = html.replace(/\{\{ \.Year \}\}/g, new Date().getFullYear().toString());
+    html = html.replace(/\{\{ \.LogoURL \}\}/g, logoUrl);
 
     return html;
   } catch (error) {
     console.error("[EMAIL] Error reading account-removed email template:", error);
+    // Fallback: same layout as password-reset and welcome (logo, table, footer)
+    const userName = (data.userName?.trim() || "there").replace(/</g, "&lt;");
     return `
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>Account removed</title></head>
-<body style="font-family: sans-serif; padding: 20px;">
-  <h1>Your account has been removed</h1>
-  <p>Hi ${(data.userName?.trim() || "there").replace(/</g, "&lt;")},</p>
-  <p>This email confirms that your Spair Money account has been permanently removed, as requested.</p>
-  <p>Your personal data has been deleted from our systems.</p>
-  <p>If you did not request this change, please contact us as soon as possible.</p>
-  <p>© ${new Date().getFullYear()} Spair Money.</p>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>We're sad to see you go - Spair Money</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+          <tr>
+            <td style="padding: 30px 40px 20px; text-align: left;">
+              <img src="${getLogoUrl()}" alt="Spair Money" style="height: 32px; width: auto;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 40px;">
+              <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700; line-height: 1.3;">
+                We're sad to see you go 💚
+              </h1>
+              <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                Hi ${userName},
+              </p>
+              <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                Your Spair Money account has been permanently deleted, just as you requested.
+              </p>
+              <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                We won't pretend — we're a little sad to see you go.
+              </p>
+              <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                Everything connected to your account has been removed from our system.
+              </p>
+              <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                If this wasn't you or you changed your mind, please reach out as soon as possible at <a href="mailto:support@spair.co" style="color: #7BC85A; text-decoration: none;">support@spair.co</a> and we'll do our best to help.
+              </p>
+              <p style="margin: 0; color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+                Thank you for being part of Spair Money, even if just for a while.<br>
+                You'll always be welcome back.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+              <p style="margin: 0 0 8px; color: #8a8a8a; font-size: 12px; line-height: 1.5;">
+                This message was sent to ${data.email}. If you have questions or complaints, please contact us.
+              </p>
+              <p style="margin: 0; color: #8a8a8a; font-size: 12px;">
+                © ${new Date().getFullYear()} Spair Money. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
     `.trim();
