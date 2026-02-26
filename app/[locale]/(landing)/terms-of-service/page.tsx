@@ -8,7 +8,7 @@ export const metadata = {
   description: "Terms of Service for Spair Money",
 };
 
-const LAST_UPDATED = "February 17, 2025";
+const LAST_UPDATED = "February 26, 2025";
 
 export default async function TermsOfServicePage() {
   let proPlanName = "PRO";
@@ -204,7 +204,12 @@ export default async function TermsOfServicePage() {
         <LegalSection title="Subscription Plans and Payment">
           <div>
             <h3>Available Plans</h3>
-            <p>Spair Money offers the following subscription plans:</p>
+            <p>
+              Spair Money may offer a free tier with limited features and one or
+              more paid plans. Plans and pricing are as displayed in the Service
+              at the time of subscription. For reference, the paid plan
+              currently includes:
+            </p>
             <ul>
               <li>
                 <strong>{proPlanName} Plan:</strong> $
@@ -251,7 +256,10 @@ export default async function TermsOfServicePage() {
               </li>
               <li>
                 Understand that subscription fees are non-refundable except as
-                required by law
+                required by law; where applicable law (e.g., Ontario or other
+                provinces) requires refund or cancellation rights, we will comply.
+                Details can be found in your account subscription page or the
+                Stripe Customer Portal
               </li>
               <li>Accept that subscription prices may change with notice</li>
               <li>
@@ -434,6 +442,29 @@ export default async function TermsOfServicePage() {
             constitutes your acceptance of them. If you do not agree to the
             revised Terms, you must stop using the Service and may terminate
             your account.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="Force Majeure">
+          <p>
+            We shall not be liable for any failure or delay in performing our
+            obligations under these Terms where such failure or delay results
+            from circumstances beyond our reasonable control, including but not
+            limited to acts of God, war, terrorism, pandemic, natural
+            disasters, power or infrastructure failures, or other events that
+            could not have been reasonably foreseen or prevented. In such
+            cases, our performance may be suspended for the duration of the
+            event, and we will use reasonable efforts to resume the Service as
+            soon as practicable.
+          </p>
+        </LegalSection>
+
+        <LegalSection title="Assignment">
+          <p>
+            We may assign or transfer these Terms, or our rights and
+            obligations hereunder, in connection with a merger, sale of assets,
+            or similar transaction. You may not assign or transfer these Terms
+            or your account without our prior written consent.
           </p>
         </LegalSection>
 

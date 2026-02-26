@@ -19,6 +19,7 @@ Manages the app’s **paid subscription** via Stripe: plans, checkout, customer 
 - **Subscription state:** The app keeps a local copy of subscription state (user_subscriptions); Stripe is the source of truth. Webhooks and the revalidate endpoint update local state after checkout, portal, or lifecycle events (e.g. cancelled, paused).
 - **Feature access:** SubscriptionContext exposes plan and status; plan-features-service and decision services determine what’s allowed (e.g. account limit, reports, goals). Components use selectors from context; no business logic in UI.
 - **Trial:** New users receive a 30-day local trial (`users.trial_ends_at` set on signup); no Stripe subscription until they click Subscribe Now in the trial banner. The **Pro trial banner** (`ProTrialBanner`) shows: active trial (days left + Subscribe Now), urgency when ≤2 days left, or trial-ended/no-subscription state with Monthly/Annual choice and Subscribe. After subscribing via the banner, Stripe Checkout creates the subscription and webhooks update local state. Stripe trialing and trial celebration are shown based on subscription state. Pause/resume (Stripe subscription) is exposed via subscriptions API; Resend segments are updated on lifecycle (active vs cancelled).
+- **Plan override (admin):** Super admins can set an effective plan override per user via Admin → Users → Plan Override. This changes only the plan used for feature limits and access; it does not change Stripe, billing, or `app_subscriptions`. Stored in `users.admin_override_plan_id`; clearing the override restores normal resolution from subscription/cache.
 
 ## Key Routes / Pages
 
@@ -34,6 +35,7 @@ Manages the app’s **paid subscription** via Stripe: plans, checkout, customer 
 |--------|----------|---------|
 | GET | `/api/v2/billing/subscription` | Get current subscription (from Stripe + local state). |
 | POST | `/api/v2/billing/revalidate-subscription` | Revalidate subscription after webhook or portal. |
+| PUT | `/api/v2/admin/users/[userId]/plan-override` | Set or clear admin plan override (super_admin only; app-only, no Stripe change). |
 | GET or POST | Stripe webhooks (e.g. customer.subscription.updated) | Update local state (handled in app API). |
 
 Pause/resume for **Stripe** subscription: `/api/v2/subscriptions/pause-status`, `/api/v2/subscriptions/resume` (see [Subscriptions](SUBSCRIPTIONS.md) doc).

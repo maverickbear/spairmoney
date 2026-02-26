@@ -1770,6 +1770,7 @@
       "urgencyMessage": "Solo quedan {count} días de tu prueba.",
       "urgencySubtext": "Suscríbete ahora para mantener el acceso completo.",
       "subscribeNow": "Suscribirse ahora",
+      "upgradeNow": "Suscribirse ahora",
       "trialEnded": "Tu prueba ha terminado.",
       "chooseBillingPeriod": "Elige el periodo de facturación y suscríbete para mantener el acceso.",
       "monthly": "Mensual",

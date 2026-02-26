@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,74 +80,79 @@ export function BlockUserDialog({
   if (!user) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-[500px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl flex items-center gap-2">
             <Ban className="h-5 w-5 text-destructive" />
             Block User
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Block {user.name || user.email} from accessing the system
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="user">User</Label>
+                <Input
+                  id="user"
+                  value={user.name || user.email}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reason">Reason for blocking *</Label>
+                <Textarea
+                  id="reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Enter the reason for blocking this user..."
+                  rows={4}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  This reason will be saved in the block history.
+                </p>
+              </div>
 
-        <div className="space-y-4 px-6">
-          <div className="space-y-2">
-            <Label htmlFor="user">User</Label>
-            <Input
-              id="user"
-              value={user.name || user.email}
-              disabled
-              className="bg-muted"
-            />
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </ScrollArea>
+          <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+            <Button
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false);
+                setReason("");
+                setError(null);
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBlock}
+              disabled={loading || !reason.trim()}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Block User
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="reason">Reason for blocking *</Label>
-            <Textarea
-              id="reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Enter the reason for blocking this user..."
-              rows={4}
-              className="resize-none"
-            />
-            <p className="text-xs text-muted-foreground">
-              This reason will be saved in the block history.
-            </p>
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
         </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-              setReason("");
-              setError(null);
-            }}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleBlock}
-            disabled={loading || !reason.trim()}
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Block User
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 

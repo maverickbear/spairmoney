@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users as UsersIcon, Calendar, ChevronRight, XCircle, Ban, MoreVertical, CheckCircle } from "lucide-react";
+import { Loader2, Users as UsersIcon, Calendar, ChevronRight, XCircle, Ban, MoreVertical, CheckCircle, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,11 +28,12 @@ interface UsersTableProps {
   onSearchChange?: (query: string) => void;
   filterType?: string | null;
   onManageSubscription?: (user: AdminUser) => void;
+  onPlanOverride?: (user: AdminUser) => void;
   onBlockUser?: (user: AdminUser) => void;
   onUnblockUser?: (user: AdminUser) => void;
 }
 
-export function UsersTable({ users: initialUsers, loading: initialLoading, searchQuery: externalSearchQuery, onSearchChange, filterType, onManageSubscription, onBlockUser, onUnblockUser }: UsersTableProps) {
+export function UsersTable({ users: initialUsers, loading: initialLoading, searchQuery: externalSearchQuery, onSearchChange, filterType, onManageSubscription, onPlanOverride, onBlockUser, onUnblockUser }: UsersTableProps) {
   const [users, setUsers] = useState<AdminUser[]>(initialUsers);
   const [loading, setLoading] = useState(initialLoading);
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
@@ -241,13 +242,13 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
               <TableHead>Days Left</TableHead>
               <TableHead>Household</TableHead>
               <TableHead>Created</TableHead>
-              {(onManageSubscription || onBlockUser || onUnblockUser) && <TableHead className="text-right">Actions</TableHead>}
+              {(onManageSubscription || onPlanOverride || onBlockUser || onUnblockUser) && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={(onManageSubscription || onBlockUser || onUnblockUser) ? 8 : 7} className="p-0">
+                <TableCell colSpan={(onManageSubscription || onPlanOverride || onBlockUser || onUnblockUser) ? 8 : 7} className="p-0">
                   <div className="flex items-center justify-center min-h-[400px] w-full">
                     <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
                       <UsersIcon className="h-8 w-8" />
@@ -289,11 +290,20 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                             </div>
                           </TableCell>
                         <TableCell>
-                          {group.owner.plan ? (
-                            <Badge variant="outline">{group.owner.plan.name}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">No plan</span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {group.owner.adminOverridePlanId && group.owner.adminOverridePlanName && (
+                              <Badge variant="secondary" className="text-xs">
+                                Override: {group.owner.adminOverridePlanName}
+                              </Badge>
+                            )}
+                            {group.owner.plan ? (
+                              <Badge variant="outline">{group.owner.plan.name}</Badge>
+                            ) : (
+                              !group.owner.adminOverridePlanId && (
+                                <span className="text-muted-foreground">No plan</span>
+                              )
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {group.owner.subscription
@@ -329,7 +339,7 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                         <TableCell className="text-muted-foreground">
                           {formatDate(group.owner.createdAt)}
                         </TableCell>
-                        {(onManageSubscription || onBlockUser || onUnblockUser) && (
+                        {(onManageSubscription || onPlanOverride || onBlockUser || onUnblockUser) && (
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                               <DropdownMenu>
@@ -352,6 +362,17 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                                     >
                                       <Calendar className="h-4 w-4 mr-2" />
                                       Subscription
+                                    </DropdownMenuItem>
+                                  )}
+                                  {onPlanOverride && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPlanOverride(group.owner!);
+                                      }}
+                                    >
+                                      <Shield className="h-4 w-4 mr-2" />
+                                      Plan Override
                                     </DropdownMenuItem>
                                   )}
                                   {!group.owner.isBlocked && onBlockUser && (
@@ -397,11 +418,20 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                           </div>
                         </TableCell>
                         <TableCell>
-                          {member.plan ? (
-                            <Badge variant="outline">{member.plan.name}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">No plan</span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {member.adminOverridePlanId && member.adminOverridePlanName && (
+                              <Badge variant="secondary" className="text-xs">
+                                Override: {member.adminOverridePlanName}
+                              </Badge>
+                            )}
+                            {member.plan ? (
+                              <Badge variant="outline">{member.plan.name}</Badge>
+                            ) : (
+                              !member.adminOverridePlanId && (
+                                <span className="text-muted-foreground">No plan</span>
+                              )
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {member.subscription
@@ -437,7 +467,7 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                         <TableCell className="text-muted-foreground">
                           {formatDate(member.createdAt)}
                         </TableCell>
-                        {(onManageSubscription || onBlockUser || onUnblockUser) && (
+                        {(onManageSubscription || onPlanOverride || onBlockUser || onUnblockUser) && (
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                               <DropdownMenu>
@@ -460,6 +490,17 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                                     >
                                       <Calendar className="h-4 w-4 mr-2" />
                                       Subscription
+                                    </DropdownMenuItem>
+                                  )}
+                                  {onPlanOverride && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPlanOverride(member);
+                                      }}
+                                    >
+                                      <Shield className="h-4 w-4 mr-2" />
+                                      Plan Override
                                     </DropdownMenuItem>
                                   )}
                                   {!member.isBlocked && onBlockUser && (
@@ -528,7 +569,7 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                         <TableCell>
                           <span className="text-muted-foreground">-</span>
                         </TableCell>
-                        {onManageSubscription && (
+                        {(onManageSubscription || onPlanOverride || onBlockUser || onUnblockUser) && (
                           <TableCell>
                             <span className="text-muted-foreground">-</span>
                           </TableCell>
@@ -548,11 +589,20 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                       </div>
                     </TableCell>
                     <TableCell>
-                      {user.plan ? (
-                        <Badge variant="outline">{user.plan.name}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">No plan</span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {user.adminOverridePlanId && user.adminOverridePlanName && (
+                          <Badge variant="secondary" className="text-xs">
+                            Override: {user.adminOverridePlanName}
+                          </Badge>
+                        )}
+                        {user.plan ? (
+                          <Badge variant="outline">{user.plan.name}</Badge>
+                        ) : (
+                          !user.adminOverridePlanId && (
+                            <span className="text-muted-foreground">No plan</span>
+                          )
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {user.subscription
@@ -586,7 +636,7 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                     <TableCell className="text-muted-foreground">
                       {formatDate(user.createdAt)}
                     </TableCell>
-                    {(onManageSubscription || onBlockUser || onUnblockUser) && (
+                    {(onManageSubscription || onPlanOverride || onBlockUser || onUnblockUser) && (
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <DropdownMenu>
@@ -605,6 +655,14 @@ export function UsersTable({ users: initialUsers, loading: initialLoading, searc
                                 >
                                   <Calendar className="h-4 w-4 mr-2" />
                                   Subscription
+                                </DropdownMenuItem>
+                              )}
+                              {onPlanOverride && (
+                                <DropdownMenuItem
+                                  onClick={() => onPlanOverride(user)}
+                                >
+                                  <Shield className="h-4 w-4 mr-2" />
+                                  Plan Override
                                 </DropdownMenuItem>
                               )}
                               {!user.isBlocked && onBlockUser && (

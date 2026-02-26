@@ -1,8 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useTranslations } from "next-intl";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
@@ -180,68 +187,25 @@ export function ProUpgradeDialog({
   }
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" />
-        <DialogPrimitive.Content
-          className={cn(
-            "fixed z-50 flex w-full max-w-[590px] flex-col overflow-hidden rounded-none border border-border bg-background p-0 shadow-lg",
-            "left-0 top-0 h-full max-h-screen translate-x-0 translate-y-0 sm:inset-auto sm:h-auto",
-            "sm:left-[50%] sm:top-[50%] sm:max-w-[773px] sm:h-auto sm:max-h-[90vh] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl"
-          )}
-          onInteractOutside={(e) => !canClose && e.preventDefault()}
-          onEscapeKeyDown={(e) => !canClose && e.preventDefault()}
-        >
-          {canClose && (
-            <DialogPrimitive.Close asChild>
-              <button
-                type="button"
-                className="absolute right-3 top-3 z-10 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </DialogPrimitive.Close>
-          )}
-          <DialogPrimitive.Title className="sr-only">
-            {copy.title}
-          </DialogPrimitive.Title>
-          <DialogPrimitive.Description className="sr-only">
-            {copy.description}
-          </DialogPrimitive.Description>
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto sm:flex-row sm:min-h-[420px] sm:overflow-visible sm:flex-initial">
-            {/* Left panel – form and features */}
-            <div className="flex flex-none flex-col bg-[#f8f4f1] px-6 py-6 sm:min-h-0 sm:min-w-0 sm:flex-1 sm:overflow-y-auto sm:px-8 sm:py-8 sm:rounded-l-2xl order-1 sm:order-1 sm:w-1/2">
-              <h3 className="text-xl font-bold text-foreground">{copy.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{copy.description}</p>
-
-              <ul className="mt-6 space-y-3">
-                {features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground">
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="text-sm text-foreground">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {copy.secondaryButton && (
-                <div className="mt-8">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleSecondary}
-                    disabled={loading}
-                  >
-                    {copy.secondaryButton}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Right panel – Pro plan, two option cards, and primary CTA */}
-            <div className="flex shrink-0 flex-col justify-end bg-background px-6 py-8 sm:w-1/2 sm:rounded-r-2xl sm:px-8 sm:py-10 order-2 sm:order-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className={cn(
+          "w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l",
+          "sm:max-w-[464px]"
+        )}
+        onInteractOutside={(e) => !canClose && e.preventDefault()}
+        onEscapeKeyDown={(e) => !canClose && e.preventDefault()}
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl">{copy.title}</SheetTitle>
+          <SheetDescription>{copy.description}</SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex flex-col flex-1 min-h-0">
+            <div className="flex flex-1 min-h-0 flex-col">
+            {/* 1. Billing period + CTA on top (all resolutions) */}
+            <div className="flex shrink-0 flex-col justify-start bg-background px-6 py-8 sm:px-8 sm:py-10 border-b border-border">
               <h3 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
                 {t("chooseBillingPeriod")}
               </h3>
@@ -344,33 +308,59 @@ export function ProUpgradeDialog({
                   </div>
                 )}
               </div>
-
-              {/* Primary CTA – uses plan.id + interval (price ID resolved server-side) */}
-              <div className="mt-6">
-                <Button
-                  type="button"
-                  onClick={handlePrimary}
-                  disabled={loading || plansLoading || !plan}
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("loading")}
-                    </>
-                  ) : currentPlanId === "trial" ? (
-                    interval === "year" ? t("subscribeToYearlyPlan") : t("subscribeToMonthlyPlan")
-                  ) : (
-                    copy.primaryButton
-                  )}
-                </Button>
-              </div>
-
-              {/* Footer disclaimer */}
-              <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
-                {t(copy.footerDisclaimer)}
-              </p>
             </div>
+
+            {/* 2. Features list below (all resolutions) */}
+            <div className="flex flex-none flex-col bg-[#f8f4f1] px-6 py-6 sm:px-8 sm:py-8">
+              <ul className="space-y-3">
+                {features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground">
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-sm text-foreground">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {copy.secondaryButton && (
+                <div className="mt-8">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSecondary}
+                    disabled={loading}
+                  >
+                    {copy.secondaryButton}
+                  </Button>
+                </div>
+              )}
+            </div>
+            </div>
+          </ScrollArea>
+
+          {/* Fixed footer: Subscribe button + disclaimer */}
+          <div className="p-4 border-t flex flex-col gap-2 shrink-0 bg-background">
+            <Button
+              type="button"
+              onClick={handlePrimary}
+              disabled={loading || plansLoading || !plan}
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t("loading")}
+                </>
+              ) : currentPlanId === "trial" ? (
+                interval === "year" ? t("subscribeToYearlyPlan") : t("subscribeToMonthlyPlan")
+              ) : (
+                copy.primaryButton
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t(copy.footerDisclaimer)}
+            </p>
           </div>
 
           {plansLoading && (
@@ -385,8 +375,8 @@ export function ProUpgradeDialog({
               <Loader2 className="h-8 w-8 animate-spin --sentiment-positive" />
             </div>
           )}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

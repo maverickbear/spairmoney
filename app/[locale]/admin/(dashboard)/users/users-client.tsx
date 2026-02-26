@@ -21,6 +21,7 @@ export function UsersPageClient({ users, filter }: UsersPageClientProps) {
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [isSubscriptionDialogOpen, setIsSubscriptionDialogOpen] = useState(false);
   const [subscriptionUser, setSubscriptionUser] = useState<AdminUser | null>(null);
+  const [subscriptionDialogInitialTab, setSubscriptionDialogInitialTab] = useState<string | undefined>(undefined);
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [blockUser, setBlockUser] = useState<AdminUser | null>(null);
   const [isUnblockDialogOpen, setIsUnblockDialogOpen] = useState(false);
@@ -31,6 +32,13 @@ export function UsersPageClient({ users, filter }: UsersPageClientProps) {
       console.error("User does not have a valid subscription");
       return;
     }
+    setSubscriptionDialogInitialTab(undefined);
+    setSubscriptionUser(user);
+    setIsSubscriptionDialogOpen(true);
+  }
+
+  function handlePlanOverride(user: AdminUser) {
+    setSubscriptionDialogInitialTab("plan-override");
     setSubscriptionUser(user);
     setIsSubscriptionDialogOpen(true);
   }
@@ -96,6 +104,7 @@ export function UsersPageClient({ users, filter }: UsersPageClientProps) {
         searchQuery={userSearchQuery} 
         onSearchChange={setUserSearchQuery}
         onManageSubscription={handleManageSubscription}
+        onPlanOverride={handlePlanOverride}
         onBlockUser={handleBlockUser}
         onUnblockUser={handleUnblockUser}
       />
@@ -105,9 +114,13 @@ export function UsersPageClient({ users, filter }: UsersPageClientProps) {
         open={isSubscriptionDialogOpen}
         onOpenChange={(open) => {
           setIsSubscriptionDialogOpen(open);
-          if (!open) setSubscriptionUser(null);
+          if (!open) {
+            setSubscriptionUser(null);
+            setSubscriptionDialogInitialTab(undefined);
+          }
         }}
         onSuccess={handleSuccess}
+        initialTab={subscriptionDialogInitialTab}
       />
 
       <BlockUserDialog

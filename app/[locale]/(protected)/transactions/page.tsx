@@ -44,14 +44,6 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -2355,79 +2347,105 @@ export default function TransactionsPage() {
       </div>
 
 
-      {/* Transaction summary modal: click row → summary with Edit / Delete */}
-      <Dialog open={!!transactionSummaryModal} onOpenChange={(open) => !open && setTransactionSummaryModal(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader className="pb-4 border-b">
-            <DialogTitle className="text-lg font-semibold">{tTx("transactionSummaryTitle")}</DialogTitle>
-          </DialogHeader>
+      {/* Transaction summary drawer: click row → summary with Edit / Delete */}
+      <Sheet open={!!transactionSummaryModal} onOpenChange={(open) => !open && setTransactionSummaryModal(null)}>
+        <SheetContent
+          side="right"
+          className="sm:max-w-[600px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+        >
+          <SheetHeader className="p-6 pb-4 border-b shrink-0">
+            <SheetTitle className="text-xl">{tTx("transactionSummaryTitle")}</SheetTitle>
+          </SheetHeader>
           {transactionSummaryModal && (
             <>
-              <div className="space-y-3 py-4 px-6">
-                <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 text-sm">
-                  <span className="text-muted-foreground">{tTx("summaryDate")}</span>
-                  <span>{formatTransactionDate(transactionSummaryModal.date)}</span>
-                  <span className="text-muted-foreground">{tTx("summaryType")}</span>
-                  <span className="capitalize">{tTx(transactionSummaryModal.type as "expense" | "income" | "transfer")}</span>
-                  <span className="text-muted-foreground">{tTx("summaryAccount")}</span>
-                  <span>
-                    {transactionSummaryModal.type === "transfer" && transactionSummaryModal.transferToId && transactionSummaryModal.account?.name && transactionSummaryModal.toAccount?.name
-                      ? formatTransferLabel(transactionSummaryModal.account.name, transactionSummaryModal.toAccount.name)
-                      : (transactionSummaryModal.account?.name ?? "—")}
-                  </span>
-                  <span className="text-muted-foreground">{tTx("summaryCategory")}</span>
-                  <span>
-                    {transactionSummaryModal.category?.name
-                      ? [transactionSummaryModal.category.name, transactionSummaryModal.subcategory?.name].filter(Boolean).join(" / ")
-                      : "—"}
-                  </span>
-                  <span className="text-muted-foreground">{tTx("summaryDescription")}</span>
-                  <span className="break-words">
-                    {transactionSummaryModal.type === "transfer" && transactionSummaryModal.transferToId ? "—" : (transactionSummaryModal.description || "—")}
-                  </span>
-                  <span className="text-muted-foreground">{tTx("summaryAmount")}</span>
-                  <span className={`font-medium ${transactionSummaryModal.type === "income" ? "text-sentiment-positive" : transactionSummaryModal.type === "expense" ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                    {transactionSummaryModal.type === "expense" ? "-" : ""}{formatMoney(transactionSummaryModal.amount)}
-                  </span>
+              <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <ScrollArea className="flex-1">
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 text-sm">
+                      <span className="text-muted-foreground">{tTx("summaryDate")}</span>
+                      <span>{formatTransactionDate(transactionSummaryModal.date)}</span>
+                      <span className="text-muted-foreground">{tTx("summaryType")}</span>
+                      <span className="capitalize">{tTx(transactionSummaryModal.type as "expense" | "income" | "transfer")}</span>
+                      <span className="text-muted-foreground">{tTx("summaryAccount")}</span>
+                      <span>
+                        {transactionSummaryModal.type === "transfer" && transactionSummaryModal.transferToId && transactionSummaryModal.account?.name && transactionSummaryModal.toAccount?.name
+                          ? formatTransferLabel(transactionSummaryModal.account.name, transactionSummaryModal.toAccount.name)
+                          : (transactionSummaryModal.account?.name ?? "—")}
+                      </span>
+                      <span className="text-muted-foreground">{tTx("summaryCategory")}</span>
+                      <span>
+                        {transactionSummaryModal.category?.name
+                          ? [transactionSummaryModal.category.name, transactionSummaryModal.subcategory?.name].filter(Boolean).join(" / ")
+                          : "—"}
+                      </span>
+                      <span className="text-muted-foreground">{tTx("summaryDescription")}</span>
+                      <span className="break-words">
+                        {transactionSummaryModal.type === "transfer" && transactionSummaryModal.transferToId ? "—" : (transactionSummaryModal.description || "—")}
+                      </span>
+                      <span className="text-muted-foreground">{tTx("summaryAmount")}</span>
+                      <span className={`font-medium ${transactionSummaryModal.type === "income" ? "text-sentiment-positive" : transactionSummaryModal.type === "expense" ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
+                        {transactionSummaryModal.type === "expense" ? "-" : ""}{formatMoney(transactionSummaryModal.amount)}
+                      </span>
+                    </div>
+                  </div>
+                </ScrollArea>
+                <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!checkWriteAccess()) return;
+                      setSelectedTransaction(transactionSummaryModal);
+                      setTransactionSummaryModal(null);
+                      setIsFormOpen(true);
+                    }}
+                    disabled={!canWrite}
+                    className="gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    {tCommon("edit")}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      const id = transactionSummaryModal.id;
+                      setTransactionSummaryModal(null);
+                      handleDelete(id);
+                    }}
+                    disabled={deletingId === transactionSummaryModal.id}
+                    className="gap-2"
+                  >
+                    {deletingId === transactionSummaryModal.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    {tCommon("delete")}
+                  </Button>
                 </div>
               </div>
-              <DialogFooter className="flex flex-row gap-2 sm:gap-2 border-t pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (!checkWriteAccess()) return;
-                    setSelectedTransaction(transactionSummaryModal);
-                    setTransactionSummaryModal(null);
-                    setIsFormOpen(true);
-                  }}
-                  disabled={!canWrite}
-                  className="gap-2"
-                >
-                  <Edit className="h-4 w-4" />
-                  {tCommon("edit")}
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    const id = transactionSummaryModal.id;
-                    setTransactionSummaryModal(null);
-                    handleDelete(id);
-                  }}
-                  disabled={deletingId === transactionSummaryModal.id}
-                  className="gap-2"
-                >
-                  {deletingId === transactionSummaryModal.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                  {tCommon("delete")}
-                </Button>
-              </DialogFooter>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
+
+      {/* CSV Import Upgrade drawer */}
+      <Sheet open={showImportUpgradeModal} onOpenChange={setShowImportUpgradeModal}>
+        <SheetContent
+          side="right"
+          className="sm:max-w-2xl w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+        >
+          <SheetHeader className="p-6 pb-4 border-b shrink-0">
+            <SheetTitle className="text-xl">{tTx("upgradeToCsvImport")}</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="flex-1">
+              <div className="p-6">
+                <BlockedFeature feature="hasCsvImport" featureName={tTx("csvImportFeatureName")} />
+              </div>
+            </ScrollArea>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <TransactionForm
         open={isFormOpen}
@@ -2475,18 +2493,6 @@ export default function TransactionsPage() {
         accounts={accounts}
         categories={categories}
       />
-
-      {/* CSV Import Upgrade Modal */}
-      <Dialog open={showImportUpgradeModal} onOpenChange={setShowImportUpgradeModal}>
-        <DialogContent className="max-w-5xl sm:max-w-5xl md:max-w-6xl lg:max-w-7xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-          <DialogHeader className="sr-only">
-            <DialogTitle>{tTx("upgradeToCsvImport")}</DialogTitle>
-          </DialogHeader>
-          <div className="p-4 sm:p-6 md:p-8">
-            <BlockedFeature feature="hasCsvImport" featureName={tTx("csvImportFeatureName")} />
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Filters Drawer */}
       <Sheet open={isFiltersModalOpen} onOpenChange={setIsFiltersModalOpen}>

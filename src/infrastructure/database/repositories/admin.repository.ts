@@ -212,7 +212,7 @@ export class AdminRepository {
     // Get all users
     const { data: users, error: usersError } = await supabase
       .from("users")
-      .select("id, email, name, created_at, is_blocked")
+      .select("id, email, name, created_at, is_blocked, admin_override_plan_id")
       .order("created_at", { ascending: false });
 
     if (usersError) {
@@ -240,6 +240,9 @@ export class AdminRepository {
       .select("id, name");
 
     const planMap = new Map((plans || []).map((p) => [p.id, p]));
+
+    // Type for user row with optional admin_override_plan_id
+    type UserRow = (typeof users)[number] & { admin_override_plan_id?: string | null };
     
     // Create subscription map (most recent per user)
     const subscriptionMap = new Map<string, SubscriptionRow>();
@@ -309,6 +312,7 @@ export class AdminRepository {
 
     // Map users with their data
     return users.map((user) => {
+      const userRow = user as UserRow;
       const subscription = subscriptionMap.get(user.id);
       // FIX: subscription comes from database in snake_case, use plan_id not planId
       const plan = subscription ? planMap.get(subscription.plan_id) : null;
@@ -319,6 +323,8 @@ export class AdminRepository {
         householdId: null,
         ownerId: null,
       };
+      const adminOverridePlanId = userRow.admin_override_plan_id ?? null;
+      const overridePlan = adminOverridePlanId ? planMap.get(adminOverridePlanId) : null;
 
       return {
         id: user.id,
@@ -326,6 +332,8 @@ export class AdminRepository {
         name: user.name,
         createdAt: new Date(user.created_at),
         isBlocked: user.is_blocked || false,
+        adminOverridePlanId,
+        adminOverridePlanName: overridePlan?.name ?? null,
         plan: plan ? { id: plan.id, name: plan.name } : null,
         subscription: subscription ? {
           id: subscription.id,
@@ -411,6 +419,25 @@ export class AdminRepository {
           reason: reason.trim(),
           blocked_by: blockedBy,
         });
+    }
+  }
+
+  /**
+   * Set or clear admin plan override for a user (app-only; does not change Stripe).
+   */
+  async setUserPlanOverride(userId: string, planId: string | null): Promise<void> {
+    const supabase = createServiceRoleClient();
+    const { error } = await supabase
+      .from("users")
+      .update({
+        admin_override_plan_id: planId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (error) {
+      logger.error("[AdminRepository] Error setting user plan override:", error);
+      throw new Error(`Failed to set plan override: ${error.message}`);
     }
   }
 

@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Save, X, Upload, Camera } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import { Loader2 } from "lucide-react";
@@ -331,18 +331,22 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-        <DialogHeader>
-          <DialogTitle>Profile</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-2xl w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl">Profile</SheetTitle>
+          <SheetDescription>
             Manage your profile information
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        {/* Scrollable Content */}
-        <form onSubmit={form.handleSubmit(onSubmit as (data: ProfileFormData) => Promise<void>)} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 py-6">
+        <form onSubmit={form.handleSubmit(onSubmit as (data: ProfileFormData) => Promise<void>)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="flex-1">
+              <div className="p-6">
             {loading ? (
               <div className="space-y-6 py-6">
                 <div className="animate-pulse space-y-4">
@@ -504,40 +508,41 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
               </div>
               </div>
             )}
+              </div>
+            </ScrollArea>
+            <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+              <Button
+                type="button"
+                variant="outline"
+                size="medium"
+                onClick={handleCancel}
+                disabled={saving || uploading || loading}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                size="medium"
+                disabled={saving || uploading || loading || !form.formState.isDirty}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              size="medium"
-              onClick={handleCancel}
-              disabled={saving || uploading || loading}
-            >
-              <X className="mr-2 h-4 w-4" />
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              size="medium"
-              disabled={saving || uploading || loading || !form.formState.isDirty}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 

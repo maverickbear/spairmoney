@@ -236,12 +236,10 @@ function NavComponent() {
               })}
             </nav>
 
-            {/* Trial banner card - above user avatar, only when sidebar expanded */}
-            {!isCollapsed && (
-              <div className="shrink-0 px-3 pb-0">
-                <ProTrialBanner variant="sidebar" />
-              </div>
-            )}
+            {/* Trial banner - above user avatar; full card when expanded, compact when collapsed */}
+            <div className="shrink-0 px-3 pb-0">
+              <ProTrialBanner variant="sidebar" isSidebarCollapsed={isCollapsed} />
+            </div>
 
             {/* User Menu Client Island - handles all user/subscription UI */}
             <UserMenuClient isCollapsed={isCollapsed} />

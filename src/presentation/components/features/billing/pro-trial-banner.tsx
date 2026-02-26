@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { apiUrl } from "@/lib/utils/api-base-url";
 import { AlertCircle, Loader2, CreditCard } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSubscriptionSafe } from "@/contexts/subscription-context";
 import { useToast } from "@/components/toast-provider";
 import { cn } from "@/lib/utils";
@@ -35,9 +37,10 @@ export function ProTrialBanner({
   variant = "top",
 }: ProTrialBannerProps) {
   const t = useTranslations("billing.trialBanner");
+  const router = useRouter();
   const context = useSubscriptionSafe();
   const { toast } = useToast();
-  const { subscription, trialEndsAt } = context;
+  const { subscription, plan, trialEndsAt } = context;
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
@@ -51,6 +54,11 @@ export function ProTrialBanner({
   const trialEndFromUser = trialEndsAt ? new Date(trialEndsAt) : null;
   const trialEnd = trialEndFromSub ?? trialEndFromUser;
   const hasLocalTrial = !subscription && trialEndsAt;
+  const isTrialPlan = plan?.id === "trial";
+  const isTrialPlanWithActiveTrial =
+    isTrialPlan && trialEnd !== null && trialEnd.getTime() > Date.now();
+  const isTrialPlanExpired =
+    isTrialPlan && trialEnd !== null && trialEnd.getTime() <= Date.now();
   const localTrialEnded =
     hasLocalTrial && trialEndFromUser && trialEndFromUser.getTime() <= Date.now();
   const noSubscriptionNoTrial = !subscription && !trialEndsAt;
@@ -59,13 +67,17 @@ export function ProTrialBanner({
 
   const state: BannerState = subscriptionTrialing
     ? "stripe_trialing"
-    : localTrialEnded || noSubscriptionNoTrial
+    : isTrialPlanExpired || localTrialEnded || noSubscriptionNoTrial
       ? "expired"
-      : hasLocalTrial && trialEnd
+      : isTrialPlanWithActiveTrial
         ? isUrgency
           ? "urgency"
           : "active"
-        : "hidden";
+        : hasLocalTrial && trialEnd
+          ? isUrgency
+            ? "urgency"
+            : "active"
+          : "hidden";
 
   const showBanner =
     state === "active" ||
@@ -73,8 +85,9 @@ export function ProTrialBanner({
     state === "expired" ||
     state === "stripe_trialing";
 
+  // Load plans whenever the banner is shown so "Subscribe Now" has a plan to use
   useEffect(() => {
-    if (state !== "expired") return;
+    if (!showBanner) return;
     let cancelled = false;
     setLoadingPlans(true);
     fetch(apiUrl("/api/billing/plans/public"))
@@ -93,7 +106,7 @@ export function ProTrialBanner({
     return () => {
       cancelled = true;
     };
-  }, [state]);
+  }, [showBanner]);
 
   const proPlan = plans.find((p) => p.name.toLowerCase() === "pro") ?? plans[plans.length - 1];
 
@@ -160,7 +173,32 @@ export function ProTrialBanner({
     const cardBg =
       isExpired || isUrgency
         ? "bg-amber-500/10 dark:bg-amber-500/15 border-amber-500/20"
-        : "bg-muted/50 dark:bg-muted/30 border-border";
+        : "bg-[#f8f4f1] dark:bg-[#f8f4f1] border-border";
+
+    // Collapsed sidebar: compact pill with tooltip
+    if (isSidebarCollapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              href="/settings/billing"
+              className={cn(
+                "flex items-center justify-center w-10 h-10 rounded-lg border shrink-0 mx-auto",
+                cardBg
+              )}
+              aria-label={isExpired ? t("trialEnded") : t("onTrial")}
+            >
+              <AlertCircle className={cn("h-5 w-5", isExpired || isUrgency ? "text-muted-foreground" : "text-black")} />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent side="right" variant="pill">
+            {isExpired ? t("trialEnded") : t("onTrial")}
+            {!isExpired && trialEnd ? ` — ${t("daysLeft", { count: daysLeft })}` : ""}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
     return (
       <div
         className={cn(
@@ -168,10 +206,16 @@ export function ProTrialBanner({
           cardBg
         )}
       >
-        <p className="font-semibold text-sm text-foreground leading-tight">
+        <p className={cn(
+          "font-semibold text-sm leading-tight",
+          isExpired || isUrgency ? "text-foreground" : "text-black"
+        )}>
           {isExpired ? t("trialEnded") : t("onTrial")}
         </p>
-        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+        <p className={cn(
+          "text-xs mt-1 leading-relaxed",
+          isExpired || isUrgency ? "text-muted-foreground" : "text-black/90"
+        )}>
           {isExpired
             ? t("chooseBillingPeriod")
             : isUrgency
@@ -222,22 +266,20 @@ export function ProTrialBanner({
             </Button>
           </div>
         ) : isStripeTrialing ? (
-          <Button variant="outline" size="small" className="w-full mt-3" asChild>
+          <Button
+            size="small"
+            className="w-full mt-3"
+            asChild
+          >
             <a href="/settings/billing">{t("manageBilling")}</a>
           </Button>
         ) : (
           <Button
             size="small"
-            variant="outline"
             className="w-full mt-3"
-            onClick={() => startCheckout("month")}
-            disabled={checkoutLoading}
+            onClick={() => router.push("/settings/billing?openPricingModal=true")}
           >
-            {checkoutLoading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              t("subscribeNow")
-            )}
+            {t("upgradeNow")}
           </Button>
         )}
       </div>

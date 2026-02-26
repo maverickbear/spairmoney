@@ -21,6 +21,7 @@ export interface Database {
           effective_subscription_status: string | null;
           effective_subscription_id: string | null;
           subscription_updated_at: string | null;
+          admin_override_plan_id: string | null;
           is_blocked: boolean;
           temporary_expected_income: string | null;
           temporary_expected_income_amount: number | null;

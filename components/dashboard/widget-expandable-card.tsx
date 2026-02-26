@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-// Dashboard components removed - using simple card components instead
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 interface WidgetExpandableCardProps {
@@ -88,23 +88,29 @@ export function WidgetExpandableCard({
         />
       </div>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent
+          side="right"
           className={cn(
-            modalWidth === "60%" ? "sm:w-[60%]" : !modalWidth && "sm:max-w-4xl",
-            "max-h-[90vh] overflow-y-auto"
+            "w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l",
+            modalWidth === "60%" ? "sm:max-w-[60%]" : !modalWidth ? "sm:max-w-2xl" : "sm:max-w-[600px]"
           )}
-          style={modalWidth && modalWidth !== "60%" ? { "--modal-width": modalWidth } as React.CSSProperties & { "--modal-width": string } : undefined}
         >
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
+          <SheetHeader className="p-6 pb-4 border-b shrink-0">
+            <SheetTitle className="text-xl">{title}</SheetTitle>
             {description && (
               <p className="text-sm text-muted-foreground mt-1">{description}</p>
             )}
-          </DialogHeader>
-          <div className="mt-4">{expandedContent}</div>
-        </DialogContent>
-      </Dialog>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="flex-1">
+              <div className="p-6 space-y-4">
+                {expandedContent}
+              </div>
+            </ScrollArea>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

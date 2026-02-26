@@ -2,13 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { CategorySelectionModal } from "./category-selection-modal";
 import { Loader2 } from "lucide-react";
@@ -50,40 +50,49 @@ export function CategorySelectionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-[600px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl">
             {transaction?.category?.name ? tForms("changeCategory") : tForms("addCategory")}
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             {tForms("selectCategoryForTransaction")}
-          </DialogDescription>
-        </DialogHeader>
-        <CategorySelectionModal
-          transaction={transaction}
-          categories={categories}
-          onSelect={onCategorySelect}
-          onClear={onClear}
-          clearTrigger={clearTrigger}
-        />
-        <DialogFooter>
-          <Button type="button" variant="outline" size="medium" onClick={handleClear} disabled={saving}>
-            {t("clear")}
-          </Button>
-          <Button type="button" size="medium" onClick={onSave} disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
-                {t("saving")}
-              </>
-            ) : (
-              t("save")
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-4">
+              <CategorySelectionModal
+                transaction={transaction}
+                categories={categories}
+                onSelect={onCategorySelect}
+                onClear={onClear}
+                clearTrigger={clearTrigger}
+              />
+            </div>
+          </ScrollArea>
+          <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+            <Button type="button" variant="outline" size="medium" onClick={handleClear} disabled={saving}>
+              {t("clear")}
+            </Button>
+            <Button type="button" size="medium" onClick={onSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+                  {t("saving")}
+                </>
+              ) : (
+                t("save")
+              )}
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

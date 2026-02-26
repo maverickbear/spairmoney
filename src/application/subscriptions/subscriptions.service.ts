@@ -361,6 +361,7 @@ export class SubscriptionsService {
     const effectiveSubscriptionStatus = userCache?.effective_subscription_status;
     const effectiveSubscriptionId = userCache?.effective_subscription_id;
     const subscriptionUpdatedAt = userCache?.subscription_updated_at;
+    const adminOverridePlanId = userCache?.admin_override_plan_id ?? null;
     
     if (effectivePlanId && effectiveSubscriptionStatus && subscriptionUpdatedAt) {
       const subscriptionUpdatedAtTime = new Date(subscriptionUpdatedAt).getTime();
@@ -439,11 +440,10 @@ export class SubscriptionsService {
             };
           }
 
-          return {
-            subscription: fullSubscription,
-            plan,
-            limits: plan.features,
-          };
+          return this.applyAdminPlanOverride(
+            { subscription: fullSubscription, plan, limits: plan.features },
+            adminOverridePlanId
+          );
         }
       }
     }
@@ -542,18 +542,34 @@ export class SubscriptionsService {
     if (plan.id === TRIAL_PLAN_ID && subscription.trialEndDate) {
       const trialEnd = new Date(subscription.trialEndDate);
       if (trialEnd <= new Date()) {
-        return {
-          subscription,
-          plan,
-          limits: getDefaultFeatures(),
-        };
+        return this.applyAdminPlanOverride(
+          { subscription, plan, limits: getDefaultFeatures() },
+          adminOverridePlanId
+        );
       }
     }
 
+    return this.applyAdminPlanOverride(
+      { subscription, plan, limits: plan.features },
+      adminOverridePlanId
+    );
+  }
+
+  /**
+   * When admin has set an override plan (users.admin_override_plan_id), use that plan for limits/features
+   * instead of the subscription's plan. Does not change subscription status; only plan and limits.
+   */
+  private async applyAdminPlanOverride(
+    data: BaseSubscriptionData,
+    overridePlanId: string | null
+  ): Promise<BaseSubscriptionData> {
+    if (!overridePlanId) return data;
+    const overridePlan = await this.getPlanById(overridePlanId, true);
+    if (!overridePlan) return data;
     return {
-      subscription,
-      plan,
-      limits: plan.features,
+      ...data,
+      plan: overridePlan,
+      limits: overridePlan.features,
     };
   }
 

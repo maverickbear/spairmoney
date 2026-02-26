@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { IncomeOnboardingForm } from "./income-onboarding-form";
@@ -141,39 +141,44 @@ export function IncomeOnboardingDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="text-left">
-          <DialogTitle>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-2xl w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl">
             {step === "income"
               ? "Annual Household Income"
               : "Choose Your Budget Rule"}
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             {step === "income"
               ? "Used to tailor your budgets and insights. Not shared with anyone."
               : "Select a budget rule that fits your lifestyle. We'll automatically generate budgets based on your income."}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="pt-4 px-6 pb-4">
-          {step === "income" ? (
-            <IncomeOnboardingForm
-              hideCard
-              showButtons={false}
-              selectedExpectedAnnualIncome={expectedAnnualIncome}
-              onExpectedAnnualIncomeChange={setExpectedAnnualIncome}
-            />
-          ) : (
-            <BudgetRuleSelector
-              selectedRule={selectedRule}
-              recommendedRule={recommendedRule}
-              onSelect={(rule) => setSelectedRule(rule.id)}
-              loading={loading}
-            />
-          )}
-        </div>
-        <DialogFooter>
-          <div className="flex gap-2 w-full sm:w-auto">
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-4">
+              {step === "income" ? (
+                <IncomeOnboardingForm
+                  hideCard
+                  showButtons={false}
+                  selectedExpectedAnnualIncome={expectedAnnualIncome}
+                  onExpectedAnnualIncomeChange={setExpectedAnnualIncome}
+                />
+              ) : (
+                <BudgetRuleSelector
+                  selectedRule={selectedRule}
+                  recommendedRule={recommendedRule}
+                  onSelect={(rule) => setSelectedRule(rule.id)}
+                  loading={loading}
+                />
+              )}
+            </div>
+          </ScrollArea>
+          <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
             {step === "rule" && (
               <Button
                 type="button"
@@ -208,8 +213,8 @@ export function IncomeOnboardingDialog({
               )}
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

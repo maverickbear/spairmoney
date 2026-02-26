@@ -2,21 +2,29 @@
 
 import { useState, useEffect } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, AlertTriangle, Calendar, AlertCircle } from "lucide-react";
+import { Loader2, AlertTriangle, Calendar, AlertCircle, Shield } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SimpleTabs, SimpleTabsList, SimpleTabsTrigger, SimpleTabsContent } from "@/components/ui/simple-tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { AdminUser } from "@/src/domain/admin/admin.types";
 
 interface SubscriptionDialogProps {
@@ -24,18 +32,23 @@ interface SubscriptionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  /** When set, open directly on this tab (e.g. "plan-override"). */
+  initialTab?: string;
 }
 
 type CancelOption = "immediately" | "end_of_period" | "specific_date";
 type RefundOption = "none" | "prorated" | "full";
+
+type PlanOption = { id: string; name: string };
 
 export function SubscriptionDialog({
   user,
   open,
   onOpenChange,
   onSuccess,
+  initialTab,
 }: SubscriptionDialogProps) {
-  const [activeTab, setActiveTab] = useState<string>("trial");
+  const [activeTab, setActiveTab] = useState<string>(initialTab ?? "trial");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +60,29 @@ export function SubscriptionDialog({
   const [cancelOption, setCancelOption] = useState<CancelOption>("immediately");
   const [specificCancelDate, setSpecificCancelDate] = useState("");
   const [refundOption, setRefundOption] = useState<RefundOption>("none");
+
+  // Plan override state
+  const [plans, setPlans] = useState<PlanOption[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [selectedOverridePlanId, setSelectedOverridePlanId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialTab && open) setActiveTab(initialTab);
+  }, [initialTab, open]);
+
+  useEffect(() => {
+    if (user && open && activeTab === "plan-override") {
+      setPlansLoading(true);
+      fetch("/api/v2/admin/plans")
+        .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to load plans"))))
+        .then((data: { plans?: Array<{ id: string; name: string }> }) => {
+          setPlans(data.plans ?? []);
+          setSelectedOverridePlanId(user.adminOverridePlanId ?? null);
+        })
+        .catch(() => setPlans([]))
+        .finally(() => setPlansLoading(false));
+    }
+  }, [user, open, activeTab]);
 
   useEffect(() => {
     if (user && user.subscription && open) {
@@ -197,22 +233,50 @@ export function SubscriptionDialog({
     }
   }
 
-  if (!user || !user.subscription) return null;
+  async function handleSavePlanOverride() {
+    if (!user) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/v2/admin/users/${user.id}/plan-override`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: selectedOverridePlanId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update plan override");
+        return;
+      }
+      onSuccess();
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update plan override");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const isTrialing = user.subscription.status === "trialing";
-  const isActive = user.subscription.status === "active";
+  if (!user) return null;
+
+  const isTrialing = user.subscription?.status === "trialing";
+  const isActive = user.subscription?.status === "active";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Manage Subscription</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-[600px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl">Manage Subscription</SheetTitle>
+          <SheetDescription>
             Manage subscription for {user.name || user.email}
-          </DialogDescription>
-        </DialogHeader>
-
-        <SimpleTabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1">
+            <SimpleTabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <SimpleTabsList className="border-b">
             {isTrialing && (
               <SimpleTabsTrigger value="trial">
@@ -226,6 +290,10 @@ export function SubscriptionDialog({
                 Cancel Subscription
               </SimpleTabsTrigger>
             )}
+            <SimpleTabsTrigger value="plan-override">
+              <Shield className="h-4 w-4 mr-2" />
+              Plan Override
+            </SimpleTabsTrigger>
           </SimpleTabsList>
 
           {/* Trial Edit Tab */}
@@ -369,37 +437,85 @@ export function SubscriptionDialog({
             )}
           </SimpleTabsContent>
 
+          {/* Plan Override Tab */}
+          <SimpleTabsContent value="plan-override" className="p-6">
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Override the effective plan for this user (app-only). Does not change Stripe or billing. The user will get the selected plan&apos;s limits and features until you clear the override.
+              </p>
+              <div className="space-y-2">
+                <Label>Current override</Label>
+                {user.adminOverridePlanId && user.adminOverridePlanName ? (
+                  <Badge variant="secondary">
+                    {user.adminOverridePlanName}
+                  </Badge>
+                ) : (
+                  <span className="text-sm text-muted-foreground">None</span>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="override-plan">Set plan override</Label>
+                {plansLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading plans…
+                  </div>
+                ) : (
+                  <Select
+                    value={selectedOverridePlanId ?? "none"}
+                    onValueChange={(v) => setSelectedOverridePlanId(v === "none" ? null : v)}
+                  >
+                    <SelectTrigger id="override-plan">
+                      <SelectValue placeholder="Select plan or clear override" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Clear override</SelectItem>
+                      {plans.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+          </SimpleTabsContent>
+
           {error && (
             <Alert variant="destructive" className="mx-6">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-        </SimpleTabs>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              if (activeTab === "trial") handleSaveTrial();
-              else if (activeTab === "cancel") handleCancelSubscription();
-            }}
-            disabled={loading}
-            variant={activeTab === "cancel" ? "destructive" : "default"}
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {activeTab === "trial" && "Save Changes"}
-            {activeTab === "cancel" && "Cancel Subscription"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            </SimpleTabs>
+          </ScrollArea>
+          <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (activeTab === "trial") handleSaveTrial();
+                else if (activeTab === "cancel") handleCancelSubscription();
+                else if (activeTab === "plan-override") handleSavePlanOverride();
+              }}
+              disabled={loading}
+              variant={activeTab === "cancel" ? "destructive" : "default"}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {activeTab === "trial" && "Save Changes"}
+              {activeTab === "cancel" && "Cancel Subscription"}
+              {activeTab === "plan-override" && "Save Plan Override"}
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

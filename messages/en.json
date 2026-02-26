@@ -1907,6 +1907,7 @@
       "urgencyMessage": "Only {count} days left in your trial.",
       "urgencySubtext": "Subscribe now to keep full access.",
       "subscribeNow": "Subscribe Now",
+      "upgradeNow": "Upgrade Now",
       "trialEnded": "Your trial has ended.",
       "chooseBillingPeriod": "Choose your billing period and subscribe to keep access.",
       "monthly": "Monthly",

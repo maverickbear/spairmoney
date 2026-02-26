@@ -8,7 +8,7 @@ export const metadata = {
   description: "Privacy Policy for Spair Money",
 };
 
-const LAST_UPDATED = "February 17, 2025";
+const LAST_UPDATED = "February 26, 2025";
 
 const externalLinkClass =
   "text-foreground underline underline-offset-4 hover:--sentiment-positive";
@@ -136,6 +136,43 @@ export default async function PrivacyPolicyPage() {
           </div>
         </LegalSection>
 
+        <LegalSection title="Cookies and Similar Technologies">
+          <p>
+            We use cookies and similar technologies (e.g., local storage) to
+            operate the Service and to remember your preferences.
+          </p>
+          <div>
+            <h3>Types of cookies we use</h3>
+            <ul>
+              <li>
+                <strong>Strictly necessary:</strong> Required for the Service to
+                function (e.g., authentication, session management, security).
+                These cannot be disabled.
+              </li>
+              <li>
+                <strong>Preferences:</strong> Remember your settings (e.g.,
+                language, cookie consent choice). You can manage these through
+                the cookie banner when you first visit or by clearing your
+                browser data.
+              </li>
+              <li>
+                <strong>Analytics and performance:</strong> If we use
+                non-essential analytics or performance cookies, we will do so
+                only with your consent. You may accept or reject non-essential
+                cookies via the cookie preference banner.
+              </li>
+            </ul>
+          </div>
+          <p>
+            Cookie duration depends on type: session cookies expire when you
+            close your browser; persistent cookies may remain for a set period
+            (e.g., 12 months for consent preferences). You can change your
+            cookie choices at any time by clearing cookies or revisiting the
+            cookie banner when it is shown. For more detail on how we use
+            data, see the rest of this Policy.
+          </p>
+        </LegalSection>
+
         <LegalSection title="How We Use Your Information">
           <p>We use the information we collect to:</p>
           <ul>
@@ -165,8 +202,10 @@ export default async function PrivacyPolicyPage() {
 
         <LegalSection title="How We Share Your Information">
           <p>
-            We do not sell your personal or financial information. We may share
-            your information only in the following circumstances:
+            We do not sell your personal or financial information. We do not
+            sell or share your personal information for cross-context
+            behavioral advertising. We may share your information only in the
+            following circumstances:
           </p>
           <ul>
             <li>
@@ -375,6 +414,19 @@ export default async function PrivacyPolicyPage() {
           </div>
         </LegalSection>
 
+        <LegalSection title="International Data Transfers">
+          <p>
+            Your information may be processed in Canada and, where our service
+            providers operate, in other countries (including the United States,
+            where providers such as Supabase, Vercel, and Stripe may process or
+            store data). When we transfer personal data outside the European
+            Economic Area, we implement appropriate safeguards as required by
+            applicable law, such as standard contractual clauses or adequacy
+            decisions. By using the Service, you consent to such transfers in
+            accordance with this Policy.
+          </p>
+        </LegalSection>
+
         <LegalSection title="Data Security">
           <p>
             We implement industry-standard security measures to protect your
@@ -436,6 +488,12 @@ export default async function PrivacyPolicyPage() {
             terminations. This information is used for security purposes and
             compliance with our Terms of Service.
           </p>
+          <p>
+            <strong>Data Breach Notification:</strong> In the event of a data
+            breach that poses a real risk of significant harm to individuals, we
+            will notify affected individuals and report to the Office of the
+            Privacy Commissioner of Canada as required by applicable law.
+          </p>
         </LegalSection>
 
         <LegalSection title="Your Rights and Choices">
@@ -469,7 +527,7 @@ export default async function PrivacyPolicyPage() {
           <p>
             You can manage many preferences in your account settings. To
             exercise any of the above rights, contact us at legal@spair.co. We
-            will respond in accordance with applicable data protection laws.
+            will respond within 30 days (or as required by applicable law).
           </p>
         </LegalSection>
 
@@ -508,8 +566,8 @@ export default async function PrivacyPolicyPage() {
           </ul>
           <p>
             To request deletion of your data, contact us at legal@spair.co. We
-            will process requests in accordance with applicable data protection
-            laws.
+            will process requests within 30 days (or as required by applicable
+            law).
           </p>
         </LegalSection>
 
@@ -558,6 +616,14 @@ export default async function PrivacyPolicyPage() {
                 processing, and withdraw consent. You may also lodge a complaint
                 with your local data protection authority.
               </p>
+              <p>
+                <strong>Legal basis for processing:</strong> We process your
+                data where necessary for the performance of our contract with
+                you (providing the Service), to comply with legal obligations,
+                for our legitimate interests (e.g., security, improving the
+                Service, fraud prevention), and, where applicable, based on your
+                consent (e.g., non-essential cookies).
+              </p>
             </div>
             <div>
               <h3>CCPA (California)</h3>
@@ -593,7 +659,7 @@ export default async function PrivacyPolicyPage() {
           <p>
             For data subject requests or privacy complaints, please email
             legal@spair.co with &quot;Privacy Request&quot; in the subject line. We
-            will respond in accordance with applicable law.
+            will respond within 30 days (or as required by applicable law).
           </p>
         </LegalSection>
       </article>

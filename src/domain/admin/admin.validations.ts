@@ -97,3 +97,10 @@ export const unblockUserSchema = z.object({
 
 export type UnblockUserFormData = z.infer<typeof unblockUserSchema>;
 
+/** Body for admin setting or clearing a user's plan override (app-only; does not change Stripe). */
+export const planOverrideSchema = z.object({
+  planId: z.string().min(1, "Plan ID must be non-empty").nullable(),
+});
+
+export type PlanOverrideFormData = z.infer<typeof planOverrideSchema>;
+

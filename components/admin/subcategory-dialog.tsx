@@ -15,13 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import type { SystemSubcategory } from "@/src/domain/admin/admin.types";
@@ -214,24 +214,29 @@ export function SubcategoryDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px] sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-        <DialogHeader>
-          <DialogTitle>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-[500px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl">
             {subcategory ? "Edit System Subcategory" : "Create System Subcategories"}
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             {subcategory
               ? "Update the system subcategory name below."
               : "Create one or more system subcategories separated by commas. They will be available to all users."}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <form 
           onSubmit={subcategory ? form.handleSubmit(onSubmit) : handleCreateSubmit} 
-          className="flex flex-col flex-1 overflow-hidden"
+          className="flex flex-col flex-1 min-h-0 overflow-hidden"
         >
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="flex-1">
+              <div className="p-6 space-y-4">
           {subcategory ? (
             // Edit mode: single subcategory form
             <>
@@ -311,33 +316,34 @@ export function SubcategoryDialog({
             </div>
             </>
           )}
+              </div>
+            </ScrollArea>
+            <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+              <Button
+                type="button"
+                variant="outline"
+                size="medium"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                size="medium"
+                disabled={
+                  isSubmitting || 
+                  (!subcategory && (!selectedCategoryId || parseCommaSeparated(subcategoryNamesText).length === 0))
+                }
+              >
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {subcategory ? "Update" : "Create"}
+              </Button>
+            </div>
           </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              size="medium"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              size="medium"
-              disabled={
-                isSubmitting || 
-                (!subcategory && (!selectedCategoryId || parseCommaSeparated(subcategoryNamesText).length === 0))
-              }
-            >
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {subcategory ? "Update" : "Create"}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 

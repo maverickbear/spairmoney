@@ -135,6 +135,25 @@ export class AdminService {
   }
 
   /**
+   * Set or clear admin plan override for a user (app-only; does not change Stripe or app_subscriptions).
+   * When set, the user gets this plan's limits/features; clearing (null) restores normal resolution.
+   */
+  async setUserPlanOverride(userId: string, planId: string | null): Promise<void> {
+    const user = await this.repository.getUserById(userId);
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+    if (planId !== null) {
+      const plans = await this.repository.getAllPlans();
+      const planExists = plans.some((p) => p.id === planId);
+      if (!planExists) {
+        throw new AppError("Plan not found", 400);
+      }
+    }
+    await this.repository.setUserPlanOverride(userId, planId);
+  }
+
+  /**
    * Get all promo codes
    */
   async getAllPromoCodes(): Promise<PromoCode[]> {

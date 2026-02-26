@@ -375,6 +375,7 @@ export class SubscriptionsRepository {
     effective_subscription_status: string | null;
     effective_subscription_id: string | null;
     subscription_updated_at: string | null;
+    admin_override_plan_id: string | null;
   } | null> {
     // Validate userId
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
@@ -418,7 +419,7 @@ export class SubscriptionsRepository {
     // Try query with regular client first
     let { data: user, error } = await supabase
       .from("users")
-      .select("effective_plan_id, effective_subscription_status, effective_subscription_id, subscription_updated_at")
+      .select("effective_plan_id, effective_subscription_status, effective_subscription_id, subscription_updated_at, admin_override_plan_id")
       .eq("id", userId)
       .maybeSingle();
 
@@ -429,7 +430,7 @@ export class SubscriptionsRepository {
       const serviceRoleSupabase = createServiceRoleClient();
       const retryResult = await serviceRoleSupabase
         .from("users")
-        .select("effective_plan_id, effective_subscription_status, effective_subscription_id, subscription_updated_at")
+        .select("effective_plan_id, effective_subscription_status, effective_subscription_id, subscription_updated_at, admin_override_plan_id")
         .eq("id", userId)
         .maybeSingle();
       

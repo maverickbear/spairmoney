@@ -9,6 +9,10 @@ export interface AdminUser {
   name: string | null;
   createdAt: Date;
   isBlocked?: boolean;
+  /** When set, admin has overridden effective plan (app-only; display e.g. "Override: Pro"). */
+  adminOverridePlanId?: string | null;
+  /** Name of the override plan when adminOverridePlanId is set (for badge display). */
+  adminOverridePlanName?: string | null;
   plan: {
     id: string;
     name: string;
@@ -90,6 +94,14 @@ export interface AdminDashboardMetrics {
     planName: string;
     count: number;
   }>;
+}
+
+/**
+ * Admin plan override: effective plan for feature access without changing Stripe/billing.
+ * When set, the user gets this plan's limits; clearing (null) restores normal resolution.
+ */
+export interface PlanOverride {
+  planId: string | null;
 }
 
 /** Admin invite for staff registration (creates super_admin users) */

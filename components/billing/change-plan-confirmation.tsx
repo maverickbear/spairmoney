@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { AlertTriangle, Check, X } from "lucide-react";
@@ -167,81 +167,86 @@ export function ChangePlanConfirmationModal({
 
   if (isCancellation) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-          <DialogHeader>
-            <DialogTitle className="text-2xl flex items-center gap-2">
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="sm:max-w-2xl w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+        >
+          <SheetHeader className="p-6 pb-4 border-b shrink-0">
+            <SheetTitle className="text-xl flex items-center gap-2">
               <AlertTriangle className="h-6 w-6 text-yellow-500" />
               Cancel Subscription
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               Are you sure you want to cancel your subscription?
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="flex-1">
+              <div className="p-6 space-y-4">
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Warning:</strong> Cancelling your subscription will end your access to all plan features at the end of your current billing period.
+                  </AlertDescription>
+                </Alert>
 
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Warning:</strong> Cancelling your subscription will end your access to all plan features at the end of your current billing period.
-              </AlertDescription>
-            </Alert>
+                {currentPlan && (
+                  <div>
+                    <h3 className="font-semibold mb-2">You will lose access to:</h3>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      {currentPlan.features.maxTransactions > 0 && (
+                        <li>{currentPlan.features.maxTransactions} transactions/month</li>
+                      )}
+                      {currentPlan.features.maxAccounts > 0 && (
+                        <li>{currentPlan.features.maxAccounts} accounts</li>
+                      )}
+                      {currentPlan.features.hasInvestments && <li>Investment tracking</li>}
+                      {currentPlan.features.hasAdvancedReports && <li>Advanced reports</li>}
+                      {currentPlan.features.hasCsvExport && <li>CSV export</li>}
+                      {currentPlan.features.hasCsvImport && <li>CSV import</li>}
+                      {currentPlan.features.hasBudgets && <li>Budgets</li>}
+                      {currentPlan.features.hasHousehold && <li>Household members</li>}
+                      {currentPlan.features.hasReceiptScanner && <li>Receipt scanner</li>}
+                    </ul>
+                  </div>
+                )}
 
-            {currentPlan && (
-              <div>
-                <h3 className="font-semibold mb-2">You will lose access to:</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                  {currentPlan.features.maxTransactions > 0 && (
-                    <li>{currentPlan.features.maxTransactions} transactions/month</li>
-                  )}
-                  {currentPlan.features.maxAccounts > 0 && (
-                    <li>{currentPlan.features.maxAccounts} accounts</li>
-                  )}
-                  {currentPlan.features.hasInvestments && <li>Investment tracking</li>}
-                  {currentPlan.features.hasAdvancedReports && <li>Advanced reports</li>}
-                  {currentPlan.features.hasCsvExport && <li>CSV export</li>}
-                  {currentPlan.features.hasCsvImport && <li>CSV import</li>}
-                  {currentPlan.features.hasBudgets && <li>Budgets</li>}
-                  {currentPlan.features.hasHousehold && <li>Household members</li>}
-                  {currentPlan.features.hasReceiptScanner && <li>Receipt scanner</li>}
-                </ul>
+                <Alert>
+                  <AlertDescription>
+                    <strong>Note:</strong> You will continue to have access to your current plan features until the end of your billing period.
+                  </AlertDescription>
+                </Alert>
               </div>
-            )}
-
-            <Alert>
-              <AlertDescription>
-                <strong>Note:</strong> You will continue to have access to your current plan features until the end of your billing period.
-              </AlertDescription>
-            </Alert>
+            </ScrollArea>
+            <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={loading}
+                className="flex-1 sm:flex-initial"
+              >
+                Keep Subscription
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (onOpenStripePortal) {
+                    onOpenStripePortal();
+                    onOpenChange(false);
+                  } else {
+                    onConfirm();
+                  }
+                }}
+                disabled={loading}
+                className="flex-1 sm:flex-initial"
+              >
+                {loading ? "Processing..." : "Cancel Subscription"}
+              </Button>
+            </div>
           </div>
-
-          <DialogFooter className="flex-shrink-0">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-              className="flex-1 sm:flex-initial"
-            >
-              Keep Subscription
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (onOpenStripePortal) {
-                  onOpenStripePortal();
-                  onOpenChange(false);
-                } else {
-                  onConfirm();
-                }
-              }}
-              disabled={loading}
-              className="flex-1 sm:flex-initial"
-            >
-              {loading ? "Processing..." : "Cancel Subscription"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     );
   }
 
@@ -253,106 +258,109 @@ export function ChangePlanConfirmationModal({
   const gainedFeatures = isUpgrade ? getGainedFeatures(currentPlan, targetPlan) : [];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-        <DialogHeader>
-          <DialogTitle className="text-2xl flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-2xl w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl flex items-center gap-2">
             {isDowngrade ? (
               <AlertTriangle className="h-6 w-6 text-yellow-500" />
             ) : (
               <Check className="h-6 w-6 text-sentiment-positive" />
             )}
             {isDowngrade ? "Confirm Downgrade" : "Confirm Upgrade"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="px-6 pb-4">
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             You are about to {isDowngrade ? "downgrade" : "upgrade"} from{" "}
             {currentPlan.name.charAt(0).toUpperCase() + currentPlan.name.slice(1)} to{" "}
             {targetPlan.name.charAt(0).toUpperCase() + targetPlan.name.slice(1)} plan.
-          </DialogDescription>
-        </div>
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-4">
+              {isDowngrade && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Important:</strong> You will lose access to the following features when you downgrade:
+                  </AlertDescription>
+                </Alert>
+              )}
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-          {isDowngrade && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Important:</strong> You will lose access to the following features when you downgrade:
-              </AlertDescription>
-            </Alert>
-          )}
+              {isUpgrade && (
+                <Alert>
+                  <Check className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Great choice!</strong> You will gain access to the following features:
+                  </AlertDescription>
+                </Alert>
+              )}
 
-          {isUpgrade && (
-            <Alert>
-              <Check className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Great choice!</strong> You will gain access to the following features:
-              </AlertDescription>
-            </Alert>
-          )}
+              {isDowngrade && lostFeatures.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Features you will lose:</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    {lostFeatures.map((feature, index) => (
+                      <li key={index}>{feature}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-          {isDowngrade && lostFeatures.length > 0 && (
-            <div>
-              <h3 className="font-semibold mb-2">Features you will lose:</h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                {lostFeatures.map((feature, index) => (
-                  <li key={index}>{feature}</li>
-                ))}
-              </ul>
+              {isUpgrade && gainedFeatures.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Features you will gain:</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-sentiment-positive">
+                    {gainedFeatures.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <Check className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {isDowngrade ? (
+                <Alert>
+                  <AlertDescription>
+                    <strong>Note:</strong> Your plan change will take effect at the end of the current billing period. 
+                    You will continue to have access to your current plan features until then.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert>
+                  <AlertDescription>
+                    <strong>Note:</strong> Your upgrade will take effect immediately. You will be charged a prorated amount for the remainder of your billing period.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
-          )}
-
-          {isUpgrade && gainedFeatures.length > 0 && (
-            <div>
-              <h3 className="font-semibold mb-2">Features you will gain:</h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-sentiment-positive">
-                {gainedFeatures.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <Check className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {isDowngrade ? (
-            <Alert>
-              <AlertDescription>
-                <strong>Note:</strong> Your plan change will take effect at the end of the current billing period. 
-                You will continue to have access to your current plan features until then.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Alert>
-              <AlertDescription>
-                <strong>Note:</strong> Your upgrade will take effect immediately. You will be charged a prorated amount for the remainder of your billing period.
-              </AlertDescription>
-            </Alert>
-          )}
+          </ScrollArea>
+          <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+              className="flex-1 sm:flex-initial"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={isDowngrade ? "destructive" : "default"}
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 sm:flex-initial"
+            >
+              {loading ? "Processing..." : isDowngrade ? "Confirm Downgrade" : "Confirm Upgrade"}
+            </Button>
+          </div>
         </div>
-
-        <DialogFooter className="flex-shrink-0">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={loading}
-            className="flex-1 sm:flex-initial"
-          >
-            Cancel
-          </Button>
-          <Button
-            variant={isDowngrade ? "destructive" : "default"}
-            onClick={onConfirm}
-            disabled={loading}
-            className="flex-1 sm:flex-initial"
-          >
-            {loading ? "Processing..." : isDowngrade ? "Confirm Downgrade" : "Confirm Upgrade"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 

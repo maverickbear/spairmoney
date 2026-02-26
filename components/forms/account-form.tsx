@@ -15,13 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/toast-provider";
@@ -384,8 +384,10 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
   }
 
   const formContent = (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-4">
           {/* Show limit warning for new accounts - show immediately if limit reached */}
           {!account && currentAccountLimit && currentAccountLimit.limit !== -1 && (
             <LimitWarning
@@ -574,26 +576,25 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
           )}
 
           </div>
-
-          <DialogFooter className="justify-between">
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="medium" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              {(!account && isLimitReached) ? null : (
-                <Button type="submit" size="medium" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("saving")}
-                    </>
-                  ) : (
-                    t("save")
-                  )}
-                </Button>
+        </ScrollArea>
+        <div className="p-4 border-t flex flex-wrap justify-end gap-2 shrink-0 bg-background">
+          <Button type="button" variant="outline" size="medium" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          {(!account && isLimitReached) ? null : (
+            <Button type="submit" size="medium" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t("saving")}
+                </>
+              ) : (
+                t("save")
               )}
-            </div>
-          </DialogFooter>
+            </Button>
+          )}
+        </div>
+      </div>
         </form>
   );
 
@@ -602,17 +603,20 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-        <DialogHeader>
-          <DialogTitle>{account ? t("edit") : t("add")} {tForms("account")}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="sm:max-w-[600px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+      >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle className="text-xl">{account ? t("edit") : t("add")} {tForms("account")}</SheetTitle>
+          <SheetDescription>
             {account ? tForms("updateAccountDescription") : tForms("createAccountDescription")}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
         {formContent}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 
