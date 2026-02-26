@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { KBarWrapper } from "@/components/kbar-wrapper";
 import { ToastProvider } from "@/components/toast-provider";
 import { StripeProvider } from "@/components/stripe-provider";
 import { BreakpointLogger } from "@/components/breakpoint-logger";
@@ -58,7 +57,6 @@ export default function RootLayout({
             <AuthProvider>
               <BreakpointLogger />
               {children}
-              <KBarWrapper />
               <CookieConsentBanner />
               <SpeedInsightsWrapper />
             </AuthProvider>

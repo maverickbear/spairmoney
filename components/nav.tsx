@@ -2,9 +2,9 @@
 
 import { Link, usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { useState, useEffect, createContext, useContext, memo, useMemo, useRef } from "react";
+import { useState, useEffect, createContext, useContext, memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Menu, ChevronDown } from "lucide-react";
 import { Logo } from "@/components/common/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenuClient } from "@/components/nav/user-menu-client";
@@ -44,8 +44,6 @@ function NavComponent() {
   const t = useTranslations("nav");
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   // Load collapsed state from localStorage on mount
@@ -64,16 +62,6 @@ function NavComponent() {
   }, [isCollapsed]);
 
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
-
-
   // Build nav sections using centralized configuration (consumer app only)
   const navSections = useMemo((): NavSection[] => getNavSections(), []);
 
@@ -82,38 +70,37 @@ function NavComponent() {
       <TooltipProvider>
         <aside
           className={cn(
-            "fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-300 hidden lg:block",
+            "fixed left-0 top-0 z-40 h-screen border-r bg-card hidden lg:block",
+            "duration-300 transition-[width]",
             isCollapsed ? "w-16 overflow-visible" : "w-64 overflow-hidden"
           )}
-          onMouseEnter={() => {
-            // Clear any existing timeout
-            if (hoverTimeoutRef.current) {
-              clearTimeout(hoverTimeoutRef.current);
-              hoverTimeoutRef.current = null;
-            }
-            setIsHovered(true);
-          }}
-          onMouseLeave={() => {
-            // Keep button visible for 2 seconds after mouse leaves
-            hoverTimeoutRef.current = setTimeout(() => {
-              setIsHovered(false);
-              hoverTimeoutRef.current = null;
-            }, 2000);
-          }}
         >
           <div className={cn("flex h-full flex-col", isCollapsed && "overflow-visible")}>
             <div
               className={cn(
-                "flex h-16 min-h-[64px] items-center border-b px-4 relative justify-center"
+                "flex h-16 min-h-[64px] items-center border-b gap-2 relative",
+                isCollapsed ? "flex-col justify-center px-0" : "flex-row justify-start px-2"
               )}
             >
-              {isCollapsed ? (
-                <Link href="/dashboard" prefetch={true} className="flex items-center justify-center w-full h-full">
-                  <Logo variant="icon" color="auto" width={40} height={40} priority />
-                </Link>
-              ) : (
-                <Link href="/dashboard" prefetch={true} className="flex items-center justify-center w-full h-full">
-                  <Logo variant="wordmark" color="auto" width={200} height={53} priority />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn("shrink-0", isCollapsed ? "h-8 w-8" : "h-9 w-9")}
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    aria-label={isCollapsed ? t("expandMenu") : t("collapseMenu")}
+                  >
+                    <Menu className={cn(isCollapsed ? "h-4 w-4" : "h-5 w-5")} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" variant="pill">
+                  {isCollapsed ? t("expandMenu") : t("collapseMenu")}
+                </TooltipContent>
+              </Tooltip>
+              {!isCollapsed && (
+                <Link href="/dashboard" prefetch={true} className="flex items-center justify-center flex-1 min-w-0">
+                  <Logo variant="wordmark" color="auto" width={160} height={42} priority />
                 </Link>
               )}
             </div>
@@ -195,7 +182,7 @@ function NavComponent() {
                                 <TooltipTrigger asChild>
                                   <div className="relative">
                                     {soonElement}
-                                    <TooltipContent side="right">
+                                    <TooltipContent side="right" variant="pill">
                                       {itemLabel} ({t("soon")})
                                     </TooltipContent>
                                   </div>
@@ -232,7 +219,7 @@ function NavComponent() {
                               <TooltipTrigger asChild>
                                 <div className="relative">
                                   {linkElement}
-                                  <TooltipContent side="right">
+                                  <TooltipContent side="right" variant="pill">
                                     {itemLabel}
                                   </TooltipContent>
                                 </div>
@@ -260,33 +247,6 @@ function NavComponent() {
             <UserMenuClient isCollapsed={isCollapsed} />
           </div>
         </aside>
-        {/* Toggle button rendered outside aside to avoid overflow clipping */}
-        {isHovered && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "fixed top-4 h-5 w-5 z-[50] bg-card border border-border shadow-sm hidden lg:flex items-center justify-center transition-opacity duration-200",
-                  isCollapsed ? "left-16" : "left-64",
-                  isHovered ? "opacity-100" : "opacity-0"
-                )}
-                style={{ transform: 'translateX(-50%)' }}
-                onClick={() => setIsCollapsed(!isCollapsed)}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side={isCollapsed ? "right" : "bottom"}>
-              {isCollapsed ? t("expandMenu") : t("collapseMenu")}
-            </TooltipContent>
-          </Tooltip>
-        )}
       </TooltipProvider>
     </SidebarContext.Provider>
   );

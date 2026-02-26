@@ -104,6 +104,16 @@ export async function POST(request: NextRequest) {
         logger.error("[CREATE-ACCOUNT] Error sending welcome email:", welcomeEmailError);
         // Don't fail account creation if welcome email fails
       }
+      try {
+        const { sendNewSignupNotificationEmail } = await import("@/lib/utils/email");
+        await sendNewSignupNotificationEmail({
+          userEmail: authData.user.email,
+          userName: body.name ?? null,
+          signupSource: "checkout",
+        });
+      } catch (notifyError) {
+        logger.error("[CREATE-ACCOUNT] Error sending new signup notification (non-critical):", notifyError);
+      }
     }
 
     const userId = linkResult.userId || authData.user.id;

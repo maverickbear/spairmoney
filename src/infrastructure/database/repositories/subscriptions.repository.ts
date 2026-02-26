@@ -452,6 +452,25 @@ export class SubscriptionsRepository {
   }
 
   /**
+   * Get user's local trial end date (users.trial_ends_at).
+   * Used when user has no Stripe subscription to determine if they are in trial.
+   */
+  async getTrialEndsAt(userId: string, useServiceRole: boolean = false): Promise<string | null> {
+    const supabase = useServiceRole ? createServiceRoleClient() : (await createServerClient());
+    const { data, error } = await supabase
+      .from("users")
+      .select("trial_ends_at")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error && error.code !== "PGRST116") {
+      logger.debug("[SubscriptionsRepository] Error fetching trial_ends_at:", { userId, error: error.message });
+      return null;
+    }
+    const row = data as { trial_ends_at?: string | null } | null;
+    return row?.trial_ends_at ?? null;
+  }
+
+  /**
    * Get active household ID for user
    */
   async getActiveHouseholdId(userId: string, useServiceRole: boolean = false): Promise<string | null> {
@@ -829,18 +848,19 @@ export class SubscriptionsRepository {
   }
 
   /**
-   * Create subscription
+   * Create subscription.
+   * Stripe fields and period dates are optional for Trial plan (no Stripe).
    */
   async create(data: {
     id: string;
     userId: string;
     householdId: string;
     planId: string;
-    stripeSubscriptionId: string;
-    stripeCustomerId: string;
+    stripeSubscriptionId?: string | null;
+    stripeCustomerId?: string | null;
     status: "active" | "trialing" | "cancelled" | "past_due" | "unpaid";
-    currentPeriodStart: string;
-    currentPeriodEnd: string;
+    currentPeriodStart?: string | null;
+    currentPeriodEnd?: string | null;
     cancelAtPeriodEnd: boolean;
     trialStartDate?: string | null;
     trialEndDate?: string | null;
@@ -855,11 +875,11 @@ export class SubscriptionsRepository {
       user_id: data.userId,
       household_id: data.householdId,
       plan_id: data.planId,
-      stripe_subscription_id: data.stripeSubscriptionId,
-      stripe_customer_id: data.stripeCustomerId,
+      stripe_subscription_id: data.stripeSubscriptionId ?? null,
+      stripe_customer_id: data.stripeCustomerId ?? null,
       status: data.status,
-      current_period_start: data.currentPeriodStart,
-      current_period_end: data.currentPeriodEnd,
+      current_period_start: data.currentPeriodStart ?? null,
+      current_period_end: data.currentPeriodEnd ?? null,
       cancel_at_period_end: data.cancelAtPeriodEnd,
       trial_start_date: data.trialStartDate || null,
       trial_end_date: data.trialEndDate || null,

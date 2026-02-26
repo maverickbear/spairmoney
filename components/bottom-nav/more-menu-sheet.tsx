@@ -155,13 +155,14 @@ interface PlanInfo {
 interface MoreMenuSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  hasSubscription?: boolean;
+  /** True when user can use the app (trial or active subscription) */
+  hasAccess?: boolean;
 }
 
 export function MoreMenuSheet({
   open,
   onOpenChange,
-  hasSubscription = true,
+  hasAccess = true,
 }: MoreMenuSheetProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -209,12 +210,8 @@ export function MoreMenuSheet({
     return pathname === basePath || pathname === href || (basePath !== "/" && pathname.startsWith(basePath));
   };
 
-  const handleItemClick = (href: string) => {
+  const handleItemClick = () => {
     onOpenChange(false);
-    if (!hasSubscription) {
-      router.push("/dashboard");
-      return;
-    }
   };
 
   const handleLogout = async () => {
@@ -267,7 +264,7 @@ export function MoreMenuSheet({
                   </span>
                 </div>
               )}
-              {hasSubscription && (
+              {hasAccess && (
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center border-2 border-background">
                   <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
                 </div>
@@ -399,7 +396,7 @@ export function MoreMenuSheet({
                         target="_blank"
                         rel="noopener noreferrer"
                         prefetch={true}
-                        onClick={() => handleItemClick(item.href)}
+                        onClick={() => handleItemClick()}
                         className={cn(
                           "flex items-center gap-3 px-3 py-2",
                           "transition-all duration-200",
@@ -438,14 +435,7 @@ export function MoreMenuSheet({
                       key={item.href}
                       href={item.href}
                       prefetch={true}
-                      onClick={(e) => {
-                        if (!hasSubscription) {
-                          e.preventDefault();
-                          router.push("/dashboard");
-                        } else {
-                          handleItemClick(item.href);
-                        }
-                      }}
+                      onClick={() => handleItemClick()}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2",
                         "transition-all duration-200",

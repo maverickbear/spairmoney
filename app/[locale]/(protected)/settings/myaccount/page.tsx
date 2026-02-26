@@ -4,11 +4,9 @@ import { usePagePerformance } from "@/hooks/use-page-performance";
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { ProfileModule } from "../profile/profile-module";
-import { HouseholdIncomeSettings } from "@/src/presentation/components/features/onboarding/household-income-settings";
-import { BudgetPlanSettings } from "@/src/presentation/components/features/onboarding/budget-plan-settings";
 import { RequestPasswordResetLink } from "@/components/profile/request-password-reset-link";
 import { DeleteAccountSection } from "@/components/profile/delete-account-section";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/page-header";
 
 export default function MyAccountPage() {
@@ -36,54 +34,28 @@ export default function MyAccountPage() {
           <ProfileModule />
         </div>
 
-        {/* Right Column - Other Settings Cards */}
-        <div>
-          <Accordion type="single" collapsible className="space-y-6">
-            <AccordionItem value="income">
-              <AccordionTrigger>{tSettings("expectedHouseholdIncome")}</AccordionTrigger>
-              <AccordionContent className="p-0">
-                <div className="px-6 pb-4">
-                  <p className="text-sm text-muted-foreground">
-                    {tSettings("expectedHouseholdIncomeDescription")}
-                  </p>
-                </div>
-                <HouseholdIncomeSettings />
-              </AccordionContent>
-            </AccordionItem>
+        {/* Right Column - Other Settings */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">{tSettings("changePassword")}</h2>
+            </CardHeader>
+            <CardContent>
+              <RequestPasswordResetLink />
+            </CardContent>
+          </Card>
 
-            <AccordionItem value="budget">
-              <AccordionTrigger>{tSettings("budgetPlan")}</AccordionTrigger>
-              <AccordionContent className="p-0">
-                <div className="px-6 pb-4">
-                  <p className="text-sm text-muted-foreground">
-                    {tSettings("budgetPlanDescription")}
-                  </p>
-                </div>
-                <BudgetPlanSettings />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="password">
-              <AccordionTrigger>{tSettings("changePassword")}</AccordionTrigger>
-              <AccordionContent className="p-0">
-                <div className="px-6 pb-4">
-                  <RequestPasswordResetLink />
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="delete">
-              <AccordionTrigger>{tSettings("deleteAccount")}</AccordionTrigger>
-              <AccordionContent className="p-0">
-                <div className="px-6 pb-4">
-                  <p className="text-sm text-muted-foreground">
-                    {tSettings("deleteAccountDescription")}
-                  </p>
-                </div>
-                <DeleteAccountSection />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">{tSettings("deleteAccount")}</h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {tSettings("deleteAccountDescription")}
+              </p>
+              <DeleteAccountSection />
+            </CardContent>
+          </Card>
         </div>
       </div>
       </div>

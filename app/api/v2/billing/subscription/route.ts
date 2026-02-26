@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
         plan: subscriptionData.plan,
         limits: subscriptionData.limits,
         interval: intervalResult,
+        trialEndsAt: subscriptionData.trialEndsAt ?? null,
         transactionLimit: limitsResult.transactionLimit,
         accountLimit: limitsResult.accountLimit,
       },

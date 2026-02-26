@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, Re
 import { logger } from "@/lib/utils/logger";
 import { apiUrl } from "@/lib/utils/api-base-url";
 import type { Subscription, Plan, PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
-import { getDefaultFeatures } from "@/lib/utils/plan-features";
+import { getDefaultFeatures, getTrialFeatures } from "@/lib/utils/plan-features";
 
 interface SubscriptionContextValue {
   subscription: Subscription | null;
@@ -62,17 +62,19 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
   const subscriptionRef = useRef<Subscription | null>(initialData?.subscription ?? null);
   const planRef = useRef<Plan | null>(initialData?.plan ?? null);
 
-  // Update limits when plan changes
-  // Use plan.features directly from database - the database is the source of truth
+  // Update limits when plan changes or trial status changes
+  // During trial (no plan, trialEndsAt in future): full access. Otherwise plan features or defaults.
   useEffect(() => {
     if (plan?.features) {
       setLimits(plan.features);
+    } else if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
+      setLimits(getTrialFeatures());
     } else {
       setLimits(getDefaultFeatures());
     }
     // Keep ref in sync
     planRef.current = plan;
-  }, [plan]);
+  }, [plan, trialEndsAt]);
 
   // Keep subscription ref in sync
   useEffect(() => {
@@ -88,7 +90,13 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     setSubscription(nextSub);
     setPlan(nextPlan);
     setTrialEndsAt(nextTrialEndsAt);
-    setLimits(nextPlan?.features ?? getDefaultFeatures());
+    if (nextPlan?.features) {
+      setLimits(nextPlan.features);
+    } else if (nextTrialEndsAt && new Date(nextTrialEndsAt) > new Date()) {
+      setLimits(getTrialFeatures());
+    } else {
+      setLimits(getDefaultFeatures());
+    }
     subscriptionRef.current = nextSub;
     planRef.current = nextPlan;
     if (nextSub || nextPlan) {
@@ -97,7 +105,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     }
   }, [initialData?.subscription, initialData?.plan, initialData?.trialEndsAt]);
 
-  const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null; interval: "month" | "year" | null }> => {
+  const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null; interval: "month" | "year" | null; trialEndsAt?: string | null }> => {
     try {
       const response = await fetch(apiUrl("/api/v2/billing/subscription"));
       
@@ -108,6 +116,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
             subscription: null,
             plan: null,
             interval: null,
+            trialEndsAt: null,
           };
         }
         
@@ -128,6 +137,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
             subscription: subscriptionRef.current,
             plan: planRef.current,
             interval: null,
+            trialEndsAt: undefined,
           };
         }
         
@@ -142,20 +152,22 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
         subscription: data.subscription ?? null,
         plan: data.plan ?? null,
         interval: data.interval ?? null,
+        trialEndsAt: data.trialEndsAt ?? null,
       };
       
       return {
         subscription: result.subscription ?? null,
         plan: result.plan ?? null,
         interval: result.interval ?? null,
+        trialEndsAt: result.trialEndsAt ?? null,
       };
     } catch (error) {
       log.error("Error fetching subscription:", error);
-      // On network errors, return current state from refs to avoid clearing subscription data
-      return { 
-        subscription: subscriptionRef.current, 
+      return {
+        subscription: subscriptionRef.current,
         plan: planRef.current,
         interval: null,
+        trialEndsAt: undefined,
       };
     }
   }, [log]);
@@ -181,17 +193,20 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     lastFetchRef.current = Date.now();
 
     try {
-      const { subscription: newSubscription, plan: newPlan, interval: newInterval } = await fetchSubscription();
-      
+      const result = await fetchSubscription();
+      const { subscription: newSubscription, plan: newPlan, interval: newInterval, trialEndsAt: newTrialEndsAt } = result;
+
       // Check if we got rate limited (cooldown was set during fetch)
       const wasRateLimited = rateLimitCooldownRef.current > cooldownBeforeFetch;
-      
+
       // Only update state if we got fresh data (not rate limited)
-      // This prevents clearing subscription data on 429 errors
       if (!wasRateLimited) {
         setSubscription(newSubscription);
         setPlan(newPlan);
         setBillingInterval(newInterval);
+        if (newTrialEndsAt !== undefined) {
+          setTrialEndsAt(newTrialEndsAt ?? null);
+        }
       } else {
         log.log("Rate limited during fetch, preserving current subscription state");
       }

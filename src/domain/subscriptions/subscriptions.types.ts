@@ -65,6 +65,8 @@ export interface BaseSubscriptionData {
   subscription: BaseSubscription | null;
   plan: BasePlan | null;
   limits: BasePlanFeatures;
+  /** End of local trial (users.trial_ends_at). Used when no Stripe subscription yet. */
+  trialEndsAt?: string | null;
 }
 
 export interface BaseLimitCheckResult {

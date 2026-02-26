@@ -7,6 +7,7 @@ import { routing } from "@/i18n/routing";
 import { IntlProviderClient } from "@/components/common/intl-provider-client";
 import { SyncLangAttribute } from "@/components/common/sync-lang-attribute";
 import { LayoutWrapperClient } from "@/components/layout-wrapper-client";
+import { KBarWrapper } from "@/components/kbar-wrapper";
 import type { Metadata } from "next";
 
 type Props = {
@@ -48,6 +49,7 @@ async function LocaleLayoutInner({ params, children }: { params: Promise<{ local
       <LayoutWrapperClient>
         {children}
       </LayoutWrapperClient>
+      <KBarWrapper />
     </IntlProviderClient>
   );
 }

@@ -15,7 +15,32 @@
     "edit": "Edit",
     "add": "Add",
     "language": "Language",
-    "noPostsYet": "No posts yet. Check back soon."
+    "noPostsYet": "No posts yet. Check back soon.",
+    "languageEnglish": "English",
+    "languagePortuguese": "Portuguese",
+    "languageSpanish": "Spanish",
+    "searchCommands": "Search commands...",
+    "percentagePlaceholder": "0.00 %",
+    "dateRange": {
+      "allDates": "All Dates",
+      "today": "Today",
+      "past7Days": "Past 7 days",
+      "past15Days": "Past 15 days",
+      "past30Days": "Past 30 days",
+      "past90Days": "Past 90 days",
+      "last3Months": "Last 3 months",
+      "lastMonth": "Last month",
+      "last6Months": "Last 6 months",
+      "past6Months": "Past 6 months",
+      "thisMonth": "This month",
+      "thisYear": "This year",
+      "yearToDate": "Year to date",
+      "lastYear": "Last year",
+      "customRange": "Custom range",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "selectDateRange": "Select date range"
+    }
   },
   "forms": {
     "account": "Account",
@@ -155,6 +180,8 @@
     "invitedToHousehold": "{ownerName} invited you to join their household. Sign in to accept the invitation.",
     "error": "Error",
     "welcome": "Welcome",
+    "welcomeWithName": "Welcome, {name}",
+    "guest": "there",
     "signInToContinue": "Sign in to your account to continue",
     "signInToAccessDashboard": "Sign in to your account to access the dashboard",
     "name": "Name",
@@ -253,16 +280,143 @@
       "settings": "Settings",
       "helpSupport": "Help & Support",
       "feedback": "Feedback",
-      "investments": "Investments"
+      "investments": "Investments",
+      "about": "About Us",
+      "careers": "Careers",
+      "blog": "Blog"
     },
-    "titleSuffix": "Spair Money"
+    "titleSuffix": "Spair Money",
+    "aboutTitle": "About Us - Spair Money",
+    "aboutDescription": "We built Spair Money because money shouldn't feel overwhelming. One place to see what's happening, make better decisions, and feel in control.",
+    "careersTitle": "Careers - Spair Money",
+    "careersDescription": "Join Spair Money. Explore open positions and learn how you can help bring clarity to personal finance.",
+    "blogTitle": "Blog - Personal Finance Tips & Guides | Spair Money",
+    "blogDescription": "Practical personal finance articles: budgeting, expense tracking, saving, and financial peace. Tips and guides from Spair Money.",
+    "blogOgDescription": "Practical personal finance articles: budgeting, expense tracking, saving, and financial peace.",
+    "blogTwitterDescription": "Practical personal finance articles and guides from Spair Money."
+  },
+  "about": {
+    "title": "About Us",
+    "intro1": "We didn't build Spair Money because we love spreadsheets. We built it because money shouldn't feel this overwhelming.",
+    "intro2": "Most people aren't \"bad with money.\" They're just juggling too much: multiple accounts, scattered transactions, confusing budgets, and goals that never feel close enough.",
+    "intro3": "Spair Money brings it all into one place—so you can see what's happening, make better decisions, and feel in control again.",
+    "intro4": "We're a small team building a simpler way to manage money:",
+    "list1": "One clear dashboard",
+    "list2": "Budgets and goals that actually stick",
+    "list3": "Insights that help you move forward",
+    "noJudgment": "No judgment. No finance jargon. No shame.",
+    "justClarity": "Just clarity, structure, and momentum.",
+    "becauseConfidence": "Because financial confidence isn't about being rich—it's about knowing where you stand and where you're going.",
+    "welcome": "Welcome to Spair Money 💚"
+  },
+  "careers": {
+    "title": "Careers",
+    "workWithUsTitle": "Work with us",
+    "workWithUsBody": "We are a small team focused on building a product that makes a real difference in how people manage their money. If you care about clarity, simplicity, and user privacy, we would love to hear from you.",
+    "openPositionsTitle": "Open positions",
+    "openPositionsBody": "We are not actively hiring for specific roles at the moment. If you are interested in future opportunities, please check back later or <link></link> and tell us about yourself. We keep all applications on file for when new roles open up.",
+    "getInTouch": "get in touch"
   },
   "landing": {
     "hero": {
       "headline": "Your money isn't disappearing — it's just hiding.",
       "subheadline": "Small daily purchases add up fast. Coffee. Lunch. Subscriptions. Delivery. Spair shows you exactly where your money goes — so you can take control.",
       "ctaReveal": "Reveal My Spending",
-      "ctaHowItWorks": "See How It Works"
+      "ctaHowItWorks": "See How It Works",
+      "imageAlt": "Spair Money dashboard: your money in one place with Spair Score and spending overview"
+    },
+    "aria": {
+      "mainNav": "Main navigation",
+      "openMenu": "Open menu",
+      "spairHome": "Spair Money home",
+      "menu": "Menu",
+      "footerNav": "Footer navigation",
+      "featuresSection": "Features explained with visuals",
+      "mainContent": "Spair Money – Clarity over chaos: see where your money goes",
+      "prevTestimonial": "Previous testimonial",
+      "nextTestimonial": "Next testimonial",
+      "goToTestimonial": "Go to testimonial {index}"
+    },
+    "featuresThreeColumn": {
+      "item1Title": "Spair categorizes your spending.",
+      "item1Description": "Automatic categories and weekly or monthly trends show where your money really goes.",
+      "item1ImageAlt": "Smart transaction categories and spending trends",
+      "item2Title": "See debt payoff clearly.",
+      "item2Description": "Track balances, due dates, and progress toward payoff—all in one view.",
+      "item2ImageAlt": "Debt tracking with balances and payoff visibility",
+      "item3Title": "See the small stuff clearly.",
+      "item3Description": "Recurring spending and subscriptions highlighted so you can spot leaks instantly.",
+      "item3ImageAlt": "Recurring subscriptions and micro-spending"
+    },
+    "featuresShowcase": {
+      "feature0": {
+        "imageAlt": "Spair Score and dashboard: your money in one place with a clear health score",
+        "title": "Your money in one place, with a clear health score.",
+        "tagline": "Stay on top of your finances with Spair Money",
+        "description": "The dashboard shows all your accounts, recent activity, and your Spair Score in one view. See where you stand and what to do next—no more jumping between apps or spreadsheets."
+      },
+      "feature1": {
+        "imageAlt": "Budgets and savings goals with progress tracking",
+        "title": "Set limits and targets. See progress and stay on track.",
+        "tagline": "Budgets and goals that match your real habits",
+        "description": "Create monthly budgets by category and set savings goals with a clear timeline. Track spending against your budget and watch your goals move forward. You stay in control, month after month."
+      },
+      "feature2": {
+        "imageAlt": "Reports, spending trends and planned payments for the next 90 days",
+        "title": "Understand patterns. Plan payments and cash flow.",
+        "tagline": "Reports and planning in one place",
+        "description": "See where your money goes with clear reports and trends. Planned payments show what's due in the next 90 days—recurring, debts, goals, and subscriptions—so you can plan with confidence."
+      },
+      "feature3": {
+        "imageAlt": "Household sharing: manage money together with your partner or family",
+        "title": "Manage money together.",
+        "tagline": "Household sharing with Spair Money",
+        "description": "Invite your partner or family to the same household. Share accounts, budgets, and goals so everyone is aligned. Build wealth together, not just pay bills alone."
+      },
+      "feature4": {
+        "imageAlt": "Receipt scanning attached to transactions",
+        "title": "Capture receipts. Stay organized.",
+        "tagline": "Receipt scanning with Spair Money",
+        "description": "Scan receipts and attach them to transactions. Everything stays in one place for taxes, returns, or simply knowing where your money went. No more lost slips or scattered photos."
+      }
+    },
+    "whatSpairDoes": {
+      "heading": "Spair turns transactions into clarity.",
+      "subtitle": "Instead of listing features, we present outcomes.",
+      "outcome0": {
+        "title": "See the small stuff clearly",
+        "description": "Spair automatically categorizes your transactions and highlights recurring micro-spending — so you can spot leaks instantly."
+      },
+      "outcome1": {
+        "title": "Understand your behavior",
+        "description": "Weekly and monthly trends show where your habits are helping you — and where they're costing you."
+      },
+      "outcome2": {
+        "title": "Track everything in one place",
+        "description": "Accounts. Transactions. Categories. Subscriptions. Debts. Goals. No switching apps. No spreadsheets."
+      },
+      "outcome3": {
+        "title": "Get a financial clarity score",
+        "description": "Spair Score helps you understand your overall financial health in one simple number."
+      }
+    },
+    "problemSection": {
+      "heading": "It's not the big expenses.",
+      "subtitle": "Most people don't struggle because of rent or car payments. They struggle because of small, everyday spending that never feels important — until the end of the month.",
+      "cardTitle": "Here's how \"just a few small things\" add up.",
+      "item0": "Coffee & pastry",
+      "item1": "Lunch out",
+      "item2": "Snacks & drinks",
+      "item3": "Takeout / delivery",
+      "unusedSubscriptions": "Unused subscriptions",
+      "perDay": "/day",
+      "perMonth": "/mo",
+      "footer": "Most people never track it. Spair shows patterns."
+    },
+    "mobileMockupSection": {
+      "heading": "Take it with you.",
+      "description": "Your dashboard, budgets, and goals—wherever you are. Spair Money works on any device.",
+      "imageAlt": "Spair Money on mobile: take your dashboard and budgets with you"
     },
     "nav": {
       "home": "Home",
@@ -277,6 +431,10 @@
     "footer": {
       "tagline": "Clarity over chaos.",
       "allRightsReserved": "All rights reserved.",
+      "categoryProduct": "Product",
+      "categoryCompany": "Company",
+      "categoryLegal": "Legal",
+      "categorySupport": "Support",
       "features": "Features",
       "pricing": "Pricing",
       "faq": "FAQ",
@@ -284,6 +442,8 @@
       "privacy": "Privacy",
       "terms": "Terms",
       "help": "Help",
+      "aboutUs": "About Us",
+      "careers": "Careers",
       "blog": "Blog",
       "termsOfService": "Terms of Service",
       "privacyPolicy": "Privacy Policy"
@@ -439,6 +599,8 @@
     "insights": "Spair Score Insights & Actions"
   },
   "dashboard": {
+    "dashboardTitle": "{name}'s finances at a glance",
+    "namePossessive": "'s ",
     "financesAtAGlance": "finances at a glance",
     "family": "Family",
     "member": "Member",
@@ -459,6 +621,24 @@
     "debt": "Debt",
     "totalBudgets": "Total budgets",
     "spendingThisMonth": "Spending this month",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "noData": "No data",
+    "breakdown": {
+      "totalAvailable": "Total available",
+      "freeToSpend": "Free to spend",
+      "projectedEndOfMonth": "Projected end of month",
+      "actualIncomeThisMonth": "Actual income this month",
+      "nextPaycheck": "Next paycheck",
+      "spendingVsExpected": "Spending vs expected",
+      "totalSavings": "Total savings",
+      "savedThisMonth": "Saved this month",
+      "savingRate": "Saving rate",
+      "emergencyFund": "Emergency fund",
+      "netWorth": "Net worth",
+      "totalAssets": "Total assets",
+      "totalDebt": "Total debt (liabilities)"
+    },
     "transactions": "Transactions",
     "goals": "Goals",
     "recurring": "Recurring",
@@ -466,6 +646,10 @@
     "addTransaction": "Add Transaction",
     "spairScore": "Spair Score",
     "monthlyScore": "Monthly score",
+    "addThisMonthsTransactions": "Add This Month's Transactions",
+    "ofIncomeSaved": "of income saved",
+    "exposureLevel": "exposure level",
+    "vsBudget": "vs budget",
     "cashFlow": "Cash Flow",
     "upcomingPayments": "Upcoming Payments",
     "addPayment": "Add Payment",
@@ -499,6 +683,13 @@
     "income": "Income",
     "adjust": "Adjust",
     "adjustIncome": "Adjust income",
+    "setExpectedIncomeDescription": "Set your expected monthly income to compare with spending.",
+    "setIncome": "Set income",
+    "setCountryStateForAfterTax": "Set country & state in Adjust to see after-tax expected income.",
+    "expectedPerMonth": "Expected",
+    "perMonth": "/month",
+    "nextPaycheckInDays": "Next {amount} in {days} days",
+    "nextPaycheckLabel": "Next",
     "monthlyTotal": "Monthly Total",
     "expensesByCategory": "Expenses by category",
     "topSpendingAreasThisMonth": "Top spending areas this month",
@@ -766,7 +957,17 @@
     "accountAddedDescription": "Your account has been added successfully.",
     "defaultAccountUpdated": "Default account updated",
     "deleteAccountConfirmTitle": "Delete Account",
-    "deleteAccountConfirmDescription": "Are you sure you want to delete this account?"
+    "deleteAccountConfirmDescription": "Are you sure you want to delete this account?",
+    "loadError": "Error loading accounts",
+    "loadErrorDescription": "Failed to load accounts. Please try refreshing the page.",
+    "accountDeleted": "Account deleted",
+    "accountDeletedWithTransfer": "Your account has been deleted and all transactions have been transferred.",
+    "accountDeletedSuccess": "Your account has been deleted successfully.",
+    "accountRequired": "Account Required",
+    "selectDestinationAccount": "Please select a destination account to transfer transactions to.",
+    "defaultUpdatedDescription": "Your default account has been updated successfully.",
+    "setDefaultError": "Failed to set default account. Please try again.",
+    "failedToDeleteAccount": "Failed to delete account"
   },
   "reports": {
     "overview": "Overview",
@@ -899,6 +1100,30 @@
     "totalAcrossAccounts": "total across accounts"
   },
   "planning": {
+    "goalsTabTitle": "Savings Goals",
+    "goalsTabSubtitle": "Track your progress toward your financial goals",
+    "totalTarget": "Total Target",
+    "totalSaved": "Total Saved",
+    "activeGoals": "Active Goals",
+    "allocation": "Allocation",
+    "filterAllGoals": "All Goals",
+    "filterActiveOnly": "Active Only",
+    "filterCompleted": "Completed",
+    "sortByPriority": "Sort by Priority",
+    "sortByProgress": "Sort by Progress",
+    "sortByEta": "Sort by ETA",
+    "showing": "Showing",
+    "ofGoals": "of {total} goals",
+    "highPriority": "high priority",
+    "complete": "complete",
+    "completedCount": "{count} completed",
+    "budgetsTabTitle": "Budgets",
+    "budgetsTabSubtitle": "Track your spending against budgets for {monthYear}",
+    "totalBudget": "Total Budget",
+    "totalSpent": "Total Spent",
+    "remaining": "Remaining",
+    "status": "Status",
+    "percentOfBudget": "{percent}% of budget",
     "addBudget": "Add Budget",
     "manageBudgetCategories": "Manage Budget Categories",
     "manageBudgetCategoriesDescription": "Create or delete budgets for categories. Changes are saved immediately.",
@@ -924,6 +1149,7 @@
     "deleteGoalConfirm": "Are you sure you want to delete this goal?",
     "goalDeleted": "Goal deleted",
     "goalDeletedDescription": "Your goal has been deleted successfully.",
+    "failedToDeleteGoal": "Failed to delete goal",
     "name": "Name",
     "currentBalance": "Current Balance",
     "targetAmount": "Target Amount",
@@ -1473,7 +1699,95 @@
     "stillHaveQuestions": "Still have questions?",
     "stillHaveQuestionsDescription": "Didn't find the answer you were looking for? Our support team is ready to help!",
     "emailLabel": "Email:",
-    "helpAfterSignIn": "For additional help, you can also visit the Help & Support page after signing in to your account."
+    "helpAfterSignIn": "For additional help, you can also visit the Help & Support page after signing in to your account.",
+    "categories": {
+      "about": {
+        "title": "About Spair Money",
+        "q1": "What is Spair Money?",
+        "a1": "Spair Money is a simple app that helps you manage all your money in one place. You can track your spending, set budgets, save for goals, and see where your money goes—all in one easy-to-use platform.",
+        "q2": "How does Spair Money work?",
+        "a2": "It's really simple! You add your accounts and transactions manually or import from CSV. The app automatically sorts your spending into categories, helps you create budgets, and shows you how much you're saving. Everything is organized so you can see your finances at a glance.",
+        "q3": "Do I need to be tech-savvy to use it?",
+        "a3": "Not at all! Spair Money is designed for everyone. The interface is clean and easy to understand. If you can use a smartphone or computer, you can use Spair Money. No special skills needed!",
+        "q4": "Is my financial information safe?",
+        "a4": "Absolutely! We use the same security measures that banks use. Your data is encrypted (scrambled so only you can read it), and we never share your information with anyone. Your login details are handled by secure systems, and we follow strict privacy rules to keep your money information private."
+      },
+      "plans": {
+        "title": "Plans and Pricing",
+        "q1": "What plans do you offer?",
+        "a1": "We offer the {planName} plan (${priceMonthly} per month or ${priceYearly} per year) with unlimited access to all features. The plan comes with a 30-day free trial so you can try it risk-free. You get unlimited transactions, unlimited accounts, and access to all features including investments, advanced reports, CSV import/export, budgets, goals, and more.",
+        "q2": "Can I try it for free?",
+        "a2": "Yes! The {planName} plan comes with a 30-day free trial. You'll add your card to start the trial; you're only charged after the trial ends. If you decide it's not for you, cancel anytime and you won't be charged. If you cancel after subscribing, your plan stays active until the end of your billing cycle (monthly or annual). If you love it, your subscription will start automatically after 30 days.",
+        "q3": "What happens after my free trial ends?",
+        "a3": "If you don't cancel, your subscription will start automatically and you'll be charged for the plan you chose. You can cancel anytime; if you cancel, your plan stays active until the end of your current billing cycle (monthly or annual). No surprises!",
+        "q4": "What do I get with the plan?",
+        "a4": "The {planName} plan includes everything: unlimited transactions, unlimited accounts, track your investments, see detailed reports, import and export your data, add and import transactions manually or via CSV, get smart category suggestions, budgets, goals, receipt scanner, household members, and more.",
+        "q5": "Can I switch plans later?",
+        "a5": "Yes! You can upgrade or downgrade your plan anytime from your account settings. If you upgrade, you get the new features right away. If you downgrade, the change happens at the end of your current billing period. You're always in control!",
+        "q6": "Do you offer a discount if I pay yearly?",
+        "a6": "Yes! Save 17% when you pay for a full year upfront. The {planName} plan is ${priceYearly} per year (that's only ${pricePerMonth} per month).",
+        "q7": "Can I cancel anytime?",
+        "a7": "Yes! You can cancel your subscription anytime from your account settings. When you cancel, your plan stays active until the end of your current billing cycle (monthly or annual). After that, you won't be charged again. It's that simple!",
+        "q8": "Can I change my plan after I subscribe?",
+        "a8": "Absolutely! You can upgrade or downgrade anytime from your account settings. Upgrades take effect immediately so you can start using new features right away. Downgrades happen at the end of your current billing period. You can also switch between monthly and yearly billing anytime."
+      },
+      "features": {
+        "title": "Features",
+        "q1": "How do I add my accounts?",
+        "a1": "In the Accounts section, click \"Add Account\" and enter your account details (name, type, initial balance). You can then add transactions manually or import them via CSV file.",
+        "q2": "Can I sync my accounts automatically?",
+        "a2": "We don't offer automatic bank or account syncing. You add transactions manually or import them via CSV file.",
+        "q3": "Can I import my transactions from a file?",
+        "a3": "Yes! If you have your transactions in a CSV file (like from Excel or another app), you can import them. The app will help you match up the columns in your file (like date, amount, description) with the right fields. You can even preview everything before importing to make sure it looks right!",
+        "q4": "Can I download my data?",
+        "a4": "Yes! You can export all your transactions as a CSV file anytime. This is great for keeping a backup, using your data in other tools, or for tax time. You can export everything or just filter what you need.",
+        "q5": "How do budgets work?",
+        "a5": "Budgets are super simple! You set a spending limit for each category (like groceries or entertainment) for the month. The app tracks how much you've spent and shows you with a progress bar. Green means you're doing great (under 90% of your budget), yellow means you're getting close (90-100%), and red means you've gone over. It's an easy way to stay on track!",
+        "q6": "Can I track my investments?",
+        "a6": "Yes! You can track all your investments. You can add different types of investment accounts (like TFSA, RRSP, crypto wallets, etc.), add your stocks, ETFs, crypto, bonds, and other investments, record when you buy or sell, and see how much your portfolio is worth. The app even calculates your average cost automatically!",
+        "q7": "How do savings goals work?",
+        "a7": "It's easy! Just tell the app how much you want to save and when you want to reach your goal. The app will figure out how much you need to save each month and show you when you'll reach your goal. You can see your progress anytime, which helps you stay motivated!",
+        "q8": "Can my family use the same account?",
+        "a8": "Yes! On the {planName} plan, you can invite family members to your account. Each person gets their own separate finances (their own transactions, accounts, budgets), but you as the account owner can see everyone's info to help manage things. It's perfect for couples or families who want to track their money separately but stay organized together.",
+        "q9": "Can family members see each other's finances?",
+        "a9": "No, they can't! Each family member has their own private financial data—their own transactions, accounts, budgets, goals, and investments. The account owner can see everyone's info to help manage things, but family members can't see each other's data. Your privacy is protected!",
+        "q10": "How does the app know which category to use?",
+        "a10": "The app is smart! It learns from how you've categorized transactions before. It looks at your past transactions (up to 12 months) and learns your patterns. When you add a new transaction or import from CSV, it suggests the most likely category. You can just click to accept it or change it if it's wrong. The more you use it, the smarter it gets!",
+        "q11": "How do I remove an account?",
+        "a11": "You can delete an account from the Accounts section. Your transactions for that account stay until you delete them. You can add the account again later if you want.",
+        "q12": "How do I add or remove family members?",
+        "a12": "On the {planName} plan, go to the 'Members' section in your account settings. You can invite family members by email—they'll get an invitation and can choose to join. As the account owner, you can see and manage everyone, and you can remove members anytime if needed."
+      },
+      "accountSupport": {
+        "title": "Account and Support",
+        "q1": "How do I sign up?",
+        "a1": "It's free and easy! Just click 'Get Started' on the homepage. You'll need to provide your email address and create a password, then confirm your email. You'll add your card when you start your 30-day free trial—you're only charged after the trial ends. Cancel anytime; your plan stays active until the end of your billing cycle.",
+        "q2": "I forgot my password. What do I do?",
+        "a2": "No problem! On the login page, click 'Forgot my password' and enter your email address. We'll send you a link to reset your password. Make sure to check your inbox and spam folder—sometimes the email ends up there!",
+        "q3": "How do I update my payment method?",
+        "a3": "Easy! Go to your account settings and click on 'Billing'. From there, you can update your payment information anytime. We use Stripe (a trusted payment processor) to keep your payment info secure.",
+        "q4": "Is my information private?",
+        "a4": "Yes, absolutely! Your financial data belongs to you and only you. We use advanced security to make sure only you (and any family members you invite) can see your data. We never sell or share your information with anyone. Your privacy is our priority!",
+        "q5": "How do I get help if I have questions?",
+        "a5": "We're here to help! You can email us at support@spair.co anytime, or visit the 'Help & Support' section in the app after you sign in. Our team will get back to you and help with whatever you need!",
+        "q6": "Do you offer support in other languages?",
+        "a6": "Yes! Spair Money is available in multiple languages, and our support team can help you in various languages too. Just let us know your preferred language and we'll do our best to help!",
+        "q7": "What happens if I delete my account?",
+        "a7": "If you delete your account, all your data will be permanently deleted from our system immediately, as explained in our <policy></policy>. This can't be undone, so make sure to export your data first if you want to keep a copy!",
+        "a7PolicyLabel": "Privacy Policy"
+      },
+      "technical": {
+        "title": "Technical and Compatibility",
+        "q1": "What devices can I use?",
+        "a1": "You can use Spair Money on almost any device! It works on your computer, tablet, or smartphone—anything with a web browser. No need to download an app—just open your browser and go to the website. It works great on all screen sizes!",
+        "q2": "Which web browsers work?",
+        "a2": "Spair Money works on all popular browsers like Chrome, Firefox, Safari, Edge, and Opera. For the best experience, make sure you're using the latest version of your browser. It's free to update!",
+        "q3": "Can I use it without internet?",
+        "a3": "Right now, you need an internet connection to use Spair Money. But we're working on adding offline features so you can view and edit your transactions even when you're not connected. Stay tuned!",
+        "q4": "Where is my data stored?",
+        "a4": "Your data is stored securely in the cloud (online servers). This means you can access it from any device, anywhere. It's also automatically backed up, so you don't have to worry about losing your information. We use secure, trusted systems to keep everything safe."
+      }
+    }
   },
   "contactPage": {
     "title": "Contact",
@@ -1494,6 +1808,9 @@
     "toastSuccessDescription": "We'll get back to you within 24 hours.",
     "toastErrorTitle": "Error",
     "toastErrorDefault": "Failed to submit contact form"
+  },
+  "blog": {
+    "searchPlaceholder": "Search articles..."
   },
   "toasts": {
     "error": "Error",
@@ -1520,6 +1837,7 @@
     "tooManyRequestsDescription": "Please wait a moment before refreshing.",
     "subscriptionCardTitle": "Subscription",
     "noActiveSubscriptionDescription": "You don't have an active subscription. Please select a plan to continue.",
+    "freePlanPrice": "Free",
     "perYearLabel": "per year",
     "perMonthLabel": "per month",
     "yearlySubscription": "Yearly Subscription",
@@ -1541,6 +1859,7 @@
     "viewingSubscriptionManagedBy": "You are viewing the subscription managed by {name}. Only the account owner can manage the subscription.",
     "viewingSubscriptionAsMember": "You are viewing the subscription as a household member. Only the account owner can manage the subscription.",
     "manageSubscription": "Manage Subscription",
+    "upgradeNow": "Upgrade Now",
     "usage": "Usage",
     "transactionsThisMonth": "Transactions (this month)",
     "unlimited": "Unlimited",
@@ -1602,6 +1921,11 @@
     "upgradeDialog": {
       "subscribeTitle": "Subscribe to Pro",
       "subscribeDescription": "Get full control of your money with the Pro plan. Start your 30-day free trial.",
+      "subscribeNoTrialTitle": "Subscribe to Pro",
+      "subscribeNoTrialDescription": "Get full control of your money with the Pro plan. Your subscription starts immediately.",
+      "subscribe": "Subscribe",
+      "subscribeToMonthlyPlan": "Subscribe to Monthly Plan",
+      "subscribeToYearlyPlan": "Subscribe to Yearly Plan",
       "startTrial": "Start 30-day trial",
       "reactivateTitle": "Reactivate your subscription",
       "reactivateDescription": "Your subscription has been cancelled. Reactivate to regain full access, or choose a new plan below.",
@@ -1630,7 +1954,8 @@
       "enterCode": "Enter code",
       "applied": "Applied:",
       "loading": "Loading...",
-      "footerDisclaimer": "You will be charged after the trial ends. You can cancel at any time. Your plan will remain active until the end of the billing cycle."
+      "footerDisclaimer": "You will be charged after the trial ends. You can cancel at any time. Your plan will remain active until the end of the billing cycle.",
+      "footerDisclaimerNoTrial": "You will be charged now. You can cancel at any time. Your plan will remain active until the end of the billing cycle."
     },
     "featureNames": {
       "maxTransactions": "Unlimited Transactions",

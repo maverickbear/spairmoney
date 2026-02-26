@@ -65,6 +65,12 @@ const GRAY_ARC = {
 const GAUGE_ANIMATION_DURATION = 1600;
 const GAUGE_ANIMATION_DELAY = 80;
 
+/** Map known API (English) insight titles to dashboard translation keys for i18n */
+const INSIGHT_TITLE_KEYS: Record<string, string> = {
+  "Add This Month's Transactions": "addThisMonthsTransactions",
+  "Add this month's transactions": "addThisMonthsTransactions",
+};
+
 /**
  * Static placeholder so the gauge area is always visible (no layout shift).
  * Matches the gauge container size and shows a gray semicircle.
@@ -168,11 +174,16 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
   };
 
   // Single most important insight: critical alert > warning alert > first suggestion > widget message
-  const topInsight =
+  const topInsightRaw =
     details?.alerts?.find((a) => a.severity === "critical")?.title ??
     details?.alerts?.find((a) => a.severity === "warning")?.title ??
     details?.suggestions?.[0]?.title ??
     (data?.message && data.message.trim() ? data.message : null);
+  // Map known API (English) insight titles to translation keys for i18n
+  const topInsight =
+    topInsightRaw && INSIGHT_TITLE_KEYS[topInsightRaw]
+      ? t(INSIGHT_TITLE_KEYS[topInsightRaw])
+      : topInsightRaw;
 
   const pointsToNextTier = hasData ? getPointsToNextTier(score) : null;
   const progressToNextLevel = hasData ? getProgressToNextLevel(score) : null;
@@ -182,7 +193,7 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
         {
           label: t("savingsRate"),
           value: empty ? "—" : `${details.savingsRate.toFixed(1)}%`,
-          hint: "of income saved",
+          hint: t("ofIncomeSaved"),
           good: details.savingsRate >= 20,
         },
         {
@@ -194,13 +205,13 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
         {
           label: t("debtLabel"),
           value: empty ? "—" : details.debtExposure,
-          hint: "exposure level",
+          hint: t("exposureLevel"),
           good: details.debtExposure === "Low",
         },
         {
           label: t("spendingLabel"),
           value: empty ? "—" : details.spendingDiscipline,
-          hint: "vs budget",
+          hint: t("vsBudget"),
           good: details.spendingDiscipline === "Excellent" || details.spendingDiscipline === "Good",
         },
       ]

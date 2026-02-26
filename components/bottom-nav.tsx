@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, Plus } from "lucide-react";
@@ -13,20 +13,18 @@ import type { BottomNavItem } from "@/src/presentation/config/navigation.config"
 import { LayoutDashboard, Receipt, Target } from "lucide-react";
 
 interface BottomNavProps {
-  hasSubscription?: boolean;
+  /** True when user can use the app (trial or active subscription). Used to enable Add button. */
+  hasAccess?: boolean;
 }
 
-export function BottomNav({ hasSubscription = true }: BottomNavProps) {
+export function BottomNav({ hasAccess = true }: BottomNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const t = useTranslations("nav");
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
 
-  // Don't render BottomNav if user doesn't have subscription
-  if (!hasSubscription) {
-    return null;
-  }
+  // Always render BottomNav on responsive so the user always sees the menu.
+  // SubscriptionGuard handles blocking access when needed; links/actions can be disabled via hasSubscription.
 
   const isActive = (href: string) => {
     const basePath = href.split("?")[0];
@@ -36,12 +34,8 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
     return pathname === basePath || pathname === href || (basePath !== "/" && pathname.startsWith(basePath));
   };
 
-  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    if (!hasSubscription) {
-      e.preventDefault();
-      router.push("/dashboard");
-    }
-  };
+  // Allow all nav links to work so the user can navigate (e.g. to Billing to subscribe).
+  const handleLinkClick = () => {};
 
   // Build bottom nav items from centralized config
   // Bottom nav has a specific structure with action buttons
@@ -103,7 +97,7 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
                       variant="ghost"
                       size="icon"
                       onClick={item.onClick}
-                      disabled={!hasSubscription}
+                      disabled={!hasAccess}
                       className={cn(
                         "rounded-full h-10 w-10 bg-primary text-primary-foreground",
                         "hover:bg-primary/90 active:scale-95",
@@ -123,7 +117,6 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
                 <button
                   key={item.label}
                   onClick={item.onClick}
-                  disabled={!hasSubscription}
                   className={cn(
                     "flex flex-1 flex-col items-center justify-center gap-1 flex-basis-0 min-h-[44px] py-2",
                     "text-xs font-medium transition-colors",
@@ -144,12 +137,11 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
                 key={item.href}
                 href={item.href}
                 prefetch={true}
-                onClick={(e) => handleLinkClick(e, item.href)}
+                onClick={handleLinkClick}
                 className={cn(
                   "flex flex-1 flex-col items-center justify-center gap-1 flex-basis-0 min-h-[44px] py-2",
                   "text-xs font-medium transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  !hasSubscription && "opacity-50 cursor-not-allowed",
                   active
                     ? "text-primary-nav"
                     : "text-muted-foreground hover:text-foreground"
@@ -186,7 +178,7 @@ export function BottomNav({ hasSubscription = true }: BottomNavProps) {
       <MoreMenuSheet
         open={isMoreSheetOpen}
         onOpenChange={setIsMoreSheetOpen}
-        hasSubscription={hasSubscription}
+        hasAccess={hasAccess}
       />
     </>
   );

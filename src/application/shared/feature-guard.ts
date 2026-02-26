@@ -70,17 +70,22 @@ export async function checkAccountLimit(userId: string): Promise<BaseLimitCheckR
 // Removed checkFeatureAccess - no longer needed with single plan where all features are always enabled
 
 async function canUserWrite(userId: string): Promise<boolean> {
-  const { subscription } = await getUserSubscriptionData(userId);
+  const { subscription, trialEndsAt } = await getUserSubscriptionData(userId);
 
-  if (!subscription) return false;
-  if (subscription.status === "active") return true;
+  // Active subscription
+  if (subscription?.status === "active") return true;
 
-  if (subscription.status === "trialing") {
+  // Stripe trialing – allow if trial not expired
+  if (subscription?.status === "trialing") {
     if (subscription.trialEndDate) {
-      const trialEnd = new Date(subscription.trialEndDate);
-      return trialEnd > new Date();
+      return new Date(subscription.trialEndDate) > new Date();
     }
     return true;
+  }
+
+  // No Stripe subscription: allow if local trial (users.trial_ends_at) is still active
+  if (!subscription && trialEndsAt) {
+    return new Date(trialEndsAt) > new Date();
   }
 
   return false;
@@ -118,21 +123,21 @@ export async function guardFeatureAccessReadOnly(
   feature: keyof PlanFeatures
 ): Promise<GuardResult> {
   try {
-    // Check if user has a subscription (even if cancelled)
-    const { subscription } = await getUserSubscriptionData(userId);
-    
-    // User must have a subscription (active, trialing, or cancelled)
-    if (!subscription) {
-      return {
-        allowed: false,
-        error: createPlanError(PlanErrorCode.SUBSCRIPTION_INACTIVE, {
-          message: "You need an active subscription to access this feature.",
-        }),
-      };
+    const { subscription, trialEndsAt } = await getUserSubscriptionData(userId);
+
+    // Allow if user has a subscription (active, trialing, or cancelled) or is in local trial
+    const hasSubscription = !!subscription;
+    const isInLocalTrial = !subscription && trialEndsAt && new Date(trialEndsAt) > new Date();
+    if (hasSubscription || isInLocalTrial) {
+      return { allowed: true };
     }
-    
-    // Simplified: With only one plan, all features are always enabled
-    return { allowed: true };
+
+    return {
+      allowed: false,
+      error: createPlanError(PlanErrorCode.SUBSCRIPTION_INACTIVE, {
+        message: "You need an active subscription to access this feature.",
+      }),
+    };
   } catch (error) {
     logger.error("[FeatureGuard] Error in guardFeatureAccessReadOnly:", error);
     return {

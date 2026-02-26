@@ -3,19 +3,19 @@
 import { useSubscriptionContext } from "@/contexts/subscription-context";
 
 /**
- * Hook to check if user can perform write operations
- * Users with cancelled subscriptions can still view the app but cannot write
+ * Hook to check if user can perform write operations.
+ * During trial (Stripe trialing or local trial with no plan) user has full access.
+ * After trial expires, user needs an active subscription to write.
  */
 export function useWriteGuard() {
-  const { subscription } = useSubscriptionContext();
+  const { subscription, trialEndsAt } = useSubscriptionContext();
 
-  // User can write if subscription is active or trialing
-  const canWrite = subscription?.status === "active" || subscription?.status === "trialing";
+  const canWrite =
+    subscription?.status === "active" ||
+    (subscription?.status === "trialing" && (!subscription.trialEndDate || new Date(subscription.trialEndDate) > new Date())) ||
+    (!subscription && !!trialEndsAt && new Date(trialEndsAt) > new Date());
 
-  const checkWriteAccess = (): boolean => {
-    // Don't redirect - just return false so UI can show appropriate message
-    return canWrite;
-  };
+  const checkWriteAccess = (): boolean => canWrite;
 
   return {
     canWrite,

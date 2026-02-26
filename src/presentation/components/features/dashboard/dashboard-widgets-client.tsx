@@ -117,17 +117,17 @@ export function DashboardWidgetsClient({ initialDate }: DashboardWidgetsClientPr
   return (
     <div className="w-full p-4 sm:p-5 xl:p-6 min-w-0 overflow-hidden">
       <div className="flex flex-row items-center justify-between gap-3 mb-4 xl:mb-6 min-w-0">
-        <h1 className="text-lg sm:text-xl xl:text-2xl font-bold tracking-normal min-w-0 flex-1 flex items-baseline gap-x-1 overflow-hidden" title={`${selectedDisplayName}'s ${t("financesAtAGlance")}`}>
+        <h1 className="text-lg sm:text-xl xl:text-2xl font-bold tracking-normal min-w-0 flex-1 flex items-baseline gap-x-1 overflow-hidden" title={t("dashboardTitle", { name: selectedDisplayName })}>
           <Select
             value={selectedMemberId ?? "everyone"}
             onValueChange={(value) => setSelectedMemberId(value === "everyone" ? null : value)}
           >
             <SelectTrigger
-              className="inline-flex w-auto max-w-[50%] border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pr-0 pl-0 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal text-sentiment-positive hover:text-sentiment-positive cursor-pointer rounded-sm [&>svg]:hidden [&>span]:flex-none truncate min-w-0"
+              className="inline-flex w-auto max-w-[50%] items-center gap-1 border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 py-0 pl-0 pr-1 h-auto font-bold text-lg sm:text-xl xl:text-2xl tracking-normal text-sentiment-positive hover:text-sentiment-positive cursor-pointer rounded-sm [&>span]:flex-none [&>span]:truncate [&>svg]:shrink-0 [&>svg]:text-sentiment-positive [&>svg]:opacity-70 min-w-0"
               size="medium"
               aria-label={t("changeWhoseFinances")}
             >
-              <span className="text-sentiment-positive font-bold truncate" title={selectedDisplayName}>{selectedDisplayName}&apos;s </span>
+              <span className="text-sentiment-positive font-bold truncate min-w-0" title={selectedDisplayName}>{selectedDisplayName}</span>
             </SelectTrigger>
             <SelectContent align="start">
               <SelectItem value="everyone">{t("family")}</SelectItem>

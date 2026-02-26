@@ -20,7 +20,7 @@ export function RealitySection() {
         inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
       )}
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <p className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground">
           The reality
         </p>

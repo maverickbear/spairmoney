@@ -108,12 +108,12 @@ export function GoalsTab() {
 
           if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || "Failed to delete goal");
+            throw new Error(error.error || tPlanning("failedToDeleteGoal"));
           }
 
           toast({
-            title: "Goal deleted",
-            description: "Your goal has been deleted successfully.",
+            title: tPlanning("goalDeleted"),
+            description: tPlanning("goalDeletedDescription"),
             variant: "success",
           });
           
@@ -125,8 +125,8 @@ export function GoalsTab() {
             setGoals(prev => [...prev, goalToDelete]);
           }
           toast({
-            title: "Error",
-            description: error instanceof Error ? error.message : "Failed to delete goal",
+            title: tCommon("error"),
+            description: error instanceof Error ? error.message : tPlanning("failedToDeleteGoal"),
             variant: "destructive",
           });
         } finally {
@@ -187,9 +187,9 @@ export function GoalsTab() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="text-2xl md:text-3xl font-bold">Savings Goals</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">{tPlanning("goalsTabTitle")}</h2>
           <p className="text-sm text-muted-foreground">
-            Track your progress toward your financial goals
+            {tPlanning("goalsTabSubtitle")}
           </p>
         </div>
         <Button
@@ -201,7 +201,7 @@ export function GoalsTab() {
           className="w-full md:w-auto"
         >
           <Plus className="mr-2 h-4 w-4" />
-          Create Goal
+          {tPlanning("createGoal")}
         </Button>
       </div>
 
@@ -211,7 +211,7 @@ export function GoalsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Total Target</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("totalTarget")}</p>
                 <p className="text-2xl font-bold">{formatMoney(totalTarget)}</p>
               </div>
             </CardContent>
@@ -219,10 +219,10 @@ export function GoalsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Total Saved</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("totalSaved")}</p>
                 <p className="text-2xl font-bold">{formatMoney(totalCurrent)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {totalProgress.toFixed(1)}% complete
+                  {totalProgress.toFixed(1)}% {tPlanning("complete")}
                 </p>
               </div>
             </CardContent>
@@ -230,10 +230,10 @@ export function GoalsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Active Goals</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("activeGoals")}</p>
                 <p className="text-2xl font-bold">{activeGoalsCount}</p>
                 <p className="text-xs text-muted-foreground">
-                  {highPriorityGoals} high priority
+                  {highPriorityGoals} {tPlanning("highPriority")}
                 </p>
               </div>
             </CardContent>
@@ -241,12 +241,12 @@ export function GoalsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Allocation</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("allocation")}</p>
                 <p className={`text-2xl font-bold ${totalAllocation > 100 ? "text-red-600 dark:text-red-400" : totalAllocation > 90 ? "text-yellow-600 dark:text-yellow-400" : "text-sentiment-positive"}`}>
                   {totalAllocation.toFixed(1)}%
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {completedGoalsCount} completed
+                  {tPlanning("completedCount", { count: completedGoalsCount })}
                 </p>
               </div>
             </CardContent>
@@ -263,9 +263,9 @@ export function GoalsTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Goals</SelectItem>
-                <SelectItem value="active">Active Only</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="all">{tPlanning("filterAllGoals")}</SelectItem>
+                <SelectItem value="active">{tPlanning("filterActiveOnly")}</SelectItem>
+                <SelectItem value="completed">{tPlanning("filterCompleted")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -274,17 +274,17 @@ export function GoalsTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="priority">Sort by Priority</SelectItem>
-                <SelectItem value="progress">Sort by Progress</SelectItem>
-                <SelectItem value="eta">Sort by ETA</SelectItem>
+                <SelectItem value="priority">{tPlanning("sortByPriority")}</SelectItem>
+                <SelectItem value="progress">{tPlanning("sortByProgress")}</SelectItem>
+                <SelectItem value="eta">{tPlanning("sortByEta")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="text-sm font-medium">
-            <span className="text-muted-foreground">Showing </span>
+            <span className="text-muted-foreground">{tPlanning("showing")} </span>
             <span className="text-foreground">{sortedGoals.length}</span>
-            <span className="text-muted-foreground"> of {goals.length} goals</span>
+            <span className="text-muted-foreground"> {tPlanning("ofGoals", { total: goals.length })}</span>
           </div>
         </div>
       )}

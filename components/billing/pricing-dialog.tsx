@@ -42,7 +42,7 @@ export function PricingDialog({
 
   const needsReactivation = subscriptionStatus === "cancelled" || subscriptionStatus === "past_due" || subscriptionStatus === "unpaid";
   const showProUpgradeDialog = !subscriptionStatus || subscriptionStatus === "no_subscription" || showPlanSelector;
-  const canClose = false; // Legacy dialog: cannot close until user subscribes or reactivates
+  const canClose = needsReactivation || currentPlanId === "trial";
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -161,7 +161,7 @@ export function PricingDialog({
         currentInterval={currentInterval}
         onSelectPlan={handleSelectPlan}
         onManageSubscription={handleManageSubscription}
-        canClose={needsReactivation}
+        canClose={canClose}
         loading={loading}
       />
     );

@@ -7,11 +7,11 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DateOfBirthPartsInput } from "@/components/ui/date-of-birth-parts-input";
 import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 import { Camera, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
-import { formatDateInput, parseDateInput } from "@/src/infrastructure/utils/timestamp";
+import { formatDateInput } from "@/src/infrastructure/utils/timestamp";
 
 const personalDataSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -210,27 +210,6 @@ export function PersonalDataStep({ onComplete, initialData, formRef, onValidatio
     return name[0].toUpperCase();
   }
 
-  // Get dateOfBirth as Date object for DatePicker
-  const dateOfBirthDate = form.watch("dateOfBirth") 
-    ? (() => {
-        const value = form.watch("dateOfBirth");
-        if (!value) return undefined;
-        if ((value as any) instanceof Date) return (value as unknown) as Date;
-        if (typeof value === "string") {
-          const parsed = new Date(value);
-          return isNaN(parsed.getTime()) ? undefined : (parsed as unknown) as Date | undefined;
-        }
-        if (typeof value === "string") {
-          try {
-            return parseDateInput(value);
-          } catch {
-            return undefined;
-          }
-        }
-        return undefined;
-      })()
-    : undefined;
-
   return (
     <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-6">
@@ -360,15 +339,11 @@ export function PersonalDataStep({ onComplete, initialData, formRef, onValidatio
               <Label>
                 Date of Birth
               </Label>
-              <DatePicker
-                date={dateOfBirthDate}
-                onDateChange={(date) => {
-                  if (date) {
-                    form.setValue("dateOfBirth", formatDateInput(date), { shouldValidate: true });
-                  } else {
-                    form.setValue("dateOfBirth", "", { shouldValidate: true });
-                  }
-                }}
+              <DateOfBirthPartsInput
+                value={form.watch("dateOfBirth") ?? ""}
+                onChange={(value) =>
+                  form.setValue("dateOfBirth", value, { shouldValidate: true })
+                }
                 placeholder="Select your date of birth"
               />
               {form.formState.errors.dateOfBirth && (

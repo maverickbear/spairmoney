@@ -713,21 +713,43 @@ export class MembersService {
       // Don't fail the invitation acceptance if cache invalidation fails
     }
 
-    // Get household owner
+    // Get household owner and optional name
     const { data: household } = await supabase
       .from("households")
-      // FIX: Database uses snake_case, select created_by not createdBy
-      .select("created_by")
+      .select("created_by, name")
       .eq("id", invitation.household_id)
       .single();
 
-    // Get user data
+    // Get user data (accepter)
     const { data: userData } = await supabase
       .from("users")
-      // FIX: Database uses snake_case, select avatar_url not avatarUrl
       .select("id, email, name, avatar_url")
       .eq("id", userId)
       .single();
+
+    // Notify household owner that invitation was accepted (non-blocking)
+    const ownerId = household?.created_by;
+    if (ownerId && authUser?.email) {
+      try {
+        const { data: ownerRow } = await supabase
+          .from("users")
+          .select("email, name")
+          .eq("id", ownerId)
+          .single();
+        if (ownerRow?.email) {
+          const { sendInviteAcceptedEmail } = await import("@/lib/utils/email");
+          await sendInviteAcceptedEmail({
+            to: ownerRow.email,
+            ownerName: ownerRow.name ?? "Household owner",
+            accepterName: userData?.name ?? authUser.email,
+            accepterEmail: authUser.email,
+            householdName: (household as { name?: string } | null)?.name ?? undefined,
+          });
+        }
+      } catch (emailErr) {
+        logger.error("[MembersService] Error sending invite accepted email (non-critical):", emailErr);
+      }
+    }
 
     // Map snake_case to camelCase for mapper
     const user = userData ? {
@@ -737,7 +759,7 @@ export class MembersService {
       avatarUrl: userData.avatar_url || null,
     } : null;
 
-    return MembersMapper.toDomain(updatedMember, household?.created_by || "", user);
+    return MembersMapper.toDomain(updatedMember, ownerId || "", user);
   }
 
   /**

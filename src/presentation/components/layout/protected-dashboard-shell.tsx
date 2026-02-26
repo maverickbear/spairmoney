@@ -36,6 +36,12 @@ export function ProtectedDashboardShell({
 }: ProtectedDashboardShellProps) {
   const { isSidebarCollapsed } = useSidebarState();
   const hasSubscription = !!subscription;
+  const isInLocalTrial = !subscription && !!trialEndsAt && new Date(trialEndsAt) > new Date();
+  const isStripeTrialing =
+    subscription?.status === "trialing" &&
+    (!subscription.trialEndDate || new Date(subscription.trialEndDate) > new Date());
+  const hasAccess =
+    subscription?.status === "active" || isStripeTrialing || isInLocalTrial;
 
   return (
     <SubscriptionProvider initialData={{ subscription, plan, trialEndsAt }}>
@@ -49,6 +55,7 @@ export function ProtectedDashboardShell({
       <DashboardLayout
         isSidebarCollapsed={isSidebarCollapsed}
         hasSubscription={hasSubscription}
+        hasAccess={hasAccess}
       >
         {children}
       </DashboardLayout>

@@ -31,12 +31,6 @@ export function SubscriptionGuard({
   useEffect(() => {
     // Check if modal should be opened from query params (for direct navigation)
     const openFromQuery = searchParams.get("openPricingModal") === "true";
-    const trialExpired = searchParams.get("trial_expired") === "true";
-
-    // Don't open dialog if trial expired - allow user to view system
-    if (reason === "trial_expired" || trialExpired) {
-      return;
-    }
 
     // When user has no subscription and pre-selected plan on landing, redirect to Stripe once
     if (

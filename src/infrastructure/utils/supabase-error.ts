@@ -21,27 +21,61 @@ export function isAbortError(error: unknown): boolean {
 }
 
 /**
- * Check if an error is a connection error (should be suppressed from logs)
+ * Check if an error is a connection/network error (e.g. user offline, Supabase unreachable).
+ * We should NOT clear auth cookies on these errors so the user stays logged in when back online.
  */
 export function isConnectionError(error: unknown): boolean {
   if (!error) return false;
-  
-  const errorMessage = error instanceof Error 
-    ? error.message 
-    : String(error);
-  
+
+  const message = (error as { message?: string })?.message ?? "";
+  const errorMessage = typeof message === "string" ? message : String(error);
+
   const connectionErrorPatterns = [
-    'ENOTFOUND',
-    'fetch failed',
-    'ECONNREFUSED',
-    'ETIMEDOUT',
-    'ENETUNREACH',
-    'getaddrinfo',
+    "ENOTFOUND",
+    "fetch failed",
+    "Failed to fetch",
+    "ECONNREFUSED",
+    "ETIMEDOUT",
+    "ENETUNREACH",
+    "getaddrinfo",
+    "NetworkError",
+    "load failed",
+    "network",
+    "timeout",
+    "timed out",
+    "ECONNRESET",
+    "socket hang up",
   ];
-  
-  return connectionErrorPatterns.some(pattern => 
-    errorMessage.includes(pattern)
+
+  return connectionErrorPatterns.some((pattern) =>
+    errorMessage.toLowerCase().includes(pattern.toLowerCase())
   );
+}
+
+/**
+ * Only clear auth cookies when the session is definitively invalid (e.g. refresh token revoked,
+ * user deleted). Do NOT clear on connection/network errors so the user stays logged in when back online.
+ */
+export function shouldClearAuthCookiesOnAuthError(error: unknown): boolean {
+  if (!error) return false;
+  if (isConnectionError(error)) return false;
+
+  const message = (error as { message?: string })?.message ?? "";
+  const code = (error as { code?: string })?.code ?? "";
+  const errorMessage = typeof message === "string" ? message.toLowerCase() : "";
+  const errorCode = typeof code === "string" ? code.toLowerCase() : "";
+
+  const isSessionInvalid =
+    errorCode === "refresh_token_not_found" ||
+    errorMessage.includes("refresh_token_not_found") ||
+    errorMessage.includes("refresh token not found") ||
+    errorMessage.includes("invalid refresh token") ||
+    errorMessage.includes("jwt expired") ||
+    errorMessage.includes("auth session missing") ||
+    errorMessage.includes("user from sub claim in jwt does not exist") ||
+    errorMessage.includes("user does not exist");
+
+  return isSessionInvalid;
 }
 
 /**

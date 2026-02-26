@@ -47,6 +47,8 @@ export function getRouteInfo(pathname: string | null): RouteInfo {
   const isTermsOfServicePage = logical === "/terms-of-service";
   const isFAQPage = logical === "/faq";
   const isContactPage = logical === "/contact";
+  const isAboutPage = logical === "/about";
+  const isCareersPage = logical === "/careers";
   const isSubscriptionSuccessPage = logical === "/subscription/success";
   const isMaintenancePage = logical === "/maintenance";
   const isDesignPage = logical.startsWith("/design");
@@ -59,6 +61,8 @@ export function getRouteInfo(pathname: string | null): RouteInfo {
     isTermsOfServicePage ||
     isFAQPage ||
     isContactPage ||
+    isAboutPage ||
+    isCareersPage ||
     isSubscriptionSuccessPage ||
     isMaintenancePage ||
     isDesignPage ||

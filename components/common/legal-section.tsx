@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 
 interface LegalSectionProps {
-  title: string;
+  title?: string;
   children: ReactNode;
 }
 
@@ -15,12 +15,14 @@ const CONTENT_CLASS =
 /**
  * Semantic section for legal pages (Terms, Privacy). Consistent typography and spacing.
  */
-export function LegalSection({ title, children }: LegalSectionProps) {
+export function LegalSection({ title = "", children }: LegalSectionProps) {
   return (
     <section className={SECTION_CLASS}>
-      <div className={HEADER_CLASS}>
-        <h2 className={TITLE_CLASS}>{title}</h2>
-      </div>
+      {title ? (
+        <div className={HEADER_CLASS}>
+          <h2 className={TITLE_CLASS}>{title}</h2>
+        </div>
+      ) : null}
       <div className={CONTENT_CLASS}>{children}</div>
     </section>
   );

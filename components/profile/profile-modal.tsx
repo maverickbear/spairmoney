@@ -18,7 +18,7 @@ import {
 import { Save, X, Upload, Camera } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import { Loader2 } from "lucide-react";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DateOfBirthPartsInput } from "@/components/ui/date-of-birth-parts-input";
 import { formatDateInput, parseDateInput } from "@/src/infrastructure/utils/timestamp";
 
 interface Profile {
@@ -487,28 +487,11 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
                   <label className="text-sm font-medium">
                     Date of Birth
                   </label>
-                  <DatePicker
-                    date={(() => {
-                      const value = form.watch("dateOfBirth");
-                      if (!value) return undefined;
-                      if ((value as any) instanceof Date) return (value as unknown) as Date;
-                      if (typeof value === "string") {
-                        try {
-                          return parseDateInput(value) as unknown as Date;
-                        } catch {
-                          const parsed = new Date(value);
-                          return isNaN(parsed.getTime()) ? undefined : (parsed as unknown as Date);
-                        }
-                      }
-                      return undefined;
-                    })()}
-                    onDateChange={(date) => {
-                      if (date) {
-                        form.setValue("dateOfBirth", formatDateInput(date), { shouldValidate: true });
-                      } else {
-                        form.setValue("dateOfBirth", "", { shouldValidate: true });
-                      }
-                    }}
+                  <DateOfBirthPartsInput
+                    value={form.watch("dateOfBirth") ?? ""}
+                    onChange={(value) =>
+                      form.setValue("dateOfBirth", value, { shouldValidate: true })
+                    }
                     placeholder="Select your date of birth"
                     size="medium"
                   />
@@ -537,7 +520,7 @@ export function ProfileModal({ open, onOpenChange, onSuccess }: ProfileModalProp
             <Button 
               type="submit" 
               size="medium"
-              disabled={saving || uploading || loading}
+              disabled={saving || uploading || loading || !form.formState.isDirty}
             >
               {saving ? (
                 <>

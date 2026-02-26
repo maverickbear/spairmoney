@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Command } from "cmdk";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -12,6 +13,7 @@ interface KBarProps {
 }
 
 export function KBar({ open, onOpenChange }: KBarProps) {
+  const t = useTranslations("common");
   const router = useRouter();
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export function KBar({ open, onOpenChange }: KBarProps) {
       <DialogContent className="overflow-hidden p-0">
         <Command className="rounded-lg border border-border">
           <Command.Input
-            placeholder="Search commands..."
+            placeholder={t("searchCommands")}
             className="w-full px-4 py-3 text-sm border-b border-border outline-none"
           />
           <Command.List className="max-h-[300px] overflow-y-auto p-2">

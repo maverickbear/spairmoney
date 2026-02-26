@@ -77,60 +77,66 @@ export function AddTransactionSheet({
             <SheetTitle>{t("addTransaction")}</SheetTitle>
           </SheetHeader>
           <div className="px-6 py-4">
-            <div className={showReceiptScanner ? "grid grid-cols-3 gap-3" : "grid grid-cols-1 gap-3"}>
+            <ul className="flex flex-col gap-2 list-none p-0 m-0">
               {showReceiptScanner && (
                 <>
-                  <Button
-                    onClick={handleTakePicture}
-                    variant="outline"
-                    className="w-full h-auto p-4 flex flex-col items-center gap-2"
-                    size="medium"
-                  >
-                    <div className="p-2 rounded-lg bg-muted">
-                      <Camera className="h-5 w-5" />
-                    </div>
-                    <div className="text-center">
-                      <div className="font-semibold text-xs">{t("takePicture")}</div>
-                      <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                        {t("scanReceipt")}
+                  <li>
+                    <Button
+                      onClick={handleTakePicture}
+                      variant="outline"
+                      className="w-full h-auto py-3 px-4 flex flex-row items-center gap-3 justify-start"
+                      size="medium"
+                    >
+                      <div className="p-2 rounded-lg bg-muted shrink-0">
+                        <Camera className="h-5 w-5" />
                       </div>
-                    </div>
-                  </Button>
-                  <Button
-                    onClick={handleUploadReceipt}
-                    variant="outline"
-                    className="w-full h-auto p-4 flex flex-col items-center gap-2"
-                    size="medium"
-                  >
-                    <div className="p-2 rounded-lg bg-muted">
-                      <Upload className="h-5 w-5" />
-                    </div>
-                    <div className="text-center">
-                      <div className="font-semibold text-xs">{t("uploadReceipt")}</div>
-                      <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                        {t("uploadImage")}
+                      <div className="text-left">
+                        <div className="font-semibold text-sm">{t("takePicture")}</div>
+                        <div className="text-xs text-muted-foreground leading-tight">
+                          {t("scanReceipt")}
+                        </div>
                       </div>
-                    </div>
-                  </Button>
+                    </Button>
+                  </li>
+                  <li>
+                    <Button
+                      onClick={handleUploadReceipt}
+                      variant="outline"
+                      className="w-full h-auto py-3 px-4 flex flex-row items-center gap-3 justify-start"
+                      size="medium"
+                    >
+                      <div className="p-2 rounded-lg bg-muted shrink-0">
+                        <Upload className="h-5 w-5" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold text-sm">{t("uploadReceipt")}</div>
+                        <div className="text-xs text-muted-foreground leading-tight">
+                          {t("uploadImage")}
+                        </div>
+                      </div>
+                    </Button>
+                  </li>
                 </>
               )}
-              <Button
-                onClick={handleAddNewTransaction}
-                variant="outline"
-                className="w-full h-auto p-4 flex flex-col items-center gap-2"
-                size="medium"
-              >
-                <div className="p-2 rounded-lg bg-muted">
-                  <Plus className="h-5 w-5" />
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-xs">{t("addNew")}</div>
-                  <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                    {t("manualEntry")}
+              <li>
+                <Button
+                  onClick={handleAddNewTransaction}
+                  variant="outline"
+                  className="w-full h-auto py-3 px-4 flex flex-row items-center gap-3 justify-start"
+                  size="medium"
+                >
+                  <div className="p-2 rounded-lg bg-muted shrink-0">
+                    <Plus className="h-5 w-5" />
                   </div>
-                </div>
-              </Button>
-            </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-sm">{t("addNew")}</div>
+                    <div className="text-xs text-muted-foreground leading-tight">
+                      {t("manualEntry")}
+                    </div>
+                  </div>
+                </Button>
+              </li>
+            </ul>
           </div>
         </SheetContent>
       </Sheet>

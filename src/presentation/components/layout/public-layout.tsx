@@ -16,7 +16,7 @@ export function PublicLayout({ children, hasSubscription = false }: PublicLayout
   return (
     <>
       <Nav />
-      <BottomNav hasSubscription={hasSubscription} />
+      <BottomNav hasAccess={hasSubscription} />
       {children}
     </>
   );

@@ -34,10 +34,10 @@ interface UserMenuClientProps {
  * 
  * Architecture: Presentation Layer - only consumes state, no business logic
  */
-const LOCALE_OPTIONS: { value: "en" | "pt" | "es"; label: string }[] = [
-  { value: "en", label: "EN" },
-  { value: "pt", label: "PT" },
-  { value: "es", label: "ES" },
+const LOCALE_OPTIONS: { value: "en" | "pt" | "es"; labelKey: "languageEnglish" | "languagePortuguese" | "languageSpanish" }[] = [
+  { value: "en", labelKey: "languageEnglish" },
+  { value: "pt", labelKey: "languagePortuguese" },
+  { value: "es", labelKey: "languageSpanish" },
 ];
 
 export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
@@ -68,6 +68,9 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
   // Track avatar image loading state to prevent glitches
   const [avatarImageError, setAvatarImageError] = useState(false);
   const avatarUrl = useMemo(() => user?.avatarUrl, [user?.avatarUrl]);
+
+  // Track dropdown open state to show border/shadow only when open
+  const [menuOpen, setMenuOpen] = useState(false);
   
   // Reset error state when avatar URL changes
   useEffect(() => {
@@ -141,14 +144,14 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
             )}
           </div>
         ) : (
-          <DropdownMenu>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="medium"
-                className={`w-full h-auto p-2 border border-border shadow hover:bg-secondary ${
-                  isCollapsed ? "justify-center" : "justify-start"
-                }`}
+                className={`w-full h-auto p-2 hover:bg-secondary ${
+                  menuOpen ? "border border-border shadow" : "border-0 shadow-none"
+                } ${isCollapsed ? "justify-center" : "justify-start"}`}
               >
                 <div
                   className={`flex items-center w-full ${
@@ -225,14 +228,14 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
                     <Languages className="h-4 w-4" />
                     <span>{t("language")}</span>
                   </DropdownMenuLabel>
-                  {LOCALE_OPTIONS.map(({ value, label }) => (
+                  {LOCALE_OPTIONS.map(({ value, labelKey }) => (
                     <DropdownMenuItem key={value} asChild className="mb-1">
                       <Link
                         href={pathname}
                         locale={value}
                         className={locale === value ? "bg-muted" : undefined}
                       >
-                        {label}
+                        {t(labelKey)}
                       </Link>
                     </DropdownMenuItem>
                   ))}

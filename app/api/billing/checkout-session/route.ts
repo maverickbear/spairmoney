@@ -27,17 +27,22 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSubscriptions } = await supabase
       .from("app_subscriptions")
-      .select("id, status")
+      .select("id, status, plan_id, stripe_subscription_id")
       .eq("user_id", userId)
       .in("status", ["active", "trialing"])
       .order("created_at", { ascending: false })
       .limit(1);
 
     if (existingSubscriptions && existingSubscriptions.length > 0) {
-      return NextResponse.json(
-        { error: "You already have an active subscription or trial." },
-        { status: 400 }
-      );
+      const sub = existingSubscriptions[0];
+      const isLocalTrialOnly =
+        sub.plan_id === "trial" && sub.stripe_subscription_id == null;
+      if (!isLocalTrialOnly) {
+        return NextResponse.json(
+          { error: "You already have an active subscription or trial." },
+          { status: 400 }
+        );
+      }
     }
 
     const { data: cancelledWithTrial } = await supabase
@@ -50,12 +55,11 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    if (cancelledWithTrial?.trial_end_date) {
-      return NextResponse.json(
-        { error: "You have already used your trial period. Please subscribe to a plan." },
-        { status: 400 }
-      );
-    }
+    const isLocalTrialOnly =
+      existingSubscriptions?.[0]?.plan_id === "trial" &&
+      existingSubscriptions[0]?.stripe_subscription_id == null;
+    const alreadyUsedTrial = !!cancelledWithTrial?.trial_end_date;
+    const skipTrial = isLocalTrialOnly || alreadyUsedTrial;
 
     const stripeService = makeStripeService();
     const result = await stripeService.createTrialCheckoutSessionForUser(
@@ -64,7 +68,8 @@ export async function POST(request: NextRequest) {
       interval,
       returnUrl,
       undefined,
-      promoCode
+      promoCode,
+      skipTrial
     );
 
     if (result.error || !result.url) {

@@ -46,7 +46,7 @@ export default function ContactPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to submit contact form");
+        throw new Error(error.error || t("toastErrorDefault"));
       }
 
       toast({

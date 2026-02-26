@@ -18,7 +18,7 @@ export function FAQSection() {
 
   return (
     <section id="faq" ref={ref} className={cn("py-16 md:py-24 scroll-mt-20 transition-all duration-700", inView ? "opacity-100" : "opacity-0")}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="max-w-2xl">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">{t("title")}</h2>
           <p className="mt-4 text-muted-foreground text-lg">

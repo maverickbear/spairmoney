@@ -175,7 +175,9 @@ export async function POST(request: NextRequest) {
     // Map status using service
     const stripeService = makeStripeService();
     const status = stripeService.mapStripeStatus(activeSubscription.status);
-    const subscriptionId = authUser.id + "-" + plan.id;
+    // If user had a Trial plan subscription (no Stripe), update that row to Pro instead of creating a new one
+    const subscriptionId =
+      existingSub?.plan_id === "trial" ? existingSub.id : authUser.id + "-" + plan.id;
 
     // Get active household ID for the user
     let householdId: string | null = null;

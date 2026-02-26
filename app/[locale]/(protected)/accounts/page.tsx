@@ -131,8 +131,8 @@ export default function AccountsPage() {
       }
       // Show error toast to user
       toast({
-        title: "Error loading accounts",
-        description: "Failed to load accounts. Please try refreshing the page.",
+        title: tAcc("loadError"),
+        description: tAcc("loadErrorDescription"),
         variant: "destructive",
       });
     } finally {
@@ -223,14 +223,14 @@ export default function AccountsPage() {
       
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to delete account");
+        throw new Error(error.error || tAcc("failedToDeleteAccount"));
       }
 
       toast({
-        title: "Account deleted",
+        title: tAcc("accountDeleted"),
         description: transferToId 
-          ? "Your account has been deleted and all transactions have been transferred."
-          : "Your account has been deleted successfully.",
+          ? tAcc("accountDeletedWithTransfer")
+          : tAcc("accountDeletedSuccess"),
         variant: "success",
       });
       
@@ -242,8 +242,8 @@ export default function AccountsPage() {
     } catch (error) {
       console.error("Error deleting account:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete account",
+        title: tCommon("error"),
+        description: error instanceof Error ? error.message : tAcc("failedToDeleteAccount"),
         variant: "destructive",
       });
     } finally {
@@ -256,8 +256,8 @@ export default function AccountsPage() {
     
     if (!transferToAccountId) {
       toast({
-        title: "Account Required",
-        description: "Please select a destination account to transfer transactions to.",
+        title: tAcc("accountRequired"),
+        description: tAcc("selectDestinationAccount"),
         variant: "destructive",
       });
       return;
@@ -274,7 +274,6 @@ export default function AccountsPage() {
     
     // Start deletion immediately - loading will show in the table row
     // Dialog is already closed, user can continue using the app
-    performDelete(accountIdToDelete, transferToId);
     performDelete(accountIdToDelete, transferToId);
   }
 
@@ -299,7 +298,7 @@ export default function AccountsPage() {
       
       toast({
         title: tAcc("defaultAccountUpdated"),
-        description: "Your default account has been updated successfully.",
+        description: tAcc("defaultUpdatedDescription"),
         variant: "success",
       });
     } catch (error) {
@@ -307,8 +306,8 @@ export default function AccountsPage() {
       // Revert optimistic update
       setAccounts(previousAccounts);
       toast({
-        title: "Error",
-        description: "Failed to set default account. Please try again.",
+        title: tCommon("error"),
+        description: tAcc("setDefaultError"),
         variant: "destructive",
       });
     }

@@ -17,7 +17,7 @@ export function CTASection() {
         inView ? "opacity-100" : "opacity-0"
       )}
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl text-center">
         <h2 className="text-2xl md:text-3xl font-bold">
           Stop guessing where your money goes.
         </h2>

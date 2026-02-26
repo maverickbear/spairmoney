@@ -166,9 +166,15 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
       // Check if subscription status allows access
       const isActiveStatus = subscription.status === "active";
       const isTrialingStatus = subscription.status === "trialing";
-      
-      // If subscription exists and status is active or trialing, allow access
-      if (isActiveStatus || isTrialingStatus) {
+      const isExpiredTrial =
+        plan?.id === "trial" &&
+        subscription.trialEndDate &&
+        new Date(subscription.trialEndDate) <= new Date();
+
+      if (isExpiredTrial) {
+        shouldOpenModal = true;
+        reason = "trial_expired";
+      } else if (isActiveStatus || isTrialingStatus) {
         shouldOpenModal = false;
       } else {
         // Open modal for "cancelled" status (user needs to reactivate)

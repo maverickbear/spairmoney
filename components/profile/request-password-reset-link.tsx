@@ -60,7 +60,7 @@ export function RequestPasswordResetLink() {
 
   return (
     <Card className="h-fit border-0">
-      <CardContent className="pt-0 space-y-4">
+      <CardContent className="p-0 md:p-0 space-y-4">
         <p className="text-sm text-muted-foreground">
           {t("passwordResetLinkDescription")}
         </p>

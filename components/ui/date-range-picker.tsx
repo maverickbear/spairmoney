@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { format } from "date-fns";
 import {
   Select,
@@ -48,6 +49,7 @@ export function DateRangePicker({
   onValueChange,
   className,
 }: DateRangePickerProps) {
+  const t = useTranslations("common.dateRange");
   const [startDateValue, setStartDateValue] = React.useState(
     dateRange ? formatDateInput(new Date(dateRange.startDate)) : ""
   );
@@ -70,29 +72,30 @@ export function DateRangePicker({
         const end = new Date(dateRange.endDate);
         return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
       } catch {
-        return "Custom range";
+        return t("customRange");
       }
     }
 
-    const presetLabels: Record<DateRangePreset, string> = {
-      "all-dates": "All Dates",
-      today: "Today",
-      "past-7-days": "Past 7 days",
-      "past-15-days": "Past 15 days",
-      "past-30-days": "Past 30 days",
-      "past-90-days": "Past 90 days",
-      "last-3-months": "Last 3 months",
-      "last-month": "Last month",
-      "last-6-months": "Last 6 months",
-      "past-6-months": "Past 6 months",
-      "this-month": "This month",
-      "this-year": "This year",
-      "year-to-date": "Year to date",
-      "last-year": "Last year",
-      custom: "Custom range",
+    const presetKeys: Record<DateRangePreset, string> = {
+      "all-dates": "allDates",
+      today: "today",
+      "past-7-days": "past7Days",
+      "past-15-days": "past15Days",
+      "past-30-days": "past30Days",
+      "past-90-days": "past90Days",
+      "last-3-months": "last3Months",
+      "last-month": "lastMonth",
+      "last-6-months": "last6Months",
+      "past-6-months": "past6Months",
+      "this-month": "thisMonth",
+      "this-year": "thisYear",
+      "year-to-date": "yearToDate",
+      "last-year": "lastYear",
+      custom: "customRange",
     };
 
-    return presetLabels[value as DateRangePreset] || "Select date range";
+    const key = presetKeys[value as DateRangePreset];
+    return key ? t(key) : t("selectDateRange");
   };
 
   const handlePresetChange = (preset: string) => {
@@ -155,21 +158,21 @@ export function DateRangePicker({
           <SelectValue>{getDisplayText()}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all-dates">All Dates</SelectItem>
-          <SelectItem value="today">Today</SelectItem>
-          <SelectItem value="past-7-days">Past 7 days</SelectItem>
-          <SelectItem value="past-15-days">Past 15 days</SelectItem>
-          <SelectItem value="past-30-days">Past 30 days</SelectItem>
-          <SelectItem value="past-90-days">Past 90 days</SelectItem>
-          <SelectItem value="last-3-months">Last 3 months</SelectItem>
-          <SelectItem value="last-month">Last month</SelectItem>
-          <SelectItem value="last-6-months">Last 6 months</SelectItem>
-          <SelectItem value="past-6-months">Past 6 months</SelectItem>
-          <SelectItem value="this-month">This month</SelectItem>
-          <SelectItem value="this-year">This year</SelectItem>
-          <SelectItem value="year-to-date">Year to date</SelectItem>
-          <SelectItem value="last-year">Last year</SelectItem>
-          <SelectItem value="custom">Custom range</SelectItem>
+          <SelectItem value="all-dates">{t("allDates")}</SelectItem>
+          <SelectItem value="today">{t("today")}</SelectItem>
+          <SelectItem value="past-7-days">{t("past7Days")}</SelectItem>
+          <SelectItem value="past-15-days">{t("past15Days")}</SelectItem>
+          <SelectItem value="past-30-days">{t("past30Days")}</SelectItem>
+          <SelectItem value="past-90-days">{t("past90Days")}</SelectItem>
+          <SelectItem value="last-3-months">{t("last3Months")}</SelectItem>
+          <SelectItem value="last-month">{t("lastMonth")}</SelectItem>
+          <SelectItem value="last-6-months">{t("last6Months")}</SelectItem>
+          <SelectItem value="past-6-months">{t("past6Months")}</SelectItem>
+          <SelectItem value="this-month">{t("thisMonth")}</SelectItem>
+          <SelectItem value="this-year">{t("thisYear")}</SelectItem>
+          <SelectItem value="year-to-date">{t("yearToDate")}</SelectItem>
+          <SelectItem value="last-year">{t("lastYear")}</SelectItem>
+          <SelectItem value="custom">{t("customRange")}</SelectItem>
         </SelectContent>
       </Select>
 
@@ -179,7 +182,7 @@ export function DateRangePicker({
             type="date"
             value={startDateValue}
             onChange={handleStartDateChange}
-            placeholder="Start date"
+            placeholder={t("startDate")}
             className="h-9 text-xs"
           />
           <span className="text-muted-foreground text-xs">to</span>
@@ -187,7 +190,7 @@ export function DateRangePicker({
             type="date"
             value={endDateValue}
             onChange={handleEndDateChange}
-            placeholder="End date"
+            placeholder={t("endDate")}
             className="h-9 text-xs"
             min={startDateValue || undefined}
           />

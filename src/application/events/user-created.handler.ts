@@ -42,7 +42,35 @@ export async function handleUserCreated(event: DomainEvent): Promise<void> {
       throw new Error("Failed to create personal household: function returned no data");
     }
 
-    logger.info(`[UserCreatedHandler] Personal household created atomically for user ${userCreatedEvent.userId}, household ID: ${data}`);
+    const householdId = data as string;
+    logger.info(`[UserCreatedHandler] Personal household created atomically for user ${userCreatedEvent.userId}, household ID: ${householdId}`);
+
+    // Create Trial plan subscription so the user/household always has a plan (no Stripe until upgrade)
+    try {
+      const { makeSubscriptionsService } = await import("@/src/application/subscriptions/subscriptions.factory");
+      const subscriptionsService = makeSubscriptionsService();
+      await subscriptionsService.createTrialSubscriptionForNewUser(userCreatedEvent.userId, householdId);
+
+      // Persist Stripe customer on trial subscription (reuses customer created at signup)
+      try {
+        const { makeStripeService } = await import("@/src/application/stripe/stripe.factory");
+        const stripeService = makeStripeService();
+        const { customerId } = await stripeService.createOrGetStripeCustomer(
+          userCreatedEvent.userId,
+          userCreatedEvent.email,
+          userCreatedEvent.name ?? undefined,
+          householdId
+        );
+        const subscriptionId = `${userCreatedEvent.userId}-trial`;
+        await subscriptionsService.updateStripeCustomerId(subscriptionId, customerId);
+        logger.info("[UserCreatedHandler] Stripe customer persisted on trial subscription", { userId: userCreatedEvent.userId, subscriptionId });
+      } catch (stripeError) {
+        logger.error("[UserCreatedHandler] Error persisting Stripe customer on trial (non-fatal):", stripeError);
+      }
+    } catch (trialError) {
+      logger.error("[UserCreatedHandler] Error creating Trial subscription (non-fatal):", trialError);
+      throw trialError;
+    }
   } catch (error) {
     logger.error("[UserCreatedHandler] Error handling UserCreated event:", error);
     // Re-throw to allow event bus to handle it

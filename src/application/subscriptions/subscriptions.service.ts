@@ -7,10 +7,14 @@
 import { SubscriptionsRepository } from "@/src/infrastructure/database/repositories/subscriptions.repository";
 import { SubscriptionsMapper } from "./subscriptions.mapper";
 import { BaseSubscription, BasePlan, BaseSubscriptionData, BaseLimitCheckResult, BasePlanFeatures, PublicPlan } from "../../domain/subscriptions/subscriptions.types";
-import { getDefaultFeatures } from "@/lib/utils/plan-features";
+import { getDefaultFeatures, getTrialFeatures } from "@/lib/utils/plan-features";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
 import { createServerClient } from "@/src/infrastructure/database/supabase-server";
 import { getCurrentUserId } from "../shared/feature-guard";
+
+/** Plan id for the 30-day Trial plan (no Stripe, full access). */
+export const TRIAL_PLAN_ID = "trial";
 
 // In-memory cache for deduplicating concurrent requests
 // Maps userId -> Promise<BaseSubscriptionData>
@@ -69,6 +73,65 @@ export class SubscriptionsService {
       logger.error("[SubscriptionsService] Error fetching plan by ID:", error);
       return null;
     }
+  }
+
+  /**
+   * Create a Trial plan subscription for a new user (no Stripe).
+   * Called when a personal household is created. Idempotent: skips if household already has a subscription.
+   */
+  async createTrialSubscriptionForNewUser(userId: string, householdId: string): Promise<void> {
+    const log = logger.withPrefix("SubscriptionsService.createTrialSubscription");
+    const existing = await this.repository.findByHouseholdId(householdId, true);
+    if (existing) {
+      log.log("Household already has a subscription, skipping Trial creation", { householdId });
+      return;
+    }
+    const plan = await this.getPlanById(TRIAL_PLAN_ID, true);
+    if (!plan) {
+      log.warn("Trial plan not found in app_plans; run scripts/add-trial-plan.sql. Skipping Trial subscription.");
+      return;
+    }
+    const now = new Date();
+    const trialEnd = new Date(now);
+    trialEnd.setDate(trialEnd.getDate() + 30);
+    const subscriptionId = `${userId}-${TRIAL_PLAN_ID}`;
+    const createdAt = formatTimestamp(now);
+    const updatedAt = formatTimestamp(now);
+    await this.repository.create(
+      {
+        id: subscriptionId,
+        userId,
+        householdId,
+        planId: TRIAL_PLAN_ID,
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        status: "active",
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        trialStartDate: createdAt,
+        trialEndDate: formatTimestamp(trialEnd),
+        createdAt,
+        updatedAt,
+      },
+      true
+    );
+    log.log("Trial subscription created", { userId, householdId, subscriptionId });
+  }
+
+  /**
+   * Update stripe_customer_id on an existing subscription (e.g. trial row after signup).
+   * Uses service role so it can be called from event handlers.
+   */
+  async updateStripeCustomerId(subscriptionId: string, stripeCustomerId: string): Promise<void> {
+    await this.repository.update(
+      subscriptionId,
+      {
+        stripeCustomerId,
+        updatedAt: formatTimestamp(new Date()),
+      },
+      true
+    );
   }
 
   /**
@@ -440,10 +503,14 @@ export class SubscriptionsService {
     }
 
     if (!subscription) {
+      // User has no Stripe subscription - check local trial (users.trial_ends_at)
+      const trialEndsAt = await this.repository.getTrialEndsAt(userId, true);
+      const isInLocalTrial = trialEndsAt && new Date(trialEndsAt) > new Date();
       return {
         subscription: null,
         plan: null,
-        limits: getDefaultFeatures(),
+        limits: isInLocalTrial ? getTrialFeatures() : getDefaultFeatures(),
+        trialEndsAt: trialEndsAt ?? null,
       };
     }
 
@@ -469,6 +536,18 @@ export class SubscriptionsService {
         plan: null,
         limits: getDefaultFeatures(),
       };
+    }
+
+    // Trial plan: full access until trial_end_date; after that, restrictive limits (modal + block writes)
+    if (plan.id === TRIAL_PLAN_ID && subscription.trialEndDate) {
+      const trialEnd = new Date(subscription.trialEndDate);
+      if (trialEnd <= new Date()) {
+        return {
+          subscription,
+          plan,
+          limits: getDefaultFeatures(),
+        };
+      }
     }
 
     return {

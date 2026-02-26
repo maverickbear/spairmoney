@@ -1,8 +1,6 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { LandingHeader } from "@/components/landing/landing-header";
-import { SimpleFooter } from "@/components/common/simple-footer";
 
 export interface ContentPageHeroProps {
   icon: ReactNode;
@@ -16,36 +14,30 @@ interface ContentPageLayoutProps {
 }
 
 /**
- * Layout for public content pages (Terms, Privacy, FAQ).
- * Provides consistent header (scrolls with page), main area, and footer.
+ * Layout for public content pages (Terms, Privacy, FAQ, About, Careers, Contact).
+ * Header and footer are provided by (landing) layout; this only wraps the main content.
  */
 export function ContentPageLayout({ children, hero }: ContentPageLayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <LandingHeader />
-      <main
-        className="flex-1 w-full container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 md:py-12"
-      >
-        <div className="max-w-4xl mx-auto">
-          {hero && (
-            <header className="text-center mb-8 sm:mb-10 md:mb-12">
-              <div className="flex items-center justify-center gap-3 mb-3 sm:mb-4">
-                {hero.icon}
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-                  {hero.title}
-                </h1>
-              </div>
-              {hero.subtitle && (
-                <p className="text-sm sm:text-base text-muted-foreground">
-                  {hero.subtitle}
-                </p>
-              )}
-            </header>
-          )}
-          {children}
-        </div>
-      </main>
-      <SimpleFooter />
-    </div>
+    <main className="flex-1 w-full container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 md:py-12 max-w-6xl">
+      <div className="mx-auto max-w-6xl">
+        {hero && (
+          <header className="text-center mb-8 sm:mb-10 md:mb-12">
+            <div className="flex items-center justify-center gap-3 mb-3 sm:mb-4">
+              {hero.icon}
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+                {hero.title}
+              </h1>
+            </div>
+            {hero.subtitle && (
+              <p className="text-sm sm:text-base text-muted-foreground">
+                {hero.subtitle}
+              </p>
+            )}
+          </header>
+        )}
+        {children}
+      </div>
+    </main>
   );
 }

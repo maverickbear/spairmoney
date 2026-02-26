@@ -162,9 +162,9 @@ export function BudgetsTab() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="text-2xl md:text-3xl font-bold">Budgets</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">{tPlanning("budgetsTabTitle")}</h2>
           <p className="text-sm text-muted-foreground">
-            Track your spending against budgets for {format(now, "MMMM yyyy")}
+            {tPlanning("budgetsTabSubtitle", { monthYear: format(now, "MMMM yyyy") })}
           </p>
         </div>
         <Button
@@ -176,7 +176,7 @@ export function BudgetsTab() {
           className="w-full md:w-auto"
         >
           <Plus className="mr-2 h-4 w-4" />
-          Add Budget
+          {tPlanning("addBudget")}
         </Button>
       </div>
 
@@ -186,7 +186,7 @@ export function BudgetsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Total Budget</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("totalBudget")}</p>
                 <p className="text-2xl font-bold">{formatMoney(totalBudget)}</p>
               </div>
             </CardContent>
@@ -194,10 +194,10 @@ export function BudgetsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Total Spent</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("totalSpent")}</p>
                 <p className="text-2xl font-bold">{formatMoney(totalSpent)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}% of budget
+                  {tPlanning("percentOfBudget", { percent: totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0 })}
                 </p>
               </div>
             </CardContent>
@@ -205,7 +205,7 @@ export function BudgetsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Remaining</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("remaining")}</p>
                 <p className={`text-2xl font-bold ${totalRemaining < 0 ? "text-destructive" : "text-sentiment-positive"}`}>
                   {formatMoney(totalRemaining)}
                 </p>
@@ -215,7 +215,7 @@ export function BudgetsTab() {
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <p className="text-sm font-medium text-muted-foreground">{tPlanning("status")}</p>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     <div className="h-2 w-2 rounded-full bg-sentiment-positive" />

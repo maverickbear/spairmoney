@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { useInView } from "@/hooks/use-in-view";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const TESTIMONIALS = [
 const AUTO_ADVANCE_MS = 5000;
 
 export function TrustSection() {
+  const tAria = useTranslations("landing.aria");
   const { ref, inView } = useInView();
   const [index, setIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -38,7 +40,7 @@ export function TrustSection() {
 
   return (
     <section ref={ref} className={cn("py-16 md:py-24 bg-muted/40 text-foreground transition-all duration-700", inView ? "opacity-100" : "opacity-0")}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div
           className="relative"
           onMouseEnter={() => setIsPaused(true)}
@@ -49,7 +51,7 @@ export function TrustSection() {
           <div className="relative flex items-center gap-2">
             <button
               type="button"
-              aria-label="Previous testimonial"
+              aria-label={tAria("prevTestimonial")}
               className="absolute left-0 z-10 -translate-x-1 sm:-translate-x-2 md:-translate-x-4 h-8 w-8 sm:h-9 sm:w-9 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center text-foreground hover:bg-muted transition-colors touch-manipulation"
               onClick={() => goTo(index - 1)}
             >
@@ -74,7 +76,7 @@ export function TrustSection() {
                     <button
                       key={i}
                       type="button"
-                      aria-label={`Go to testimonial ${i + 1}`}
+                      aria-label={tAria("goToTestimonial", { index: i + 1 })}
                       className="group min-w-[44px] min-h-[44px] flex items-center justify-center -m-2 sm:m-0 sm:min-w-0 sm:min-h-0 touch-manipulation"
                       onClick={() => setIndex(i)}
                     >
@@ -91,7 +93,7 @@ export function TrustSection() {
             </Card>
             <button
               type="button"
-              aria-label="Next testimonial"
+              aria-label={tAria("nextTestimonial")}
               className="absolute right-0 z-10 translate-x-1 sm:translate-x-2 md:translate-x-4 h-8 w-8 sm:h-9 sm:w-9 rounded-lg border border-border bg-background shadow-sm flex items-center justify-center text-foreground hover:bg-muted transition-colors touch-manipulation"
               onClick={() => goTo(index + 1)}
             >

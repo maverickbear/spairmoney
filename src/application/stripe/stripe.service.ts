@@ -155,7 +155,7 @@ export class StripeService {
       let stripeCouponId: string | undefined;
       if (promoCode) {
         const { data: promoCodeData } = await supabase
-          .from("system_promo_codes")
+          .from("app_promo_codes")
           .select("stripe_coupon_id, is_active, expires_at, plan_ids")
           .eq("code", promoCode.toUpperCase())
           .single();
@@ -293,7 +293,7 @@ export class StripeService {
       let stripeCouponId: string | undefined;
       if (promoCode) {
         const { data: promoCodeData } = await supabase
-          .from("system_promo_codes")
+          .from("app_promo_codes")
           .select("stripe_coupon_id, is_active, expires_at, plan_ids")
           .eq("code", promoCode.toUpperCase())
           .single();
@@ -357,7 +357,8 @@ export class StripeService {
 
   /**
    * Create a checkout session for trial with card required (authenticated user).
-   * Collects payment method, creates subscription with 30-day trial, no charge until trial ends.
+   * When skipTrial is false: 30-day trial, no charge until trial ends.
+   * When skipTrial is true: subscription starts active immediately (user already on trial or already used trial).
    * Interval (month/year) determines which Stripe price is used.
    */
   async createTrialCheckoutSessionForUser(
@@ -366,7 +367,8 @@ export class StripeService {
     interval: "month" | "year" = "month",
     returnUrl?: string,
     cancelUrl?: string,
-    promoCode?: string
+    promoCode?: string,
+    skipTrial?: boolean
   ): Promise<CheckoutSessionResult> {
     try {
       const stripe = getStripeClient();
@@ -427,7 +429,7 @@ export class StripeService {
       let stripeCouponId: string | undefined;
       if (promoCode) {
         const { data: promoCodeData } = await supabase
-          .from("system_promo_codes")
+          .from("app_promo_codes")
           .select("stripe_coupon_id, is_active, expires_at, plan_ids")
           .eq("code", promoCode.toUpperCase())
           .single();
@@ -450,30 +452,34 @@ export class StripeService {
       const successPath = returnUrl ? (returnUrl.startsWith("/") ? returnUrl.slice(1) : returnUrl) : "subscription/success";
       const cancelPath = cancelUrl || "dashboard?openPricingModal=true&canceled=true";
 
+      const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] = {
+        metadata: {
+          userId,
+          planId,
+          interval,
+        },
+      };
+      if (!skipTrial) {
+        subscriptionData.trial_period_days = 30;
+        subscriptionData.trial_settings = {
+          end_behavior: { missing_payment_method: "cancel" },
+        };
+      }
+
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         mode: "subscription",
         customer: customerId,
         payment_method_types: ["card"],
         line_items: [{ price: priceId, quantity: 1 }],
-        subscription_data: {
-          trial_period_days: 30,
-          trial_settings: {
-            end_behavior: { missing_payment_method: "cancel" },
-          },
-          metadata: {
-            userId,
-            planId,
-            interval,
-          },
-        },
-        payment_method_collection: "if_required",
+        subscription_data: subscriptionData,
+        payment_method_collection: skipTrial ? "always" : "if_required",
         success_url: `${baseUrl}${successPath}${successPath.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelPath.startsWith("http") ? cancelPath : `${baseUrl}${cancelPath.startsWith("/") ? cancelPath.slice(1) : cancelPath}`,
         metadata: {
           userId,
           planId,
           interval,
-          isTrial: "true",
+          isTrial: skipTrial ? "false" : "true",
         },
       };
 
@@ -776,12 +782,23 @@ export class StripeService {
         try {
           const { data: userRow } = await serviceRoleClient
             .from("users")
-            .select("email")
+            .select("email, name")
             .eq("id", existingRow.user_id)
             .single();
           if (userRow?.email) {
             const { moveContactToCancelledSegment } = await import("@/lib/utils/resend-segments");
             await moveContactToCancelledSegment(userRow.email);
+          }
+          if (userRow?.email) {
+            try {
+              const { sendSubscriptionCancelledEmail } = await import("@/lib/utils/email");
+              await sendSubscriptionCancelledEmail({
+                to: userRow.email,
+                userName: userRow.name ?? undefined,
+              });
+            } catch (emailErr) {
+              logger.error("[StripeService] Error sending subscription cancelled email (non-critical):", emailErr);
+            }
           }
         } catch (segmentErr) {
           logger.error("[StripeService] Resend segment sync on subscription.deleted (non-critical):", segmentErr);
@@ -894,13 +911,104 @@ export class StripeService {
    */
   private async handleInvoiceEvent(event: Stripe.Event): Promise<void> {
     const invoice = event.data.object as Stripe.Invoice;
-    logger.info("[StripeService] Handling invoice event:", { 
-      type: event.type, 
-      invoiceId: invoice.id 
+    logger.info("[StripeService] Handling invoice event:", {
+      type: event.type,
+      invoiceId: invoice.id,
     });
-    
-    // TODO: Implement invoice event handling logic
-    // This should update payment status in database
+
+    const baseUrl = getStripeBaseUrl().replace(/\/$/, "");
+    const billingUrl = `${baseUrl}/settings/billing`;
+
+    if (event.type === "invoice.payment_failed") {
+      try {
+        const customerEmail = await this.getInvoiceCustomerEmail(invoice);
+        if (customerEmail) {
+          const userName = await this.getUserNameFromInvoice(invoice);
+          const { sendPaymentFailedEmail } = await import("@/lib/utils/email");
+          await sendPaymentFailedEmail({
+            to: customerEmail,
+            userName: userName ?? undefined,
+            billingUrl,
+          });
+        }
+      } catch (emailErr) {
+        logger.error("[StripeService] Error sending payment failed email (non-critical):", emailErr);
+      }
+      return;
+    }
+
+    if (event.type === "invoice.payment_succeeded" && invoice.billing_reason === "subscription_cycle") {
+      try {
+        const customerEmail = await this.getInvoiceCustomerEmail(invoice);
+        if (customerEmail) {
+          const userName = await this.getUserNameFromInvoice(invoice);
+          const amountFormatted =
+            invoice.amount_paid != null && invoice.currency
+              ? new Intl.NumberFormat("en-CA", {
+                  style: "currency",
+                  currency: (invoice.currency || "cad").toUpperCase(),
+                }).format(invoice.amount_paid / 100)
+              : undefined;
+          const periodEnd =
+            invoice.period_end != null
+              ? new Date(invoice.period_end * 1000).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })
+              : undefined;
+          const { sendRenewalSuccessEmail } = await import("@/lib/utils/email");
+          await sendRenewalSuccessEmail({
+            to: customerEmail,
+            userName: userName ?? undefined,
+            amountFormatted,
+            periodEnd,
+          });
+        }
+      } catch (emailErr) {
+        logger.error("[StripeService] Error sending renewal success email (non-critical):", emailErr);
+      }
+    }
+  }
+
+  private async getInvoiceCustomerEmail(invoice: Stripe.Invoice): Promise<string | null> {
+    if (invoice.customer_email) {
+      return invoice.customer_email;
+    }
+    const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+    if (!customerId) return null;
+    try {
+      const stripe = getStripeClient();
+      const customer = await stripe.customers.retrieve(customerId);
+      if (customer.deleted || !("email" in customer)) return null;
+      return customer.email ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getUserNameFromInvoice(invoice: Stripe.Invoice): Promise<string | null> {
+    const sub = (invoice as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }).subscription;
+    const subscriptionId = typeof sub === "string" ? sub : sub?.id;
+    if (!subscriptionId) return null;
+    try {
+      const { createServiceRoleClient } = await import("@/src/infrastructure/database/supabase-server");
+      const supabase = createServiceRoleClient();
+      const { data: row } = await supabase
+        .from("app_subscriptions")
+        .select("user_id")
+        .eq("stripe_subscription_id", subscriptionId)
+        .maybeSingle();
+      if (!row?.user_id) return null;
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", row.user_id)
+        .single();
+      return userRow?.name ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -1734,7 +1842,7 @@ export class StripeService {
       let stripeCouponId: string | undefined;
       if (promoCode) {
         const { data: promoCodeData } = await supabase
-          .from("system_promo_codes")
+          .from("app_promo_codes")
           .select("stripe_coupon_id, is_active, expires_at, plan_ids")
           .eq("code", promoCode.toUpperCase())
           .single();
@@ -2290,14 +2398,20 @@ export class StripeService {
         };
       }
 
-      const subscriptionId = `${userId}-${plan.id}`;
+      // If user has a Trial plan subscription (no Stripe), we update it to Pro instead of creating a new row
+      const subByHousehold = await this.subscriptionsRepository.findByHouseholdId(householdId, true);
+      const existingTrialSub =
+        subByHousehold?.plan_id === "trial" ? subByHousehold : null;
+      const subscriptionId = existingTrialSub
+        ? existingTrialSub.id
+        : `${userId}-${plan.id}`;
 
-      // Check for existing subscription (pending by email, by customer ID, or by subscription ID)
+      // Check for existing subscription (pending by email, by customer ID, by subscription ID, or Trial)
       const pendingSubByEmail = await this.subscriptionsRepository.findByPendingEmail(email, true);
       const existingSubByCustomer = await this.subscriptionsRepository.findByStripeCustomerId(customerId, true);
       const existingSubById = await this.subscriptionsRepository.findById(subscriptionId, true);
 
-      const existingSub = pendingSubByEmail || existingSubByCustomer || existingSubById;
+      const existingSub = pendingSubByEmail || existingSubByCustomer || existingSubById || existingTrialSub || null;
 
       // Map Stripe status to our status
       const status = stripeSubscription.status === "active" ? "active" as const
@@ -2539,14 +2653,22 @@ export class StripeService {
         };
       }
 
-      const subscriptionId = `${userId}-${plan.id}`;
+      // If user has a Trial plan subscription (no Stripe), we update it to Pro instead of creating a new row
+      const subByHousehold = householdId
+        ? await this.subscriptionsRepository.findByHouseholdId(householdId, true)
+        : null;
+      const existingTrialSub =
+        subByHousehold?.plan_id === "trial" ? subByHousehold : null;
+      const subscriptionId = existingTrialSub
+        ? existingTrialSub.id
+        : `${userId}-${plan.id}`;
 
-      // Check for existing subscription (pending by customer ID, by email, or by subscription ID)
+      // Check for existing subscription (pending by customer ID, by email, by subscription ID, or Trial)
       const pendingSubByCustomer = await this.subscriptionsRepository.findByStripeCustomerId(customerId, true);
       const pendingSubByEmail = await this.subscriptionsRepository.findByPendingEmail(email.toLowerCase(), true);
       const existingSubById = await this.subscriptionsRepository.findById(subscriptionId, true);
 
-      const existingSub = pendingSubByCustomer || pendingSubByEmail || existingSubById;
+      const existingSub = pendingSubByCustomer || pendingSubByEmail || existingSubById || existingTrialSub || null;
 
       // Map Stripe status to our status
       const status = stripeSubscription.status === "active" ? "active" as const

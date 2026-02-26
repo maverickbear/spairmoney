@@ -19,6 +19,7 @@ export function IntlProviderClient({ locale, messages, children }: IntlProviderC
     <NextIntlClientProvider
       locale={locale}
       messages={messages}
+      timeZone="UTC"
       getMessageFallback={({ namespace, key }) =>
         process.env.NODE_ENV === "development" ? `${namespace}.${key}` : "—"
       }

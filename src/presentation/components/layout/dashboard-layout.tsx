@@ -12,16 +12,19 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   isSidebarCollapsed: boolean;
   hasSubscription: boolean;
+  /** True when user can use the app: active subscription, Stripe trialing, or local trial */
+  hasAccess: boolean;
 }
 
 /**
  * Dashboard Layout Component
- * Main layout for authenticated users with subscription
+ * Main layout for authenticated users (trial or subscription)
  */
 export function DashboardLayout({
   children,
   isSidebarCollapsed,
   hasSubscription,
+  hasAccess,
 }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
@@ -33,7 +36,7 @@ export function DashboardLayout({
       {/* Main Content Area - scrolls with the page (header + content) */}
       <div
         className={cn(
-          "min-h-screen transition-all duration-300",
+          "min-h-screen duration-300 transition-[margin-left]",
           "lg:ml-64",
           isSidebarCollapsed && "lg:!ml-16"
         )}
@@ -42,7 +45,7 @@ export function DashboardLayout({
         }}
       >
         {/* Header - scrolls with content (not fixed/sticky) */}
-        <MobileHeader hasSubscription={hasSubscription} />
+        <MobileHeader hasAccess={hasAccess} />
 
         <main className="w-full max-w-full bg-white dark:bg-background">
           {/* Cancelled Subscription Banner - Inside Content Container */}
@@ -58,7 +61,7 @@ export function DashboardLayout({
       </div>
 
       {/* Bottom Navigation - Fixed Bottom (mobile only) */}
-      <BottomNav hasSubscription={hasSubscription} />
+      <BottomNav hasAccess={hasAccess} />
     </div>
   );
 }

@@ -95,11 +95,11 @@ export function Logo({
       : "/assets/logos/logo-primary-lightbg.svg";
   };
 
-  // Default dimensions based on variant
+  // Default dimensions based on variant (reduced by 20% from original 200×53 / 240×53)
   const defaultDimensions = {
     icon: { width: 40, height: 40 },
-    wordmark: { width: 200, height: 53 },
-    full: { width: 240, height: 53 },
+    wordmark: { width: 160, height: 42 },
+    full: { width: 192, height: 42 },
   };
 
   // If only width is provided, height should be auto

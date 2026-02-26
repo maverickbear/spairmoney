@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import {
@@ -13,15 +14,19 @@ import { Button } from "@/components/ui/button";
 import { Languages } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const LOCALES: { value: string; label: string; short: string }[] = [
-  { value: "en", label: "English", short: "EN" },
-  { value: "pt", label: "Português", short: "PT" },
-  { value: "es", label: "Español", short: "ES" },
+const LOCALES: {
+  value: "en" | "pt" | "es";
+  short: string;
+  labelKey: "languageEnglish" | "languagePortuguese" | "languageSpanish";
+}[] = [
+  { value: "en", short: "EN", labelKey: "languageEnglish" },
+  { value: "pt", short: "PT", labelKey: "languagePortuguese" },
+  { value: "es", short: "ES", labelKey: "languageSpanish" },
 ];
 
 interface LocaleSwitcherProps {
   className?: string;
-  /** "short" = show only EN, PT, ES (e.g. landing); "full" = show icon + full name */
+  /** "short" = Languages icon + EN/PT/ES in header (dropdown shows full names); "full" = icon + full name */
   variant?: "short" | "full";
 }
 
@@ -32,8 +37,14 @@ export function LocaleSwitcher({ className, variant = "full" }: LocaleSwitcherPr
 
   const locale = useLocale();
   const pathname = usePathname();
+  const t = useTranslations("common");
   const current = LOCALES.find((l) => l.value === locale);
-  const triggerLabel = variant === "short" ? (current?.short ?? locale.toUpperCase()) : (current?.label ?? locale);
+  const triggerLabel =
+    variant === "short"
+      ? current?.short ?? locale.toUpperCase()
+      : current
+        ? t(current.labelKey)
+        : locale;
 
   return (
     <DropdownMenu>
@@ -42,23 +53,23 @@ export function LocaleSwitcher({ className, variant = "full" }: LocaleSwitcherPr
           variant="ghost"
           size="small"
           className={cn("gap-2", className)}
-          aria-label="Language"
+          aria-label={t("language")}
         >
-          {variant === "full" && <Languages className="h-4 w-4" />}
-          <span className={variant === "short" ? "font-medium" : "hidden sm:inline"}>
+          <Languages className="h-4 w-4" />
+          <span className={variant === "short" ? "font-medium text-base" : "hidden sm:inline"}>
             {triggerLabel}
           </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {LOCALES.map(({ value, label, short }) => (
+        {LOCALES.map(({ value, labelKey }) => (
           <DropdownMenuItem key={value} asChild>
             <Link
               href={pathname}
-              locale={value as "en" | "pt" | "es"}
+              locale={value}
               className={locale === value ? "bg-muted" : undefined}
             >
-              {variant === "short" ? short : label}
+              {t(labelKey)}
             </Link>
           </DropdownMenuItem>
         ))}

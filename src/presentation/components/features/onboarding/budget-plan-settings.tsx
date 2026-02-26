@@ -18,6 +18,7 @@ export function BudgetPlanSettings() {
   const t = useTranslations("settings");
   const tCommon = useTranslations("common");
   const [selectedBudgetRule, setSelectedBudgetRule] = useState<BudgetRuleType | undefined>(undefined);
+  const [initialBudgetRule, setInitialBudgetRule] = useState<BudgetRuleType | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -33,6 +34,7 @@ export function BudgetPlanSettings() {
         const data = await response.json();
         if (data.budgetRule) {
           setSelectedBudgetRule(data.budgetRule);
+          setInitialBudgetRule(data.budgetRule);
         }
       }
     } catch (error) {
@@ -68,6 +70,7 @@ export function BudgetPlanSettings() {
         throw new Error(error.error || t("failedToSaveBudgetRule"));
       }
 
+      setInitialBudgetRule(selectedBudgetRule);
       toast({
         title: t("budgetPlanUpdated"),
         description: t("budgetPlanUpdatedDescription"),
@@ -118,7 +121,7 @@ export function BudgetPlanSettings() {
         <div className="flex justify-end pt-4">
           <Button
             onClick={handleSave}
-            disabled={saving || !selectedBudgetRule}
+            disabled={saving || !selectedBudgetRule || selectedBudgetRule === initialBudgetRule}
             size="medium"
           >
             {saving ? (

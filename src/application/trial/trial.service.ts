@@ -156,18 +156,17 @@ export class TrialService {
           // Continue anyway - customer exists, just couldn't update
         }
       } else {
-        // Create Stripe customer
-        logger.info("[TrialService] Creating new Stripe customer for user:", authUser.id);
-        const stripe = getStripeClient();
-        const customer = await stripe.customers.create({
-          email: authUser.email!,
-          name: userData?.name || undefined,
-          metadata: {
-            userId: authUser.id,
-          },
-        });
-        customerId = customer.id;
-        logger.info("[TrialService] Stripe customer created:", { customerId, email: authUser.email, name: userData?.name });
+        // Get or create Stripe customer (reuses customer from signup if found by email)
+        logger.info("[TrialService] Getting or creating Stripe customer for user:", authUser.id);
+        const stripeService = makeStripeService();
+        const result = await stripeService.createOrGetStripeCustomer(
+          authUser.id,
+          authUser.email!,
+          userData?.name ?? undefined,
+          householdId
+        );
+        customerId = result.customerId;
+        logger.info("[TrialService] Stripe customer resolved:", { customerId, email: authUser.email, name: userData?.name, isNew: result.isNew });
       }
 
       // Resolve active price (handles Stripe price updates / archived prices)

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { LocaleSwitcher } from "@/components/common/locale-switcher";
+import { SocialLinks } from "@/components/common/social-links";
 
 export function SimpleFooter() {
   const [currentYear, setCurrentYear] = useState(2024);
@@ -21,9 +21,19 @@ export function SimpleFooter() {
           <p className="text-sm text-muted-foreground">
             © {currentYear} Spair Money. {t("allRightsReserved")}
           </p>
-          <div className="flex items-center gap-4">
-            <LocaleSwitcher variant="short" className="text-muted-foreground" />
-            <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-6">
+            <Link
+              href="/about"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {t("aboutUs")}
+            </Link>
+            <Link
+              href="/careers"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {t("careers")}
+            </Link>
             <Link
               href="/blog"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -52,7 +62,7 @@ export function SimpleFooter() {
             >
               {t("privacyPolicy")}
             </Link>
-            </div>
+            <SocialLinks variant="default" />
           </div>
         </div>
       </div>

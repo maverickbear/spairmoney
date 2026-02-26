@@ -193,6 +193,16 @@ export async function GET(request: NextRequest) {
           } catch (welcomeError) {
             console.warn("[OAUTH-CALLBACK] Failed to send welcome email (non-critical):", welcomeError);
           }
+          try {
+            const { sendNewSignupNotificationEmail } = await import("@/lib/utils/email");
+            await sendNewSignupNotificationEmail({
+              userEmail: userEmail,
+              userName: authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? null,
+              signupSource: "oauth",
+            });
+          } catch (notifyError) {
+            console.warn("[OAUTH-CALLBACK] Failed to send new signup notification (non-critical):", notifyError);
+          }
         }
       } catch (profileError) {
         console.error("[OAUTH-CALLBACK] Error creating user profile:", profileError);

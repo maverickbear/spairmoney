@@ -19,6 +19,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
   return {
     locale,
     messages,
+    timeZone: "UTC",
     getMessageFallback({ namespace, key }) {
       if (process.env.NODE_ENV === "development") {
         return `${namespace}.${key}`;

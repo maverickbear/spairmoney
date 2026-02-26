@@ -86,19 +86,19 @@ export function DashboardCardBreakdownSheet({
           {cardType === "available" && data?.accountStats && (
             <>
               <BreakdownRow
-                label="Total available"
+                label={t("breakdown.totalAvailable")}
                 value={formatMoney(data.accountStats.totalAvailable)}
                 subtext="Sum of balances from your checking, savings, cash, and other liquid accounts."
               />
               {data.accountStats.availableCard != null && (
                 <>
                   <BreakdownRow
-                    label="Free to spend"
+                    label={t("breakdown.freeToSpend")}
                     value={formatMoney(data.accountStats.availableCard.freeToSpend)}
                     subtext="Money left after reserved amounts and upcoming commitments."
                   />
                   <BreakdownRow
-                    label="Projected end of month"
+                    label={t("breakdown.projectedEndOfMonth")}
                     value={formatMoney(data.accountStats.availableCard.projectedEndOfMonth)}
                     subtext="Estimated balance at month end based on income and planned spending."
                   />
@@ -115,7 +115,7 @@ export function DashboardCardBreakdownSheet({
           {cardType === "income" && data?.expectedIncomeOverview && (
             <>
               <BreakdownRow
-                label="Actual income this month"
+                label={t("breakdown.actualIncomeThisMonth")}
                 value={formatMoney(data.expectedIncomeOverview.actualIncomeThisMonth)}
                 subtext="Total income received so far this month (from linked accounts and added transactions)."
               />
@@ -129,7 +129,7 @@ export function DashboardCardBreakdownSheet({
               {data.expectedIncomeOverview.nextPaycheckAmount != null &&
                 data.expectedIncomeOverview.nextPaycheckDays != null && (
                   <BreakdownRow
-                    label="Next paycheck"
+                    label={t("breakdown.nextPaycheck")}
                     value={`${formatMoney(data.expectedIncomeOverview.nextPaycheckAmount)} in ${data.expectedIncomeOverview.nextPaycheckDays} days`}
                     subtext="Next expected pay date and amount."
                   />
@@ -138,7 +138,7 @@ export function DashboardCardBreakdownSheet({
                 data.expectedIncomeOverview.expectedMonthlyIncome > 0 &&
                 data.expectedIncomeOverview.spendingAsPercentOfExpected != null && (
                   <BreakdownRow
-                    label="Spending vs expected"
+                    label={t("breakdown.spendingVsExpected")}
                     value={`${(data.expectedIncomeOverview.spendingAsPercentOfExpected ?? 0).toFixed(1)}% of expected income`}
                     subtext={`You’ve spent ${formatMoney(data.expectedIncomeOverview.spendingThisMonth)} this month.`}
                   />
@@ -153,24 +153,24 @@ export function DashboardCardBreakdownSheet({
           {cardType === "savings" && data?.accountStats && (
             <>
               <BreakdownRow
-                label="Total savings"
+                label={t("breakdown.totalSavings")}
                 value={formatMoney(data.accountStats.totalSavings)}
                 subtext="Sum of balances in your savings accounts."
               />
               {data.accountStats.savingsCard != null && (
                 <>
                   <BreakdownRow
-                    label="Saved this month"
+                    label={t("breakdown.savedThisMonth")}
                     value={formatMoney(data.accountStats.savingsCard.savedThisMonth)}
                     subtext="Income minus spending this month (positive = you saved)."
                   />
                   <BreakdownRow
-                    label="Saving rate"
+                    label={t("breakdown.savingRate")}
                     value={`${data.accountStats.savingsCard.savingPercentOfIncome}% of income`}
                     subtext={`Target: ${data.accountStats.savingsCard.savingTargetPercent}%.`}
                   />
                   <BreakdownRow
-                    label="Emergency fund"
+                    label={t("breakdown.emergencyFund")}
                     value={`${data.accountStats.savingsCard.emergencyFundMonths} months of expenses`}
                     subtext="How many months of expenses your current savings could cover."
                   />
@@ -187,17 +187,17 @@ export function DashboardCardBreakdownSheet({
           {cardType === "net-worth" && data?.netWorth != null && (
             <>
               <BreakdownRow
-                label="Net worth"
+                label={t("breakdown.netWorth")}
                 value={formatMoney(data.netWorth.netWorth)}
                 subtext="Total assets minus total liabilities."
               />
               <BreakdownRow
-                label="Total assets"
+                label={t("breakdown.totalAssets")}
                 value={formatMoney(data.netWorth.totalAssets)}
                 subtext="Sum of all asset account balances (e.g. checking, savings, investments)."
               />
               <BreakdownRow
-                label="Total debt (liabilities)"
+                label={t("breakdown.totalDebt")}
                 value={formatMoney(data.netWorth.totalLiabilities)}
                 subtext="Sum of all liability balances (e.g. loans, credit cards)."
               />

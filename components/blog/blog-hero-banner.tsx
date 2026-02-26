@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { BookOpen, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -23,24 +24,27 @@ export function BlogHeroBanner({
   onTagChange,
   allTags,
 }: BlogHeroBannerProps) {
+  const t = useTranslations("blog");
   const handleTagClick = (tag: string) => {
     onTagChange(selectedTag === tag ? null : tag);
   };
 
   return (
     <section
-      className="relative min-h-[320px] md:min-h-[400px] flex flex-col items-center justify-center overflow-hidden w-full px-4 sm:px-6 lg:px-8 pb-10 md:pb-14"
+      className="relative min-h-[320px] md:min-h-[400px] flex flex-col items-center justify-center overflow-hidden w-full pt-[calc(var(--landing-header-offset)+2.5rem)] px-4 sm:px-6 lg:px-8 pb-10 md:pb-14"
       aria-label="Blog hero"
     >
-      {/* Background image */}
-      <Image
-        src={HERO_IMAGE_SRC}
-        alt=""
-        fill
-        className="object-cover"
-        priority
-        sizes="100vw"
-      />
+      {/* Background image - wrapper zeros vertical padding on filled image */}
+      <div className="absolute inset-0 [&_img]:pt-0 [&_img]:pb-0">
+        <Image
+          src={HERO_IMAGE_SRC}
+          alt=""
+          fill
+          className="object-cover"
+          priority
+          sizes="100vw"
+        />
+      </div>
 
       {/* Overlay for readability */}
       <div
@@ -73,7 +77,7 @@ export function BlogHeroBanner({
             />
             <Input
               type="search"
-              placeholder="Search articles..."
+              placeholder={t("searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="pl-9 rounded-xl border-primary-foreground/20 bg-background/95 text-foreground placeholder:text-muted-foreground focus-visible:ring-primary-foreground/30"

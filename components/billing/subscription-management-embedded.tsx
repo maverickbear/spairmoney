@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { format } from "date-fns";
 import { CreditCard, Loader2 } from "lucide-react";
+import { calculateTrialDaysRemaining } from "@/components/billing/trial-widget";
 import { useToast } from "@/components/toast-provider";
 import { apiUrl } from "@/lib/utils/api-base-url";
 import {
@@ -37,6 +39,8 @@ export function SubscriptionManagementEmbedded({
   householdInfo: initialHouseholdInfo,
   onSubscriptionUpdated,
 }: SubscriptionManagementEmbeddedProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const tToasts = useTranslations("toasts");
   const t = useTranslations("billing");
   const breakpoint = useBreakpoint();
@@ -44,6 +48,7 @@ export function SubscriptionManagementEmbedded({
   const [loading, setLoading] = useState(false);
   const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(initialHouseholdInfo ?? null);
   const { toast } = useToast();
+  const isTrialPlan = plan?.id === "trial";
 
   useEffect(() => {
     if (initialHouseholdInfo !== undefined) {
@@ -117,6 +122,17 @@ export function SubscriptionManagementEmbedded({
   const priceLabel = isYearly ? t("perYearLabel") : t("perMonthLabel");
   const isCancelled = subscription.cancelAtPeriodEnd || subscription.status === "cancelled";
   const isFullyCancelled = subscription.status === "cancelled";
+  const priceDisplay = displayPrice > 0 ? `$${displayPrice.toFixed(2)}` : t("freePlanPrice");
+  const showTrialDaysInHeader = displayPrice === 0 && subscription.trialEndDate;
+  const trialEndDateStr = subscription.trialEndDate
+    ? typeof subscription.trialEndDate === "string"
+      ? subscription.trialEndDate
+      : subscription.trialEndDate.toISOString()
+    : null;
+  const trialDaysLeft = showTrialDaysInHeader ? calculateTrialDaysRemaining(trialEndDateStr) : null;
+  const priceSubtext = showTrialDaysInHeader && trialDaysLeft !== null
+    ? (trialDaysLeft <= 0 ? t("trialBanner.trialEnded") : t("trialBanner.daysLeft", { count: trialDaysLeft }))
+    : priceLabel;
 
   return (
     <>
@@ -135,12 +151,10 @@ export function SubscriptionManagementEmbedded({
                   : t("subscriptionLabel")}
               </CardDescription>
             </div>
-            {displayPrice > 0 && (
-              <div className="text-right">
-                <div className="text-2xl font-bold">${displayPrice.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">{priceLabel}</div>
-              </div>
-            )}
+            <div className="text-right">
+              <div className="text-2xl font-bold">{priceDisplay}</div>
+              <div className="text-sm text-muted-foreground">{priceSubtext}</div>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -148,11 +162,19 @@ export function SubscriptionManagementEmbedded({
             let dateToShow: Date | null = null;
             let label = "";
             let isValidDate = false;
+            let isTrialPeriod = false;
 
-            if (subscription.status === "trialing" && subscription.trialEndDate) {
-              dateToShow = new Date(subscription.trialEndDate);
+            const trialEnd = subscription.trialEndDate;
+            if (subscription.status === "trialing" && trialEnd) {
+              dateToShow = new Date(trialEnd);
               label = t("yourTrialEndsOn");
               isValidDate = !isNaN(dateToShow.getTime()) && dateToShow.getFullYear() > 1970;
+              isTrialPeriod = true;
+            } else if (plan.id === "trial" && trialEnd) {
+              dateToShow = new Date(trialEnd);
+              label = t("yourTrialEndsOn");
+              isValidDate = !isNaN(dateToShow.getTime()) && dateToShow.getFullYear() > 1970;
+              isTrialPeriod = true;
             } else if (subscription.currentPeriodEnd) {
               dateToShow = new Date(subscription.currentPeriodEnd);
               isValidDate = !isNaN(dateToShow.getTime()) && dateToShow.getFullYear() > 1970;
@@ -233,13 +255,17 @@ export function SubscriptionManagementEmbedded({
           {(!householdInfo?.isMember || householdInfo?.isOwner) && (
             <div className="flex flex-col gap-2">
               <Button
-                onClick={handleOpenStripePortal}
-                disabled={loading}
+                onClick={
+                  isTrialPlan
+                    ? () => router.push(`${pathname}?openPricingModal=true`)
+                    : handleOpenStripePortal
+                }
+                disabled={!isTrialPlan && loading}
                 variant="outline"
                 size={isMobile ? "small" : "medium"}
                 className="w-full md:w-auto"
               >
-                {loading ? (
+                {!isTrialPlan && loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t("upgradeDialog.loading")}
@@ -247,7 +273,7 @@ export function SubscriptionManagementEmbedded({
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    {t("manageSubscription")}
+                    {isTrialPlan ? t("upgradeNow") : t("manageSubscription")}
                   </>
                 )}
               </Button>

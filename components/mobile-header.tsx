@@ -71,7 +71,8 @@ const getNavUserDataCache = () => {
 };
 
 interface MobileHeaderProps {
-  hasSubscription?: boolean;
+  /** True when user can use the app (trial or active subscription). Kept for future use (e.g. badges). */
+  hasAccess?: boolean;
 }
 
 /**
@@ -80,7 +81,7 @@ interface MobileHeaderProps {
  * Uses AuthContext and SubscriptionContext for user data (single source of truth)
  * No longer makes direct API calls - all data comes from Context
  */
-export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
+export function MobileHeader({ hasAccess = true }: MobileHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const tNav = useTranslations("nav");
@@ -131,10 +132,8 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
     };
   }, [refetchAuth]);
 
-  // Don't render MobileHeader if user doesn't have subscription
-  if (!hasSubscription) {
-    return null;
-  }
+  // Always render MobileHeader on responsive so the user always has a visible header/navigation context.
+  // SubscriptionGuard handles blocking access when needed; hiding the header would leave mobile users with no menu.
 
   const handleLogout = async () => {
     try {
@@ -158,12 +157,13 @@ export function MobileHeader({ hasSubscription = true }: MobileHeaderProps) {
     }
   };
 
+  const tAuth = useTranslations("auth");
   // Get page title based on pathname
   const getPageTitle = () => {
     // Special case for dashboard - show personalized welcome
     if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) {
-      const firstName = user?.name?.split(' ')[0] || 'there';
-      return `Welcome, ${firstName}`;
+      const firstName = user?.name?.split(' ')[0] || tAuth("guest");
+      return tAuth("welcomeWithName", { name: firstName });
     }
 
     const routeMap: Record<string, string> = {

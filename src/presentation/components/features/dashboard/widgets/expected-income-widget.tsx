@@ -59,27 +59,27 @@ export function ExpectedIncomeWidget({
               </div>
               {data.needsLocationForAfterTax ? (
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Set country & state in Adjust to see after-tax expected income.
+                  {t("setCountryStateForAfterTax")}
                 </p>
               ) : data.expectedMonthlyIncome > 0 ? (
                 <p className="text-xs sm:text-sm text-muted-foreground truncate" title={formatMoney(data.expectedMonthlyIncome)}>
-                  Expected <span className="font-semibold text-foreground">{formatMoney(data.expectedMonthlyIncome)}</span>/month
+                  {t("expectedPerMonth")} <span className="font-semibold text-foreground">{formatMoney(data.expectedMonthlyIncome)}</span>{t("perMonth")}
                 </p>
               ) : null}
               {data.nextPaycheckDays != null && data.nextPaycheckAmount != null ? (
-                <p className="text-xs sm:text-sm text-muted-foreground truncate" title={`Next ${formatMoney(data.nextPaycheckAmount)} in ${data.nextPaycheckDays} days`}>
-                  Next <span className="font-semibold text-foreground">{formatMoney(data.nextPaycheckAmount)}</span> in <span className="font-semibold text-foreground">{data.nextPaycheckDays}</span> days
+                <p className="text-xs sm:text-sm text-muted-foreground truncate" title={t("nextPaycheckInDays", { amount: formatMoney(data.nextPaycheckAmount), days: data.nextPaycheckDays })}>
+                  {t("nextPaycheckInDays", { amount: formatMoney(data.nextPaycheckAmount), days: data.nextPaycheckDays })}
                 </p>
               ) : (
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  Next <span className="font-semibold text-foreground">—</span>
+                  {t("nextPaycheckLabel")} <span className="font-semibold text-foreground">—</span>
                 </p>
               )}
             </>
           ) : (
             <div className="flex flex-col gap-3 py-1">
               <p className="text-sm text-muted-foreground">
-                Set your expected monthly income to compare with spending.
+                {t("setExpectedIncomeDescription")}
               </p>
               <Button
                 variant="default"
@@ -87,7 +87,7 @@ export function ExpectedIncomeWidget({
                 onClick={() => setEditOpen(true)}
                 className="w-fit"
               >
-                Set income
+                {t("setIncome")}
               </Button>
             </div>
           )}

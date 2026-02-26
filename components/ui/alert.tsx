@@ -11,7 +11,7 @@ const alertVariants = cva(
         success:
           "bg-sentiment-positive-bg border-sentiment-positive text-foreground [&>svg]:text-sentiment-positive dark:bg-sentiment-positive-bg dark:border-sentiment-positive dark:[&>svg]:text-sentiment-positive",
         destructive:
-          "bg-destructive border-destructive text-destructive-foreground [&>svg]:text-destructive-foreground dark:bg-destructive dark:border-destructive dark:text-destructive-foreground dark:[&>svg]:text-destructive-foreground",
+          "bg-[hsl(var(--destructive-alert))] border-[hsl(var(--destructive-alert-border))] text-[hsl(var(--destructive-alert-foreground))] [&>svg]:text-[hsl(var(--destructive-alert-foreground))] dark:bg-[hsl(var(--destructive-alert))] dark:border-[hsl(var(--destructive-alert-border))] dark:text-[hsl(var(--destructive-alert-foreground))] dark:[&>svg]:text-[hsl(var(--destructive-alert-foreground))]",
       },
     },
     defaultVariants: {

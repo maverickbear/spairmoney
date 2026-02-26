@@ -69,6 +69,71 @@ export interface AccountRemovedEmailData {
   appUrl?: string;
 }
 
+export interface NewSignupNotificationData {
+  userEmail: string;
+  userName?: string | null;
+  signupSource?: "email" | "oauth" | "checkout";
+}
+
+export interface PaymentFailedEmailData {
+  to: string;
+  userName?: string;
+  billingUrl: string;
+  appUrl?: string;
+}
+
+export interface SubscriptionCancelledEmailData {
+  to: string;
+  userName?: string;
+  appUrl?: string;
+}
+
+export interface TrialEndingEmailData {
+  to: string;
+  userName?: string;
+  trialEndDate: Date;
+  daysLeft: number;
+  appUrl?: string;
+}
+
+export interface RenewalSuccessEmailData {
+  to: string;
+  userName?: string;
+  amountFormatted?: string;
+  periodEnd?: string;
+  appUrl?: string;
+}
+
+export interface InviteAcceptedEmailData {
+  to: string;
+  ownerName: string;
+  accepterName: string;
+  accepterEmail: string;
+  householdName?: string;
+  appUrl?: string;
+}
+
+export interface ContactConfirmationEmailData {
+  to: string;
+  name: string;
+  subject: string;
+  appUrl?: string;
+}
+
+export interface NewContactNotificationData {
+  fromName: string;
+  fromEmail: string;
+  subject: string;
+  message: string;
+  appUrl?: string;
+}
+
+export interface PasswordChangedEmailData {
+  to: string;
+  userName?: string;
+  appUrl?: string;
+}
+
 export async function sendInvitationEmail(data: InvitationEmailData): Promise<void> {
   console.log("[EMAIL] sendInvitationEmail called with:", {
     to: data.to,
@@ -991,4 +1056,502 @@ function getAccountRemovedEmailTemplate(data: {
 </html>
     `.trim();
   }
+}
+
+const NEW_SIGNUP_NOTIFICATION_TO = "hello@spair.co";
+
+export async function sendNewSignupNotificationEmail(data: NewSignupNotificationData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. New signup notification will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const html = getNewSignupNotificationTemplate(data);
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: NEW_SIGNUP_NOTIFICATION_TO,
+      subject: `New signup: ${data.userEmail}`,
+      html,
+    });
+    if (result.error) {
+      console.error("[EMAIL] New signup notification error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] New signup notification sent to", NEW_SIGNUP_NOTIFICATION_TO);
+  } catch (error) {
+    console.error("[EMAIL] Error sending new signup notification:", error);
+  }
+}
+
+function getNewSignupNotificationTemplate(data: NewSignupNotificationData): string {
+  const userName = (data.userName ?? "—").toString().replace(/</g, "&lt;");
+  const userEmail = data.userEmail.replace(/</g, "&lt;");
+  const source = (data.signupSource ?? "email").replace(/</g, "&lt;");
+  const date = new Date().toISOString();
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>New signup - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px; text-align: left;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">New signup</h1>
+          <p style="margin: 0 0 8px; color: #4a4a4a; font-size: 16px;"><strong>Email:</strong> ${userEmail}</p>
+          <p style="margin: 0 0 8px; color: #4a4a4a; font-size: 16px;"><strong>Name:</strong> ${userName}</p>
+          <p style="margin: 0 0 8px; color: #4a4a4a; font-size: 16px;"><strong>Source:</strong> ${source}</p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;"><strong>Date:</strong> ${date}</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export async function sendPaymentFailedEmail(data: PaymentFailedEmailData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Payment failed email will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: "Payment failed – update your payment method",
+      html: getPaymentFailedEmailTemplate(data),
+    });
+    if (result.error) {
+      console.error("[EMAIL] Payment failed email error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] Payment failed email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending payment failed email:", error);
+  }
+}
+
+function getPaymentFailedEmailTemplate(data: PaymentFailedEmailData): string {
+  const userName = (data.userName?.trim() || "there").replace(/</g, "&lt;");
+  const billingUrl = data.billingUrl.replace(/"/g, "&quot;");
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Payment failed - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">Payment failed</h1>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${userName},</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">We couldn't process your last payment for your Spair Money subscription. Please update your payment method so you don't lose access.</p>
+          <p style="margin: 0 0 24px;"><a href="${billingUrl}" style="display: inline-block; padding: 12px 24px; background-color: #7BC85A; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600;">Update payment method</a></p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;">If you have questions, contact us at <a href="mailto:hello@spair.co" style="color: #7BC85A;">hello@spair.co</a>.</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export async function sendSubscriptionCancelledEmail(data: SubscriptionCancelledEmailData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Subscription cancelled email will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: "Your Spair Money subscription has been cancelled",
+      html: getSubscriptionCancelledEmailTemplate(data),
+    });
+    if (result.error) {
+      console.error("[EMAIL] Subscription cancelled email error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] Subscription cancelled email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending subscription cancelled email:", error);
+  }
+}
+
+function getSubscriptionCancelledEmailTemplate(data: SubscriptionCancelledEmailData): string {
+  const userName = (data.userName?.trim() || "there").replace(/</g, "&lt;");
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Subscription cancelled - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">Subscription cancelled</h1>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${userName},</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Your Spair Money subscription has been cancelled. You'll keep access until the end of your current billing period.</p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;">We're sorry to see you go. If you change your mind, you can resubscribe anytime from your account settings.</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export async function sendTrialEndingEmail(data: TrialEndingEmailData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Trial ending email will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: data.daysLeft <= 2 ? "Your Spair Money trial ends in 2 days" : "Your Spair Money trial ends in 7 days",
+      html: getTrialEndingEmailTemplate(data),
+    });
+    if (result.error) {
+      console.error("[EMAIL] Trial ending email error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] Trial ending email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending trial ending email:", error);
+  }
+}
+
+function getTrialEndingEmailTemplate(data: TrialEndingEmailData): string {
+  const userName = (data.userName?.trim() || "there").replace(/</g, "&lt;");
+  const trialEndStr = data.trialEndDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const appUrl = (data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://spair.co").replace(/\/$/, "");
+  const billingUrl = `${appUrl}/settings/billing`;
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Trial ending - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">Your trial ends in ${data.daysLeft} day${data.daysLeft === 1 ? "" : "s"}</h1>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${userName},</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Your Spair Money trial ends on ${trialEndStr}. To keep full access, add a payment method and we'll start your subscription when the trial ends.</p>
+          <p style="margin: 0 0 24px;"><a href="${billingUrl}" style="display: inline-block; padding: 12px 24px; background-color: #7BC85A; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600;">Manage subscription</a></p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;">If you have questions, reply to this email or contact us at <a href="mailto:hello@spair.co" style="color: #7BC85A;">hello@spair.co</a>.</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export async function sendRenewalSuccessEmail(data: RenewalSuccessEmailData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Renewal success email will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: "Your Spair Money subscription was renewed",
+      html: getRenewalSuccessEmailTemplate(data),
+    });
+    if (result.error) {
+      console.error("[EMAIL] Renewal success email error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] Renewal success email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending renewal success email:", error);
+  }
+}
+
+function getRenewalSuccessEmailTemplate(data: RenewalSuccessEmailData): string {
+  const userName = (data.userName?.trim() || "there").replace(/</g, "&lt;");
+  const amount = data.amountFormatted ?? "—";
+  const periodEnd = data.periodEnd ?? "—";
+  const appUrl = (data.appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://spair.co").replace(/\/$/, "");
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Subscription renewed - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">Subscription renewed</h1>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${userName},</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Your Spair Money subscription was successfully renewed. Amount: ${amount}. Next billing date: ${periodEnd}.</p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;">You can manage your subscription anytime in <a href="${appUrl}/settings/billing" style="color: #7BC85A;">Settings → Billing</a>.</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export async function sendInviteAcceptedEmail(data: InviteAcceptedEmailData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Invite accepted email will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: `${data.accepterName} accepted your Spair Money invitation`,
+      html: getInviteAcceptedEmailTemplate(data),
+    });
+    if (result.error) {
+      console.error("[EMAIL] Invite accepted email error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] Invite accepted email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending invite accepted email:", error);
+  }
+}
+
+function getInviteAcceptedEmailTemplate(data: InviteAcceptedEmailData): string {
+  const ownerName = data.ownerName.replace(/</g, "&lt;");
+  const accepterName = data.accepterName.replace(/</g, "&lt;");
+  const accepterEmail = data.accepterEmail.replace(/</g, "&lt;");
+  const householdName = (data.householdName ?? "your household").replace(/</g, "&lt;");
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Invitation accepted - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">Invitation accepted</h1>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${ownerName},</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;"><strong>${accepterName}</strong> (${accepterEmail}) has accepted your invitation to join ${householdName} on Spair Money.</p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;">They now have access to the household. You can manage members in your account settings.</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export async function sendContactConfirmationEmail(data: ContactConfirmationEmailData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Contact confirmation email will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: "We received your message – Spair Money",
+      html: getContactConfirmationEmailTemplate(data),
+    });
+    if (result.error) {
+      console.error("[EMAIL] Contact confirmation email error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] Contact confirmation email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending contact confirmation email:", error);
+  }
+}
+
+function getContactConfirmationEmailTemplate(data: ContactConfirmationEmailData): string {
+  const name = data.name.replace(/</g, "&lt;");
+  const subject = data.subject.replace(/</g, "&lt;");
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>We received your message - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">We received your message</h1>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${name},</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Thanks for getting in touch. We've received your message regarding &ldquo;${subject}&rdquo; and will get back to you as soon as we can.</p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;">If your matter is urgent, you can also email us at <a href="mailto:hello@spair.co" style="color: #7BC85A;">hello@spair.co</a>.</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export async function sendNewContactNotificationEmail(data: NewContactNotificationData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. New contact notification will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const name = data.fromName.replace(/</g, "&lt;");
+    const email = data.fromEmail.replace(/</g, "&lt;");
+    const subject = data.subject.replace(/</g, "&lt;");
+    const message = data.message.replace(/</g, "&lt;").replace(/\n/g, "<br>");
+    const year = new Date().getFullYear();
+    const logoUrl = getLogoUrl();
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>New contact - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">New contact form submission</h1>
+          <p style="margin: 0 0 8px; color: #4a4a4a; font-size: 16px;"><strong>From:</strong> ${name} &lt;${email}&gt;</p>
+          <p style="margin: 0 0 8px; color: #4a4a4a; font-size: 16px;"><strong>Subject:</strong> ${subject}</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px;"><strong>Message:</strong></p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">${message}</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: NEW_SIGNUP_NOTIFICATION_TO,
+      subject: `New contact: ${data.subject}`,
+      html,
+    });
+    if (result.error) {
+      console.error("[EMAIL] New contact notification error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] New contact notification sent to", NEW_SIGNUP_NOTIFICATION_TO);
+  } catch (error) {
+    console.error("[EMAIL] Error sending new contact notification:", error);
+  }
+}
+
+export async function sendPasswordChangedEmail(data: PasswordChangedEmailData): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY not configured. Password changed email will not be sent.");
+    return;
+  }
+  const finalFromEmail = "Spair Money <noreply@spair.co>";
+  try {
+    const result = await resend.emails.send({
+      from: finalFromEmail,
+      to: data.to,
+      subject: "Your Spair Money password was changed",
+      html: getPasswordChangedEmailTemplate(data),
+    });
+    if (result.error) {
+      console.error("[EMAIL] Password changed email error:", result.error);
+      return;
+    }
+    console.log("[EMAIL] Password changed email sent to:", data.to);
+  } catch (error) {
+    console.error("[EMAIL] Error sending password changed email:", error);
+  }
+}
+
+function getPasswordChangedEmailTemplate(data: PasswordChangedEmailData): string {
+  const userName = (data.userName?.trim() || "there").replace(/</g, "&lt;");
+  const year = new Date().getFullYear();
+  const logoUrl = getLogoUrl();
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Password changed - Spair Money</title></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f5f5f5;">
+    <tr><td align="center" style="padding: 40px 20px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+        <tr><td style="padding: 30px 40px 20px;"><img src="${logoUrl}" alt="Spair Money" style="height: 32px; width: auto;" /></td></tr>
+        <tr><td style="padding: 0 40px 40px;">
+          <h1 style="margin: 0 0 20px; color: #1a1a1a; font-size: 28px; font-weight: 700;">Password changed</h1>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Hi ${userName},</p>
+          <p style="margin: 0 0 16px; color: #4a4a4a; font-size: 16px; line-height: 1.5;">Your Spair Money password was recently changed. If you made this change, you can ignore this email.</p>
+          <p style="margin: 0; color: #4a4a4a; font-size: 16px;">If you didn't change your password, please contact us immediately at <a href="mailto:hello@spair.co" style="color: #7BC85A;">hello@spair.co</a>.</p>
+        </td></tr>
+        <tr><td style="padding: 20px 40px; background-color: #f9f9f9; text-align: center; border-top: 1px solid #e5e5e5; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0; color: #8a8a8a; font-size: 12px;">© ${year} Spair Money. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
 }

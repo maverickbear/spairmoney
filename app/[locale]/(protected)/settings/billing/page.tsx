@@ -9,7 +9,6 @@ import { useToast } from "@/components/toast-provider";
 import { PageHeader } from "@/components/common/page-header";
 import { UsageChart } from "@/components/billing/usage-chart";
 import { SubscriptionManagementEmbedded } from "@/components/billing/subscription-management-embedded";
-import { PaymentMethodManager } from "@/components/billing/payment-method-manager";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { PlanFeatures } from "@/src/domain/subscriptions/subscriptions.validations";
 import { BaseLimitCheckResult } from "@/src/domain/subscriptions/subscriptions.types";
@@ -275,8 +274,6 @@ export default function BillingPage() {
           accountLimit={accountLimit ?? undefined}
         />
       </div>
-
-          <PaymentMethodManager />
 
           <LazyPaymentHistory billingHistoryTitle={tSettings("billingHistory")} />
         </div>

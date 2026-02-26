@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient as createSSRServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { logger } from "@/lib/utils/logger";
-import { isAbortError } from "@/src/infrastructure/utils/supabase-error";
+import { isAbortError, shouldClearAuthCookiesOnAuthError } from "@/src/infrastructure/utils/supabase-error";
 
 /** Shape used to read optional code from Supabase/auth errors (not always on the public type). */
 type AuthErrorWithCode = { message?: string; code?: string };
@@ -240,23 +240,10 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
 
     // Try to get user to check if session is valid
     const { error: authError } = await client.auth.getUser();
-    
-    // If we get a refresh token error, clear invalid cookies silently
-    // Check both error code and message (case-insensitive) to catch all variations
-    const errorMessage = authError?.message?.toLowerCase() || "";
-    const errorCode = (authError as AuthErrorWithCode)?.code?.toLowerCase() || "";
-    const isExpectedError = authError && (
-      errorCode === "refresh_token_not_found" ||
-      errorMessage.includes("refresh_token_not_found") ||
-      errorMessage.includes("refresh token not found") ||
-      errorMessage.includes("invalid refresh token") ||
-      errorMessage.includes("jwt expired") ||
-      errorMessage.includes("auth session missing") ||
-      errorMessage.includes("user from sub claim in jwt does not exist") ||
-      errorMessage.includes("user does not exist")
-    );
-    
-    if (isExpectedError) {
+
+    // Only clear cookies when session is definitively invalid (e.g. refresh token revoked, user deleted).
+    // Do NOT clear on connection/network errors so the user stays logged in when back online.
+    if (authError && shouldClearAuthCookiesOnAuthError(authError)) {
       // Clear all Supabase auth cookies silently (expected error)
       const authCookieNames = [
         "sb-access-token",
@@ -289,20 +276,8 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
       }
     }
   } catch (error: unknown) {
-    // If there's an error, clear cookies and return unauthenticated client
-    // Check both error code and message (case-insensitive) to catch all variations
-    const err = error as AuthErrorWithCode;
-    const errorMessage = err?.message?.toLowerCase() || "";
-    const errorCode = err?.code?.toLowerCase() || "";
-    const isExpectedError = errorMessage.includes("refresh_token_not_found") ||
-      errorMessage.includes("refresh token not found") ||
-      errorMessage.includes("invalid refresh token") ||
-      errorMessage.includes("jwt expired") ||
-      errorMessage.includes("user from sub claim in jwt does not exist") ||
-      errorMessage.includes("user does not exist") ||
-      errorCode === "refresh_token_not_found";
-    
-    if (isExpectedError) {
+    // Only clear cookies when session is definitively invalid; never on connection/network errors.
+    if (shouldClearAuthCookiesOnAuthError(error)) {
       const authCookieNames = [
         "sb-access-token",
         "sb-refresh-token",

@@ -25,8 +25,19 @@ interface ProUpgradeDialogProps {
 
 function getCopy(
   subscriptionStatus: UpgradeDialogSubscriptionStatus,
+  currentPlanId: string | undefined,
   t: ReturnType<typeof useTranslations<"billing.upgradeDialog">>
 ) {
+  if (currentPlanId === "trial") {
+    return {
+      title: t("subscribeNoTrialTitle"),
+      description: t("subscribeNoTrialDescription"),
+      primaryButton: t("subscribe"),
+      secondaryButton: null as string | null,
+      footerDisclaimer: "footerDisclaimerNoTrial" as const,
+    };
+  }
+
   const isNoPlan = !subscriptionStatus || subscriptionStatus === "no_subscription";
 
   if (isNoPlan) {
@@ -35,6 +46,7 @@ function getCopy(
       description: t("subscribeDescription"),
       primaryButton: t("startTrial"),
       secondaryButton: null as string | null,
+      footerDisclaimer: "footerDisclaimer" as const,
     };
   }
   if (subscriptionStatus === "cancelled") {
@@ -43,6 +55,7 @@ function getCopy(
       description: t("reactivateDescription"),
       primaryButton: t("reactivate"),
       secondaryButton: t("maybeLater"),
+      footerDisclaimer: "footerDisclaimer" as const,
     };
   }
   if (subscriptionStatus === "past_due") {
@@ -51,6 +64,7 @@ function getCopy(
       description: t("pastDueDescription"),
       primaryButton: t("updatePayment"),
       secondaryButton: t("maybeLater"),
+      footerDisclaimer: "footerDisclaimer" as const,
     };
   }
   if (subscriptionStatus === "unpaid") {
@@ -59,6 +73,7 @@ function getCopy(
       description: t("unpaidDescription"),
       primaryButton: t("updatePayment"),
       secondaryButton: t("maybeLater"),
+      footerDisclaimer: "footerDisclaimer" as const,
     };
   }
   return {
@@ -66,6 +81,7 @@ function getCopy(
     description: t("subscribeDescription"),
     primaryButton: t("startTrial"),
     secondaryButton: null as string | null,
+    footerDisclaimer: "footerDisclaimer" as const,
   };
 }
 
@@ -136,7 +152,7 @@ export function ProUpgradeDialog({
     }
   }, [open]);
 
-  const copy = getCopy(subscriptionStatus, t);
+  const copy = getCopy(subscriptionStatus, currentPlanId, t);
   const needsReactivation =
     subscriptionStatus === "cancelled" || subscriptionStatus === "past_due" || subscriptionStatus === "unpaid";
   const priceMonthly = plan?.priceMonthly ?? 8;
@@ -166,17 +182,27 @@ export function ProUpgradeDialog({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" />
         <DialogPrimitive.Content
           className={cn(
             "fixed z-50 flex w-full max-w-[590px] flex-col overflow-hidden rounded-none border border-border bg-background p-0 shadow-lg",
             "left-0 top-0 h-full max-h-screen translate-x-0 translate-y-0 sm:inset-auto sm:h-auto",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
             "sm:left-[50%] sm:top-[50%] sm:max-w-[773px] sm:h-auto sm:max-h-[90vh] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl"
           )}
           onInteractOutside={(e) => !canClose && e.preventDefault()}
           onEscapeKeyDown={(e) => !canClose && e.preventDefault()}
         >
+          {canClose && (
+            <DialogPrimitive.Close asChild>
+              <button
+                type="button"
+                className="absolute right-3 top-3 z-10 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </DialogPrimitive.Close>
+          )}
           <DialogPrimitive.Title className="sr-only">
             {copy.title}
           </DialogPrimitive.Title>
@@ -325,13 +351,15 @@ export function ProUpgradeDialog({
                   type="button"
                   onClick={handlePrimary}
                   disabled={loading || plansLoading || !plan}
-                  className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       {t("loading")}
                     </>
+                  ) : currentPlanId === "trial" ? (
+                    interval === "year" ? t("subscribeToYearlyPlan") : t("subscribeToMonthlyPlan")
                   ) : (
                     copy.primaryButton
                   )}
@@ -340,10 +368,17 @@ export function ProUpgradeDialog({
 
               {/* Footer disclaimer */}
               <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
-                {t("footerDisclaimer")}
+                {t(copy.footerDisclaimer)}
               </p>
             </div>
           </div>
+
+          {plansLoading && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/80 backdrop-blur-sm">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">{t("loading")}</p>
+            </div>
+          )}
 
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-background/80 backdrop-blur-sm">

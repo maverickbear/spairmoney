@@ -2,6 +2,7 @@ import { PlanFeatures, Plan } from "@/src/domain/subscriptions/subscriptions.val
 
 /**
  * Get default plan features (free plan limits)
+ * Used when user has no subscription and no active trial.
  */
 export function getDefaultFeatures(): PlanFeatures {
   return {
@@ -17,6 +18,27 @@ export function getDefaultFeatures(): PlanFeatures {
     hasHousehold: false,
     hasBudgets: false,
     hasReceiptScanner: false,
+  };
+}
+
+/**
+ * Full-access limits for users in trial (local or Stripe).
+ * During trial there are no usage limits or feature restrictions.
+ */
+export function getTrialFeatures(): PlanFeatures {
+  return {
+    maxTransactions: -1,
+    maxAccounts: -1,
+    hasInvestments: true,
+    hasAdvancedReports: true,
+    hasCsvExport: true,
+    hasCsvImport: true,
+    hasDebts: true,
+    hasGoals: true,
+    hasBankIntegration: true,
+    hasHousehold: true,
+    hasBudgets: true,
+    hasReceiptScanner: true,
   };
 }
 

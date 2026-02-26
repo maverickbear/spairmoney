@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter, usePathname } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlanBadge } from "@/components/common/plan-badge";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
+import { calculateTrialDaysRemaining } from "@/components/billing/trial-widget";
 import {
   Alert,
   AlertDescription,
@@ -27,6 +29,8 @@ interface SubscriptionCardProps {
 }
 
 export function SubscriptionCard({ subscription, plan, interval, onSubscriptionUpdated }: SubscriptionCardProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
   const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(null);
 
@@ -82,6 +86,17 @@ export function SubscriptionCard({ subscription, plan, interval, onSubscriptionU
     ? (isYearly ? plan.priceYearly : plan.priceMonthly)
     : 0;
   const priceLabel = isYearly ? "per year" : "per month";
+  const priceDisplay = displayPrice > 0 ? `$${displayPrice.toFixed(2)}` : "Free";
+  const isTrialPlan = displayPrice === 0 && subscription.trialEndDate;
+  const trialEndDateStr = subscription.trialEndDate
+    ? typeof subscription.trialEndDate === "string"
+      ? subscription.trialEndDate
+      : subscription.trialEndDate.toISOString()
+    : null;
+  const trialDaysLeft = isTrialPlan ? calculateTrialDaysRemaining(trialEndDateStr) : null;
+  const priceSubtext = isTrialPlan && trialDaysLeft !== null
+    ? (trialDaysLeft <= 0 ? "Your trial has ended." : `${trialDaysLeft} days left`)
+    : priceLabel;
 
   return (
     <Card>
@@ -96,34 +111,31 @@ export function SubscriptionCard({ subscription, plan, interval, onSubscriptionU
               {plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} plan
             </CardDescription>
           </div>
-          {displayPrice > 0 && (
-            <div className="text-right">
-              <div className="text-2xl font-bold">${displayPrice.toFixed(2)}</div>
-              <div className="text-sm text-muted-foreground">{priceLabel}</div>
-            </div>
-          )}
+          <div className="text-right">
+            <div className="text-2xl font-bold">{priceDisplay}</div>
+            <div className="text-sm text-muted-foreground">{priceSubtext}</div>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {(subscription.currentPeriodEnd || subscription.trialEndDate) && (
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {subscription.status === "trialing"
-                ? "Your trial period ends in"
-                : "Current period ends"}
-            </p>
-            <p className="font-medium">
-              {format(
-                new Date(
-                  subscription.status === "trialing" && subscription.trialEndDate
-                    ? subscription.trialEndDate
-                    : subscription.currentPeriodEnd!
-                ),
-                "PPP"
-              )}
-            </p>
-          </div>
-        )}
+        {(() => {
+          const trialEnd = subscription.trialEndDate;
+          const isTrialPeriod = (subscription.status === "trialing" && trialEnd) || (plan.id === "trial" && trialEnd);
+          const dateToShow = isTrialPeriod && trialEnd
+            ? new Date(trialEnd)
+            : subscription.currentPeriodEnd
+            ? new Date(subscription.currentPeriodEnd)
+            : null;
+          if (!dateToShow || isNaN(dateToShow.getTime())) return null;
+          return (
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {isTrialPeriod ? "Your trial period ends on" : "Current period ends"}
+              </p>
+              <p className="font-medium">{format(dateToShow, "PPP")}</p>
+            </div>
+          );
+        })()}
 
         {subscription.cancelAtPeriodEnd && (
           <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 p-3 text-sm text-yellow-800 dark:text-yellow-200">
@@ -148,8 +160,16 @@ export function SubscriptionCard({ subscription, plan, interval, onSubscriptionU
         )}
 
         {(!householdInfo?.isMember || householdInfo?.isOwner) && (
-          <Button onClick={handleManageSubscription} disabled={loading} className="w-full">
-            {loading ? "Loading..." : "Manage Subscription"}
+          <Button
+            onClick={
+              isTrialPlan
+                ? () => router.push(`${pathname}?openPricingModal=true`)
+                : handleManageSubscription
+            }
+            disabled={!isTrialPlan && loading}
+            className="w-full"
+          >
+            {!isTrialPlan && loading ? "Loading..." : isTrialPlan ? "Upgrade Now" : "Manage Subscription"}
           </Button>
         )}
       </CardContent>

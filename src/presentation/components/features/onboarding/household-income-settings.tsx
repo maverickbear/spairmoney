@@ -91,6 +91,7 @@ const CANADIAN_PROVINCES = [
 export function HouseholdIncomeSettings() {
   const { toast } = useToast();
   const [expectedAnnualIncome, setExpectedAnnualIncome] = useState<number | undefined>(undefined);
+  const [initialExpectedAnnualIncome, setInitialExpectedAnnualIncome] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -133,8 +134,10 @@ export function HouseholdIncomeSettings() {
           incomeData.expectedAnnualIncome > 0
         ) {
           setExpectedAnnualIncome(incomeData.expectedAnnualIncome);
+          setInitialExpectedAnnualIncome(incomeData.expectedAnnualIncome);
         } else {
           setExpectedAnnualIncome(undefined);
+          setInitialExpectedAnnualIncome(undefined);
         }
       }
 
@@ -209,6 +212,9 @@ export function HouseholdIncomeSettings() {
         const error = await locationResponse.json();
         throw new Error(error.error || "Failed to save location");
       }
+
+      setInitialExpectedAnnualIncome(expectedAnnualIncome);
+      locationForm.reset(locationForm.getValues());
 
       toast({
         title: "Settings updated",
@@ -353,7 +359,8 @@ export function HouseholdIncomeSettings() {
               expectedAnnualIncome == null ||
               expectedAnnualIncome <= 0 ||
               !selectedCountry ||
-              !selectedStateOrProvince
+              !selectedStateOrProvince ||
+              (!locationForm.formState.isDirty && expectedAnnualIncome === initialExpectedAnnualIncome)
             }
             size="medium"
           >

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient as createSSRServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { logger } from "@/src/infrastructure/utils/logger";
+import { shouldClearAuthCookiesOnAuthError } from "@/src/infrastructure/utils/supabase-error";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 // New format (sb_publishable_...) is preferred, fallback to old format (anon JWT) for backward compatibility
@@ -156,21 +157,10 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
 
     // Try to get user to check if session is valid
     const { data: { user }, error: authError } = await client.auth.getUser();
-    
-    // If we get a refresh token error, clear invalid cookies silently
-    // Check both error code and message (case-insensitive) to catch all variations
-    const errorMessage = authError?.message?.toLowerCase() || "";
-    const errorCode = (authError as any)?.code?.toLowerCase() || "";
-    const isExpectedError = authError && (
-      errorCode === "refresh_token_not_found" ||
-      errorMessage.includes("refresh_token_not_found") ||
-      errorMessage.includes("refresh token not found") ||
-      errorMessage.includes("invalid refresh token") ||
-      errorMessage.includes("jwt expired") ||
-      errorMessage.includes("auth session missing")
-    );
-    
-    if (isExpectedError) {
+
+    // Only clear cookies when session is definitively invalid (e.g. refresh token revoked, user deleted).
+    // Do NOT clear on connection/network errors so the user stays logged in when back online.
+    if (authError && shouldClearAuthCookiesOnAuthError(authError)) {
       // Clear all Supabase auth cookies silently (expected error)
       const authCookieNames = [
         "sb-access-token",
@@ -192,17 +182,8 @@ export async function createServerClient(accessToken?: string, refreshToken?: st
       logger.warn("[createServerClient] Unexpected auth error:", authError.message);
     }
   } catch (error: any) {
-    // If there's an error, clear cookies and return unauthenticated client
-    // Check both error code and message (case-insensitive) to catch all variations
-    const errorMessage = error?.message?.toLowerCase() || "";
-    const errorCode = error?.code?.toLowerCase() || "";
-    const isExpectedError = errorMessage.includes("refresh_token_not_found") ||
-      errorMessage.includes("refresh token not found") ||
-      errorMessage.includes("invalid refresh token") ||
-      errorMessage.includes("jwt expired") ||
-      errorCode === "refresh_token_not_found";
-    
-    if (isExpectedError) {
+    // Only clear cookies when session is definitively invalid; never on connection/network errors.
+    if (shouldClearAuthCookiesOnAuthError(error)) {
       const authCookieNames = [
         "sb-access-token",
         "sb-refresh-token",

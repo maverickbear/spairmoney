@@ -73,6 +73,14 @@
     --destructive-foreground: 0 0% 100%;
     /* Base Contrast: #FFFFFF */
 
+    /* Destructive Alert variant: soft background and border, dark text (for Alert component only) */
+    --destructive-alert: 6 100% 96%;
+    /* Light background: #FFEDEB */
+    --destructive-alert-border: 6 100% 89%;
+    /* Light border: #FFCDC7 */
+    --destructive-alert-foreground: 0 100% 23%;
+    /* Dark text: #750000 */
+
     /* Border and input colors */
     --border: 0 0% 11% / 0.12;
     /* Use in most separators, for example in the section header and tabs components: #1C1C1C1F */
@@ -85,6 +93,9 @@
 
     /* Border radius */
     --radius: 12px;
+
+    /* Landing: space from viewport top occupied by the fixed header (top-4 + nav height) */
+    --landing-header-offset: 72px;
 
     /* Legacy grey scale - mapped to new content colors */
     --grey-50: 0 0% 100%;
@@ -217,6 +228,11 @@
     /* Indicates negative sentiment, for example on error states or destructive actions. Can be used as text or as a background: #A8200D */
     --destructive-foreground: 0 0% 100%;
     /* Base Contrast: #FFFFFF */
+
+    /* Destructive Alert variant (same soft look in dark mode) */
+    --destructive-alert: 6 100% 96%;
+    --destructive-alert-border: 6 100% 89%;
+    --destructive-alert-foreground: 0 100% 23%;
 
     /* Border and input colors - Lighter in dark mode for better contrast */
     --border: 0 0% 100% / 0.12;

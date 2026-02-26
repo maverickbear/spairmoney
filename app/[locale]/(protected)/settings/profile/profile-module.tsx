@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Save, User, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DateOfBirthPartsInput } from "@/components/ui/date-of-birth-parts-input";
 import { formatDateInput, parseDateInput } from "@/src/infrastructure/utils/timestamp";
 
 // Profile interfaces
@@ -257,12 +257,19 @@ export function ProfileModule() {
 
       const updatedProfile = await response.json();
       setProfile(updatedProfile);
-      
+
+      form.reset({
+        name: updatedProfile.name ?? "",
+        avatarUrl: updatedProfile.avatarUrl ?? "",
+        phoneNumber: updatedProfile.phoneNumber ?? "",
+        dateOfBirth: updatedProfile.dateOfBirth ?? "",
+      });
+
       // Update cache after successful save
       profileDataCache.data = updatedProfile;
       profileDataCache.timestamp = Date.now();
       profileDataCache.promise = null;
-      
+
       const successEvent = new CustomEvent("profile-saved", { detail: updatedProfile });
       window.dispatchEvent(successEvent);
       toast({ title: tAuth("success"), description: t("profileUpdated"), variant: "success" });
@@ -559,28 +566,9 @@ export function ProfileModule() {
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <>
-                      <DatePicker
-                        date={(() => {
-                          const value = field.value;
-                          if (!value) return undefined;
-                          if ((value as any) instanceof Date) return (value as unknown) as Date;
-                          if (typeof value === "string") {
-                            try {
-                              return parseDateInput(value) as unknown as Date;
-                            } catch {
-                              const parsed = new Date(value);
-                              return isNaN(parsed.getTime()) ? undefined : (parsed as unknown as Date);
-                            }
-                          }
-                          return undefined;
-                        })()}
-                        onDateChange={(date) => {
-                          if (date) {
-                            field.onChange(formatDateInput(date));
-                          } else {
-                            field.onChange("");
-                          }
-                        }}
+                      <DateOfBirthPartsInput
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
                         placeholder={t("selectDateOfBirth")}
                         size="medium"
                       />
@@ -595,7 +583,7 @@ export function ProfileModule() {
               </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-                <Button type="submit" size="medium" disabled={saving} className="w-full sm:w-auto">
+                <Button type="submit" size="medium" disabled={saving || !form.formState.isDirty} className="w-full sm:w-auto">
                   {saving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

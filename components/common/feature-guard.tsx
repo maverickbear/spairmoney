@@ -33,7 +33,7 @@ export function FeatureGuard({
   header,
   headerTitle,
 }: FeatureGuardProps) {
-  const { limits, checking: loading, plan, subscription } = useSubscription();
+  const { limits, checking: loading, plan, subscription, trialEndsAt } = useSubscription();
   const { role, checking: checkingAuth } = useAuthSafe(); // Use Context instead of fetch
   
   // Derive isSuperAdmin from Context role
@@ -55,9 +55,11 @@ export function FeatureGuard({
     return <>{children}</>;
   }
 
-  // SIMPLIFIED: With only one plan, all features are always enabled
-  // Just check if user has an active subscription (status: active or trialing)
-  const hasActiveSubscription = subscription?.status === "active" || subscription?.status === "trialing";
+  // Full access: active subscription, Stripe trialing, or local trial (no plan, trialEndsAt in future)
+  const hasActiveSubscription =
+    subscription?.status === "active" ||
+    (subscription?.status === "trialing" && (!subscription.trialEndDate || new Date(subscription.trialEndDate) > new Date())) ||
+    (!subscription && !!trialEndsAt && new Date(trialEndsAt) > new Date());
 
   if (!hasActiveSubscription) {
     if (fallback) {

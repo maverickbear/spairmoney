@@ -214,6 +214,16 @@ export class AuthService {
             } catch (segmentError) {
               logger.error("[AuthService] Error syncing Resend segment (non-critical):", segmentError);
             }
+            try {
+              const { sendNewSignupNotificationEmail } = await import("@/lib/utils/email");
+              await sendNewSignupNotificationEmail({
+                userEmail: authData.user.email,
+                userName: data.name ?? null,
+                signupSource: "email",
+              });
+            } catch (notifyError) {
+              logger.error("[AuthService] Error sending new signup notification (non-critical):", notifyError);
+            }
           }
         } catch (householdError) {
           logger.error("Error processing UserCreated event during signup:", householdError);
@@ -598,7 +608,20 @@ export class AuthService {
         password: data.newPassword,
       });
 
-      return { error: error ? getAuthErrorMessage(error, "Failed to change password") : null };
+      if (error) {
+        return { error: getAuthErrorMessage(error, "Failed to change password") };
+      }
+      try {
+        const { sendPasswordChangedEmail } = await import("@/lib/utils/email");
+        const { data: profile } = await supabase.from("users").select("name").eq("id", user.id).single();
+        await sendPasswordChangedEmail({
+          to: user.email,
+          userName: profile?.name ?? undefined,
+        });
+      } catch (emailErr) {
+        logger.error("[AuthService] Error sending password changed email (non-critical):", emailErr);
+      }
+      return { error: null };
     } catch (error) {
       logger.error("Error in changePassword:", error);
       return { error: error instanceof Error ? error.message : "Failed to change password" };

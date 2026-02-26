@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/common/logo";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Menu } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Menu, ArrowRight } from "lucide-react";
 import { useAuthSafe } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabase";
 import { LocaleSwitcher } from "@/components/common/locale-switcher";
@@ -22,7 +21,6 @@ const NAV_LINK_KEYS = [
 ];
 
 export function LandingHeader() {
-  const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const t = useTranslations("landing");
   const { isAuthenticated, role } = useAuthSafe();
@@ -47,103 +45,90 @@ export function LandingHeader() {
     }
   };
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   return (
     <>
-      <header
-        className={cn(
-          "relative z-50 transition-all duration-300",
-          scrolled ? "bg-background/95 backdrop-blur-sm border-b border-border" : "bg-transparent"
-        )}
-      >
-        <nav className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
-          <div className="flex items-center justify-between h-16 md:h-[72px]">
-            <Link
-              href="/"
-              className="flex items-center shrink-0"
-              aria-label="Spair Money home"
-              onClick={() => trackLandingClick({ section: "header", link_id: "nav_home", destination: "/" })}
+      <header className="fixed top-4 left-4 right-4 z-50 sm:left-6 sm:right-6 lg:left-8 lg:right-8">
+        <nav
+          className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 rounded-full bg-white/80 px-4 py-2.5 shadow-lg backdrop-blur-md sm:px-6"
+          aria-label={t("aria.mainNav")}
+        >
+          <div className="flex shrink-0 items-center lg:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 text-foreground hover:bg-black/5"
+              onClick={() => setMobileOpen(true)}
+              aria-label={t("aria.openMenu")}
             >
-              <Logo variant="icon" color="auto" width={32} height={32} className="md:hidden" />
-              <Logo variant="full" color="auto" width={140} height={32} className="hidden md:block" />
-            </Link>
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
 
-            <div className="hidden lg:flex items-center justify-center absolute left-1/2 -translate-x-1/2">
-              <ul className="flex items-center gap-8">
-                {NAV_LINK_KEYS.map((item) => (
-                  <li key={item.key}>
-                    <Link
-                      href={item.href}
-                      className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => {
-                        setMobileOpen(false);
-                        trackLandingClick({ section: "header", link_id: `nav_${item.key}`, destination: item.href });
-                      }}
-                    >
-                      {t(`nav.${item.key}`)}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <Link
+            href="/"
+            className="flex shrink-0 items-center lg:min-w-0"
+            aria-label={t("aria.spairHome")}
+            onClick={() => trackLandingClick({ section: "header", link_id: "nav_home", destination: "/" })}
+          >
+            <Logo variant="full" color="auto" width={120} height={28} />
+          </Link>
 
-            <div className="flex items-center gap-2 sm:gap-3">
-              <LocaleSwitcher variant="short" />
-              {isConsumer ? (
-                <>
-                  <Button asChild variant="ghost" size="medium" className="hidden lg:inline-flex text-muted-foreground">
-                    <Link href="/dashboard" onClick={() => trackLandingClick({ section: "header", link_id: "header_dashboard", destination: "/dashboard" })}>
-                      {t("dashboard")}
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="medium"
-                    className="hidden lg:inline-flex"
-                    onClick={() => {
-                      trackLandingClick({ section: "header", link_id: "header_logout" });
-                      handleLogout();
-                    }}
-                  >
-                    {t("logOut")}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button asChild variant="outline" size="medium" className="hidden lg:inline-flex">
-                    <Link href="/auth/login" onClick={() => trackLandingClick({ section: "header", link_id: "header_sign_in", destination: "/auth/login" })}>
-                      {t("signIn")}
-                    </Link>
-                  </Button>
-                  <Button asChild size="medium" className="hidden lg:inline-flex bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-transform">
-                    <Link href="/auth/signup" onClick={() => trackLandingClick({ section: "header", link_id: "header_start_trial", destination: "/auth/signup" })}>
-                      {t("startTrial")}
-                    </Link>
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="lg:hidden shrink-0"
-                onClick={() => setMobileOpen(true)}
-                aria-label="Open menu"
-              >
-                <Menu className="h-5 w-5" />
+          <ul className="hidden items-center gap-8 lg:flex">
+            {NAV_LINK_KEYS.map((item) => (
+              <li key={item.key}>
+                <Link
+                  href={item.href}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    trackLandingClick({ section: "header", link_id: `nav_${item.key}`, destination: item.href });
+                  }}
+                >
+                  {t(`nav.${item.key}`)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <LocaleSwitcher variant="short" />
+            {isConsumer ? (
+              <>
+                <Button asChild variant="ghost" size="medium" className="hidden text-muted-foreground hover:text-foreground lg:inline-flex">
+                  <Link href="/dashboard" onClick={() => trackLandingClick({ section: "header", link_id: "header_dashboard", destination: "/dashboard" })}>
+                    {t("dashboard")}
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="medium"
+                  className="hidden text-muted-foreground hover:text-foreground lg:inline-flex"
+                  onClick={() => {
+                    trackLandingClick({ section: "header", link_id: "header_logout" });
+                    handleLogout();
+                  }}
+                >
+                  {t("logOut")}
+                </Button>
+              </>
+            ) : (
+              <Button asChild size="medium" className="hidden shrink-0 rounded-full bg-foreground px-4 font-medium text-background hover:bg-foreground/90 lg:inline-flex">
+                <Link
+                  href="/auth/login"
+                  onClick={() => trackLandingClick({ section: "header", link_id: "header_sign_in", destination: "/auth/login" })}
+                >
+                  {t("signIn")}
+                  <ArrowRight className="ml-1.5 h-4 w-4" />
+                </Link>
               </Button>
-            </div>
+            )}
           </div>
         </nav>
       </header>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="right" className="w-[280px] p-4 flex flex-col">
-          <SheetTitle className="sr-only">Menu</SheetTitle>
+        <SheetContent side="left" className="w-[280px] p-4 flex flex-col">
+          <SheetTitle className="sr-only">{t("aria.menu")}</SheetTitle>
           <ul className="flex flex-col gap-4 pt-8 flex-1">
             {NAV_LINK_KEYS.map((item) => (
               <li key={item.key}>
@@ -159,11 +144,6 @@ export function LandingHeader() {
                 </Link>
               </li>
             ))}
-            <li className="pt-4 border-t border-border">
-              <div className="pb-4">
-                <LocaleSwitcher variant="short" />
-              </div>
-            </li>
           </ul>
           <footer className="pt-4 mt-auto border-t border-border flex flex-col gap-2">
             {isConsumer ? (
@@ -203,17 +183,6 @@ export function LandingHeader() {
                     }}
                   >
                     {t("signIn")}
-                  </Link>
-                </Button>
-                <Button asChild size="medium" className="w-full bg-primary text-primary-foreground">
-                  <Link
-                    href="/auth/signup"
-                    onClick={() => {
-                      setMobileOpen(false);
-                      trackLandingClick({ section: "header", link_id: "header_start_trial", destination: "/auth/signup" });
-                    }}
-                  >
-                    {t("startTrial")}
                   </Link>
                 </Button>
               </>

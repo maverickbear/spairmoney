@@ -113,12 +113,16 @@ function TooltipTriggerImpl({ children, asChild }: TooltipTriggerProps) {
 TooltipTriggerImpl.displayName = "TooltipTrigger";
 export const TooltipTrigger = TooltipTriggerImpl;
 
+export type TooltipVariant = "default" | "pill";
+
 interface TooltipContentProps {
   children: React.ReactNode;
-  /** Optional title. When provided, renders as bold title above body (with-title variant). */
+  /** Optional title. When provided, renders as bold title above body (with-title variant). Only used for default variant. */
   title?: React.ReactNode;
   className?: string;
   side?: Side;
+  /** default = large informative tooltip; pill = compact label for nav/short text */
+  variant?: TooltipVariant;
 }
 
 const sideClasses: Record<Side, string> = {
@@ -128,18 +132,41 @@ const sideClasses: Record<Side, string> = {
   right: "left-full ml-2 top-1/2 -translate-y-1/2",
 };
 
-/** Arrow (pointer) facing the trigger. White fill and border to match tooltip. */
-function TooltipArrow({ side }: { side: Side }) {
-  const arrowClasses: Record<Side, string> = {
-    top: "absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-white",
-    bottom: "absolute left-1/2 -translate-x-1/2 -top-2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-transparent border-b-white",
-    left: "absolute top-1/2 -translate-y-1/2 -right-2 w-0 h-0 border-t-[6px] border-b-[6px] border-l-[6px] border-transparent border-l-white",
-    right: "absolute top-1/2 -translate-y-1/2 -left-2 w-0 h-0 border-t-[6px] border-b-[6px] border-r-[6px] border-transparent border-r-white",
+/** Arrow (pointer) facing the trigger. Color matches variant. */
+function TooltipArrow({ side, variant }: { side: Side; variant: TooltipVariant }) {
+  const isPill = variant === "pill";
+  const arrowBySide: Record<
+    Side,
+    { base: string; fill: string }
+  > = {
+    top: {
+      base: "absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-transparent",
+      fill: isPill ? "border-t-primary" : "border-t-white",
+    },
+    bottom: {
+      base: "absolute left-1/2 -translate-x-1/2 -top-2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-transparent",
+      fill: isPill ? "border-b-primary" : "border-b-white",
+    },
+    left: {
+      base: "absolute top-1/2 -translate-y-1/2 -right-2 w-0 h-0 border-t-[6px] border-b-[6px] border-l-[6px] border-transparent",
+      fill: isPill ? "border-l-primary" : "border-l-white",
+    },
+    right: {
+      base: "absolute top-1/2 -translate-y-1/2 -left-2 w-0 h-0 border-t-[6px] border-b-[6px] border-r-[6px] border-transparent",
+      fill: isPill ? "border-r-primary" : "border-r-white",
+    },
   };
-  return <span className={cn("pointer-events-none", arrowClasses[side])} aria-hidden />;
+  const { base, fill } = arrowBySide[side];
+  return <span className={cn("pointer-events-none", base, fill)} aria-hidden />;
 }
 
-export function TooltipContent({ children, title, className, side = "bottom" }: TooltipContentProps) {
+export function TooltipContent({
+  children,
+  title,
+  className,
+  side = "bottom",
+  variant = "default",
+}: TooltipContentProps) {
   const ctx = React.useContext(TooltipRootContext);
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
@@ -150,20 +177,29 @@ export function TooltipContent({ children, title, className, side = "bottom" }: 
     return null;
   }
 
+  const isPill = variant === "pill";
+
   return (
     <span
       role="tooltip"
       className={cn(
-        "absolute z-[60] px-3 py-2.5 text-left rounded-lg bg-white text-neutral-900 shadow-md border border-gray-200",
+        "absolute z-[60] text-left",
         "opacity-0 invisible transition-opacity duration-150 pointer-events-none",
         open && "opacity-100 visible",
-        "min-w-[120px] max-w-[570px] max-[480px]:max-w-[min(570px,calc(100vw-2rem))]",
         sideClasses[side],
+        isPill
+          ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-primary-foreground shadow-md whitespace-nowrap"
+          : cn(
+              "px-3 py-2.5 rounded-lg bg-white text-neutral-900 shadow-md border border-gray-200",
+              "min-w-0 max-w-[720px] max-[480px]:max-w-[min(720px,calc(100vw-2rem))]"
+            ),
         className
       )}
     >
-      <TooltipArrow side={side} />
-      {title != null ? (
+      {!isPill && <TooltipArrow side={side} variant={variant} />}
+      {isPill ? (
+        <span className="leading-snug">{children}</span>
+      ) : title != null ? (
         <div className="space-y-1">
           <p className="text-sm font-semibold text-neutral-900 leading-tight">{title}</p>
           <div className="text-sm font-normal text-neutral-700 leading-snug">{children}</div>
