@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { apiUrl, categoriesApiUrl } from "@/lib/utils/api-base-url";
 import { logger } from "@/src/infrastructure/utils/logger";
@@ -196,6 +196,7 @@ export default function TransactionsPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const { openDialog: openDeleteDialog, ConfirmDialog: DeleteConfirmDialog } = useConfirmDialog();
   const { openDialog: openDeleteMultipleDialog, ConfirmDialog: DeleteMultipleConfirmDialog } = useConfirmDialog();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -322,6 +323,19 @@ export default function TransactionsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Open add-transaction form when navigating from /transactions/new (redirects with ?open=new)
+  useEffect(() => {
+    if (searchParams.get("open") === "new") {
+      setSelectedTransaction(null);
+      setIsFormOpen(true);
+      // Remove ?open=new from URL without full navigation
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("open");
+      const q = next.toString();
+      router.replace(q ? `${pathname ?? "/transactions"}?${q}` : (pathname ?? "/transactions"), { scroll: false });
+    }
+  }, [pathname, router, searchParams]);
 
   // Parse URL params when searchParams change
   useEffect(() => {

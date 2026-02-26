@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: feedback }, { status: 201 });
   } catch (error) {
     console.error("Error in feedback API:", error);
-    
+
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: "Invalid form data", details: error.errors },
@@ -31,8 +31,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const message = error instanceof Error ? error.message : "Internal server error";
+    const isDev = process.env.NODE_ENV === "development";
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: isDev ? message : "Internal server error" },
       { status: 500 }
     );
   }

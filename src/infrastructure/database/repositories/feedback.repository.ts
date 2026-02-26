@@ -5,8 +5,6 @@
 
 import { createServerClient } from "../supabase-server";
 import { logger } from "@/src/infrastructure/utils/logger";
-import { formatTimestamp } from "@/src/infrastructure/utils/timestamp";
-import { BaseFeedback } from "@/src/domain/feedback/feedback.types";
 
 export interface FeedbackRow {
   id: string;
@@ -29,16 +27,13 @@ export class FeedbackRepository {
     }
   ): Promise<FeedbackRow> {
     const supabase = await createServerClient();
-    const now = formatTimestamp(new Date());
 
     const { data: feedback, error } = await supabase
-      .from("system_feedback")
+      .from("system_support_feedback")
       .insert({
         user_id: userId,
         rating: data.rating,
         feedback: data.feedback || null,
-        created_at: now,
-        updated_at: now,
       })
       .select()
       .single();
