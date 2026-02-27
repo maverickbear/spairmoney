@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/components/common/money";
-import { formatTransactionDate, formatShortDate } from "@/src/infrastructure/utils/timestamp";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { formatTransferLabel } from "@/src/presentation/utils/format-transfer-label";
 import { Loader2, Repeat, Clock, Check, X, Wallet, ShoppingCart, UtensilsCrossed, Car, Home, Heart, GraduationCap, Gamepad2, Plane, Dumbbell, Shirt, Laptop, Music, BookOpen, Gift, CreditCard, Building2, Briefcase, PiggyBank, TrendingUp, Coffee, Receipt as ReceiptIcon, Tag, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -182,12 +182,13 @@ export function TransactionsMobileCard({
   processingSuggestion,
 }: TransactionsMobileCardProps) {
   const t = useTranslations("transactions");
+  const formatDate = useFormatDisplayDate();
   const description = transaction.description || t("transactionFallbackLabel");
   const displayName =
     transaction.type === "transfer" && transaction.transferToId && transaction.account?.name && transaction.toAccount?.name
       ? formatTransferLabel(transaction.account.name, transaction.toAccount.name)
       : (transaction.description || transaction.category?.name || t("transactionFallbackLabel"));
-  const date = formatTransactionDate(transaction.date);
+  const date = formatDate(transaction.date, "shortDate");
   const isIncome = transaction.type === "income";
   const isExpense = transaction.type === "expense";
   const categoryName = transaction.category?.name;

@@ -11,6 +11,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -99,11 +100,12 @@ export function AddAccountSheet({
           open={open} 
           onOpenChange={onOpenChange}
         >
-          <DialogContent 
-            className="max-w-md"
-          >
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{tAcc("addAccount")}</DialogTitle>
+              <DialogDescription className="sr-only">
+                {tAcc("addAccountManuallyDescription")}
+              </DialogDescription>
             </DialogHeader>
             <div className="px-6 py-6 space-y-3">
               {content}

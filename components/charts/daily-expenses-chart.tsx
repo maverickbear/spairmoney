@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartCard } from "./chart-card";
+import { formatMoney } from "@/components/common/money";
 import { sentiment } from "@/lib/design-system/colors";
 
 interface DailyExpensesData {
@@ -23,7 +24,7 @@ export function DailyExpensesChart({ data }: DailyExpensesChartProps) {
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
           <YAxis />
-          <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
+          <Tooltip formatter={(value) => formatMoney(Number(value))} />
           <Line type="monotone" dataKey="amount" stroke={sentiment.negative} strokeWidth={2} />
         </LineChart>
       </ResponsiveContainer>

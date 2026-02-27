@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { format } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import {
   Select,
   SelectContent,
@@ -50,6 +50,7 @@ export function DateRangePicker({
   className,
 }: DateRangePickerProps) {
   const t = useTranslations("common.dateRange");
+  const formatDate = useFormatDisplayDate();
   const [startDateValue, setStartDateValue] = React.useState(
     dateRange ? formatDateInput(new Date(dateRange.startDate)) : ""
   );
@@ -70,7 +71,7 @@ export function DateRangePicker({
       try {
         const start = new Date(dateRange.startDate);
         const end = new Date(dateRange.endDate);
-        return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
+        return `${formatDate(start, "short")} - ${formatDate(end, "shortDate")}`;
       } catch {
         return t("customRange");
       }

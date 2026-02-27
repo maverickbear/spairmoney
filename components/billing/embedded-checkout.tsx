@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { formatMoney } from "@/components/common/money";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { useRouter } from "next/navigation";
 
@@ -101,10 +102,10 @@ export function EmbeddedCheckout({
               {plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} Plan
             </p>
             <p className="text-2xl font-bold">
-              ${price?.toFixed(2)}/{interval === "month" ? "month" : "year"}
+              {formatMoney(price ?? 0)}/{interval === "month" ? "month" : "year"}
               {interval === "year" && (
                 <span className="text-base font-normal text-muted-foreground ml-2">
-                  (${monthlyPrice?.toFixed(2)}/month)
+                  ({formatMoney(monthlyPrice ?? 0)}/month)
                 </span>
               )}
             </p>

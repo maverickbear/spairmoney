@@ -12,6 +12,7 @@ import {
 import { formatMoney } from "@/components/common/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 
 interface SpendingWidgetProps {
   data: SpendingWidgetData | null;
@@ -22,6 +23,7 @@ type ViewType = 'trend' | 'categories';
 
 export function SpendingWidget({ data, className }: SpendingWidgetProps) {
   const t = useTranslations("dashboard");
+  const formatDate = useFormatDisplayDate();
   const [view, setView] = useState<ViewType>('trend');
 
   if (!data) return null;
@@ -29,12 +31,12 @@ export function SpendingWidget({ data, className }: SpendingWidgetProps) {
   const currentSeries = data.series.find(s => s.label === "This month");
   const previousSeries = data.series.find(s => s.label === "Last month");
 
-  // Merge data for line chart
+  // Merge data for line chart (point.date is yyyy-MM-dd from API; format for locale)
   const chartData = currentSeries?.data.map((point, i) => {
     return {
-      name: point.date,
+      name: formatDate(point.date, "short"),
       current: point.cumulative,
-      previous: previousSeries?.data[i]?.cumulative || null, 
+      previous: previousSeries?.data[i]?.cumulative || null,
     };
   }) || [];
 
@@ -107,11 +109,11 @@ export function SpendingWidget({ data, className }: SpendingWidgetProps) {
                     axisLine={false} 
                     tickLine={false} 
                     tick={{ fontSize: 12, fill: "#6B7280" }}
-                    tickFormatter={(value) => `$${value}`}
+                    tickFormatter={(value) => formatMoney(Number(value))}
                   />
                   <Tooltip 
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`$${value.toFixed(2)}`]}
+                    formatter={(value: number) => [formatMoney(value)]}
                   />
                   <Line 
                     type="monotone" 

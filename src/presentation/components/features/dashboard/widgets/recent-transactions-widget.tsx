@@ -8,6 +8,7 @@ import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, Receipt } from "lucid
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/common/money";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 
 interface RecentTransactionsWidgetProps {
   data: RecentTransactionsWidgetData | null;
@@ -16,6 +17,7 @@ interface RecentTransactionsWidgetProps {
 
 export function RecentTransactionsWidget({ data, className }: RecentTransactionsWidgetProps) {
   const t = useTranslations("dashboard");
+  const formatDate = useFormatDisplayDate();
   if (!data) return null;
 
   if (data.transactions.length === 0) {
@@ -62,7 +64,7 @@ export function RecentTransactionsWidget({ data, className }: RecentTransactions
               </div>
               <div className="flex flex-col">
                 <span className="font-medium text-sm">{tx.name}</span>
-                <span className="text-xs text-slate-400">{tx.date}</span>
+                <span className="text-xs text-slate-400">{formatDate(tx.date, "short")}</span>
               </div>
             </div>
             

@@ -21,6 +21,10 @@
     "languageSpanish": "Espanhol",
     "searchCommands": "Buscar comandos...",
     "percentagePlaceholder": "0,00 %",
+    "notAvailable": "N/D",
+    "unknown": "Desconhecido",
+    "uncategorized": "Sem categoria",
+    "dash": "—",
     "dateRange": {
       "allDates": "Todas as datas",
       "today": "Hoje",
@@ -518,7 +522,7 @@
       "legalPreferences": "Legal e preferências"
     },
     "items": {
-      "dashboard": "Painel",
+      "dashboard": "Painel Financeiro",
       "insights": "Insights",
       "reports": "Relatórios",
       "bankAccounts": "Contas bancárias",
@@ -530,7 +534,7 @@
       "debts": "Dívidas",
       "myAccount": "Minha conta",
       "billing": "Cobrança",
-      "household": "Casa",
+      "household": "Grupo Familiar",
       "categories": "Categorias"
     },
     "expandMenu": "Expandir menu",
@@ -593,7 +597,15 @@
     "failedToSaveBudgetPlan": "Falha ao salvar plano de orçamento. Tente novamente.",
     "userFallback": "Usuário",
     "expensesRuleLabel": "Regra de gastos",
-    "expensesRuleDescription": "Escolha uma regra de orçamento que se adapte aos seus objetivos e estilo de vida."
+    "expensesRuleDescription": "Escolha uma regra de orçamento que se adapte aos seus objetivos e estilo de vida.",
+    "displayCurrency": "Moeda de exibição",
+    "displayCurrencyDescription": "Todos os valores no app serão exibidos nesta moeda (apenas formato e símbolo).",
+    "displayCurrencyUpdated": "Moeda atualizada",
+    "displayCurrencyUpdatedDescription": "A moeda de exibição foi atualizada. Os valores passam a ser mostrados na moeda selecionada.",
+    "displayCurrencyUpdateFailed": "Falha ao atualizar a moeda",
+    "currencyAndLanguage": "Moeda e idioma",
+    "language": "Idioma",
+    "languageDescription": "Idioma da interface. A formatação de moeda usa o locale da moeda de exibição selecionada."
   },
   "pages": {
     "insights": "Insights e Ações do Spair Score"
@@ -667,6 +679,10 @@
     "startTrackingDescription": "Obtenha seu Spair Score com base em receitas, despesas e economias",
     "seeIncomeVsExpenses": "Ver receitas vs despesas",
     "noData": "Sem dados",
+    "spairScoreEmptySavingsRateHint": "Adicione sua renda e gastos",
+    "spairScoreEmptyEmergencyFundHint": "Defina seu total guardado",
+    "spairScoreEmptyDebtHint": "Cadastre suas dívidas",
+    "spairScoreEmptySpendingHint": "Defina seu orçamento",
     "addTransactionsToSeeScore": "Adicione transações para ver a pontuação",
     "pointsToNextTier": "Pontos para o próximo nível",
     "toNextLevel": "Para o próximo nível",

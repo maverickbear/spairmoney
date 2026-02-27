@@ -118,7 +118,7 @@ function GaugePlaceholder({
             fill: "var(--muted-foreground)",
           }}
         >
-          —
+          {isEmpty ? "0 / 100" : "—"}
         </text>
       </svg>
       <p
@@ -192,26 +192,26 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
     ? [
         {
           label: t("savingsRate"),
-          value: empty ? "—" : `${details.savingsRate.toFixed(1)}%`,
-          hint: t("ofIncomeSaved"),
+          value: empty ? t("noData") : `${details.savingsRate.toFixed(1)}%`,
+          hint: empty ? t("spairScoreEmptySavingsRateHint") : t("ofIncomeSaved"),
           good: details.savingsRate >= 20,
         },
         {
           label: t("emergencyFundLabel"),
-          value: empty ? "—" : `${details.emergencyFundMonths.toFixed(1)} mo`,
-          hint: t("monthsOfExpenses"),
+          value: empty ? t("noData") : `${details.emergencyFundMonths.toFixed(1)} mo`,
+          hint: empty ? t("spairScoreEmptyEmergencyFundHint") : t("monthsOfExpenses"),
           good: details.emergencyFundMonths >= 6,
         },
         {
           label: t("debtLabel"),
-          value: empty ? "—" : details.debtExposure,
-          hint: t("exposureLevel"),
+          value: empty ? t("noData") : details.debtExposure,
+          hint: empty ? t("spairScoreEmptyDebtHint") : t("exposureLevel"),
           good: details.debtExposure === "Low",
         },
         {
           label: t("spendingLabel"),
-          value: empty ? "—" : details.spendingDiscipline,
-          hint: t("vsBudget"),
+          value: empty ? t("noData") : details.spendingDiscipline,
+          hint: empty ? t("spairScoreEmptySpendingHint") : t("vsBudget"),
           good: details.spendingDiscipline === "Excellent" || details.spendingDiscipline === "Good",
         },
       ]
@@ -292,7 +292,7 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                     }}
                     labels={{
                       valueLabel: {
-                        formatTextValue: (val: number) => (hasScoreData ? String(Math.round(val)) : "—"),
+                        formatTextValue: (val: number) => (hasScoreData ? String(Math.round(val)) : "0 / 100"),
                         animateValue: true,
                         style: {
                           color: hasScoreData ? "#000" : "var(--muted-foreground)",
@@ -328,8 +328,9 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
                     <span
                       className={cn(
                         "text-base font-semibold tabular-nums",
+                        empty && "text-muted-foreground",
                         !empty && m.good && "text-sentiment-positive",
-                        !empty && !m.good && m.value !== "—" && "text-sentiment-warning"
+                        !empty && !m.good && "text-sentiment-warning"
                       )}
                     >
                       {m.value}
@@ -346,15 +347,15 @@ export function SpairScoreFullWidthWidget({ data, onOpenDetails }: SpairScoreFul
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="rounded-lg border border-border bg-card p-3 sm:p-4 text-card-foreground min-w-0">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t("stats")}</p>
-              <p className="mt-1 text-xl sm:text-2xl font-bold tabular-nums">
-                {pointsToNextTier !== null ? pointsToNextTier : "—"}
+              <p className={cn("mt-1 text-xl sm:text-2xl font-bold tabular-nums", pointsToNextTier === null && "text-muted-foreground")}>
+                {pointsToNextTier !== null ? pointsToNextTier : t("noData")}
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground">{t("pointsToNextTier")}</p>
             </div>
             <div className="rounded-lg border border-border bg-card p-3 sm:p-4 text-card-foreground min-w-0">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t("progress")}</p>
-              <p className="mt-1 text-xl sm:text-2xl font-bold tabular-nums">
-                {progressToNextLevel !== null ? `${progressToNextLevel}%` : "—"}
+              <p className={cn("mt-1 text-xl sm:text-2xl font-bold tabular-nums", progressToNextLevel === null && "text-muted-foreground")}>
+                {progressToNextLevel !== null ? `${progressToNextLevel}%` : t("noData")}
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground">{t("toNextLevel")}</p>
             </div>

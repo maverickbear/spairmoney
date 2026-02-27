@@ -70,8 +70,20 @@ async function calculateFinancialHealthInternal(
   preFetchedTransactions?: TransactionWithRelations[] | null,
   preFetchedPreviousTransactions?: TransactionWithRelations[] | null,
   preFetchedDebts?: DebtWithCalculations[] | null,
-  preFetchedGoals?: GoalWithCalculations[] | null
+  preFetchedGoals?: GoalWithCalculations[] | null,
+  displayCurrency?: string,
+  displayCurrencyLocale?: string
 ): Promise<FinancialHealthData> {
+  const formatMoneyFn = (amount: number): string => {
+    const locale = displayCurrencyLocale || "en-CA";
+    const currency = (displayCurrency || "CAD").toUpperCase();
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
   const date = selectedDate || new Date();
   const selectedMonth = startOfMonth(date);
   const selectedMonthEnd = endOfMonth(date);
@@ -419,7 +431,7 @@ async function calculateFinancialHealthInternal(
     savingsRate,
     emergencyFundMonths,
     debtExposure,
-  });
+  }, formatMoneyFn);
   
   // Validate against budget rule if provided
   if (budgetRule && monthlyIncome > 0 && transactions.length > 0) {
@@ -471,7 +483,7 @@ async function calculateFinancialHealthInternal(
     classification,
     emergencyFundMonths,
     debtExposure,
-  });
+  }, formatMoneyFn);
 
   // Calculate spending discipline based on savings rate
   // Excellent: >= 30%, Good: 20-29%, Fair: 10-19%, Poor: 0-9%, Critical: < 0%
@@ -565,6 +577,21 @@ export async function calculateFinancialHealth(
     }
   }
   
+  // Resolve display currency for alert/suggestion formatting
+  let displayCurrency: string | undefined;
+  let displayCurrencyLocale: string | undefined;
+  if (finalUserId && finalAccessToken && finalRefreshToken) {
+    try {
+      const { makeOnboardingService } = await import("../onboarding/onboarding.factory");
+      const onboardingService = makeOnboardingService();
+      const settings = await onboardingService.getHouseholdSettings(finalUserId, finalAccessToken, finalRefreshToken);
+      displayCurrency = settings.displayCurrency;
+      displayCurrencyLocale = settings.displayCurrencyLocale;
+    } catch (e) {
+      // Non-fatal: alerts will use CAD fallback
+    }
+  }
+
   try {
     const result = await calculateFinancialHealthInternal(
       selectedDate, 
@@ -576,7 +603,9 @@ export async function calculateFinancialHealth(
       preFetchedTransactions,
       preFetchedPreviousTransactions,
       preFetchedDebts,
-      preFetchedGoals
+      preFetchedGoals,
+      displayCurrency,
+      displayCurrencyLocale
     );
     
     // Validate result before returning
@@ -736,7 +765,7 @@ export async function recalculateFinancialHealthFromTransactions(
     spendingDiscipline = "Critical";
   }
 
-  // Identify alerts and suggestions
+  // Identify alerts and suggestions (use default formatMoney)
   const alerts = identifyAlerts({
     monthlyIncome,
     monthlyExpenses,
@@ -875,7 +904,7 @@ function identifyAlerts(data: {
   savingsRate: number;
   emergencyFundMonths?: number;
   debtExposure?: "Low" | "Moderate" | "High";
-}): Array<{
+}, formatMoneyFn: (amount: number) => string = formatMoney): Array<{
   id: string;
   title: string;
   description: string;
@@ -890,7 +919,7 @@ function identifyAlerts(data: {
     alerts.push({
       id: "expenses_exceeding_income",
       title: "Spending More Than You Earned This Month",
-      description: `This month you spent ${formatMoney(data.monthlyExpenses)} and earned ${formatMoney(data.monthlyIncome)} — ${excessPercentage}% over your income.`,
+      description: `This month you spent ${formatMoneyFn(data.monthlyExpenses)} and earned ${formatMoneyFn(data.monthlyIncome)} — ${excessPercentage}% over your income.`,
       severity: "critical" as const,
       action: "Review this month's expenses and see where you can reduce spending.",
     });
@@ -898,7 +927,7 @@ function identifyAlerts(data: {
     alerts.push({
       id: "expenses_exceeding_income",
       title: "Spending With No Income This Month",
-      description: `This month you have ${formatMoney(data.monthlyExpenses)} in expenses but no income recorded.`,
+      description: `This month you have ${formatMoneyFn(data.monthlyExpenses)} in expenses but no income recorded.`,
       severity: "critical" as const,
       action: "Add income transactions or review this month's expenses.",
     });
@@ -909,7 +938,7 @@ function identifyAlerts(data: {
     alerts.push({
       id: "negative_savings_rate",
       title: "Spending More Than You Earned This Month",
-      description: `This month you spent ${formatMoney(Math.abs(data.netAmount))} more than you earned.`,
+      description: `This month you spent ${formatMoneyFn(Math.abs(data.netAmount))} more than you earned.`,
       severity: "critical" as const,
       action: "Reduce expenses or add income so next month you don't spend more than you earn.",
     });
@@ -967,7 +996,7 @@ function generateSuggestions(data: {
   classification: string;
   emergencyFundMonths?: number;
   debtExposure?: "Low" | "Moderate" | "High";
-}): Array<{
+}, formatMoneyFn: (amount: number) => string = formatMoney): Array<{
   id: string;
   title: string;
   description: string;
@@ -981,7 +1010,7 @@ function generateSuggestions(data: {
     suggestions.push({
       id: "reduce_expenses",
       title: "Spend Less Than You Earn Next Month",
-      description: `This month you spent ${formatMoney(reductionNeeded)} more than you earned. Reducing next month's expenses by that amount (or adding income) can recover about 8–12 points on your Spair Score.`,
+      description: `This month you spent ${formatMoneyFn(reductionNeeded)} more than you earned. Reducing next month's expenses by that amount (or adding income) can recover about 8–12 points on your Spair Score.`,
       impact: "high" as const,
     });
   }
@@ -1000,7 +1029,7 @@ function generateSuggestions(data: {
     suggestions.push({
       id: "increase_savings_rate",
       title: "Aim for 20% Savings Next Month",
-      description: `This month you saved less than 20%. Saving at least ${formatMoney(targetSavings)} next month (20% of income) can improve your score.`,
+      description: `This month you saved less than 20%. Saving at least ${formatMoneyFn(targetSavings)} next month (20% of income) can improve your score.`,
       impact: "high" as const,
     });
   }

@@ -26,7 +26,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
-import { formatTransactionDate, parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
+import { parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
 import { useToast } from "@/components/toast-provider";
 import { formatMoney } from "@/components/common/money";
 import { DatePicker } from "@/components/ui/date-picker";

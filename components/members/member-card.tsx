@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import type { HouseholdMember } from "@/src/domain/members/members.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ function getInitials(name: string | null | undefined): string {
 
 export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
   const t = useTranslations("members");
+  const formatDate = useFormatDisplayDate();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -128,17 +130,17 @@ export function MemberCard({ member, onUpdate, onDelete }: MemberCardProps) {
           <div className="space-y-2">
             {!member.isOwner && member.status === "pending" && member.invitedAt && (
               <p className="text-sm text-muted-foreground">
-                {t("invitationSentOn", { date: new Date(member.invitedAt).toLocaleDateString() })}
+                {t("invitationSentOn", { date: formatDate(member.invitedAt, "shortDate") })}
               </p>
             )}
             {!member.isOwner && member.status === "active" && member.acceptedAt && (
               <p className="text-sm text-muted-foreground">
-                {t("joinedOn", { date: new Date(member.acceptedAt).toLocaleDateString() })}
+                {t("joinedOn", { date: formatDate(member.acceptedAt, "shortDate") })}
               </p>
             )}
             {member.isOwner && member.createdAt && (
               <p className="text-sm text-muted-foreground">
-                {t("accountOwnerSince", { date: new Date(member.createdAt).toLocaleDateString() })}
+                {t("accountOwnerSince", { date: formatDate(member.createdAt, "shortDate") })}
               </p>
             )}
             <div className="flex justify-end space-x-2 pt-2">

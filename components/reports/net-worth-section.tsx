@@ -2,14 +2,14 @@
 
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney } from "@/components/common/money";
+import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { TrendingUp, TrendingDown, Wallet, CreditCard, PiggyBank } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NetWorthData } from "@/src/domain/reports/reports.types";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ChartCard } from "@/components/charts/chart-card";
-import { format, parseISO } from "date-fns";
 import { sentiment, interactive } from "@/lib/design-system/colors";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 
 interface NetWorthSectionProps {
   netWorth: NetWorthData | null;
@@ -17,6 +17,7 @@ interface NetWorthSectionProps {
 
 export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
   const t = useTranslations("reports");
+  const formatDate = useFormatDisplayDate();
   if (!netWorth) {
     return (
       <Card>
@@ -31,9 +32,9 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
 
   const { totalAssets, totalLiabilities, netWorth: netWorthValue, historical, change } = netWorth;
 
-  // Prepare chart data
+  // Prepare chart data (point.date is yyyy-MM-dd; format with locale)
   const chartData = historical.map((point) => ({
-    date: format(parseISO(point.date), "MMM yyyy"),
+    date: formatDate(point.date, "monthYear"),
     assets: point.assets,
     liabilities: point.liabilities,
     netWorth: point.netWorth,
@@ -140,11 +141,7 @@ export function NetWorthSection({ netWorth }: NetWorthSectionProps) {
                     axisLine={{ stroke: "hsl(var(--border))" }}
                     tickLine={{ stroke: "hsl(var(--border))" }}
                     width={80}
-                    tickFormatter={(value) => {
-                      if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-                      if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
-                      return `$${value}`;
-                    }}
+                    tickFormatter={(value) => formatMoneyCompact(Number(value), { showDecimals: value >= 1000000, threshold: 1000 })}
                   />
                   <Tooltip
                     content={({ active, payload }) => {

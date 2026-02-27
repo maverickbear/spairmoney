@@ -16,6 +16,8 @@ interface SubscriptionContextValue {
   refetch: () => Promise<void>;
   /** End of 30-day local trial (no Stripe until Subscribe Now). From users.trial_ends_at. */
   trialEndsAt: string | null;
+  /** True when initial load failed or data is inconclusive (e.g. connection issue). UI should not show "trial ended" until confirmed. */
+  subscriptionStateUnknown: boolean;
   // Helper methods for common checks
   isActive: () => boolean;
   isTrialing: () => boolean;
@@ -28,6 +30,8 @@ interface InitialData {
   subscription: Subscription | null;
   plan: Plan | null;
   trialEndsAt?: string | null;
+  /** True when server failed to load subscription (e.g. timeout). Prevents showing "trial ended" until refetch succeeds. */
+  subscriptionDataUnavailable?: boolean;
 }
 
 interface SubscriptionProviderProps {
@@ -50,7 +54,10 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     initialData?.plan?.features ?? getDefaultFeatures()
   );
   const [checking, setChecking] = useState(false);
-  
+  const [subscriptionStateUnknown, setSubscriptionStateUnknown] = useState(
+    initialData?.subscriptionDataUnavailable ?? false
+  );
+
   const checkingRef = useRef(false);
   // Track if we have initial data to avoid immediate refetch on mount
   const hasInitialDataRef = useRef(!!initialData);
@@ -87,9 +94,11 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
     const nextSub = initialData?.subscription ?? null;
     const nextPlan = initialData?.plan ?? null;
     const nextTrialEndsAt = initialData?.trialEndsAt ?? null;
+    const nextDataUnavailable = initialData?.subscriptionDataUnavailable ?? false;
     setSubscription(nextSub);
     setPlan(nextPlan);
     setTrialEndsAt(nextTrialEndsAt);
+    setSubscriptionStateUnknown(nextDataUnavailable);
     if (nextPlan?.features) {
       setLimits(nextPlan.features);
     } else if (nextTrialEndsAt && new Date(nextTrialEndsAt) > new Date()) {
@@ -103,7 +112,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
       hasInitialDataRef.current = true;
       lastFetchRef.current = Date.now();
     }
-  }, [initialData?.subscription, initialData?.plan, initialData?.trialEndsAt]);
+  }, [initialData?.subscription, initialData?.plan, initialData?.trialEndsAt, initialData?.subscriptionDataUnavailable]);
 
   const fetchSubscription = useCallback(async (): Promise<{ subscription: Subscription | null; plan: Plan | null; interval: "month" | "year" | null; trialEndsAt?: string | null }> => {
     try {
@@ -207,6 +216,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
         if (newTrialEndsAt !== undefined) {
           setTrialEndsAt(newTrialEndsAt ?? null);
         }
+        setSubscriptionStateUnknown(false);
       } else {
         log.log("Rate limited during fetch, preserving current subscription state");
       }
@@ -340,6 +350,7 @@ export function SubscriptionProvider({ children, initialData }: SubscriptionProv
         checking,
         refetch,
         trialEndsAt,
+        subscriptionStateUnknown,
         isActive,
         isTrialing,
         hasSubscription,
@@ -374,6 +385,7 @@ export function useSubscriptionSafe() {
       checking: false,
       refetch: async () => {},
       trialEndsAt: null,
+      subscriptionStateUnknown: false,
       isActive: () => false,
       isTrialing: () => false,
       hasSubscription: () => false,

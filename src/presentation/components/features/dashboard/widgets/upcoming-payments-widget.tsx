@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, AlertTriangle, ArrowRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/common/money";
-import { format } from "date-fns";
 import type { UpcomingPaymentsWidgetData } from "@/src/domain/dashboard/types";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { WidgetEmptyState } from "./widget-empty-state";
 import { WidgetCard } from "./widget-card";
 
@@ -21,6 +21,7 @@ interface UpcomingPaymentsWidgetProps {
 
 export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPaymentsWidgetProps) {
   const t = useTranslations("dashboard");
+  const formatDate = useFormatDisplayDate();
   const router = useRouter();
 
   if (loading) {
@@ -81,7 +82,7 @@ export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPayment
           {data.totalDueNext7Days > 0 && (
             <div className="p-2 rounded border bg-sentiment-warning/5 border-sentiment-warning/20">
               <p className="text-xs font-medium text-sentiment-warning">
-                ${data.totalDueNext7Days.toFixed(2)} due in 7 days
+                {formatMoney(data.totalDueNext7Days)} due in 7 days
               </p>
             </div>
           )}
@@ -106,7 +107,7 @@ export function UpcomingPaymentsWidget({ data, loading, error }: UpcomingPayment
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
-                    <span>{format(new Date(payment.date), "MMM dd")}</span>
+                    <span>{formatDate(payment.date, "short")}</span>
                     {payment.daysUntil <= 7 && (
                       <span className="text-sentiment-warning">
                         ({payment.daysUntil}d)

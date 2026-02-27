@@ -144,7 +144,9 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
   let reason: "no_subscription" | "trial_expired" | "subscription_inactive" | undefined;
   let subscription: Subscription | null = null;
   let plan: Plan | null = null;
-  
+  /** When true, subscription fetch failed (e.g. timeout, DB error). UI should not show "trial ended" until data is confirmed. */
+  let subscriptionDataUnavailable = false;
+
   try {
     // CRITICAL: Get userId BEFORE calling getDashboardSubscription() to avoid
     // calling cookies() inside a "use cache" function
@@ -197,6 +199,7 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
     // Let onboarding handle it (user might be new and needs onboarding)
     log.error("Error checking subscription:", error);
     shouldOpenModal = false; // Don't open pricing dialog, let onboarding handle it
+    subscriptionDataUnavailable = true; // So UI does not show "trial ended" on load/connection issues
   }
 
   // Get current plan ID and interval for the dialog
@@ -231,6 +234,7 @@ async function AuthGuard({ children }: { children: React.ReactNode }) {
       currentPlanId={currentPlanId}
       currentInterval={currentInterval}
       subscriptionStatus={subscriptionStatus}
+      subscriptionDataUnavailable={subscriptionDataUnavailable}
     >
       {children}
     </ProtectedDashboardShell>

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
+import { getCurrencySymbol } from "@/components/common/money";
 import { formatDateOnly } from "@/src/infrastructure/utils/timestamp";
 
 interface AddTransactionWidgetProps {
@@ -209,7 +210,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
           <div className="space-y-1.5">
             <Label htmlFor="amount" className="text-xs text-muted-foreground">{t("amountLabel")}</Label>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol()}</span>
               <Input
                 id="amount"
                 type="number"

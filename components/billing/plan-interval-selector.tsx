@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatMoney } from "@/components/common/money";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -95,12 +96,12 @@ export function PlanIntervalSelector({
   const isCurrentYearly = currentPlanId === plan.id && currentInterval === "year";
 
   const selectedPrice = selectedInterval === "month" ? priceMonthly : priceYearly;
-  const selectedLabel = selectedInterval === "month" ? `$${priceMonthly.toFixed(2)}/month` : `$${priceYearly.toFixed(2)}/year`;
+  const selectedLabel = selectedInterval === "month" ? `${formatMoney(priceMonthly)}/month` : `${formatMoney(priceYearly)}/year`;
   const currentLabel =
     currentInterval === "month"
-      ? `$${priceMonthly.toFixed(2)}/month`
+      ? `${formatMoney(priceMonthly)}/month`
       : currentInterval === "year"
-        ? `$${priceYearly.toFixed(2)}/year`
+        ? `${formatMoney(priceYearly)}/year`
         : null;
 
   function handleSubmit() {
@@ -133,7 +134,7 @@ export function PlanIntervalSelector({
               )}
             </div>
             <CardDescription className="mt-0">Billed every month</CardDescription>
-            <p className="text-2xl font-bold text-foreground pt-1">${priceMonthly.toFixed(2)}/month</p>
+            <p className="text-2xl font-bold text-foreground pt-1">{formatMoney(priceMonthly)}/month</p>
           </CardHeader>
         </Card>
 
@@ -164,8 +165,8 @@ export function PlanIntervalSelector({
             </div>
             <CardDescription className="mt-0">Billed annually</CardDescription>
             <div className="space-y-1 pt-1">
-              <p className="text-2xl font-bold text-foreground">${priceYearly.toFixed(2)}/year</p>
-              <p className="text-sm text-muted-foreground">${yearlyMonthlyEquivalent.toFixed(2)}/month</p>
+              <p className="text-2xl font-bold text-foreground">{formatMoney(priceYearly)}/year</p>
+              <p className="text-sm text-muted-foreground">{formatMoney(yearlyMonthlyEquivalent)}/month</p>
             </div>
           </CardHeader>
         </Card>

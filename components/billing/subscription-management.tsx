@@ -6,7 +6,7 @@ import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
-import { format } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { CreditCard, Loader2, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import {
@@ -54,6 +54,7 @@ export function SubscriptionManagement({
   // OPTIMIZED: Use provided householdInfo or load it if not provided
   const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(initialHouseholdInfo ?? null);
   const t = useTranslations("toasts");
+  const formatDate = useFormatDisplayDate();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -215,7 +216,7 @@ export function SubscriptionManagement({
                 <div>
                   <p className="text-sm text-muted-foreground">{label}</p>
                   <p className="font-medium">
-                    {format(dateToShow, "PPP")}
+                    {formatDate(dateToShow, "longDate")}
                   </p>
                 </div>
               );
@@ -257,7 +258,7 @@ export function SubscriptionManagement({
                   <>
                     <strong>Subscription Will Be Cancelled:</strong> Your subscription will be cancelled on{" "}
                     {subscription.currentPeriodEnd
-                      ? format(new Date(subscription.currentPeriodEnd), "PPP")
+                      ? formatDate(subscription.currentPeriodEnd, "longDate")
                       : "the end of your billing period"}
                     . You can reactivate it through the Stripe Customer Portal.
                   </>

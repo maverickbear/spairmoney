@@ -6,7 +6,6 @@ import { apiUrl } from "@/lib/utils/api-base-url";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/components/common/money";
 import {
-  format,
   differenceInDays,
   isToday,
   isTomorrow,
@@ -18,6 +17,7 @@ import {
   addDays,
   subMonths,
 } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { cn } from "@/lib/utils";
 import { Check, X, SkipForward, ArrowRight, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
@@ -120,6 +120,7 @@ function getDateRangeOptions(tPlanned: (key: string) => string): { value: DateRa
 export function PlannedPaymentList() {
   const t = useTranslations("nav");
   const tPlanned = useTranslations("plannedPayments");
+  const formatDate = useFormatDisplayDate();
   const { toast } = useToast();
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -675,13 +676,13 @@ export function PlannedPaymentList() {
       const months = Math.round(daysUntil / 30);
       return tPlanned("inMonths", { count: months });
     }
-    return format(dueDate, "MMM d, yyyy");
+    return formatDate(dueDate, "shortDate");
   };
 
-  /** Formatted date for support text (e.g. "Feb 20, 2026") */
+  /** Formatted date for support text (locale-aware) */
   const formatDateSupport = (date: string | Date) => {
     const dueDate = date instanceof Date ? date : new Date(date);
-    return format(dueDate, "MMM d, yyyy");
+    return formatDate(dueDate, "shortDate");
   };
 
   const getUrgencyColor = (daysUntil: number) => {

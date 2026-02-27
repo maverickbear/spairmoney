@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatMoney } from "@/components/common/money";
 import { Plan, Subscription } from "@/src/domain/subscriptions/subscriptions.validations";
 import { Loader2, Check } from "lucide-react";
 import { ChangePlanConfirmationModal } from "@/components/billing/change-plan-confirmation";
@@ -240,7 +241,7 @@ export function PlansGrid({ currentPlanId, currentInterval, subscription, onPlan
                 <div className="mt-3 sm:mt-4">
                   <div className="flex items-baseline gap-1">
                     <span className="text-xl sm:text-2xl font-bold">
-                      ${price.toFixed(2)}
+                      {formatMoney(price)}
                     </span>
                     <span className="text-muted-foreground text-xs sm:text-sm">/mo</span>
                   </div>

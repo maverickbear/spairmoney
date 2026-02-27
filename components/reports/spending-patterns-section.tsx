@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney } from "@/components/common/money";
+import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ChartCard } from "@/components/charts/chart-card";
 import { Calendar, CreditCard } from "lucide-react";
@@ -107,10 +107,7 @@ export function SpendingPatternsSection({ transactions }: SpendingPatternsSectio
                     axisLine={{ stroke: "hsl(var(--border))" }}
                     tickLine={{ stroke: "hsl(var(--border))" }}
                     width={50}
-                    tickFormatter={(value) => {
-                      if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
-                      return `$${value}`;
-                    }}
+                    tickFormatter={(value) => formatMoneyCompact(Number(value), { showDecimals: false, threshold: 1000 })}
                   />
                   <Tooltip
                     content={({ active, payload }) => {
@@ -155,10 +152,7 @@ export function SpendingPatternsSection({ transactions }: SpendingPatternsSectio
                     tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                     axisLine={{ stroke: "hsl(var(--border))" }}
                     tickLine={{ stroke: "hsl(var(--border))" }}
-                    tickFormatter={(value) => {
-                      if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
-                      return `$${value}`;
-                    }}
+                    tickFormatter={(value) => formatMoneyCompact(Number(value), { showDecimals: false, threshold: 1000 })}
                   />
                   <YAxis
                     dataKey="name"

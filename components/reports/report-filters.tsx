@@ -10,7 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Calendar } from "lucide-react";
-import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { DateRangePicker, type DateRangePreset, type DateRange } from "@/components/ui/date-range-picker";
 
 export type ReportPeriod = 
@@ -80,6 +81,7 @@ export function ReportFilters({ period }: ReportFiltersProps) {
   };
 
   const dateRange = getDateRange(period);
+  const formatDate = useFormatDisplayDate();
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -100,7 +102,7 @@ export function ReportFilters({ period }: ReportFiltersProps) {
         </Select>
       </div>
       <div className="text-sm text-muted-foreground">
-        {format(dateRange.startDate, "MMM dd, yyyy")} - {format(dateRange.endDate, "MMM dd, yyyy")}
+        {formatDate(dateRange.startDate, "shortDate")} - {formatDate(dateRange.endDate, "shortDate")}
       </div>
     </div>
   );

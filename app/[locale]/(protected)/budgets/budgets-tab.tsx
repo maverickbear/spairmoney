@@ -6,7 +6,7 @@ import { apiUrl } from "@/lib/utils/api-base-url";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Wallet } from "lucide-react";
-import { format } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { BudgetForm } from "@/components/forms/budget-form";
 import { BudgetCard } from "@/components/budgets/budget-card";
 import { useToast } from "@/components/toast-provider";
@@ -54,6 +54,7 @@ interface Category {
 export function BudgetsTab() {
   const t = useTranslations("toasts");
   const tPlanning = useTranslations("planning");
+  const formatDate = useFormatDisplayDate();
   const { toast } = useToast();
   const { canWrite } = useWriteGuard();
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -164,7 +165,7 @@ export function BudgetsTab() {
         <div className="space-y-1">
           <h2 className="text-2xl md:text-3xl font-bold">{tPlanning("budgetsTabTitle")}</h2>
           <p className="text-sm text-muted-foreground">
-            {tPlanning("budgetsTabSubtitle", { monthYear: format(now, "MMMM yyyy") })}
+            {tPlanning("budgetsTabSubtitle", { monthYear: formatDate(now, "monthYear") })}
           </p>
         </div>
         <Button

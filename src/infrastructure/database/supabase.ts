@@ -30,6 +30,19 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['users']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['users']['Insert']>;
       };
+      currencies: {
+        Row: {
+          code: string;
+          name: string;
+          locale: string;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['currencies']['Row'], 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['currencies']['Insert']>;
+      };
       households: {
         Row: {
           id: string;

@@ -3,7 +3,8 @@
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/components/common/money";
-import { format, subMonths } from "date-fns";
+import { subMonths } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/src/domain/transactions/transactions.types";
@@ -23,6 +24,7 @@ export function FinancialOverviewCard({
   now,
 }: FinancialOverviewCardProps) {
   const t = useTranslations("reports");
+  const formatDate = useFormatDisplayDate();
   // Calculate current month totals
   const currentIncome = currentMonthTransactions
     .filter((t) => t.type === "income")
@@ -53,8 +55,8 @@ export function FinancialOverviewCard({
   // Calculate savings rate
   const savingsRate = currentIncome > 0 ? (currentNet / currentIncome) * 100 : 0;
 
-  const currentMonthName = format(now, "MMMM yyyy");
-  const lastMonthName = format(subMonths(now, 1), "MMMM yyyy");
+  const currentMonthName = formatDate(now, "monthYear");
+  const lastMonthName = formatDate(subMonths(now, 1), "monthYear");
 
   return (
     <Card>

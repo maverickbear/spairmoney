@@ -16,5 +16,7 @@ export interface HouseholdSettings {
   onboardingCompletedAt?: string | null; // ISO timestamp when onboarding was completed
   onboardingGoals?: string[] | null; // User goals selected during onboarding
   onboardingHouseholdType?: "personal" | "shared" | null; // Household type selected during onboarding
+  /** ISO 4217 currency code for app display (e.g. "CAD", "USD"). */
+  displayCurrency?: string | null;
 }
 

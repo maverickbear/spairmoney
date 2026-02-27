@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { apiUrl } from "@/lib/utils/api-base-url";
 import { usePagePerformance } from "@/hooks/use-page-performance";
 import { SubscriptionCard } from "@/components/subscriptions/subscription-card";
@@ -48,6 +49,7 @@ export default function SubscriptionsPage() {
   const t = useTranslations("nav");
   const tSub = useTranslations("subscriptions");
   const tCommon = useTranslations("common");
+  const formatDate = useFormatDisplayDate();
   const perf = usePagePerformance("Subscriptions");
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess, canWrite } = useWriteGuard();
@@ -296,9 +298,9 @@ export default function SubscriptionsPage() {
   };
 
   const formatFirstBillingDate = (date: string | null | undefined): string => {
-    if (!date) return "—";
+    if (!date) return tCommon("dash");
     const parsedDate = new Date(date);
-    return isNaN(parsedDate.getTime()) ? "—" : parsedDate.toLocaleDateString();
+    return isNaN(parsedDate.getTime()) ? tCommon("dash") : formatDate(date, "shortDate");
   };
 
   async function handleDetectSubscriptions() {
@@ -681,7 +683,7 @@ export default function SubscriptionsPage() {
               {filteredSubscriptions.map((subscription) => {
                 const frequencyLabel = subscription.billingFrequency 
                   ? getBillingFrequencyLabel(subscription.billingFrequency)
-                  : "—";
+                  : tCommon("dash");
                 const billingDayLabel = getBillingDayLabel(subscription);
                 const isSelected = selectedSubscriptions.has(subscription.id);
                 
@@ -700,7 +702,7 @@ export default function SubscriptionsPage() {
                       </TableCell>
                     )}
                     <TableCell className="text-muted-foreground">
-                      {subscription.subscriptionCategoryName || subscription.category?.name || subscription.subcategory?.name || "—"}
+                      {subscription.subscriptionCategoryName || subscription.category?.name || subscription.subcategory?.name || tCommon("dash")}
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -717,7 +719,7 @@ export default function SubscriptionsPage() {
                           />
                         )}
                         <div className="flex flex-col gap-1 min-w-0">
-                          <span className="truncate">{subscription.serviceName?.trim() || "—"}</span>
+                          <span className="truncate">{subscription.serviceName?.trim() || tCommon("dash")}</span>
                         {subscription.description && (
                           <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                             {subscription.description}
@@ -742,7 +744,7 @@ export default function SubscriptionsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {subscription.account?.name || "N/A"}
+                      {subscription.account?.name || tCommon("notAvailable")}
                     </TableCell>
                     <TableCell>
                       {subscription.isActive ? (
@@ -1026,7 +1028,7 @@ export default function SubscriptionsPage() {
                             <div className="text-right ml-4">
                               <div className="font-semibold">{formatMoney(tx.amount)}</div>
                               <div className="text-xs text-muted-foreground">
-                                {new Date(tx.date).toLocaleDateString()}
+                                {formatDate(tx.date, "shortDate")}
                               </div>
                             </div>
                           </div>

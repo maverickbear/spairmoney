@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,7 @@ export function SubscriptionSuccessDialog({
 }: SubscriptionSuccessDialogProps) {
   const router = useRouter();
   const t = useTranslations("subscriptionSuccess");
-  const locale = useLocale();
+  const formatDate = useFormatDisplayDate();
   const { subscription, refetch, checking } = useSubscriptionContext();
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -225,11 +226,7 @@ export function SubscriptionSuccessDialog({
                           <CheckCircle2 className="w-4 h-4 text-sentiment-positive mt-0.5 flex-shrink-0" />
                           <span>
                             {t("trialEndsOn", {
-                              date: new Date(trialEndDate).toLocaleDateString(locale, {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              }),
+                              date: formatDate(trialEndDate, "longDate"),
                             })}
                           </span>
                         </li>

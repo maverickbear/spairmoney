@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { Link, usePathname } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { apiUrl } from "@/lib/utils/api-base-url";
-import { Moon, Sun, LogOut, MessageSquare, HelpCircle, Shield, FileText as FileTextIcon, Languages } from "lucide-react";
+import { Moon, Sun, LogOut, MessageSquare, HelpCircle, Shield, FileText as FileTextIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuthSafe } from "@/contexts/auth-context";
 import { useSubscriptionSafe } from "@/contexts/subscription-context";
@@ -34,16 +34,8 @@ interface UserMenuClientProps {
  * 
  * Architecture: Presentation Layer - only consumes state, no business logic
  */
-const LOCALE_OPTIONS: { value: "en" | "pt" | "es"; labelKey: "languageEnglish" | "languagePortuguese" | "languageSpanish" }[] = [
-  { value: "en", labelKey: "languageEnglish" },
-  { value: "pt", labelKey: "languagePortuguese" },
-  { value: "es", labelKey: "languageSpanish" },
-];
-
 export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const locale = useLocale();
   const t = useTranslations("common");
   const tNav = useTranslations("nav");
   const tAuth = useTranslations("auth");
@@ -221,26 +213,6 @@ export function UserMenuClient({ isCollapsed }: UserMenuClientProps) {
                   <span>{tNav("termsOfService")}</span>
                 </Link>
               </DropdownMenuItem>
-              {process.env.NODE_ENV !== "production" && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="flex items-center gap-2 text-muted-foreground">
-                    <Languages className="h-4 w-4" />
-                    <span>{t("language")}</span>
-                  </DropdownMenuLabel>
-                  {LOCALE_OPTIONS.map(({ value, labelKey }) => (
-                    <DropdownMenuItem key={value} asChild className="mb-1">
-                      <Link
-                        href={pathname}
-                        locale={value}
-                        className={locale === value ? "bg-muted" : undefined}
-                      >
-                        {t(labelKey)}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
               {isSuperAdmin && (
                 <>
                   <DropdownMenuSeparator />

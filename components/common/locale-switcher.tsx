@@ -31,10 +31,6 @@ interface LocaleSwitcherProps {
 }
 
 export function LocaleSwitcher({ className, variant = "full" }: LocaleSwitcherProps) {
-  if (process.env.NODE_ENV === "production") {
-    return null;
-  }
-
   const locale = useLocale();
   const pathname = usePathname();
   const t = useTranslations("common");

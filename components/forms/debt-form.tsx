@@ -24,7 +24,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatMoney } from "@/components/common/money";
-import { formatTransactionDate, parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
+import { parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import { PercentageInput } from "@/components/common/percentage-input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -113,6 +114,7 @@ export function DebtForm({
   onSuccess,
 }: DebtFormProps) {
   const t = useTranslations("debts");
+  const formatDate = useFormatDisplayDate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forecast, setForecast] = useState<{
@@ -1339,7 +1341,7 @@ export function DebtForm({
                         const start = new Date(startDate);
                         const finish = new Date(start);
                         finish.setMonth(finish.getMonth() + totalMonths);
-                        return formatTransactionDate(finish);
+                        return formatDate(finish, "shortDate");
                       } catch {
                         return '';
                       }

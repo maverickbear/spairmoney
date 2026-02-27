@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatMoney } from "@/components/common/money";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { Loader2, Check } from "lucide-react";
 
@@ -202,16 +203,16 @@ export function DynamicPricingTable({
                   {interval === "year" ? (
                     <>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-foreground">${monthlyPrice.toFixed(2)}</span>
+                        <span className="text-4xl font-bold text-foreground">{formatMoney(monthlyPrice)}</span>
                         <span className="text-muted-foreground text-lg">/month</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        ${price.toFixed(2)}/year
+                        {formatMoney(price)}/year
                       </p>
                     </>
                   ) : (
                     <>
-                      <span className="text-4xl font-bold text-foreground">${price.toFixed(2)}</span>
+                      <span className="text-4xl font-bold text-foreground">{formatMoney(price)}</span>
                       <span className="text-muted-foreground">
                         /month
                       </span>

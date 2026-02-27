@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { format } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 
 interface Invoice {
   id: string;
@@ -30,6 +30,7 @@ interface PaymentHistoryProps {
 
 export function PaymentHistory({ className, title }: PaymentHistoryProps) {
   const t = useTranslations("billing");
+  const formatDate = useFormatDisplayDate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +160,7 @@ export function PaymentHistory({ className, title }: PaymentHistoryProps) {
                 <div className="flex items-center gap-4 flex-1">
                   <div>
                     <p className="text-sm font-medium">
-                      {format(new Date(invoice.created * 1000), "MMMM d, yyyy")}
+                      {formatDate(new Date(invoice.created * 1000), "longDate")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

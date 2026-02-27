@@ -7,7 +7,8 @@ import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/src/domain/accounts/accounts.types";
 import type { Transaction } from "@/src/domain/transactions/transactions.types";
-import { startOfMonth, eachMonthOfInterval, format } from "date-fns";
+import { startOfMonth, eachMonthOfInterval } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 
 interface AccountBalancesSectionProps {
   accounts: Account[];
@@ -21,6 +22,7 @@ export function AccountBalancesSection({
   now,
 }: AccountBalancesSectionProps) {
   const t = useTranslations("reports");
+  const formatDate = useFormatDisplayDate();
   if (accounts.length === 0) {
     return null;
   }
@@ -66,7 +68,7 @@ export function AccountBalancesSection({
 
     const monthTotal = Array.from(balances.values()).reduce((sum, bal) => sum + bal, 0);
     return {
-      month: format(month, "MMM yyyy"),
+      month: formatDate(month, "monthYear"),
       balance: monthTotal,
     };
   });

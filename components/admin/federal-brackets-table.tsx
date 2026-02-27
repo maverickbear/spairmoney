@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Edit } from "lucide-react";
+import { formatMoney } from "@/components/common/money";
 import type { FederalTaxBracket } from "@/src/domain/taxes/federal-brackets.types";
 
 interface FederalBracketsTableProps {
@@ -31,14 +32,10 @@ export function FederalBracketsTable({
     return `${(rate * 100).toFixed(2)}%`;
   };
 
-  const formatCurrency = (amount: number | null): string => {
+  const formatCurrency = (amount: number | null, countryCode: string): string => {
     if (amount === null) return "No limit";
-    return new Intl.NumberFormat("en-CA", {
-      style: "currency",
-      currency: "CAD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    const currency = countryCode === "US" ? "USD" : "CAD";
+    return formatMoney(amount, { currency }).replace(/\s+/g, " ").trim();
   };
 
   if (loading) {
@@ -115,7 +112,7 @@ export function FederalBracketsTable({
                       </TableCell>
                       <TableCell>
                         <span className="font-mono">
-                          {formatCurrency(bracket.minIncome)} - {formatCurrency(bracket.maxIncome)}
+                          {formatCurrency(bracket.minIncome, countryCode)} - {formatCurrency(bracket.maxIncome, countryCode)}
                         </span>
                       </TableCell>
                       <TableCell>

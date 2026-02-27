@@ -58,7 +58,8 @@ import {
 } from "@/components/ui/simple-tabs";
 import { FixedTabsWrapper } from "@/components/common/fixed-tabs-wrapper";
 import { Input } from "@/components/ui/input";
-import { formatTransactionDate, formatShortDate, parseDateWithoutTimezone, parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
+import { parseDateWithoutTimezone, parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { formatTransferLabel } from "@/src/presentation/utils/format-transfer-label";
 import { format } from "date-fns";
 import { exportTransactionsToCSV, downloadCSV } from "@/lib/csv/export";
@@ -183,6 +184,7 @@ export default function TransactionsPage() {
   const tTx = useTranslations("transactions");
   const tToasts = useTranslations("toasts");
   const tCommon = useTranslations("common");
+  const formatDate = useFormatDisplayDate();
   const locale = useLocale();
   const perf = usePagePerformance("Transactions");
   const { toast } = useToast();
@@ -2062,10 +2064,10 @@ export default function TransactionsPage() {
                       }}
                       title={tTx("clickToEditDate")}
                     >
-                      <span>{formatTransactionDate(tx.date)}</span>
+                      <span>{formatDate(tx.date, "shortDate")}</span>
                       {authorizedDate && (
                         <span className="text-[10px] text-muted-foreground">
-                          {tTx("authDateLabel")}: {formatShortDate(authorizedDate)}
+                          {tTx("authDateLabel")}: {formatDate(authorizedDate, "short")}
                         </span>
                       )}
                     </div>
@@ -2363,7 +2365,7 @@ export default function TransactionsPage() {
                   <div className="p-6 space-y-4">
                     <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-1 text-sm">
                       <span className="text-muted-foreground">{tTx("summaryDate")}</span>
-                      <span>{formatTransactionDate(transactionSummaryModal.date)}</span>
+                      <span>{formatDate(transactionSummaryModal.date, "shortDate")}</span>
                       <span className="text-muted-foreground">{tTx("summaryType")}</span>
                       <span className="capitalize">{tTx(transactionSummaryModal.type as "expense" | "income" | "transfer")}</span>
                       <span className="text-muted-foreground">{tTx("summaryAccount")}</span>

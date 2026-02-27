@@ -9,8 +9,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ChevronRight, ArrowUp, ArrowDown, ArrowLeftRight, CalendarClock, Check, SkipForward, X } from "lucide-react";
 import Link from "next/link";
 import { formatMoney } from "@/components/common/money";
-import { differenceInCalendarDays, isToday, isTomorrow, parse, format } from "date-fns";
+import { differenceInCalendarDays, isToday, isTomorrow, parse } from "date-fns";
 import { useDashboardSnapshot } from "@/src/presentation/contexts/dashboard-snapshot-context";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { useToast } from "@/components/toast-provider";
 import { Button } from "@/components/ui/button";
 
@@ -23,6 +24,7 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
   const t = useTranslations("dashboard");
   const tTx = useTranslations("transactions");
   const tToasts = useTranslations("toasts");
+  const formatDate = useFormatDisplayDate();
   const { refresh } = useDashboardSnapshot();
   const { toast } = useToast();
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
@@ -83,13 +85,13 @@ export function RecurringWidget({ data, className }: RecurringWidgetProps) {
             </span>
           </div>
           <span className="text-xs text-muted-foreground">
-            {format(new Date(), "MMMM yyyy")}
+            {formatDate(new Date(), "monthYear")}
           </span>
         </div>
 
         <div className="space-y-4">
         {data.items.map((item) => {
-          const dueLabel = formatFriendlyDueDate(item.nextDate, t);
+          const dueLabel = formatFriendlyDueDate(item.nextDate, t, formatDate);
           const isDueTomorrow = dueLabel === t("tomorrow");
           return (
             <Link
@@ -305,11 +307,12 @@ function parseDueDate(dateStr: string): Date | null {
 
 /**
  * Format a date string (YYYY-MM-DD or "dd MMM") as user-friendly relative text.
- * Uses t for all user-visible strings.
+ * Uses t for all user-visible strings; formatDate for locale-aware fallback.
  */
 function formatFriendlyDueDate(
   dateStr: string,
-  t: (key: string, values?: { count?: number }) => string
+  t: (key: string, values?: { count?: number }) => string,
+  formatDate: (date: Date | string, preset?: "short" | "shortDate" | "monthYear") => string
 ): string {
   const due = parseDueDate(dateStr);
   if (!due) return dateStr;
@@ -325,8 +328,7 @@ function formatFriendlyDueDate(
   if (days >= 14 && days <= 20) return t("in2Weeks");
   if (days >= 21 && days <= 27) return t("in3Weeks");
   if (days >= 28 && days <= 60) return t("in1Month");
-  // Fallback: "28 Feb" (use format from date-fns - month names stay in locale via format)
-  return format(due, "d MMM");
+  return formatDate(due, "short");
 }
 
 function TransactionTypeIcon({ type }: { type: "income" | "expense" | "transfer" }) {

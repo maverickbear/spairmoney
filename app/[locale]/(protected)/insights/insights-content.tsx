@@ -12,6 +12,7 @@ import {
   CreditCard,
   Wallet,
 } from "lucide-react";
+import { formatMoney } from "@/components/common/money";
 import { calculateTotalExpenses } from "../dashboard/utils/transaction-helpers";
 import type { FinancialHealthData } from "@/src/application/shared/financial-health";
 
@@ -96,7 +97,7 @@ export function SpairScoreInsightsPage({
         type: "success",
         badge: "Savings",
         text: `You're saving ${savingsRate.toFixed(0)}% of your income. Increasing this to 22% would help you reach your goals faster.`,
-        action: `Save an additional $${additionalSavings.toFixed(0)} per month to reach the 22% savings target.`,
+        action: `Save an additional ${formatMoney(additionalSavings)} per month to reach the 22% savings target.`,
         icon: <CheckCircle2 className="h-5 w-5" />,
         category: "spending",
       });
@@ -119,12 +120,12 @@ export function SpairScoreInsightsPage({
       
       let actionText: string;
       if (monthsToReach === null || monthsToReach === 0) {
-        actionText = `You need to save $${totalNeeded.toFixed(0)} to reach 6 months coverage. Consider increasing your savings rate or reducing expenses.`;
+        actionText = `You need to save ${formatMoney(totalNeeded)} to reach 6 months coverage. Consider increasing your savings rate or reducing expenses.`;
       } else if (monthsToReach > 120) {
         // More than 10 years - not realistic
-        actionText = `You need to save $${totalNeeded.toFixed(0)} to reach 6 months coverage. At $${recommendedTransfer.toFixed(0)}/month, this would take over 10 years. Consider increasing your savings rate.`;
+        actionText = `You need to save ${formatMoney(totalNeeded)} to reach 6 months coverage. At ${formatMoney(recommendedTransfer)}/month, this would take over 10 years. Consider increasing your savings rate.`;
       } else {
-        actionText = `Set up an automatic transfer of $${recommendedTransfer.toFixed(0)}/month to reach 6 months coverage in approximately ${monthsToReach} ${monthsToReach === 1 ? 'month' : 'months'}.`;
+        actionText = `Set up an automatic transfer of ${formatMoney(recommendedTransfer)}/month to reach 6 months coverage in approximately ${monthsToReach} ${monthsToReach === 1 ? 'month' : 'months'}.`;
       }
       
       alertsList.push({
@@ -149,7 +150,7 @@ export function SpairScoreInsightsPage({
         alertsList.push({
           type: "danger",
           badge: "Overspending",
-          text: `Your spending is ${expenseChange.toFixed(0)}% higher than last month, which is $${excessAmount.toFixed(0)} more than expected.`,
+          text: `Your spending is ${expenseChange.toFixed(0)}% higher than last month, which is ${formatMoney(excessAmount)} more than expected.`,
           action: `Review your budget categories and identify areas where you can reduce spending. Consider setting spending limits for discretionary categories.`,
           icon: <AlertTriangle className="h-5 w-5" />,
           category: "spending",

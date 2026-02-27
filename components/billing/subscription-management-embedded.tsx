@@ -6,9 +6,10 @@ import { useTranslations } from "next-intl";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatMoney } from "@/components/common/money";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
-import { format } from "date-fns";
 import { CreditCard, Loader2 } from "lucide-react";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { calculateTrialDaysRemaining } from "@/components/billing/trial-widget";
 import { useToast } from "@/components/toast-provider";
 import { apiUrl } from "@/lib/utils/api-base-url";
@@ -43,6 +44,7 @@ export function SubscriptionManagementEmbedded({
   const pathname = usePathname();
   const tToasts = useTranslations("toasts");
   const t = useTranslations("billing");
+  const formatDate = useFormatDisplayDate();
   const breakpoint = useBreakpoint();
   const isMobile = !breakpoint || breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [loading, setLoading] = useState(false);
@@ -122,7 +124,7 @@ export function SubscriptionManagementEmbedded({
   const priceLabel = isYearly ? t("perYearLabel") : t("perMonthLabel");
   const isCancelled = subscription.cancelAtPeriodEnd || subscription.status === "cancelled";
   const isFullyCancelled = subscription.status === "cancelled";
-  const priceDisplay = displayPrice > 0 ? `$${displayPrice.toFixed(2)}` : t("freePlanPrice");
+  const priceDisplay = displayPrice > 0 ? formatMoney(displayPrice) : t("freePlanPrice");
   const showTrialDaysInHeader = displayPrice === 0 && subscription.trialEndDate;
   const trialEndDateStr = subscription.trialEndDate
     ? typeof subscription.trialEndDate === "string"
@@ -195,7 +197,7 @@ export function SubscriptionManagementEmbedded({
                 <div>
                   <p className="text-sm text-muted-foreground">{label}</p>
                   <p className="font-medium">
-                    {format(dateToShow, "PPP")}
+                    {formatDate(dateToShow, "longDate")}
                   </p>
                 </div>
               );
@@ -225,7 +227,7 @@ export function SubscriptionManagementEmbedded({
                     <strong>{t("subscriptionWillBeCancelledTitle")}</strong>{" "}
                     {t("subscriptionWillBeCancelledDescription", {
                       date: subscription.currentPeriodEnd
-                        ? format(new Date(subscription.currentPeriodEnd), "PPP")
+                        ? formatDate(subscription.currentPeriodEnd, "longDate")
                         : t("endOfBillingPeriod"),
                     })}
                   </>

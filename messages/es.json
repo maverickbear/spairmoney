@@ -21,6 +21,10 @@
     "languageSpanish": "Español",
     "searchCommands": "Buscar comandos...",
     "percentagePlaceholder": "0,00 %",
+    "notAvailable": "N/D",
+    "unknown": "Desconocido",
+    "uncategorized": "Sin categoría",
+    "dash": "—",
     "dateRange": {
       "allDates": "Todas las fechas",
       "today": "Hoy",
@@ -512,7 +516,15 @@
     "failedToSaveBudgetPlan": "Error al guardar el plan de presupuesto. Inténtalo de nuevo.",
     "userFallback": "Usuario",
     "expensesRuleLabel": "Regla de gastos",
-    "expensesRuleDescription": "Elige una regla de presupuesto que se adapte a tus objetivos y estilo de vida."
+    "expensesRuleDescription": "Elige una regla de presupuesto que se adapte a tus objetivos y estilo de vida.",
+    "displayCurrency": "Moneda de visualización",
+    "displayCurrencyDescription": "Todos los importes de la app se mostrarán en esta moneda (solo formato y símbolo).",
+    "displayCurrencyUpdated": "Moneda actualizada",
+    "displayCurrencyUpdatedDescription": "La moneda de visualización se ha actualizado. Los importes se mostrarán en la moneda seleccionada.",
+    "displayCurrencyUpdateFailed": "Error al actualizar la moneda",
+    "currencyAndLanguage": "Moneda e idioma",
+    "language": "Idioma",
+    "languageDescription": "Idioma de la interfaz. El formato de moneda usa el locale de la moneda de visualización seleccionada."
   },
   "pages": {
     "insights": "Insights y Acciones del Spair Score"
@@ -586,6 +598,10 @@
     "startTrackingDescription": "Obtén tu Spair Score según ingresos, gastos y ahorros",
     "seeIncomeVsExpenses": "Ver ingresos vs gastos",
     "noData": "Sin datos",
+    "spairScoreEmptySavingsRateHint": "Añade tus ingresos y gastos",
+    "spairScoreEmptyEmergencyFundHint": "Define tu total ahorrado",
+    "spairScoreEmptyDebtHint": "Registra tus deudas",
+    "spairScoreEmptySpendingHint": "Define tu presupuesto",
     "addTransactionsToSeeScore": "Añade transacciones para ver la puntuación",
     "pointsToNextTier": "Puntos al siguiente nivel",
     "toNextLevel": "Al siguiente nivel",

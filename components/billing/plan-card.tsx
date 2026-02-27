@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlanBadge } from "@/components/common/plan-badge";
+import { formatMoney } from "@/components/common/money";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -53,7 +54,7 @@ export function PlanCard({ subscription, plan, onManage }: PlanCardProps) {
     : 0;
 
   const billingText = price > 0 
-    ? `$${price.toFixed(2)} Billed Monthly`
+    ? `${formatMoney(price)} Billed Monthly`
     : "No active subscription";
 
   return (

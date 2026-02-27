@@ -4,6 +4,7 @@
  */
 
 import { HouseholdRepository } from "@/src/infrastructure/database/repositories/household.repository";
+import { CurrencyRepository, getDefaultDisplayCurrency } from "@/src/infrastructure/database/repositories/currency.repository";
 import { OnboardingMapper } from "./onboarding.mapper";
 import { OnboardingStatusExtended } from "../../domain/onboarding/onboarding.types";
 import { expectedAnnualIncomeSchema } from "../../domain/onboarding/onboarding.validations";
@@ -25,12 +26,17 @@ import { getAccountsForDashboard } from "../accounts/get-dashboard-accounts";
 import { makeProfileService } from "../profile/profile.factory";
 import { getDashboardSubscription } from "../subscriptions/get-dashboard-subscription";
 import { AppError } from "../shared/app-error";
+import {
+  displayCurrencyUpdateSchema,
+  currencyCodeSchema,
+} from "../../domain/currency/currency.validations";
 
 export class OnboardingService {
   constructor(
     private householdRepository: HouseholdRepository,
     private budgetGenerator: BudgetGenerator,
-    private categoryHelper: CategoryHelper
+    private categoryHelper: CategoryHelper,
+    private currencyRepository: CurrencyRepository
   ) {}
 
   /**
@@ -412,6 +418,123 @@ export class OnboardingService {
       country: settings?.country ?? null,
       stateOrProvince: settings?.stateOrProvince ?? null,
     };
+  }
+
+  /**
+   * Get display currency for the active household. Defaults to DEFAULT_DISPLAY_CURRENCY when not set.
+   */
+  async getDisplayCurrency(
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<string> {
+    const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+    if (!householdId) {
+      return getDefaultDisplayCurrency();
+    }
+    const settings = await this.householdRepository.getSettings(
+      householdId,
+      accessToken,
+      refreshToken
+    );
+    const code = settings?.displayCurrency?.trim().toUpperCase();
+    if (code && code.length === 3) {
+      return code;
+    }
+    return getDefaultDisplayCurrency();
+  }
+
+  /**
+   * Save display currency for the active household. Validates code is in allowed list (from currencies table or fallback).
+   */
+  async saveDisplayCurrency(
+    userId: string,
+    displayCurrency: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<void> {
+    const parsed = currencyCodeSchema.safeParse(displayCurrency.trim().toUpperCase());
+    if (!parsed.success || !parsed.data) {
+      throw new AppError("Invalid display currency (must be 3-letter ISO 4217 code)", 400);
+    }
+    const code = parsed.data;
+    const allowed = await this.currencyRepository.getAllowedCodes(accessToken, refreshToken);
+    if (!allowed.includes(code)) {
+      throw new AppError(`Display currency must be one of: ${allowed.join(", ")}`, 400);
+    }
+    const householdId = await getActiveHouseholdId(userId, accessToken, refreshToken);
+    if (!householdId) {
+      throw new AppError("Household must exist to save display currency", 400);
+    }
+    const currentSettings = await this.householdRepository.getSettings(
+      householdId,
+      accessToken,
+      refreshToken
+    );
+    const updatedSettings = OnboardingMapper.settingsToDatabase({
+      ...currentSettings,
+      displayCurrency: code,
+    });
+    await this.householdRepository.updateSettings(
+      householdId,
+      updatedSettings,
+      accessToken,
+      refreshToken
+    );
+    logger.info(`[OnboardingService] Saved display currency for user ${userId}: ${code}`);
+  }
+
+  /**
+   * Get list of supported display currency options (for dropdown). Reads from currencies table with fallback.
+   */
+  async getSupportedDisplayCurrencies(
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<{ code: string; name: string; locale: string; sortOrder: number }[]> {
+    return this.currencyRepository.listActive(accessToken, refreshToken);
+  }
+
+  /**
+   * Get household settings for the active household (e.g. for GET /api/v2/household/settings).
+   * Optionally includes supported currencies for the dropdown.
+   */
+  async getHouseholdSettings(
+    userId: string,
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<{
+    displayCurrency: string;
+    displayCurrencyLocale?: string;
+    supportedCurrencies?: { code: string; name: string; locale: string; sortOrder: number }[];
+  }> {
+    const [displayCurrency, supportedCurrencies] = await Promise.all([
+      this.getDisplayCurrency(userId, accessToken, refreshToken),
+      this.getSupportedDisplayCurrencies(accessToken, refreshToken),
+    ]);
+    const displayCurrencyLocale = supportedCurrencies?.find(
+      (c) => c.code === displayCurrency
+    )?.locale;
+    return { displayCurrency, displayCurrencyLocale, supportedCurrencies };
+  }
+
+  /**
+   * Update household settings (partial). Validates and merges with current settings.
+   */
+  async updateHouseholdSettings(
+    userId: string,
+    patch: { displayCurrency?: string | null },
+    accessToken?: string,
+    refreshToken?: string
+  ): Promise<{ displayCurrency: string }> {
+    const parsed = displayCurrencyUpdateSchema.safeParse(patch);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.errors.map((e) => e.message).join("; ") || "Invalid input", 400);
+    }
+    const { displayCurrency } = parsed.data;
+    if (displayCurrency != null && displayCurrency !== "") {
+      await this.saveDisplayCurrency(userId, displayCurrency, accessToken, refreshToken);
+    }
+    return this.getHouseholdSettings(userId, accessToken, refreshToken);
   }
 
   /**

@@ -187,7 +187,7 @@ function calculateCashFlowStandalone(
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
     return {
-      month: format(month, "MMM yyyy"),
+      month: format(month, "yyyy-MM"),
       income,
       expenses,
       net: income - expenses,

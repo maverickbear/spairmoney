@@ -1,113 +1,179 @@
 /**
- * Formats a monetary amount as currency (CAD)
- * Handles edge cases: undefined, null, NaN, and ensures 0 displays as $0.00
- * 
- * @param amount - The amount to format (can be number, string, null, or undefined)
- * @returns Formatted currency string (e.g., "$0.00", "$1,234.56")
+ * Formats monetary amounts using the app's display currency (from household settings).
+ * Handles edge cases: undefined, null, NaN, and ensures 0 displays correctly.
+ * Use optional currency override for specific cases (e.g. invoice in original currency).
  */
-export function formatMoney(amount: number | string | null | undefined): string {
-  // Handle null, undefined, or empty string
-  if (amount == null || amount === '') {
-    return new Intl.NumberFormat("en-CA", {
-      style: "currency",
-      currency: "CAD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(0);
+
+import {
+  getDisplayCurrency,
+  getDisplayCurrencyLocale,
+} from "@/src/presentation/stores/currency-store";
+
+/** Fallback for override currency or SSR when store locale is not set. */
+const FALLBACK_LOCALE: Record<string, string> = {
+  CAD: "en-CA",
+  USD: "en-US",
+  BRL: "pt-BR",
+};
+
+function getLocaleForCurrency(currencyCode: string): string {
+  const code = currencyCode.toUpperCase();
+  if (code === getDisplayCurrency()) {
+    return getDisplayCurrencyLocale();
   }
+  return FALLBACK_LOCALE[code] ?? "en";
+}
 
-  // Convert to number if it's a string
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
-
-  // Handle NaN or invalid numbers
-  if (isNaN(numAmount) || !isFinite(numAmount)) {
-    return new Intl.NumberFormat("en-CA", {
-      style: "currency",
-      currency: "CAD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(0);
-  }
-
-  // Format the valid number
-  return new Intl.NumberFormat("en-CA", {
+/**
+ * Returns the currency symbol for the given (or display) currency (e.g. "$", "R$", "€").
+ * Use for inputs or compact labels where full formatMoney is not needed.
+ */
+export function getCurrencySymbol(currency?: string): string {
+  const code = (currency ?? getDisplayCurrency()).toUpperCase();
+  const locale = getLocaleForCurrency(code);
+  const formatted = new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "CAD",
+    currency: code,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(0);
+  const raw = formatted.replace(/\d/g, "").replace(/\s/g, " ").trim();
+  return raw ? raw.replace(/\s+$/, "") : code;
+}
+
+export interface FormatMoneyOptions {
+  /** Override display currency (e.g. for invoices in original currency). Default: household setting. */
+  currency?: string;
+}
+
+/**
+ * Formats a monetary amount as currency using the app's display currency (or override).
+ *
+ * @param amount - The amount to format (can be number, string, null, or undefined)
+ * @param options - Optional currency override
+ * @returns Formatted currency string (e.g. "$0.00", "$1,234.56")
+ */
+export function formatMoney(
+  amount: number | string | null | undefined,
+  options?: FormatMoneyOptions
+): string {
+  const currency = (options?.currency ?? getDisplayCurrency()).toUpperCase();
+  const locale = getLocaleForCurrency(currency);
+
+  if (amount == null || amount === "") {
+    const zeroFormatted = new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(0);
+    return zeroFormatted.replace(/^([\-]?[^\d,.\s]*)\s*(\d)/, "$1 $2").replace(/\s{2,}/g, " ");
+  }
+
+  const numAmount = typeof amount === "string" ? parseFloat(amount) : Number(amount);
+
+  if (isNaN(numAmount) || !isFinite(numAmount)) {
+    const zeroFormatted = new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(0);
+    return zeroFormatted.replace(/^([\-]?[^\d,.\s]*)\s*(\d)/, "$1 $2").replace(/\s{2,}/g, " ");
+  }
+
+  const formatted = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(numAmount);
+  // Ensure exactly one space between currency symbol and first digit
+  return formatted.replace(/^([\-]?[^\d,.\s]*)\s*(\d)/, "$1 $2").replace(/\s{2,}/g, " ");
 }
 
-export function Money({ amount }: { amount: number }) {
-  return <span>{formatMoney(amount)}</span>;
+export function Money({
+  amount,
+  currency,
+}: {
+  amount: number;
+  currency?: string;
+}) {
+  return <span>{formatMoney(amount, currency ? { currency } : undefined)}</span>;
+}
+
+export interface FormatMoneyCompactOptions {
+  showDecimals?: boolean;
+  threshold?: number;
+  /** Override display currency. */
+  currency?: string;
 }
 
 /**
  * Formats a monetary amount in compact notation (1K, 1M, etc.)
- * Useful for displaying large numbers in a more readable format
- * 
- * @param amount - The amount to format (can be number, string, null, or undefined)
+ *
+ * @param amount - The amount to format
  * @param options - Optional configuration
- * @returns Formatted currency string (e.g., "$1.2K", "$1.5M", "$2.3B")
+ * @returns Formatted currency string (e.g. "$1.2K", "$1.5M")
  */
 export function formatMoneyCompact(
   amount: number | string | null | undefined,
-  options?: {
-    showDecimals?: boolean; // Show decimals for compact format (default: true)
-    threshold?: number; // Only use compact format above this value (default: 1000)
-  }
+  options?: FormatMoneyCompactOptions
 ): string {
-  const { showDecimals = true, threshold = 1000 } = options || {};
+  const { showDecimals = true, threshold = 1000, currency } = options ?? {};
 
-  // Handle null, undefined, or empty string
-  if (amount == null || amount === '') {
-    return formatMoney(0);
+  if (amount == null || amount === "") {
+    return formatMoney(0, currency ? { currency } : undefined);
   }
 
-  // Convert to number if it's a string
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+  const numAmount = typeof amount === "string" ? parseFloat(amount) : Number(amount);
 
-  // Handle NaN or invalid numbers
   if (isNaN(numAmount) || !isFinite(numAmount)) {
-    return formatMoney(0);
+    return formatMoney(0, currency ? { currency } : undefined);
   }
 
   const absAmount = Math.abs(numAmount);
-  const sign = numAmount < 0 ? '-' : '';
+  const sign = numAmount < 0 ? "-" : "";
 
-  // Only use compact format if above threshold
   if (absAmount < threshold) {
-    return formatMoney(numAmount);
+    return formatMoney(numAmount, currency ? { currency } : undefined);
   }
 
-  // Format in compact notation
   let compactValue: string;
   let suffix: string;
 
   if (absAmount >= 1_000_000_000) {
-    // Billions
     compactValue = (absAmount / 1_000_000_000).toFixed(showDecimals ? 1 : 0);
-    suffix = 'B';
+    suffix = "B";
   } else if (absAmount >= 1_000_000) {
-    // Millions
     compactValue = (absAmount / 1_000_000).toFixed(showDecimals ? 1 : 0);
-    suffix = 'M';
+    suffix = "M";
   } else if (absAmount >= 1_000) {
-    // Thousands
     compactValue = (absAmount / 1_000).toFixed(showDecimals ? 1 : 0);
-    suffix = 'K';
+    suffix = "K";
   } else {
-    return formatMoney(numAmount);
+    return formatMoney(numAmount, currency ? { currency } : undefined);
   }
 
-  // Remove trailing .0 if not showing decimals
   if (!showDecimals) {
-    compactValue = compactValue.replace(/\.0$/, '');
+    compactValue = compactValue.replace(/\.0$/, "");
   } else {
-    // Remove trailing zeros after decimal point
-    compactValue = compactValue.replace(/\.?0+$/, '');
+    compactValue = compactValue.replace(/\.?0+$/, "");
   }
 
-  return `${sign}$${compactValue}${suffix}`;
-}
+  const curr = (currency ?? getDisplayCurrency()).toUpperCase();
+  const symbol =
+    curr === "USD" || curr === "CAD"
+      ? "$"
+      : new Intl.NumberFormat(getLocaleForCurrency(curr), {
+          style: "currency",
+          currency: curr,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        })
+          .format(0)
+          .replace(/\d/g, "")
+          .trim() || curr + " ";
 
+  return `${sign}${symbol.replace(/\s+$/, "")} ${compactValue}${suffix}`;
+}

@@ -15,6 +15,7 @@ import {
   Search,
   FileCode,
   BookOpen,
+  CircleDollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminUserMenu } from "@/components/admin/admin-user-menu";
@@ -30,6 +31,7 @@ const adminNavItems = [
   { href: "/admin/plans", label: "Plans", icon: CreditCard },
   { href: "/admin/subscription-services", label: "Subscription Services", icon: Settings2 },
   { href: "/admin/tax-rates", label: "Tax Rates", icon: Calculator },
+  { href: "/admin/currencies", label: "Currencies", icon: CircleDollarSign },
   { href: "/admin/seo", label: "SEO Settings", icon: Search },
   { href: "/admin/studio", label: "Sanity Studio", icon: FileCode },
   { href: "/admin/docs", label: "Docs", icon: BookOpen },

@@ -21,6 +21,10 @@
     "languageSpanish": "Spanish",
     "searchCommands": "Search commands...",
     "percentagePlaceholder": "0.00 %",
+    "notAvailable": "N/A",
+    "unknown": "Unknown",
+    "uncategorized": "Uncategorized",
+    "dash": "—",
     "dateRange": {
       "allDates": "All Dates",
       "today": "Today",
@@ -593,7 +597,15 @@
     "failedToSaveBudgetPlan": "Failed to save budget plan. Please try again.",
     "userFallback": "User",
     "expensesRuleLabel": "Expenses Rule",
-    "expensesRuleDescription": "Choose a budget rule that best fits your financial goals and lifestyle."
+    "expensesRuleDescription": "Choose a budget rule that best fits your financial goals and lifestyle.",
+    "displayCurrency": "Display Currency",
+    "displayCurrencyDescription": "All amounts in the app will be shown in this currency (format and symbol only).",
+    "displayCurrencyUpdated": "Currency updated",
+    "displayCurrencyUpdatedDescription": "Display currency has been updated. Amounts will now show in the selected currency.",
+    "displayCurrencyUpdateFailed": "Failed to update currency",
+    "currencyAndLanguage": "Currency & language",
+    "language": "Language",
+    "languageDescription": "App interface language. Currency formatting uses the locale of the selected display currency."
   },
   "pages": {
     "insights": "Spair Score Insights & Actions"
@@ -667,6 +679,10 @@
     "startTrackingDescription": "Get your Spair Score based on income, expenses, and savings",
     "seeIncomeVsExpenses": "See income vs expenses",
     "noData": "No data",
+    "spairScoreEmptySavingsRateHint": "Add your income and expenses",
+    "spairScoreEmptyEmergencyFundHint": "Set your total saved",
+    "spairScoreEmptyDebtHint": "Register your debts",
+    "spairScoreEmptySpendingHint": "Set your budget",
     "addTransactionsToSeeScore": "Add transactions to see score",
     "pointsToNextTier": "Points to next tier",
     "toNextLevel": "To next level",

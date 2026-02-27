@@ -29,22 +29,22 @@ export function PageHeader({ title, description, children, className }: PageHead
   }, []);
 
   return (
-    <div
-      id="page-header"
-      className={cn(
-        "z-30 h-16 min-h-16 bg-card border-b border-border",
-        "hidden lg:flex lg:items-center",
-        "box-border overflow-hidden",
-        className
-      )}
-      style={{ "--header-height": `${PAGE_HEADER_HEIGHT_PX}px`, "--page-header-height": `${PAGE_HEADER_HEIGHT_PX}px` } as React.CSSProperties}
-    >
-      <div className="w-full px-4 lg:px-8 h-full flex items-center min-h-0">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 w-full min-h-0">
+    <>
+      <div
+        id="page-header"
+        className={cn(
+          "z-30 fixed top-0 h-16 min-h-16 bg-card border-b border-border",
+          "hidden lg:flex lg:items-center",
+          "box-border overflow-hidden",
+          "left-[var(--sidebar-width,0)] right-0",
+          className
+        )}
+        style={{ "--header-height": `${PAGE_HEADER_HEIGHT_PX}px`, "--page-header-height": `${PAGE_HEADER_HEIGHT_PX}px` } as React.CSSProperties}
+      >
+        <div className="w-full px-4 lg:px-8 h-full flex items-center min-h-0">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 w-full min-h-0">
             <div className="flex flex-col gap-1">
-              {/* Title uses content.primary (text-foreground) to emphasise primary content */}
               <h1 className="text-lg md:text-xl font-semibold text-foreground">{title}</h1>
-              {/* Description uses content.secondary (text-muted-foreground) for body text */}
               {description && (
                 <p className="text-sm md:text-base text-muted-foreground">{description}</p>
               )}
@@ -60,7 +60,10 @@ export function PageHeader({ title, description, children, className }: PageHead
             </div>
           </div>
         </div>
-    </div>
+      </div>
+      {/* Spacer so content is not hidden under fixed header */}
+      <div className="h-16 shrink-0 hidden lg:block" aria-hidden />
+    </>
   );
 }
 

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { PlanBadge } from "@/components/common/plan-badge";
 import { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
-import { format } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { useState, useEffect } from "react";
 import { calculateTrialDaysRemaining } from "@/components/billing/trial-widget";
 import {
@@ -31,6 +31,7 @@ interface SubscriptionCardProps {
 export function SubscriptionCard({ subscription, plan, interval, onSubscriptionUpdated }: SubscriptionCardProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const formatDate = useFormatDisplayDate();
   const [loading, setLoading] = useState(false);
   const [householdInfo, setHouseholdInfo] = useState<UserHouseholdInfo | null>(null);
 
@@ -132,7 +133,7 @@ export function SubscriptionCard({ subscription, plan, interval, onSubscriptionU
               <p className="text-sm text-muted-foreground">
                 {isTrialPeriod ? "Your trial period ends on" : "Current period ends"}
               </p>
-              <p className="font-medium">{format(dateToShow, "PPP")}</p>
+              <p className="font-medium">{formatDate(dateToShow, "longDate")}</p>
             </div>
           );
         })()}

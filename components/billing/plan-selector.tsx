@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatMoney } from "@/components/common/money";
 import { Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 import { Check } from "lucide-react";
 import { useState } from "react";
@@ -182,13 +183,13 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                             </Badge>
                             <div>
                               <span className="text-muted-foreground text-xs line-through mr-1">
-                                ${originalYearlyPrice.toFixed(2)}
+                                {formatMoney(originalYearlyPrice)}
                               </span>
                             </div>
                           </div>
                         )}
                         <span className="text-2xl font-bold">
-                          {price === 0 ? "Free" : `$${price.toFixed(2)}`}
+                          {price === 0 ? "Free" : formatMoney(price)}
                         </span>
                         {price > 0 && (
                           <span className="text-muted-foreground text-xs block">
@@ -466,7 +467,7 @@ export function PlanSelector({ plans, currentPlanId, currentInterval, onSelectPl
                   <div className="mt-4">
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-bold">
-                        {price === 0 ? "Free" : `$${price.toFixed(2)}`}
+                        {price === 0 ? "Free" : formatMoney(price)}
                       </span>
                       {price > 0 && (
                         <span className="text-muted-foreground text-sm">

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { Target, Home, Car, Plane, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/components/common/money";
 import type { GoalsProgressWidgetData } from "@/src/domain/dashboard/types";
 import { WidgetCard } from "./widget-card";
 import { WidgetEmptyState } from "./widget-empty-state";
@@ -73,9 +74,9 @@ export function GoalsProgressWidget({ data, className }: GoalsProgressWidgetProp
                    <div className="flex items-center gap-2">
                       <div className="text-right">
                          <span className="text-sm font-semibold">
-                           ${goal.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                           {formatMoney(goal.currentBalance)}
                          </span>
-                         <span className="text-slate-400 text-sm"> / ${goal.targetAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                         <span className="text-slate-400 text-sm"> / {formatMoney(goal.targetAmount)}</span>
                       </div>
                    </div>
                 </Link>

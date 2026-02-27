@@ -72,6 +72,10 @@ export class OnboardingMapper {
         settings.onboardingHouseholdType === "shared"
           ? settings.onboardingHouseholdType
           : undefined,
+      displayCurrency:
+        typeof settings.displayCurrency === "string" && settings.displayCurrency.length === 3
+          ? (settings.displayCurrency as string).toUpperCase()
+          : undefined,
     };
   }
 
@@ -113,6 +117,9 @@ export class OnboardingMapper {
     if (settings.onboardingHouseholdType !== undefined) {
       result.onboardingHouseholdType = settings.onboardingHouseholdType;
     }
+    if (settings.displayCurrency !== undefined) {
+      result.displayCurrency = settings.displayCurrency;
+    }
 
     Object.keys(settings).forEach((key) => {
       if (
@@ -125,6 +132,7 @@ export class OnboardingMapper {
           "onboardingCompletedAt",
           "onboardingGoals",
           "onboardingHouseholdType",
+          "displayCurrency",
         ].includes(key)
       ) {
         result[key] = settings[key];

@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { getCategoryColor } from "@/lib/utils/category-colors";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { subDays, format } from "date-fns";
+import { subDays } from "date-fns";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 
 // Non-clickable Portfolio Performance Chart for promotions
 function NonClickablePortfolioPerformanceWidget() {
+  const formatDate = useFormatDisplayDate();
   // Generate mock historical data for last 5 years (monthly data points)
   const mockData = [];
   const today = new Date();
@@ -40,9 +42,9 @@ function NonClickablePortfolioPerformanceWidget() {
     // Format date for display (show year for older dates, month for recent)
     let dateLabel: string;
     if (i > 12) {
-      dateLabel = format(date, "MMM yyyy");
+      dateLabel = formatDate(date, "monthYear");
     } else {
-      dateLabel = format(date, "MMM");
+      dateLabel = formatDate(date, "short");
     }
     
     mockData.push({
@@ -65,7 +67,7 @@ function NonClickablePortfolioPerformanceWidget() {
       return (
         <div className="rounded-lg border bg-background p-3 shadow-sm">
           <div className="font-semibold text-sm">
-            {data.dateISO ? format(new Date(data.dateISO), "MMM d, yyyy") : data.date}
+            {data.dateISO ? formatDate(data.dateISO, "shortDate") : data.date}
           </div>
           <div className="text-sm text-muted-foreground">
             Value: {formatMoney(data.value)}

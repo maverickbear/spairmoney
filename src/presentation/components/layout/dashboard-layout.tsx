@@ -36,9 +36,11 @@ export function DashboardLayout({
       {/* Main Content Area - scrolls with the page (header + content) */}
       <div
         className={cn(
-          "min-h-screen duration-300 transition-[margin-left]",
+          "min-h-screen duration-300 transition-[margin-left] [--sidebar-width:0]",
           "lg:ml-64",
-          isSidebarCollapsed && "lg:!ml-16"
+          isSidebarCollapsed && "lg:!ml-16",
+          !isSidebarCollapsed && "lg:[--sidebar-width:16rem]",
+          isSidebarCollapsed && "lg:[--sidebar-width:4rem]"
         )}
         style={{
           paddingBottom: "var(--bottom-nav-height, 0px)",

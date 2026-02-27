@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { apiUrl } from "@/lib/utils/api-base-url";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { Button } from "@/components/ui/button";
 import { FeatureGuard } from "@/components/common/feature-guard";
 import {
@@ -52,6 +53,8 @@ export interface HouseholdModuleProps {
 
 export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange }: HouseholdModuleProps = {}) {
   const t = useTranslations("members");
+  const tCommon = useTranslations("common");
+  const formatDate = useFormatDisplayDate();
   const { openDialog, ConfirmDialog } = useConfirmDialog();
   const { checkWriteAccess, canWrite } = useWriteGuard();
   const [members, setMembers] = useState<HouseholdMember[]>([]);
@@ -283,7 +286,7 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                                   {t("active")}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground">
-                                  {t("since")} {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}
+                                  {t("since")} {member.createdAt ? formatDate(member.createdAt, "shortDate") : tCommon("notAvailable")}
                                 </span>
                               </>
                             ) : (
@@ -291,9 +294,9 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                                 <InvitationStatus status={member.status} />
                                 <span className="text-xs text-muted-foreground">
                                   {member.status === "pending"
-                                    ? `${t("invited")} ${member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}`
+                                    ? `${t("invited")} ${member.invitedAt ? formatDate(member.invitedAt, "shortDate") : tCommon("notAvailable")}`
                                     : member.acceptedAt
-                                      ? `${t("joined")} ${new Date(member.acceptedAt).toLocaleDateString()}`
+                                      ? `${t("joined")} ${formatDate(member.acceptedAt, "shortDate")}`
                                       : "—"}
                                 </span>
                               </>
@@ -421,11 +424,11 @@ export function HouseholdModule({ externalInviteOpen, onExternalInviteOpenChange
                       </TableCell>
                       <TableCell className="text-xs md:text-sm text-muted-foreground">
                         {member.isOwner ? (
-                          <span>{t("since")} {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "N/A"}</span>
+                          <span>{t("since")} {member.createdAt ? formatDate(member.createdAt, "shortDate") : tCommon("notAvailable")}</span>
                         ) : member.status === "pending" ? (
-                          <span>{t("invited")} {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString() : "N/A"}</span>
+                          <span>{t("invited")} {member.invitedAt ? formatDate(member.invitedAt, "shortDate") : tCommon("notAvailable")}</span>
                         ) : member.acceptedAt ? (
-                          <span>{t("joined")} {new Date(member.acceptedAt).toLocaleDateString()}</span>
+                          <span>{t("joined")} {formatDate(member.acceptedAt, "shortDate")}</span>
                         ) : (
                           <span>-</span>
                         )}

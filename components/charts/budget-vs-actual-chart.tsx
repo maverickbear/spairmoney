@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ChartCard } from "./chart-card";
-import { formatMoney } from "@/components/common/money";
+import { formatMoney, formatMoneyCompact } from "@/components/common/money";
 import { sentiment } from "@/lib/design-system/colors";
 import type { BudgetWithRelations } from "@/src/domain/budgets/budgets.types";
 
@@ -92,10 +92,7 @@ export function BudgetVsActualChart({ budgets }: BudgetVsActualChartProps) {
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
               axisLine={{ stroke: "hsl(var(--border))" }}
               tickLine={{ stroke: "hsl(var(--border))" }}
-              tickFormatter={(value) => {
-                if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(0)}k`;
-                return `$${value}`;
-              }}
+              tickFormatter={(value) => formatMoneyCompact(Number(value), { showDecimals: false, threshold: 1000 })}
             />
             <YAxis
               type="category"

@@ -1010,7 +1010,7 @@ export class DashboardService {
         totalBudgeted,
         totalActual,
         totalDifference,
-        period: format(period, "MMMM yyyy"),
+        period: format(period, "yyyy-MM"),
         actions,
         insights,
       };
@@ -1142,8 +1142,8 @@ export class DashboardService {
       return {
         categories,
         totalSpending,
-        period: format(startDate, "MMMM yyyy"),
-        comparisonPeriod: format(previousStartDate, "MMMM yyyy"),
+        period: format(startDate, "yyyy-MM"),
+        comparisonPeriod: format(previousStartDate, "yyyy-MM"),
         actions,
         insights,
       };
@@ -1762,7 +1762,7 @@ export class DashboardService {
            cumulative += dailyAmount;
            
            data.push({
-             date: format(checkDate, 'd MMM'),
+             date: format(checkDate, "yyyy-MM-dd"),
              amount: dailyAmount,
              cumulative
            });
@@ -1852,7 +1852,7 @@ export class DashboardService {
         id: t.id,
         name: t.description || 'Unknown',
         amount: Math.abs(getTransactionAmount(t.amount) || 0),
-        date: format(new Date(t.date), 'dd MMM'),
+        date: typeof t.date === "string" ? t.date : format(new Date(t.date), "yyyy-MM-dd"),
         category: t.category?.name || 'Uncategorized',
         type: t.type as 'income' | 'expense' | 'transfer',
         categoryColor: getCategoryColor(t.category?.name),
@@ -2026,7 +2026,7 @@ export class DashboardService {
               name: s.serviceName,
               amount: s.amount,
               frequency, 
-              nextDate: format(new Date(s.firstBillingDate), 'dd MMM'), // Approximate
+              nextDate: format(new Date(s.firstBillingDate), "yyyy-MM-dd"), // Approximate; UI formats with locale
               logo: s.serviceLogo
             };
          });

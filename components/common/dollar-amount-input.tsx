@@ -3,6 +3,8 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { getCurrencySymbol } from "@/components/common/money";
+import { getDisplayCurrencyLocale } from "@/src/presentation/stores/currency-store";
 
 export interface DollarAmountInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "size"> {
@@ -13,10 +15,9 @@ export interface DollarAmountInputProps
 }
 
 /**
- * Formats a number to display with commas and 2 decimal places
- * Examples: 1.00, 10.00, 100.00, 1,000.00, 100,000.00, 1,000,000.00
+ * Formats a number to display with locale-appropriate grouping and 2 decimal places.
  */
-function formatDisplayValue(value: number | string | undefined | null): string {
+function formatDisplayValue(value: number | string | undefined | null, locale: string): string {
   if (value === null || value === undefined || value === "") {
     return "";
   }
@@ -27,45 +28,39 @@ function formatDisplayValue(value: number | string | undefined | null): string {
     return "";
   }
 
-  // Format with commas for thousands and 2 decimal places (including 0.00)
-  return numValue.toLocaleString("en-US", {
+  return numValue.toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }
 
 /**
- * Formats only the integer part with commas (for real-time formatting while typing)
- * Examples: 1 → "1", 10 → "10", 100 → "100", 1000 → "1,000", 10000 → "10,000"
+ * Formats only the integer part with locale-appropriate grouping (for real-time formatting while typing).
  */
-function formatIntegerPart(value: string): string {
+function formatIntegerPart(value: string, locale: string): string {
   if (!value || value === "" || value === ".") {
     return "";
   }
 
-  // Handle negative sign
   const isNegative = value.startsWith("-");
   const valueWithoutSign = isNegative ? value.slice(1) : value;
 
-  // Split by decimal point
   const parts = valueWithoutSign.split(".");
   const integerPart = parts[0] || "";
   const decimalPart = parts[1] || "";
 
   if (integerPart === "" || integerPart === "-") {
-    return value; // Return as is if no integer part
+    return value;
   }
 
-  // Format integer part with commas
   const integerNum = parseInt(integerPart, 10);
   if (isNaN(integerNum)) {
     return value;
   }
 
-  const formattedInteger = integerNum.toLocaleString("en-US");
+  const formattedInteger = integerNum.toLocaleString(locale);
   const sign = isNegative ? "-" : "";
 
-  // Reconstruct with decimal part if present
   if (decimalPart !== "") {
     return `${sign}${formattedInteger}.${decimalPart}`;
   }
@@ -74,12 +69,12 @@ function formatIntegerPart(value: string): string {
 }
 
 /**
- * Parses a formatted string back to a number
- * Removes $, commas and whitespace, then parses the number
+ * Parses a formatted string back to a number.
+ * Strips the currency prefix, then removes locale grouping (commas or periods) and parses.
  */
-function parseInputValue(value: string): number | undefined {
-  // Remove $, commas and whitespace
-  const cleaned = value.replace(/\$/g, "").replace(/,/g, "").trim();
+function parseInputValue(value: string, prefix: string): number | undefined {
+  const withoutPrefix = value.startsWith(prefix) ? value.slice(prefix.length) : value;
+  const cleaned = withoutPrefix.replace(/,/g, "").replace(/\s/g, "").trim();
 
   if (cleaned === "" || cleaned === ".") {
     return undefined;
@@ -90,17 +85,23 @@ function parseInputValue(value: string): number | undefined {
 }
 
 /**
- * Dollar amount input component that only accepts numbers
- * and formats them with $ prefix, commas and 2 decimal places
+ * Amount input that uses the app's display currency symbol and locale for formatting.
  */
 export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmountInputProps>(
-  ({ value, onChange, onBlur, className, placeholder = "$ 0.00", ...props }, ref) => {
+  ({ value, onChange, onBlur, className, placeholder, ...props }, ref) => {
+    const locale = getDisplayCurrencyLocale();
+    const prefix = React.useMemo(() => getCurrencySymbol().replace(/\s+$/, "") + " ", []);
+    const prefixLen = prefix.length;
+
+    const defaultPlaceholder = `${prefix}0.00`;
+    const resolvedPlaceholder = placeholder ?? defaultPlaceholder;
+
     const [displayValue, setDisplayValue] = React.useState<string>(() => {
-      const formatted = formatDisplayValue(value);
+      const formatted = formatDisplayValue(value, locale);
       if (formatted !== "") {
-        return `$ ${formatted}`;
+        return `${prefix}${formatted}`;
       } else if (value === 0 || value === "0") {
-        return "$ 0.00";
+        return `${prefix}${formatDisplayValue(0, locale)}`;
       }
       return "";
     });
@@ -110,28 +111,24 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
     // Update display value when value prop changes (only when not focused)
     React.useEffect(() => {
       if (!isFocused) {
-        const formatted = formatDisplayValue(value);
+        const formatted = formatDisplayValue(value, locale);
         if (formatted !== "") {
-          // formatted can be "0.00" when value is 0, which is a valid string
-          setDisplayValue(`$ ${formatted}`);
+          setDisplayValue(`${prefix}${formatted}`);
         } else if (value === 0 || value === "0") {
-          // Explicitly handle 0 value
-          setDisplayValue("$ 0.00");
+          setDisplayValue(`${prefix}${formatDisplayValue(0, locale)}`);
         } else {
-          // Only set to empty if not focused, to allow placeholder to show
           setDisplayValue("");
         }
       }
-    }, [value, isFocused]);
+    }, [value, isFocused, locale, prefix]);
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
-      // If empty, add "$ " prefix when focused
       if (!displayValue || displayValue === "" || displayValue.trim() === "") {
-        setDisplayValue("$ ");
+        setDisplayValue(prefix);
         setTimeout(() => {
           if (inputRef.current) {
-            inputRef.current.setSelectionRange(2, 2);
+            inputRef.current.setSelectionRange(prefixLen, prefixLen);
           }
         }, 0);
       }
@@ -142,56 +139,51 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
       const inputValue = e.target.value;
       const cursorPosition = e.target.selectionStart || 0;
 
-      // Always ensure "$ " prefix is present when user is typing
-      if (!inputValue.startsWith("$ ")) {
-        // If user tries to delete "$ ", restore it
-        if (inputValue === "" || inputValue === "$" || inputValue.trim() === "") {
-          setDisplayValue("$ ");
+      // Always ensure currency prefix is present when user is typing
+      if (!inputValue.startsWith(prefix)) {
+        if (inputValue === "" || inputValue.trim() === "") {
+          setDisplayValue(prefix);
           onChange?.(undefined);
-          // Reset cursor to after "$ "
           setTimeout(() => {
             if (inputRef.current) {
-              inputRef.current.setSelectionRange(2, 2);
+              inputRef.current.setSelectionRange(prefixLen, prefixLen);
             }
           }, 0);
           return;
         }
-        // If "$ " is missing, add it back
-        const cleaned = inputValue.replace(/\$/g, "").replace(/,/g, "").trim();
+        const cleaned = inputValue.replace(/,/g, "").trim();
         if (cleaned === "" || cleaned === ".") {
-          setDisplayValue("$ ");
+          setDisplayValue(prefix);
           onChange?.(undefined);
           setTimeout(() => {
             if (inputRef.current) {
-              inputRef.current.setSelectionRange(2, 2);
+              inputRef.current.setSelectionRange(prefixLen, prefixLen);
             }
           }, 0);
           return;
         }
-        // Reconstruct with "$ " prefix
         const parsed = parseFloat(cleaned);
         if (!isNaN(parsed)) {
-          const formatted = formatDisplayValue(parsed);
-          setDisplayValue(`$ ${formatted}`);
+          const formatted = formatDisplayValue(parsed, locale);
+          setDisplayValue(`${prefix}${formatted}`);
           onChange?.(parsed);
           setTimeout(() => {
             if (inputRef.current) {
-              inputRef.current.setSelectionRange(`$ ${formatted}`.length, `$ ${formatted}`.length);
+              inputRef.current.setSelectionRange((prefix + formatted).length, (prefix + formatted).length);
             }
           }, 0);
         } else {
-          setDisplayValue(`$ ${cleaned}`);
+          setDisplayValue(`${prefix}${cleaned}`);
           setTimeout(() => {
             if (inputRef.current) {
-              inputRef.current.setSelectionRange(`$ ${cleaned}`.length, `$ ${cleaned}`.length);
+              inputRef.current.setSelectionRange((prefix + cleaned).length, (prefix + cleaned).length);
             }
           }, 0);
         }
         return;
       }
 
-      // Remove "$ " prefix for validation
-      const valueWithoutPrefix = inputValue.slice(2); // Remove "$ "
+      const valueWithoutPrefix = inputValue.slice(prefixLen);
       const cleaned = valueWithoutPrefix.replace(/,/g, "").trim();
       
       // Allow digits, single decimal point, and optional negative sign
@@ -202,7 +194,7 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
       }
 
       // Parse the cleaned value
-      const parsed = parseInputValue(inputValue);
+      const parsed = parseInputValue(inputValue, prefix);
       
       // Explicitly handle "0" case - parseFloat("0") returns 0, which is valid
       const isZero = cleaned === "0" || cleaned === "-0" || parsed === 0;
@@ -217,22 +209,19 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
         
         // Check if user just typed '.' (has decimal point but no decimal digits yet)
         if (hasDecimal && decimalPart === "" && integerPart !== "" && integerPart !== "-") {
-          // Add '.00' automatically
           const valueWithCents = `${integerPart}.00`;
-          const formatted = formatIntegerPart(valueWithCents);
-          setDisplayValue(`$ ${formatted}`);
+          const formatted = formatIntegerPart(valueWithCents, locale);
+          setDisplayValue(`${prefix}${formatted}`);
           
-          // Position cursor after the decimal point (before the first 0)
           setTimeout(() => {
             if (inputRef.current) {
               const decimalPos = formatted.indexOf(".");
               if (decimalPos !== -1) {
-                inputRef.current.setSelectionRange(decimalPos + 3, decimalPos + 3); // +3 for "$ " and position after "."
+                inputRef.current.setSelectionRange(prefixLen + decimalPos + 3, prefixLen + decimalPos + 3);
               }
             }
           }, 0);
           
-          // Parse and send the numeric value
           const parsedWithCents = parseFloat(valueWithCents);
           if (!isNaN(parsedWithCents) && isFinite(parsedWithCents)) {
             onChange?.(parsedWithCents);
@@ -240,23 +229,20 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
           return;
         }
         
-        // If user has decimal part, format it properly (limit to 2 decimal places)
-        // This replaces the '.00' with whatever the user types
         if (hasDecimal && decimalPart !== "") {
-          // Limit decimal part to 2 digits - use what user typed
           const limitedDecimalPart = decimalPart.slice(0, 2);
           const valueToFormat = `${integerPart}.${limitedDecimalPart}`;
-          const formatted = formatIntegerPart(valueToFormat);
-          setDisplayValue(`$ ${formatted}`);
+          const formatted = formatIntegerPart(valueToFormat, locale);
+          setDisplayValue(`${prefix}${formatted}`);
           
           // Calculate cursor position
-          const cursorInCleaned = Math.max(0, cursorPosition - 2);
+          const cursorInCleaned = Math.max(0, cursorPosition - prefixLen);
           const cleanedBeforeCursor = cleaned.slice(0, Math.min(cursorInCleaned, cleaned.length));
           const digitCountBeforeCursor = cleanedBeforeCursor.replace(/[^\d]/g, "").length;
           const hasDecimalBeforeCursor = cleanedBeforeCursor.includes(".");
           
           // Find position in formatted string
-          let newCursorPos = 2;
+          let newCursorPos = prefixLen;
           let digitCount = 0;
           let foundPosition = false;
           
@@ -265,35 +251,34 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
             if (/\d/.test(char)) {
               digitCount++;
               if (digitCount > digitCountBeforeCursor) {
-                newCursorPos = i + 2;
+                newCursorPos = prefixLen + i;
                 foundPosition = true;
                 break;
               }
-              newCursorPos = i + 3;
+              newCursorPos = prefixLen + i + 1;
             } else if (char === ".") {
               if (hasDecimalBeforeCursor && digitCount === digitCountBeforeCursor) {
-                newCursorPos = i + 2;
+                newCursorPos = prefixLen + i;
                 foundPosition = true;
                 break;
               }
-              newCursorPos = i + 3;
-            } else if (char === ",") {
-              newCursorPos = i + 3;
+              newCursorPos = prefixLen + i + 1;
+            } else if (char === "," || char === " ") {
+              newCursorPos = prefixLen + i + 1;
             }
           }
           
           if (cursorPosition >= inputValue.length || !foundPosition) {
-            newCursorPos = formatted.length + 2;
+            newCursorPos = prefixLen + formatted.length;
           }
           
           setTimeout(() => {
             if (inputRef.current) {
-              const pos = Math.min(Math.max(2, newCursorPos), formatted.length + 2);
+              const pos = Math.min(Math.max(prefixLen, newCursorPos), prefixLen + formatted.length);
               inputRef.current.setSelectionRange(pos, pos);
             }
           }, 0);
           
-          // Parse and send the numeric value
           const parsed = parseFloat(valueToFormat);
           if (!isNaN(parsed) && isFinite(parsed)) {
             onChange?.(parsed);
@@ -302,20 +287,15 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
         }
         
         // Format the integer part with commas in real-time
-        const formatted = formatIntegerPart(cleaned);
-        setDisplayValue(`$ ${formatted}`);
+        const formatted = formatIntegerPart(cleaned, locale);
+        setDisplayValue(`${prefix}${formatted}`);
         
-        // Calculate cursor position after formatting
-        // Get the position in the cleaned value (without "$ " prefix)
-        const cursorInCleaned = Math.max(0, cursorPosition - 2);
-        
-        // Count how many digits (and decimal point) are before the cursor in cleaned value
+        const cursorInCleaned = Math.max(0, cursorPosition - prefixLen);
         const cleanedBeforeCursor = cleaned.slice(0, Math.min(cursorInCleaned, cleaned.length));
         const digitCountBeforeCursor = cleanedBeforeCursor.replace(/[^\d]/g, "").length;
         const hasDecimalBeforeCursor = cleanedBeforeCursor.includes(".");
         
-        // Find the corresponding position in the formatted string
-        let newCursorPos = 2; // Start after "$ "
+        let newCursorPos = prefixLen;
         let digitCount = 0;
         let foundPosition = false;
         
@@ -323,71 +303,59 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
           const char = formatted[i];
           if (/\d/.test(char)) {
             digitCount++;
-            // If we've passed the digit count, position cursor here
             if (digitCount > digitCountBeforeCursor) {
-              newCursorPos = i + 2; // +2 for "$ "
+              newCursorPos = prefixLen + i;
               foundPosition = true;
               break;
             }
-            // Update position to after this digit
-            newCursorPos = i + 3; // +3 for "$ " and position after digit
+            newCursorPos = prefixLen + i + 1;
           } else if (char === ".") {
-            // If cursor was at or before decimal point
             if (hasDecimalBeforeCursor && digitCount === digitCountBeforeCursor) {
-              newCursorPos = i + 2; // +2 for "$ "
+              newCursorPos = prefixLen + i;
               foundPosition = true;
               break;
             }
-            newCursorPos = i + 3; // +3 for "$ " and position after decimal
-          } else if (char === ",") {
-            // Commas don't affect digit count, just update position
-            newCursorPos = i + 3; // +3 for "$ " and position after comma
+            newCursorPos = prefixLen + i + 1;
+          } else if (char === "," || char === " ") {
+            newCursorPos = prefixLen + i + 1;
           }
         }
         
-        // If cursor was at the end of input, keep it at the end
         if (cursorPosition >= inputValue.length || !foundPosition) {
-          newCursorPos = formatted.length + 2;
+          newCursorPos = prefixLen + formatted.length;
         }
         
-        // Set cursor position after state update
         setTimeout(() => {
           if (inputRef.current) {
-            const pos = Math.min(Math.max(2, newCursorPos), formatted.length + 2);
+            const pos = Math.min(Math.max(prefixLen, newCursorPos), prefixLen + formatted.length);
             inputRef.current.setSelectionRange(pos, pos);
           }
         }, 0);
         
-        // Parse and send the numeric value for form validation (including 0)
         if (isZero) {
-          // Explicitly handle "0" case to ensure it's sent as a value
           onChange?.(0);
         } else if (parsed !== undefined && !isNaN(parsed) && isFinite(parsed)) {
           onChange?.(parsed);
         }
       } else {
-        setDisplayValue("$ ");
+        setDisplayValue(prefix);
         onChange?.(undefined);
       }
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(false);
-      // Ensure final format on blur
-      const parsed = parseInputValue(displayValue);
-      // Check if the value is 0 (including "0", "0.0", "0.00", etc.)
-      const isZeroValue = parsed === 0 || displayValue.replace(/\$/g, "").replace(/,/g, "").trim() === "0";
+      const parsed = parseInputValue(displayValue, prefix);
+      const numericPart = displayValue.startsWith(prefix) ? displayValue.slice(prefixLen).replace(/,/g, "").replace(/\s/g, "").trim() : "";
+      const isZeroValue = parsed === 0 || numericPart === "0" || numericPart === "0." || numericPart === "0.0" || numericPart === "0.00";
       
       if (parsed !== undefined || isZeroValue) {
-        // If parsed is 0 or the display value represents 0, format and send 0
         const valueToFormat = parsed !== undefined ? parsed : 0;
-        const formatted = formatDisplayValue(valueToFormat);
-        setDisplayValue(`$ ${formatted}`);
-        // Send raw number without formatting (including 0.00)
+        const formatted = formatDisplayValue(valueToFormat, locale);
+        setDisplayValue(`${prefix}${formatted}`);
         onChange?.(valueToFormat);
       } else {
         setDisplayValue("");
-        // Send undefined when empty
         onChange?.(undefined);
       }
       onBlur?.(e);
@@ -398,31 +366,28 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
       const cursorPosition = input.selectionStart || 0;
       const selectionEnd = input.selectionEnd || 0;
 
-      // Prevent deleting "$ " prefix
-      if (cursorPosition <= 2 && selectionEnd <= 2) {
+      // Prevent deleting currency prefix
+      if (cursorPosition <= prefixLen && selectionEnd <= prefixLen) {
         if (e.key === "Backspace" || e.key === "Delete") {
           e.preventDefault();
-          // Move cursor to after "$ "
           setTimeout(() => {
             if (inputRef.current) {
-              inputRef.current.setSelectionRange(2, 2);
+              inputRef.current.setSelectionRange(prefixLen, prefixLen);
             }
           }, 0);
           return;
         }
       }
 
-      // Prevent arrow keys from moving cursor before "$ "
-      if (e.key === "ArrowLeft" && cursorPosition <= 2) {
+      if (e.key === "ArrowLeft" && cursorPosition <= prefixLen) {
         e.preventDefault();
-        input.setSelectionRange(2, 2);
+        input.setSelectionRange(prefixLen, prefixLen);
         return;
       }
 
-      // Prevent Home key from moving cursor before "$ "
       if (e.key === "Home") {
         e.preventDefault();
-        input.setSelectionRange(2, 2);
+        input.setSelectionRange(prefixLen, prefixLen);
         return;
       }
     };
@@ -432,10 +397,10 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
       const selectionStart = input.selectionStart || 0;
       const selectionEnd = input.selectionEnd || 0;
 
-      // If selection includes "$ ", adjust it
-      if (selectionStart < 2 || selectionEnd < 2) {
-        const newStart = Math.max(2, selectionStart);
-        const newEnd = Math.max(2, selectionEnd);
+      // If selection includes currency prefix, adjust it
+      if (selectionStart < prefixLen || selectionEnd < prefixLen) {
+        const newStart = Math.max(prefixLen, selectionStart);
+        const newEnd = Math.max(prefixLen, selectionEnd);
         setTimeout(() => {
           if (inputRef.current) {
             inputRef.current.setSelectionRange(newStart, newEnd);
@@ -462,7 +427,7 @@ export const DollarAmountInput = React.forwardRef<HTMLInputElement, DollarAmount
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         onSelect={handleSelect}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         className={cn(className)}
         {...props}
       />

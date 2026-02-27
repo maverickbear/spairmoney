@@ -40,7 +40,7 @@ export function ProTrialBanner({
   const router = useRouter();
   const context = useSubscriptionSafe();
   const { toast } = useToast();
-  const { subscription, plan, trialEndsAt } = context;
+  const { subscription, plan, trialEndsAt, subscriptionStateUnknown } = context;
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
@@ -79,11 +79,16 @@ export function ProTrialBanner({
             : "active"
           : "hidden";
 
+  // When subscription data failed to load (e.g. connection issue), do not show "trial ended"
+  // so we don't worry the user with incorrect information until we have confirmed data
+  const effectiveState: BannerState =
+    state === "expired" && subscriptionStateUnknown ? "hidden" : state;
+
   const showBanner =
-    state === "active" ||
-    state === "urgency" ||
-    state === "expired" ||
-    state === "stripe_trialing";
+    effectiveState === "active" ||
+    effectiveState === "urgency" ||
+    effectiveState === "expired" ||
+    effectiveState === "stripe_trialing";
 
   // Load plans whenever the banner is shown so "Subscribe Now" has a plan to use
   useEffect(() => {

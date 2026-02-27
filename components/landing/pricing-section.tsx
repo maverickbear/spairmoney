@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useInView } from "@/hooks/use-in-view";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/components/common/money";
 import { apiUrl } from "@/lib/utils/api-base-url";
 import { trackLandingClick } from "@/lib/analytics/landing-events";
 
@@ -129,18 +130,18 @@ export function PricingSection() {
                       <>
                         <div className="flex items-baseline gap-2">
                           <span className="text-3xl font-bold text-foreground">
-                            ${monthlyEquivalent.toFixed(2)}
+                            {formatMoney(monthlyEquivalent)}
                           </span>
                           <span className="text-muted-foreground">{t("perMonth")}</span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {t("billedAnnually", { amount: `$${priceYearly.toFixed(2)}` })}
+                          {t("billedAnnually", { amount: formatMoney(priceYearly) })}
                         </p>
                       </>
                     ) : (
                       <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-bold text-foreground">
-                          ${priceMonthly.toFixed(2)}
+                          {formatMoney(priceMonthly)}
                         </span>
                         <span className="text-muted-foreground">{t("perMonth")}</span>
                       </div>

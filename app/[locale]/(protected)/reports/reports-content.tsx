@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SimpleTabsContent } from "@/components/ui/simple-tabs";
 import { format } from "date-fns/format";
 import { startOfMonth } from "date-fns/startOfMonth";
+import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
 import { endOfMonth } from "date-fns/endOfMonth";
 import { eachMonthOfInterval } from "date-fns/eachMonthOfInterval";
 import { subMonths } from "date-fns/subMonths";
@@ -76,6 +77,7 @@ export function ReportsContent({
   dateRange,
 }: ReportsContentProps) {
   const t = useTranslations("reports");
+  const formatDate = useFormatDisplayDate();
   const currentMonth = startOfMonth(now);
   const lastMonth = subMonths(now, 1);
   const lastMonthKey = format(lastMonth, "yyyy-MM");
@@ -104,7 +106,7 @@ export function ReportsContent({
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
     return {
-      month: format(month, "MMM yyyy"),
+      month: formatDate(month, "monthYear"),
       income,
       expenses,
     };
@@ -152,11 +154,11 @@ export function ReportsContent({
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 10);
 
-  const periodDescription = period === "current-month" 
-    ? format(now, "MMMM yyyy")
+  const periodDescription = period === "current-month"
+    ? formatDate(now, "monthYear")
     : period === "year-to-date"
     ? `${format(dateRange.startDate, "yyyy")} (${t("yearToDateLabel")})`
-    : `${format(dateRange.startDate, "MMM dd, yyyy")} - ${format(dateRange.endDate, "MMM dd, yyyy")}`;
+    : `${formatDate(dateRange.startDate, "shortDate")} - ${formatDate(dateRange.endDate, "shortDate")}`;
 
   return (
     <>
@@ -260,7 +262,7 @@ export function ReportsContent({
                   <TableBody>
                     {topExpenses.map((tx) => (
                       <TableRow key={tx.id}>
-                        <TableCell className="font-medium text-xs md:text-sm whitespace-nowrap">{format(new Date(tx.date), "MMM dd, yyyy")}</TableCell>
+                        <TableCell className="font-medium text-xs md:text-sm whitespace-nowrap">{formatDate(tx.date, "shortDate")}</TableCell>
                         <TableCell className="text-xs md:text-sm hidden md:table-cell max-w-[150px] truncate">{tx.description || "-"}</TableCell>
                         <TableCell className="text-xs md:text-sm">
                           {tx.category?.name}

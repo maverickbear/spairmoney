@@ -3,6 +3,7 @@
 import { SubscriptionProvider } from "@/contexts/subscription-context";
 import { SubscriptionGuard } from "@/components/subscription-guard";
 import { DashboardLayout } from "@/src/presentation/components/layout/dashboard-layout";
+import { CurrencyInitializer } from "@/src/presentation/components/layout/currency-initializer";
 import { useSidebarState } from "@/src/presentation/hooks/use-sidebar-state";
 import type { Subscription, Plan } from "@/src/domain/subscriptions/subscriptions.validations";
 
@@ -15,6 +16,8 @@ export interface ProtectedDashboardShellProps {
   currentPlanId: string | undefined;
   currentInterval: "month" | "year" | null;
   subscriptionStatus: "no_subscription" | "cancelled" | "past_due" | "unpaid" | null;
+  /** True when subscription fetch failed (e.g. timeout). Prevents showing "trial ended" until data is confirmed. */
+  subscriptionDataUnavailable?: boolean;
   children: React.ReactNode;
 }
 
@@ -32,6 +35,7 @@ export function ProtectedDashboardShell({
   currentPlanId,
   currentInterval,
   subscriptionStatus,
+  subscriptionDataUnavailable = false,
   children,
 }: ProtectedDashboardShellProps) {
   const { isSidebarCollapsed } = useSidebarState();
@@ -44,7 +48,15 @@ export function ProtectedDashboardShell({
     subscription?.status === "active" || isStripeTrialing || isInLocalTrial;
 
   return (
-    <SubscriptionProvider initialData={{ subscription, plan, trialEndsAt }}>
+    <SubscriptionProvider
+      initialData={{
+        subscription,
+        plan,
+        trialEndsAt,
+        subscriptionDataUnavailable,
+      }}
+    >
+      <CurrencyInitializer />
       <SubscriptionGuard
         shouldOpenModal={shouldOpenModal}
         reason={reason}

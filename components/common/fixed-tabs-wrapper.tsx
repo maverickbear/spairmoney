@@ -74,20 +74,29 @@ export function FixedTabsWrapper({ children, className }: FixedTabsWrapperProps)
   }, [children]);
 
   return (
-    <div
-      ref={tabsRef}
-      data-fixed-tabs
-      className={cn(
-        "sticky z-40 bg-card dark:bg-background border-b border-border border-t-0 px-4 lg:px-8",
-        "hidden lg:block", // Only show on desktop
-        className
-      )}
-      style={{
-        top: 'var(--page-header-height, 64px)',
-      }}
-    >
+    <>
+      <div
+        ref={tabsRef}
+        data-fixed-tabs
+        className={cn(
+          "fixed z-40 bg-card dark:bg-background border-b border-border border-t-0 px-4 lg:px-8",
+          "hidden lg:block", // Only show on desktop
+          "left-[var(--sidebar-width,0)] right-0",
+          className
+        )}
+        style={{
+          top: "var(--page-header-height, 64px)",
+        }}
+      >
         {children}
-    </div>
+      </div>
+      {/* Spacer so content is not hidden under fixed tabs */}
+      <div
+        className="hidden lg:block shrink-0"
+        style={{ height: "var(--fixed-tabs-height, 3.5rem)" }}
+        aria-hidden
+      />
+    </>
   );
 }
 
