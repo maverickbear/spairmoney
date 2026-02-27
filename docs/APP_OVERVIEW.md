@@ -119,4 +119,5 @@ docs/                   # App and feature documentation (markdown)
 | [I18N](features/I18N.md) | Internationalization: en, pt, es; next-intl, messages, locale switcher |
 | [I18N – TODOs](features/I18N_TODO.md) | Checklist to complete full i18n (auth, nav, dashboard, dialogs, etc.) |
 | [Landing vs features](LANDING_VS_FEATURES.md) | What the landing page shows vs documented app features; unification notes |
+| [SEO](features/SEO.md) | SEO diagnosis, changes (landing/blog, schema, sitemap, robots), recommendations, validation checklist |
 | [Production](PRODUCTION.md) | Production deployment checklist, env vars, build, Stripe webhook, Sentry |

@@ -1,18 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { HeroSection } from "./hero-section";
-import { ProblemSection } from "./problem-section";
-import { WhatSpairDoesSection } from "./what-spair-does-section";
-import { FeaturesThreeColumn } from "./features-three-column";
-import { FeaturesShowcase } from "./features-showcase";
-import { FeaturesStructuredSection } from "./features-structured-section";
-import { MobileMockupSection } from "./mobile-mockup-section";
-import { TrustSection } from "./trust-section";
-import { PricingSection } from "./pricing-section";
+
+/** Below-the-fold sections loaded in separate chunks for faster initial load and TTI. SSR kept so content is in first HTML. */
+const ProblemSection = dynamic(() => import("./problem-section").then((m) => ({ default: m.ProblemSection })), { ssr: true });
+const WhatSpairDoesSection = dynamic(() => import("./what-spair-does-section").then((m) => ({ default: m.WhatSpairDoesSection })), { ssr: true });
+const FeaturesShowcase = dynamic(() => import("./features-showcase").then((m) => ({ default: m.FeaturesShowcase })), { ssr: true });
+const MobileMockupSection = dynamic(() => import("./mobile-mockup-section").then((m) => ({ default: m.MobileMockupSection })), { ssr: true });
+const FeaturesThreeColumn = dynamic(() => import("./features-three-column").then((m) => ({ default: m.FeaturesThreeColumn })), { ssr: true });
+const FeaturesStructuredSection = dynamic(() => import("./features-structured-section").then((m) => ({ default: m.FeaturesStructuredSection })), { ssr: true });
+const TrustSection = dynamic(() => import("./trust-section").then((m) => ({ default: m.TrustSection })), { ssr: true });
+const FAQSection = dynamic(() => import("./faq-section").then((m) => ({ default: m.FAQSection })), { ssr: true });
+const PricingSection = dynamic(() => import("./pricing-section").then((m) => ({ default: m.PricingSection })), { ssr: true });
 
 /**
  * Main content of the landing home page. Header and footer are provided by (landing) layout.
+ * Section order: hero, problem, what we do, features, mobile, trust, FAQ, pricing.
+ * Below-fold sections are code-split so the initial JS bundle is smaller and the page becomes interactive faster.
  */
 export function LandingView() {
   const t = useTranslations("landing.aria");
@@ -30,6 +36,7 @@ export function LandingView() {
         <FeaturesThreeColumn />
         <FeaturesStructuredSection />
         <TrustSection />
+        <FAQSection />
         <PricingSection />
       </main>
     </>

@@ -75,7 +75,7 @@ export function BlogPostStructuredData({ post }: BlogPostStructuredDataProps) {
       url: BASE_URL,
       logo: {
         "@type": "ImageObject",
-        url: `${BASE_URL}/icon-512x512.png`,
+        url: `${BASE_URL}/icon.svg`,
       },
     },
     ...(post.image && {
@@ -88,6 +88,28 @@ export function BlogPostStructuredData({ post }: BlogPostStructuredDataProps) {
     }),
   };
 
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      />
+      <BlogPostBreadcrumbSchema post={post} />
+    </>
+  );
+}
+
+/** BreadcrumbList JSON-LD for blog post (Home > Blog > Post title). */
+function BlogPostBreadcrumbSchema({ post }: BlogPostStructuredDataProps) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: BASE_URL },
+      { "@type": "ListItem", position: 2, name: "Blog", item: `${BASE_URL}/blog` },
+      { "@type": "ListItem", position: 3, name: post.title, item: `${BASE_URL}/blog/${post.slug}` },
+    ],
+  };
   return (
     <script
       type="application/ld+json"

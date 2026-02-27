@@ -69,4 +69,25 @@ export class BlogService {
     }
     return Array.from(set).sort();
   }
+
+  /**
+   * Returns related posts for a given slug (by shared tags, then by recency). Excludes current post. Max count.
+   */
+  async getRelatedPosts(slug: string, count: number = 3): Promise<BlogPostListItem[]> {
+    const all = await this.getAllPosts();
+    const current = all.find((p) => p.slug === slug);
+    if (!current) return [];
+    const rest = all.filter((p) => p.slug !== slug);
+    const currentTags = new Set(current.tags ?? []);
+    const withScore = rest.map((post) => {
+      const postTags = new Set(post.tags ?? []);
+      let shared = 0;
+      for (const t of postTags) {
+        if (currentTags.has(t)) shared++;
+      }
+      return { post, shared };
+    });
+    withScore.sort((a, b) => b.shared - a.shared || 0);
+    return withScore.slice(0, count).map(({ post }) => post);
+  }
 }

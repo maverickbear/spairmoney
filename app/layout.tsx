@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: "/icon.svg",
+    apple: "/icon.svg",
   },
 };
 
@@ -38,6 +39,11 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
         <link
+          rel="preload"
+          href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap"
+          as="style"
+        />
+        <link
           rel="stylesheet"
           href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap"
         />
@@ -55,7 +61,7 @@ export default function RootLayout({
           <StripeProvider>
           <ToastProvider>
             <AuthProvider>
-              <BreakpointLogger />
+              {process.env.NODE_ENV === "development" ? <BreakpointLogger /> : null}
               {children}
               <CookieConsentBanner />
               <SpeedInsightsWrapper />

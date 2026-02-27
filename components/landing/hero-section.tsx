@@ -48,6 +48,7 @@ export function HeroSection() {
               alt={t("imageAlt")}
               fill
               priority
+              sizes="(max-width: 1024px) 100vw, min(600px, 50vw)"
               className="rounded-[32px]"
             />
           </div>

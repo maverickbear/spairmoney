@@ -8,7 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, Loader2, Lock, Mail, User, AlertCircle, Wallet, TrendingUp, Shield, Zap, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Lock, Mail, User, AlertCircle, TrendingUp, Shield, Zap, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/common/logo";
 
 const passwordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -202,12 +203,7 @@ function AcceptInvitationForm() {
         
         <div className="relative z-10 space-y-8">
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-lg">
-                <Wallet className="w-8 h-8 text-black" />
-              </div>
-              <h1 className="text-3xl font-bold">Spair Money</h1>
-            </div>
+            <Logo variant="full" color="purple" className="h-10 w-auto" />
             <p className="text-lg text-muted-foreground max-w-md">
               Manage your personal finances intelligently and make more informed decisions about your money.
             </p>
@@ -264,11 +260,8 @@ function AcceptInvitationForm() {
           </Link>
           {/* Mobile header */}
           <div className="lg:hidden text-center space-y-2">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-2 bg-primary rounded-lg">
-                <Wallet className="w-6 h-6 text-black" />
-              </div>
-              <h1 className="text-2xl font-bold">Spair Money</h1>
+            <div className="flex justify-center mb-4">
+              <Logo variant="full" color="purple" className="h-8 w-auto" />
             </div>
             <p className="text-muted-foreground text-sm">
               Accept your invitation and create your account

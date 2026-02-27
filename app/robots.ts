@@ -2,11 +2,13 @@ import { MetadataRoute } from "next";
 
 /**
  * Robots.txt configuration
- * 
- * Controls how search engine crawlers access and index the site
+ *
+ * Controls how search engine crawlers access and index the site.
+ * Allow rules use path prefix: "/blog" allows /blog and all /blog/* URLs.
  */
 export default function robots(): MetadataRoute.Robots {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
+  const base = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
 
   return {
     rules: [
@@ -96,7 +98,7 @@ export default function robots(): MetadataRoute.Robots {
         crawlDelay: 1,
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: `${base}/sitemap.xml`,
   };
 }
 

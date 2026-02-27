@@ -45,7 +45,7 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
   const org = settings?.organization || {
     name: "Spair Money",
-    logo: `${baseUrl}/icon-512x512.png`,
+    logo: `${baseUrl}/icon.svg`,
     url: baseUrl,
     socialLinks: {
       twitter: "",
@@ -92,10 +92,11 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
     },
   };
 
-  // WebSite Schema
+  // WebSite Schema (with @id for WebPage isPartOf reference)
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": `${org.url}/#website`,
     name: org.name,
     url: org.url,
     description: description,
@@ -122,6 +123,18 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
         item: org.url,
       },
     ],
+  };
+
+  // WebPage schema for homepage (rich results, clarity for crawlers)
+  const webPageSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${org.url}/#webpage`,
+    url: org.url,
+    name: org.name,
+    description: description,
+    isPartOf: { "@id": `${org.url}/#website` },
+    about: { "@id": `${org.url}/#organization` },
   };
 
   // SoftwareApplication Schema
@@ -170,6 +183,10 @@ export function StructuredData({ seoSettings }: StructuredDataProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
       />
       <script
         type="application/ld+json"

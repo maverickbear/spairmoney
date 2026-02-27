@@ -8,6 +8,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("blogTitle"),
     description: t("blogDescription"),
+    robots: { index: true, follow: true },
+    keywords: [
+      "personal finance",
+      "budgeting",
+      "expense tracking",
+      "saving money",
+      "financial tips",
+      "Spair Money",
+    ],
     openGraph: {
       type: "website",
       locale: "en_US",

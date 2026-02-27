@@ -2,7 +2,8 @@
 
 /**
  * Renders Sanity Portable Text (block content) with semantic HTML and prose styling.
- * Supports headings (h1–h6), blockquote, lists, bold/italic/code, and inline images.
+ * Supports headings (h2–h6), blockquote, lists, bold/italic/code, and inline images.
+ * Note: Content h1 is rendered as h2 so the page keeps a single H1 (the post title).
  */
 
 import type { PortableTextBlock } from "@portabletext/types";
@@ -12,10 +13,11 @@ import Image from "next/image";
 
 const blockComponents: PortableTextComponents = {
   block: {
+    // Render as h2 to avoid duplicate H1 (post title is the only H1 for SEO)
     h1: ({ children }) => (
-      <h1 className="mt-8 mb-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl first:mt-0">
+      <h2 className="mt-8 mb-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl first:mt-0">
         {children}
-      </h1>
+      </h2>
     ),
     h2: ({ children }) => (
       <h2 className="mt-8 mb-3 text-xl font-semibold tracking-tight text-foreground sm:text-2xl first:mt-0">

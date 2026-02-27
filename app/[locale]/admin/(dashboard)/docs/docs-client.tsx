@@ -33,6 +33,7 @@ const DOC_ITEMS: { path: string; label: string }[] = [
   { path: "features/I18N.md", label: "I18N" },
   { path: "features/I18N_TODO.md", label: "I18N – TODOs" },
   { path: "LANDING_VS_FEATURES.md", label: "Landing vs features" },
+  { path: "features/SEO.md", label: "SEO" },
   { path: "PRODUCTION.md", label: "Production" },
 ];
 

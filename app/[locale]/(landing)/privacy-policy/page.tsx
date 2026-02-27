@@ -1,11 +1,26 @@
+import type { Metadata } from "next";
 import { Shield } from "lucide-react";
 import { makeSubscriptionsService } from "@/src/application/subscriptions/subscriptions.factory";
 import { ContentPageLayout } from "@/components/common/content-page-layout";
 import { LegalSection } from "@/components/common/legal-section";
 
-export const metadata = {
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.spair.co";
+const base = BASE_URL.endsWith("/") ? BASE_URL.slice(0, -1) : BASE_URL;
+const canonicalUrl = `${base}/privacy-policy`;
+
+export const metadata: Metadata = {
   title: "Privacy Policy - Spair Money",
-  description: "Privacy Policy for Spair Money",
+  description: "Privacy Policy for Spair Money. How we collect, use, and protect your information.",
+  robots: { index: true, follow: true },
+  alternates: { canonical: canonicalUrl },
+  openGraph: {
+    type: "website",
+    url: canonicalUrl,
+    siteName: "Spair Money",
+    title: "Privacy Policy - Spair Money",
+    description: "Privacy Policy for Spair Money.",
+  },
+  twitter: { card: "summary_large_image", title: "Privacy Policy - Spair Money", description: "Privacy Policy for Spair Money." },
 };
 
 const LAST_UPDATED = "February 26, 2025";
