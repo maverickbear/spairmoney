@@ -629,7 +629,6 @@ export function GoalForm({
               <DollarAmountInput
                 value={form.watch("targetAmount") || undefined}
                 onChange={(value) => form.setValue("targetAmount", value ?? 0, { shouldValidate: true })}
-                placeholder="$ 0.00"
                 size="medium"
                 required
               />
@@ -647,7 +646,6 @@ export function GoalForm({
               <DollarAmountInput
                 value={form.watch("currentBalance") || undefined}
                 onChange={(value) => form.setValue("currentBalance", value ?? 0, { shouldValidate: true })}
-                placeholder="$ 0.00"
                 size="medium"
                 disabled={!!accountId}
               />

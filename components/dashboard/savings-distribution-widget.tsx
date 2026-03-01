@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import {
   Select,
   SelectContent,
@@ -219,11 +219,10 @@ export function SavingsDistributionWidget({
     setIsDistributionDialogOpen(true);
   };
 
-  const handleAmountChange = (goalId: string, value: string) => {
-    const amount = parseFloat(value) || 0;
+  const handleAmountChange = (goalId: string, value: number | undefined) => {
     setDistributionAmounts((prev) => ({
       ...prev,
-      [goalId]: Math.max(0, amount),
+      [goalId]: Math.max(0, value ?? 0),
     }));
   };
 
@@ -546,13 +545,9 @@ export function SavingsDistributionWidget({
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max={savings}
-                        value={amount.toFixed(2)}
-                        onChange={(e) => handleAmountChange(goal.id, e.target.value)}
+                      <DollarAmountInput
+                        value={amount}
+                        onChange={(v) => handleAmountChange(goal.id, v)}
                         className="flex-1"
                       />
                       <span className="text-sm text-muted-foreground w-12 text-right">

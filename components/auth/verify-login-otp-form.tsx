@@ -11,7 +11,7 @@ import { Loader2, AlertCircle, HelpCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { setTrustedBrowser } from "@/lib/utils/trusted-browser";
+import { registerTrustedDevice } from "@/lib/utils/trusted-browser";
 
 /** Window augmentation for global caches used by nav/profile/billing (set by layout/header). */
 interface WindowWithCaches extends Window {
@@ -451,9 +451,9 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack, redirectTo 
         localStorage.setItem("lastAuthMethod", "password");
       }
 
-      // Store trusted browser if user checked the option
-      if (trustBrowser && email) {
-        setTrustedBrowser(email);
+      // Register this device as trusted in Supabase if user checked the option
+      if (trustBrowser) {
+        await registerTrustedDevice();
       }
 
       // Verify session is established before proceeding
@@ -712,7 +712,7 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack, redirectTo 
               htmlFor="trust-browser"
               className="text-sm text-foreground cursor-pointer select-none"
             >
-              Don&apos;t ask again for this browser
+              {t("askAgainIn30Days")}
             </label>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -725,8 +725,8 @@ export function VerifyLoginOtpForm({ email, invitationToken, onBack, redirectTo 
                   <HelpCircle className="w-4 h-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" title={t("trustedBrowser")} className="max-w-[280px] whitespace-normal">
-                Only enable this on personal or trusted devices. We&apos;ll still ask for your password on future logins, but we won&apos;t require a verification code on this browser for a while.
+              <TooltipContent side="right" title={t("trustedBrowser")}>
+                {t("trustedBrowserTooltip")}
               </TooltipContent>
             </Tooltip>
           </div>

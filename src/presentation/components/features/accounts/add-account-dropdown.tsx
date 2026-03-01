@@ -11,7 +11,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Plus } from "lucide-react";
-import { useToast } from "@/components/toast-provider";
 
 interface AddAccountDropdownProps {
   onSuccess?: () => void;
@@ -25,18 +24,13 @@ export function AddAccountDropdown({
   trigger,
 }: AddAccountDropdownProps) {
   const tAcc = useTranslations("accounts");
-  const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
   const handleSuccess = () => {
     setOpen(false);
     window.dispatchEvent(new CustomEvent("account-created"));
     onSuccess?.();
-    toast({
-      title: tAcc("accountAdded"),
-      description: tAcc("accountAddedDescription"),
-      variant: "success",
-    });
+    // Toast is shown by AccountForm to avoid duplicate banners
   };
 
   const defaultTrigger = (

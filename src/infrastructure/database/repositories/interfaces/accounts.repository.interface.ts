@@ -57,6 +57,8 @@ export interface IAccountsRepository {
     type: string;
     amount: unknown;
     date: string;
+    transferFromId?: string | null;
+    transferToId?: string | null;
   }>>;
   hasTransactions(accountId: string): Promise<boolean>;
   getAccountOwners(

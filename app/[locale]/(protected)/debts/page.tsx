@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, CreditCard, Loader2, Edit, Trash2, Pause, Play, DollarSign } from "lucide-react";
+import { Plus, CreditCard, Loader2 } from "lucide-react";
 import { RecordPaymentDialog } from "@/components/debts/record-payment-dialog";
 import { useToast } from "@/components/toast-provider";
 import { formatMoney } from "@/components/common/money";
@@ -286,19 +286,18 @@ export default function DebtsPage() {
                 <TableHead className="text-xs md:text-sm">{tDebt("progress")}</TableHead>
                 <TableHead className="text-xs md:text-sm">{tDebt("monthsRemaining")}</TableHead>
                 <TableHead className="text-xs md:text-sm">{tDebt("status")}</TableHead>
-                <TableHead className="text-xs md:text-sm">{tDebt("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && !hasLoaded ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {tDebt("loadingDebts")}
                   </TableCell>
                 </TableRow>
               ) : sortedDebts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {filterBy === "all" ? tDebt("noDebtsYet") : tDebt("noDebtsFilter", { filter: filterBy === "active" ? tDebt("filterActive") : filterBy === "paused" ? tDebt("filterPaused") : tDebt("filterPaidOff") })}
                   </TableCell>
                 </TableRow>
@@ -309,24 +308,20 @@ export default function DebtsPage() {
                   const loanTypeLabel = getLoanTypeLabel(debt.loanType);
 
                   return (
-                    <TableRow key={debt.id} className={debt.isPaidOff ? "opacity-75" : ""}>
+                    <TableRow
+                      key={debt.id}
+                      className={cn(
+                        debt.isPaidOff && "opacity-75",
+                        canWrite && "cursor-pointer hover:bg-muted/25"
+                      )}
+                      onClick={() => {
+                        if (!checkWriteAccess()) return;
+                        setSelectedDebt({ ...debt, createdAt: debt.createdAt, updatedAt: debt.updatedAt });
+                        setIsFormOpen(true);
+                      }}
+                    >
                       <TableCell className="font-medium text-xs md:text-sm">
-                        <div className="flex flex-col gap-0.5">
-                          <span>{debt.name}</span>
-                          {debt.priority && (
-                            <Badge 
-                              variant="outline" 
-                              className={cn(
-                                "text-xs w-fit",
-                                debt.priority === "High" && "border-sentiment-negative text-sentiment-negative",
-                                debt.priority === "Medium" && "border-sentiment-warning text-sentiment-warning",
-                                debt.priority === "Low" && "border-interactive-primary text-interactive-primary"
-                              )}
-                            >
-                              {tDebt(debt.priority.toLowerCase() as "high" | "medium" | "low")}
-                            </Badge>
-                          )}
-                        </div>
+                        {debt.name}
                       </TableCell>
                       <TableCell className="text-xs md:text-sm">
                         {loanTypeLabel}
@@ -380,74 +375,6 @@ export default function DebtsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {canWrite && (
-                          <div className="flex space-x-1 md:space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 md:h-10 md:w-10"
-                              onClick={() => {
-                                if (!checkWriteAccess()) return;
-                                setSelectedDebt({ ...debt, createdAt: debt.createdAt, updatedAt: debt.updatedAt });
-                                setIsFormOpen(true);
-                              }}
-                            >
-                              <Edit className="h-3 w-3 md:h-4 md:w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 md:h-10 md:w-10"
-                              onClick={() => {
-                                if (!checkWriteAccess()) return;
-                                if (pausingId !== debt.id) {
-                                  handlePause(debt.id, debt.isPaused);
-                                }
-                              }}
-                              disabled={pausingId === debt.id || debt.isPaidOff}
-                            >
-                              {pausingId === debt.id ? (
-                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                              ) : debt.isPaused ? (
-                                <Play className="h-3 w-3 md:h-4 md:w-4" />
-                              ) : (
-                                <Pause className="h-3 w-3 md:h-4 md:w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 md:h-10 md:w-10"
-                              onClick={() => {
-                                if (!checkWriteAccess()) return;
-                                handlePayment(debt.id);
-                              }}
-                              disabled={debt.isPaidOff || debt.isPaused}
-                            >
-                              <DollarSign className="h-3 w-3 md:h-4 md:w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 md:h-10 md:w-10"
-                              onClick={() => {
-                                if (!checkWriteAccess()) return;
-                                if (deletingId !== debt.id) {
-                                  handleDelete(debt.id);
-                                }
-                              }}
-                              disabled={deletingId === debt.id}
-                            >
-                              {deletingId === debt.id ? (
-                                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -468,6 +395,36 @@ export default function DebtsPage() {
         onSuccess={() => {
           loadDebts();
           setSelectedDebt(null);
+        }}
+        onDelete={(id) => {
+          openDialog(
+            {
+              title: tDebt("deleteDebt"),
+              description: tDebt("deleteDebtConfirm"),
+              variant: "destructive",
+              confirmLabel: tDebt("delete"),
+            },
+            async () => {
+              setDeletingId(id);
+              try {
+                const response = await fetch(apiUrl(`/api/v2/debts/${id}`), {
+                  method: "DELETE",
+                });
+                if (!response.ok) {
+                  const error = await response.json();
+                  throw new Error(error.error || "Failed to delete debt");
+                }
+                loadDebts();
+                setIsFormOpen(false);
+                setSelectedDebt(null);
+              } catch (error) {
+                console.error("Error deleting debt:", error);
+                alert(error instanceof Error ? error.message : tDebt("failedToDeleteDebt"));
+              } finally {
+                setDeletingId(null);
+              }
+            }
+          );
         }}
       />
 

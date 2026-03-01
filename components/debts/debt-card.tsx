@@ -2,24 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ProgressRing } from "../goals/progress-ring";
 import { formatMoney } from "@/components/common/money";
-import {
-  MoreVertical,
-  Edit,
-  Trash2,
-  Pause,
-  Play,
-  DollarSign,
-} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface DebtCardProps {
   debt: {
@@ -50,9 +36,9 @@ export interface DebtCardProps {
     progressPct?: number;
   };
   onEdit: (debt: DebtCardProps["debt"]) => void;
-  onDelete: (id: string) => void;
-  onPause: (id: string, isPaused: boolean) => void;
-  onPayment: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onPause?: (id: string, isPaused: boolean) => void;
+  onPayment?: (id: string) => void;
 }
 
 const loanTypeKeyMap: Record<string, string> = {
@@ -75,9 +61,6 @@ const paymentFreqKeyMap: Record<string, string> = {
 export function DebtCard({
   debt,
   onEdit,
-  onDelete,
-  onPause,
-  onPayment,
 }: DebtCardProps) {
   const t = useTranslations("debts");
   const loanTypeLabel = debt.loanType && loanTypeKeyMap[debt.loanType] ? t(loanTypeKeyMap[debt.loanType] as keyof typeof loanTypeKeyMap) : debt.loanType;
@@ -155,7 +138,10 @@ export function DebtCard({
   const showMonthsRemaining = monthsRemaining !== null;
 
   return (
-    <Card className={debt.isPaidOff ? "opacity-75" : ""}>
+    <Card
+      className={cn(debt.isPaidOff && "opacity-75", "cursor-pointer hover:bg-muted/25 transition-colors")}
+      onClick={() => onEdit(debt)}
+    >
       <CardContent className="p-4">
         <div className="flex flex-col gap-4">
           {/* Header with Progress Ring and Title */}
@@ -188,49 +174,6 @@ export function DebtCard({
                 </div>
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="flex-shrink-0">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEdit(debt)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  {t("edit")}
-                </DropdownMenuItem>
-                {!debt.isPaidOff && (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() => onPause(debt.id, !debt.isPaused)}
-                    >
-                      {debt.isPaused ? (
-                        <>
-                          <Play className="mr-2 h-4 w-4" />
-                          {t("resume")}
-                        </>
-                      ) : (
-                        <>
-                          <Pause className="mr-2 h-4 w-4" />
-                          {t("pause")}
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onPayment(debt.id)}>
-                      <DollarSign className="mr-2 h-4 w-4" />
-                      {t("recordPayment")}
-                    </DropdownMenuItem>
-                  </>
-                )}
-                <DropdownMenuItem
-                  onClick={() => onDelete(debt.id)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t("delete")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
 
           {/* Main Metrics */}

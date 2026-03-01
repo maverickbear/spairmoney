@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { getCurrencySymbol } from "@/components/common/money";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import { formatDateOnly } from "@/src/infrastructure/utils/timestamp";
 
 interface AddTransactionWidgetProps {
@@ -35,6 +35,8 @@ interface Account {
   name: string;
   type: string;
   isDefault?: boolean;
+  householdName?: string | null;
+  owners?: Array<{ id: string; name: string | null; avatarUrl: string | null }>;
 }
 
 interface Category {
@@ -44,16 +46,40 @@ interface Category {
   subcategories?: Array<{ id: string; name: string; logo?: string | null }>;
 }
 
+const ACCOUNT_TYPE_KEYS: Record<string, string> = {
+  checking: "accountTypeChecking",
+  savings: "accountTypeSavings",
+  credit: "accountTypeCredit",
+  cash: "accountTypeCash",
+  investment: "accountTypeInvestment",
+  other: "accountTypeOther",
+};
+
 export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidgetProps) {
   const t = useTranslations("dashboard");
   const tTx = useTranslations("transactions");
   const tToasts = useTranslations("toasts");
+  const tForms = useTranslations("forms");
   const router = useRouter();
   const { toast } = useToast();
+
+  const getAccountTypeLabel = (type: string) =>
+    tForms((ACCOUNT_TYPE_KEYS[type.toLowerCase()] ?? "accountTypeOther") as "accountTypeChecking");
+
+  const getAccountDisplayLabel = (acc: Account): string => {
+    const typeLabel = getAccountTypeLabel(acc.type);
+    const base = `${acc.name} (${typeLabel})`;
+    if (acc.householdName?.trim()) return `${base} · ${acc.householdName.trim()}`;
+    if (acc.owners?.length) {
+      const names = acc.owners.map((o) => o.name).filter(Boolean).join(", ");
+      if (names) return `${base} · ${names}`;
+    }
+    return base;
+  };
   
   
   const [type, setType] = useState<"expense" | "income" | "transfer">("expense");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number | undefined>(undefined);
   const [description, setDescription] = useState("");
   const [transactionDate, setTransactionDate] = useState<Date>(() => new Date());
   const [loading, setLoading] = useState(false);
@@ -102,7 +128,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !accountId) {
+    if (amount == null || amount <= 0 || !accountId) {
       if (!accountId) {
         toast({
           variant: "destructive",
@@ -136,7 +162,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
       
       const payload: Record<string, unknown> = {
         type,
-        amount: parseFloat(amount),
+        amount,
         description,
         date: formatDateOnly(transactionDate),
         accountId,
@@ -166,7 +192,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
         description: t("transactionCreated"),
       });
       
-      setAmount("");
+      setAmount(undefined);
       setDescription("");
       setTransactionDate(new Date());
       setCategoryId("");
@@ -209,20 +235,13 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="amount" className="text-xs text-muted-foreground">{t("amountLabel")}</Label>
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencySymbol()}</span>
-              <Input
-                id="amount"
-                type="number"
-                placeholder="0.00"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="pl-6 h-9 text-sm"
-                required
-              />
-            </div>
+            <DollarAmountInput
+              id="amount"
+              value={amount}
+              onChange={setAmount}
+              className="h-9 text-sm"
+              required
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="account" className="text-xs text-muted-foreground">
@@ -235,7 +254,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
               <SelectContent>
                 {accounts.map((acc) => (
                   <SelectItem key={acc.id} value={acc.id}>
-                    {acc.name}
+                    {getAccountDisplayLabel(acc)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -255,7 +274,7 @@ export function AddTransactionWidget({ onTransactionAdded }: AddTransactionWidge
                   .filter(acc => acc.id !== accountId)
                   .map((acc) => (
                     <SelectItem key={acc.id} value={acc.id}>
-                      {acc.name}
+                      {getAccountDisplayLabel(acc)}
                     </SelectItem>
                   ))}
               </SelectContent>

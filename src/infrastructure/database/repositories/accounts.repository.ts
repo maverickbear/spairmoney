@@ -215,7 +215,7 @@ export class AccountsRepository implements IAccountsRepository {
       throw new Error(`Failed to create account: ${error.message}`);
     }
 
-    return account as AccountRow;
+    return AccountsRepository.toAccountRow((account ?? {}) as Record<string, unknown>);
   }
 
   /**
@@ -274,15 +274,15 @@ export class AccountsRepository implements IAccountsRepository {
   /**
    * Permanently delete an account from Supabase.
    * Removes account_owners rows first to avoid FK violations, then deletes the account row.
+   * Uses RPC so account_id is passed as uuid (avoids Postgres "text = uuid" operator error).
    */
   async delete(id: string): Promise<void> {
     const supabase = await createServerClient();
 
-    // Delete account_owners for this account first (FK from account_owners to accounts)
-    const { error: ownersError } = await supabase
-      .from("account_owners")
-      .delete()
-      .eq("account_id", id);
+    // Delete account_owners via RPC so the parameter is cast to uuid (PostgREST sends filter values as text)
+    const { error: ownersError } = await supabase.rpc("delete_account_owners_by_account_id", {
+      p_account_id: id,
+    });
 
     if (ownersError) {
       logger.error("[AccountsRepository] Error deleting account owners:", ownersError);
@@ -424,7 +424,7 @@ export class AccountsRepository implements IAccountsRepository {
 
     const { data: transactions, error } = await supabase
       .from("transactions")
-      .select("account_id, type, amount, date")
+      .select("account_id, type, amount, date, transfer_from_id, transfer_to_id")
       .in("account_id", accountIds)
       .lte("date", endDate.toISOString())
       .is("deleted_at", null); // Exclude soft-deleted records
@@ -439,6 +439,8 @@ export class AccountsRepository implements IAccountsRepository {
       type: tx.type,
       amount: tx.amount,
       date: tx.date,
+      transferFromId: tx.transfer_from_id ?? null,
+      transferToId: tx.transfer_to_id ?? null,
     }));
   }
 

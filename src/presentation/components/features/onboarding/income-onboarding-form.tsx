@@ -361,7 +361,6 @@ export function IncomeOnboardingForm({
             id="expected-annual-income"
             value={expectedAnnualIncome ?? undefined}
             onChange={handleExpectedAnnualIncomeChange}
-            placeholder="$ 0.00"
             className="w-full"
           />
         </div>

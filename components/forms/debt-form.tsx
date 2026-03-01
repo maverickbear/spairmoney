@@ -17,12 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { formatMoney } from "@/components/common/money";
 import { parseDateInput, formatDateInput } from "@/src/infrastructure/utils/timestamp";
 import { useFormatDisplayDate } from "@/src/presentation/utils/format-date";
@@ -31,7 +32,7 @@ import { PercentageInput } from "@/components/common/percentage-input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { calculateDebtMetrics, convertToMonthlyPayment, convertFromMonthlyPayment, calculateMonthlyPayment, calculatePaymentsFromDate, type DebtForCalculation } from "@/lib/utils/debts";
 import { useToast } from "@/components/toast-provider";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { AccountRequiredDialog } from "@/components/common/account-required-dialog";
 // Using API routes instead of client-side APIs
 import type { Category } from "@/src/domain/categories/categories.types";
@@ -71,6 +72,8 @@ interface DebtFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** When provided, a Delete button is shown on the left side of the drawer (edit mode only). */
+  onDelete?: (id: string) => void;
 }
 
 // Helper function to format account type for display
@@ -112,6 +115,7 @@ export function DebtForm({
   open,
   onOpenChange,
   onSuccess,
+  onDelete,
 }: DebtFormProps) {
   const t = useTranslations("debts");
   const formatDate = useFormatDisplayDate();
@@ -198,9 +202,10 @@ export function DebtForm({
       firstPaymentDateLabel: t("firstPaymentDate"),
       paymentAmountLabel: t("paymentAmount"),
       totalMonthsPresets: [12, 24, 36, 48, 60, 72, 84, 96, 120, 180, 240, 300, 360],
+      showStartDate: true,
     };
     
-    // Credit card configuration
+    // Credit card configuration — fewer fields: no down payment, term, or start date
     if (isCreditCard) {
       return {
         showDownPayment: false,
@@ -215,6 +220,7 @@ export function DebtForm({
         firstPaymentDateLabel: t("nextDueDate"),
         paymentAmountLabel: t("plannedMonthlyPayment"),
         totalMonthsPresets: [],
+        showStartDate: false,
       };
     }
     
@@ -232,27 +238,13 @@ export function DebtForm({
       firstPaymentDateLabel: string;
       paymentAmountLabel: string;
       totalMonthsPresets: number[];
+      showStartDate: boolean;
     }> = {
-      mortgage: {
-        ...defaultConfig,
-        totalMonthsPresets: [300, 360],
-      },
-      car_loan: {
-        ...defaultConfig,
-        totalMonthsPresets: [24, 36, 48, 60, 72, 84],
-      },
-      personal_loan: {
-        ...defaultConfig,
-        totalMonthsPresets: [12, 24, 36, 48, 60],
-      },
-      student_loan: {
-        ...defaultConfig,
-        totalMonthsPresets: [120, 180, 240, 300, 360],
-      },
-      business_loan: {
-        ...defaultConfig,
-        totalMonthsPresets: [12, 24, 36, 48, 60, 72, 84, 96, 120],
-      },
+      mortgage: { ...defaultConfig, totalMonthsPresets: [300, 360] },
+      car_loan: { ...defaultConfig, totalMonthsPresets: [24, 36, 48, 60, 72, 84] },
+      personal_loan: { ...defaultConfig, totalMonthsPresets: [12, 24, 36, 48, 60] },
+      student_loan: { ...defaultConfig, totalMonthsPresets: [120, 180, 240, 300, 360] },
+      business_loan: { ...defaultConfig, totalMonthsPresets: [12, 24, 36, 48, 60, 72, 84, 96, 120] },
     };
     
     // Try to find matching config by checking if type contains known keywords
@@ -575,13 +567,12 @@ export function DebtForm({
   useEffect(() => {
     if (debt && debt.id && debtsCategories.length > 0 && debt.loanType && !selectedCategoryId) {
       const loanTypeLower = debt.loanType.toLowerCase().replace(/_/g, " ");
-      // Try to find category or subcategory that matches
+      // Try exact match first (e.g. "personal loan" -> "Personal Loan")
       for (const category of debtsCategories) {
         if (category.name.toLowerCase() === loanTypeLower) {
           setSelectedCategoryId(category.id);
           return;
         }
-        // Check subcategories
         if (category.subcategories) {
           const matchingSub = category.subcategories.find(
             (sub) => sub.name.toLowerCase() === loanTypeLower
@@ -591,6 +582,13 @@ export function DebtForm({
             setSelectedSubcategoryId(matchingSub.id);
             return;
           }
+        }
+      }
+      // Fallback: match when category name contains loan type (e.g. "credit card" -> "Credit Card Payment")
+      for (const category of debtsCategories) {
+        if (category.name.toLowerCase().includes(loanTypeLower)) {
+          setSelectedCategoryId(category.id);
+          return;
         }
       }
     }
@@ -960,17 +958,23 @@ export function DebtForm({
         }}
       />
       {shouldShowForm && (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="sm:max-w-2xl sm:max-h-[90vh] flex flex-col !p-0 !gap-0">
-        <DialogHeader>
-          <DialogTitle>{debt ? t("editDebt") : t("createDebtTitle")}</DialogTitle>
-        </DialogHeader>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent
+            side="right"
+            className="sm:max-w-[598px] w-full p-0 flex flex-col gap-0 overflow-hidden bg-background border-l"
+          >
+        <SheetHeader className="p-6 pb-4 border-b shrink-0">
+          <SheetTitle>{debt ? t("editDebt") : t("createDebtTitle")}</SheetTitle>
+          <SheetDescription>
+            {debt ? t("editDebtDescription") : t("createDebtDescription")}
+          </SheetDescription>
+        </SheetHeader>
 
         <form
           onSubmit={form.handleSubmit(onSubmit as (data: DebtFormData) => Promise<void>)}
-          className="flex flex-col flex-1 overflow-hidden"
+          className="flex flex-col flex-1 min-h-0 overflow-hidden"
         >
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-6">
           {/* Loan Information */}
           <div className="space-y-4">
             <div>
@@ -1083,7 +1087,6 @@ export function DebtForm({
                 <DollarAmountInput
                   value={form.watch("initialAmount") || undefined}
                   onChange={(value) => form.setValue("initialAmount", value ?? 0, { shouldValidate: true })}
-                  placeholder="$ 0.00"
                   size="medium"
                   required
                 />
@@ -1102,7 +1105,6 @@ export function DebtForm({
                   <DollarAmountInput
                     value={form.watch("downPayment") || undefined}
                     onChange={(value) => form.setValue("downPayment", value ?? 0, { shouldValidate: true })}
-                    placeholder="$ 0.00"
                     size="medium"
                     required={fieldConfig.downPaymentRequired}
                   />
@@ -1230,7 +1232,6 @@ export function DebtForm({
                     isPaymentAmountManuallyEdited.current = true;
                     form.setValue("paymentAmount", value ?? 0, { shouldValidate: true });
                   }}
-                  placeholder="$ 0.00"
                   size="medium"
                 />
                 {form.formState.errors.paymentAmount && (
@@ -1261,7 +1262,7 @@ export function DebtForm({
               <h3 className="text-base font-semibold mb-1">Account & Dates</h3>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${fieldConfig.showStartDate ? "grid-cols-3" : "grid-cols-2"}`}>
               <div className="space-y-1">
                 <label className="text-sm font-medium">
                   {t("account")}
@@ -1289,25 +1290,27 @@ export function DebtForm({
                 )}
               </div>
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium">
-                  {fieldConfig.startDateLabel}
-                </label>
-                <DatePicker
-                  date={form.watch("startDate")}
-                  onDateChange={(date) => {
-                    form.setValue("startDate", date || new Date(), { shouldValidate: true });
-                  }}
-                  placeholder={t("selectStartDate")}
-                  size="medium"
-                  required={!((loanType || "").toLowerCase().includes("credit") || (loanType || "").toLowerCase().includes("card"))}
-                />
-                {form.formState.errors.startDate && (
-                  <p className="text-xs text-destructive">
-                    {form.formState.errors.startDate.message}
-                  </p>
-                )}
-              </div>
+              {fieldConfig.showStartDate && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">
+                    {fieldConfig.startDateLabel}
+                  </label>
+                  <DatePicker
+                    date={form.watch("startDate")}
+                    onDateChange={(date) => {
+                      form.setValue("startDate", date || new Date(), { shouldValidate: true });
+                    }}
+                    placeholder={t("selectStartDate")}
+                    size="medium"
+                    required
+                  />
+                  {form.formState.errors.startDate && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.startDate.message}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">
@@ -1365,7 +1368,6 @@ export function DebtForm({
                     isPrincipalPaidManuallyEdited.current = true;
                     form.setValue("principalPaid", value ?? 0, { shouldValidate: true });
                   }}
-                  placeholder="$ 0.00"
                   size="medium"
                 />
                 {form.formState.errors.principalPaid && (
@@ -1380,7 +1382,6 @@ export function DebtForm({
                 <DollarAmountInput
                   value={form.watch("interestPaid") || undefined}
                   onChange={(value) => form.setValue("interestPaid", value ?? 0, { shouldValidate: true })}
-                  placeholder="$ 0.00"
                   size="medium"
                 />
                 {form.formState.errors.interestPaid && (
@@ -1426,7 +1427,23 @@ export function DebtForm({
 
           </div>
 
-          <DialogFooter>
+          <SheetFooter className="p-4 border-t w-full flex flex-row flex-nowrap items-center shrink-0 bg-background">
+            <div className="flex items-center justify-start min-w-0">
+              {debt && onDelete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="medium"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => onDelete(debt.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t("delete")}
+                </Button>
+              )}
+            </div>
+            <div className="flex-1 min-w-4" aria-hidden />
+            <div className="flex items-center justify-end gap-2 shrink-0">
             <Button
               type="button"
               variant="outline"
@@ -1446,10 +1463,11 @@ export function DebtForm({
                 debt ? t("update") : t("create")
               )} {t("debtLabel")}
             </Button>
-          </DialogFooter>
+            </div>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
       )}
     </>
   );

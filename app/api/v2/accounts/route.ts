@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAccountsService } from "@/src/application/accounts/accounts.factory";
+import { makeCreditCardDebtSyncService } from "@/src/application/credit-card-debt/credit-card-debt-sync.factory";
 import { AccountFormData } from "@/src/domain/accounts/accounts.validations";
 import { ZodError } from "zod";
 import { getCurrentUserId, guardAccountLimit, throwIfNotAllowed } from "@/src/application/shared/feature-guard";
 import { AppError } from "@/src/application/shared/app-error";
 import { getCacheHeaders } from "@/src/infrastructure/utils/cache-headers";
 import { revalidateTag } from 'next/cache';
+import { logger } from "@/src/infrastructure/utils/logger";
 
 
 export async function GET(request: NextRequest) {
@@ -57,10 +59,47 @@ export async function POST(request: NextRequest) {
     await throwIfNotAllowed(accountGuard);
 
     const data: AccountFormData = await request.json();
-    
+
+    logger.info("[CreditCardDebtFlow] POST /accounts – request body", {
+      type: data.type,
+      initialBalance: data.initialBalance,
+      initialBalanceType: typeof data.initialBalance,
+    });
+
     const service = makeAccountsService();
     const account = await service.createAccount(data);
-    
+
+    logger.info("[CreditCardDebtFlow] POST /accounts – account created", {
+      accountId: account.id,
+      accountType: account.type,
+      accountInitialBalance: account.initialBalance,
+    });
+
+    // Create linked credit-card debt with the exact value the user entered as Current Balance (amount owed).
+    // Form sends it as negative for storage; we pass it to sync so the debt is created with that amount (sync uses |value| as amount owed).
+    const creditCurrentBalance =
+      data.type === "credit" && data.initialBalance != null && Math.abs(data.initialBalance) > 0.01
+        ? data.initialBalance
+        : null;
+
+    logger.info("[CreditCardDebtFlow] POST /accounts – credit debt sync decision", {
+      isCredit: account.type === "credit",
+      creditCurrentBalance,
+      willCallSync: account.type === "credit" && creditCurrentBalance != null && !!userId,
+    });
+
+    if (account.type === "credit" && creditCurrentBalance != null && userId) {
+      try {
+        const creditCardDebtSync = makeCreditCardDebtSyncService();
+        await creditCardDebtSync.syncForAccount(account.id, userId, undefined, undefined, {
+          overrideInitialBalance: creditCurrentBalance,
+        });
+      } catch (err) {
+        logger.error("[POST /api/v2/accounts] Credit card debt sync after create failed:", err);
+        // Do not fail the request; account was created successfully
+      }
+    }
+
     // Invalidate cache so dashboard and reports reflect new data
     revalidateTag('accounts', 'max');
     revalidateTag('subscriptions', 'max');

@@ -5,6 +5,7 @@
 
 import { DebtsRepository } from "@/src/infrastructure/database/repositories/debts.repository";
 import { ITransactionsRepository } from "@/src/infrastructure/database/repositories/interfaces/transactions.repository.interface";
+import { IAccountsRepository } from "@/src/infrastructure/database/repositories/interfaces/accounts.repository.interface";
 import { DebtsMapper } from "./debts.mapper";
 import { DebtFormData } from "../../domain/debts/debts.validations";
 import { BaseDebt, DebtWithCalculations } from "../../domain/debts/debts.types";
@@ -27,7 +28,8 @@ export class DebtsService {
 
   constructor(
     private repository: DebtsRepository,
-    private transactionsRepository?: ITransactionsRepository
+    private transactionsRepository?: ITransactionsRepository,
+    private accountsRepository?: IAccountsRepository
   ) {
     this.debtPlannedPaymentsService = new DebtPlannedPaymentsService();
   }
@@ -45,8 +47,8 @@ export class DebtsService {
       return [];
     }
 
-    // Reconcile credit-card debts: current_balance must match sum of expenses − payments for account_id
-    if (this.transactionsRepository) {
+    // Reconcile credit-card debts: balance = account initial_balance (as amount owed) + expenses − payments (same formula as CreditCardDebtSyncService)
+    if (this.transactionsRepository && this.accountsRepository) {
       await Promise.all(
         rows
           .filter(
@@ -57,12 +59,25 @@ export class DebtsService {
           )
           .map(async (debt) => {
             try {
-              const computedBalance =
+              const transactionBalance =
                 await this.transactionsRepository!.computeCreditCardDebtBalance(
                   debt.account_id!,
                   accessToken,
                   refreshToken
                 );
+              const account = await this.accountsRepository!.findById(
+                debt.account_id!,
+                accessToken,
+                refreshToken
+              );
+              const rawInitial =
+                account?.initial_balance != null
+                  ? account.initial_balance
+                  : (account as { initialBalance?: number } | null)?.initialBalance ?? null;
+              const baseBalance =
+                rawInitial != null && rawInitial < 0 ? Math.abs(rawInitial) : 0;
+              const computedBalance = Math.max(0, baseBalance + transactionBalance);
+
               if (
                 Math.abs(computedBalance - debt.current_balance) > 0.01
               ) {
@@ -310,6 +325,7 @@ export class DebtsService {
     accountId: string;
     accountName: string;
     currentBalance: number;
+    principalPaid?: number;
     userId: string;
     householdId: string | null;
   }): Promise<BaseDebt> {
@@ -332,7 +348,7 @@ export class DebtsService {
       monthlyPayment: 0,
       paymentFrequency: "monthly",
       paymentAmount: null,
-      principalPaid: 0,
+      principalPaid: params.principalPaid ?? 0,
       interestPaid: 0,
       additionalContributions: false,
       additionalContributionAmount: null,

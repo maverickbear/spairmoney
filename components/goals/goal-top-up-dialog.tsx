@@ -146,7 +146,6 @@ export function GoalTopUpDialog({
                 <DollarAmountInput
                   value={amount}
                   onChange={setAmount}
-                  placeholder="$ 0.00"
                   disabled={loading}
                 />
               </div>

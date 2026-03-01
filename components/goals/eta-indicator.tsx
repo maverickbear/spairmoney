@@ -59,9 +59,7 @@ export function ETAIndicator({
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p>
-            Based on your last 3 months average income ({formatMoney(incomeBasis)})
-          </p>
+          Based on your last 3 months average income ({formatMoney(incomeBasis)})
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

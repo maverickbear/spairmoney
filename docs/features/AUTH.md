@@ -22,6 +22,10 @@ Handles user authentication: sign-up (email), sign-in (email or Google), sign-ou
 - `app/auth/` – Login, signup, reset password pages.
 - `contexts/auth-context.tsx` – Client-side auth state and helpers.
 
+## Trusted device (skip OTP for 30 days)
+
+After the user verifies OTP (email or Google), they can check “Ask again in 30 days”. That choice is stored in Supabase in the `trusted_browsers` table (per user, per browser fingerprint). On the next login, if the device is trusted, the app skips OTP and signs in with password (or Google) only. Trust expires after 30 days. See `scripts/add-trusted-browsers-table.sql` for the schema.
+
 ## API
 
 | Method | Endpoint | Purpose |
@@ -30,6 +34,8 @@ Handles user authentication: sign-up (email), sign-in (email or Google), sign-ou
 | POST | `/api/v2/auth/google-signin` | Initiate or complete Google OAuth sign-in. |
 | POST | `/api/v2/auth/sign-out` | Sign out and clear session. |
 | POST | `/api/v2/auth/reset-password` | Request or complete password reset. |
+| POST | `/api/v2/auth/trusted-device` | Register current device as trusted (auth required). |
+| POST | `/api/v2/auth/trusted-device/check` | Check if email + fingerprint is trusted (login flow). |
 
 ## Domain / Application
 

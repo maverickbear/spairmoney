@@ -14,7 +14,7 @@ import { Mail, Lock, Loader2, AlertCircle, Eye, EyeOff, Info } from "lucide-reac
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GoogleSignInButton } from "./google-signin-button";
 import { VerifyLoginOtpForm } from "./verify-login-otp-form";
-import { isTrustedBrowser } from "@/lib/utils/trusted-browser";
+import { checkTrustedDevice } from "@/lib/utils/trusted-browser";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -175,8 +175,8 @@ function LoginFormContent({ redirectTo }: LoginFormProps = {}) {
       setLoading(true);
       setError(null);
 
-      // Check if browser is trusted
-      const isTrusted = isTrustedBrowser(data.email);
+      // Check if this device is trusted (Supabase)
+      const isTrusted = await checkTrustedDevice(data.email);
 
       if (isTrusted) {
         // Browser is trusted - sign in directly without OTP

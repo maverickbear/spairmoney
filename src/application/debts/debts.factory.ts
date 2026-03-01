@@ -6,6 +6,7 @@
 import { DebtsService } from "./debts.service";
 import { DebtsRepository } from "@/src/infrastructure/database/repositories/debts.repository";
 import { TransactionsRepository } from "@/src/infrastructure/database/repositories/transactions.repository";
+import { AccountsRepository } from "@/src/infrastructure/database/repositories/accounts.repository";
 
 /**
  * Create a DebtsService instance with all dependencies
@@ -13,6 +14,7 @@ import { TransactionsRepository } from "@/src/infrastructure/database/repositori
 export function makeDebtsService(): DebtsService {
   const repository = new DebtsRepository();
   const transactionsRepository = new TransactionsRepository();
-  return new DebtsService(repository, transactionsRepository);
+  const accountsRepository = new AccountsRepository();
+  return new DebtsService(repository, transactionsRepository, accountsRepository);
 }
 

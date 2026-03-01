@@ -345,7 +345,6 @@ export function HouseholdIncomeSettings() {
               id="expected-annual-income"
               value={expectedAnnualIncome ?? undefined}
               onChange={(value) => setExpectedAnnualIncome(value)}
-              placeholder="$ 0.00"
               className="w-full"
             />
           </div>

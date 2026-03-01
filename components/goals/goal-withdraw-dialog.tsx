@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import {
   Select,
   SelectContent,
@@ -51,7 +51,7 @@ export function GoalWithdrawDialog({
   loading = false,
 }: GoalWithdrawDialogProps) {
   const t = useTranslations("planning");
-  const [amount, setAmount] = useState<string>("");
+  const [amount, setAmount] = useState<number | undefined>(undefined);
   const [toAccountId, setToAccountId] = useState<string>("");
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
 
@@ -83,31 +83,29 @@ export function GoalWithdrawDialog({
   const handleSubmit = async () => {
     if (!goal) return;
 
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
+    if (amount == null || amount <= 0) {
       return;
     }
     if (needsToAccount && !toAccountId) {
       return;
     }
 
-    await onConfirm(amountNum, needsToAccount ? toAccountId : undefined);
-    setAmount("");
+    await onConfirm(amount, needsToAccount ? toAccountId : undefined);
+    setAmount(undefined);
     setToAccountId("");
   };
 
   const handleClose = () => {
     if (!loading) {
-      setAmount("");
+      setAmount(undefined);
       setToAccountId("");
       onOpenChange(false);
     }
   };
 
   const canSubmit =
-    amount.trim() !== "" &&
-    !isNaN(parseFloat(amount)) &&
-    parseFloat(amount) > 0 &&
+    amount != null &&
+    amount > 0 &&
     (!needsToAccount || Boolean(toAccountId));
 
   return (
@@ -151,12 +149,9 @@ export function GoalWithdrawDialog({
               )}
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("amount")}</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
+                <DollarAmountInput
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={setAmount}
                   disabled={loading}
                 />
                 {goal && (

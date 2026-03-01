@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeAccountsService } from "@/src/application/accounts/accounts.factory";
+import { makeCreditCardDebtSyncService } from "@/src/application/credit-card-debt/credit-card-debt-sync.factory";
 import { AccountFormData } from "@/src/domain/accounts/accounts.validations";
 import { AppError } from "@/src/application/shared/app-error";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { requireAccountOwnership } from "@/src/infrastructure/utils/security";
 import { revalidateTag } from 'next/cache';
+import { logger } from "@/src/infrastructure/utils/logger";
 
 export async function GET(
   request: NextRequest,
@@ -60,7 +62,17 @@ export async function PATCH(
     
     const service = makeAccountsService();
     const account = await service.updateAccount(id, data);
-    
+
+    // Keep credit-card debt in sync when account (e.g. current balance) is updated
+    if (account.type === "credit" && userId) {
+      try {
+        const creditCardDebtSync = makeCreditCardDebtSyncService();
+        await creditCardDebtSync.syncForAccount(account.id, userId);
+      } catch (err) {
+        logger.error("[PATCH /api/v2/accounts/[id]] Credit card debt sync after update failed:", err);
+      }
+    }
+
     // Invalidate cache so dashboard and reports reflect changes
     revalidateTag('accounts', 'max');
     revalidateTag('subscriptions', 'max');

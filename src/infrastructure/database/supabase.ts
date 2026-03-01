@@ -795,6 +795,17 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['analytics_category_learning']['Row'], 'last_used_at'>;
         Update: Partial<Database['public']['Tables']['analytics_category_learning']['Insert']>;
       };
+      trusted_browsers: {
+        Row: {
+          id: string;
+          user_id: string;
+          fingerprint: string;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['trusted_browsers']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['trusted_browsers']['Insert']>;
+      };
     };
   };
 }

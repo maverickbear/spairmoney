@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DollarAmountInput } from "@/components/common/dollar-amount-input";
 import { Loader2 } from "lucide-react";
 import { formatMoney } from "@/components/common/money";
 
@@ -35,23 +35,22 @@ export function RecordPaymentDialog({
   onConfirm,
   loading = false,
 }: RecordPaymentDialogProps) {
-  const [amount, setAmount] = useState<string>("");
+  const [amount, setAmount] = useState<number | undefined>(undefined);
 
   const handleSubmit = async () => {
     if (!debt) return;
 
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
+    if (amount == null || amount <= 0) {
       return;
     }
 
-    await onConfirm(amountNum);
-    setAmount("");
+    await onConfirm(amount);
+    setAmount(undefined);
   };
 
   const handleClose = () => {
     if (!loading) {
-      setAmount("");
+      setAmount(undefined);
       onOpenChange(false);
     }
   };
@@ -77,12 +76,9 @@ export function RecordPaymentDialog({
         <div className="space-y-4 px-6">
           <div className="space-y-2">
             <label className="text-sm font-medium">Payment Amount</label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
+            <DollarAmountInput
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={setAmount}
               disabled={loading}
             />
             {debt && (
@@ -96,7 +92,7 @@ export function RecordPaymentDialog({
           <Button variant="outline" onClick={handleClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading || !amount}>
+          <Button onClick={handleSubmit} disabled={loading || amount == null || amount <= 0}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -84,6 +84,7 @@ function normalizeTypeForDefaults(t: unknown): (typeof VALID_ACCOUNT_TYPES)[numb
 export function AccountForm({ open, onOpenChange, account, onSuccess, initialAccountLimit, variant = "dialog" }: AccountFormProps) {
   const t = useTranslations("common");
   const tForms = useTranslations("forms");
+  const tAcc = useTranslations("accounts");
   const { toast } = useToast();
   const [households, setHouseholds] = useState<Household[]>([]);
   const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
@@ -98,11 +99,18 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
     if (account) {
       const typeValue = normalizeTypeForDefaults(account.type ?? account.accountType);
       const ownerIds = account.ownerIds?.length ? account.ownerIds : account.userId ? [account.userId] : [];
+      // For credit cards, store current balance as positive (amount owed) in the form; DB has negative
+      const initialBalance =
+        typeValue === "credit" && account.initialBalance != null
+          ? -Number(account.initialBalance)
+          : account.initialBalance != null
+            ? Number(account.initialBalance)
+            : undefined;
       return {
         name: account.name ?? "",
         type: typeValue,
         creditLimit: account.creditLimit != null ? Number(account.creditLimit) : undefined,
-        initialBalance: account.initialBalance != null ? Number(account.initialBalance) : undefined,
+        initialBalance,
         ownerIds,
         dueDayOfMonth: account.dueDayOfMonth != null ? Number(account.dueDayOfMonth) : undefined,
       };
@@ -319,6 +327,13 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
       if (data.type === "credit") {
         payload.creditLimit = data.creditLimit ?? null;
         payload.dueDayOfMonth = data.dueDayOfMonth ?? null;
+        // Current balance (amount owed): user enters positive; we store negative in DB
+        payload.initialBalance =
+          data.initialBalance != null && data.initialBalance > 0
+            ? -Math.abs(data.initialBalance)
+            : data.initialBalance != null
+              ? data.initialBalance
+              : 0;
       }
 
       if (data.type === "checking" || data.type === "savings" || data.type === "cash") {
@@ -365,8 +380,8 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
       onSuccess?.();
 
       toast({
-        title: account ? "Account updated" : "Account created",
-        description: account ? "Your account has been updated successfully." : "Your account has been created successfully.",
+        title: account ? "Account updated" : tAcc("accountAdded"),
+        description: account ? "Your account has been updated successfully." : tAcc("accountAddedDescription"),
         variant: "success",
       });
     } catch (error) {
@@ -421,8 +436,10 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                       if (value !== "credit") {
                         form.setValue("creditLimit", undefined);
                       }
-                      // Clear initial balance when changing away from checking/savings/cash
-                      if (value !== "checking" && value !== "savings" && value !== "cash") {
+                      // Clear initial/current balance when switching type so the right field is shown empty
+                      if (value !== "checking" && value !== "savings" && value !== "cash" && value !== "credit") {
+                        form.setValue("initialBalance", undefined);
+                      } else if (value === "credit") {
                         form.setValue("initialBalance", undefined);
                       }
                     }}
@@ -477,16 +494,29 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
               {accountType === "credit" && (
                 <>
                   <div className="space-y-1">
-                    <label className="text-sm font-medium">Credit Limit</label>
+                    <label className="text-sm font-medium">{tAcc("creditLimit")}</label>
                     <DollarAmountInput
                       value={form.watch("creditLimit") || undefined}
                       onChange={(value) => form.setValue("creditLimit", value ?? undefined, { shouldValidate: true })}
-                      placeholder="$ 0.00"
                       size="medium"
                       required
                     />
                     {form.formState.errors.creditLimit && (
                       <p className="text-sm text-destructive">{form.formState.errors.creditLimit.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">{tAcc("currentBalance")}</label>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {tAcc("currentBalanceCreditHint")}
+                    </p>
+                    <DollarAmountInput
+                      value={form.watch("initialBalance") ?? undefined}
+                      onChange={(value) => form.setValue("initialBalance", value !== undefined ? value : undefined, { shouldValidate: true })}
+                      size="medium"
+                    />
+                    {form.formState.errors.initialBalance && (
+                      <p className="text-sm text-destructive">{form.formState.errors.initialBalance.message}</p>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -519,7 +549,6 @@ export function AccountForm({ open, onOpenChange, account, onSuccess, initialAcc
                   <DollarAmountInput
                     value={form.watch("initialBalance") ?? undefined}
                     onChange={(value) => form.setValue("initialBalance", value !== undefined ? value : undefined, { shouldValidate: true })}
-                    placeholder="$ 0.00"
                     size="medium"
                   />
                   {form.formState.errors.initialBalance && (

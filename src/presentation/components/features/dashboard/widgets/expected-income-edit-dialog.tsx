@@ -337,7 +337,6 @@ export function ExpectedIncomeEditDialog({
                       id={`income-${key}`}
                       value={memberIncomes[key] || undefined}
                       onChange={(value) => setMemberIncome(key, value)}
-                      placeholder="$ 0.00"
                       className="w-full"
                     />
                   </div>

@@ -18,7 +18,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { AccountForm } from "@/components/forms/account-form";
 import { Wallet } from "lucide-react";
-import { useToast } from "@/components/toast-provider";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 
 interface AddAccountSheetProps {
@@ -35,7 +34,6 @@ export function AddAccountSheet({
   canWrite = true,
 }: AddAccountSheetProps) {
   const tAcc = useTranslations("accounts");
-  const { toast } = useToast();
   const breakpoint = useBreakpoint();
   const isDesktop = breakpoint === "lg" || breakpoint === "xl" || breakpoint === "2xl";
   const [showManualForm, setShowManualForm] = useState(false);
@@ -45,11 +43,7 @@ export function AddAccountSheet({
     onOpenChange(false);
     window.dispatchEvent(new CustomEvent("account-created"));
     onSuccess?.();
-    toast({
-      title: tAcc("accountAdded"),
-      description: tAcc("accountAddedDescription"),
-      variant: "success",
-    });
+    // Toast is shown by AccountForm to avoid duplicate banners
   };
 
   if (showManualForm) {

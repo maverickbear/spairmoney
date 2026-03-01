@@ -200,7 +200,12 @@ export class AccountsService {
       type: data.type,
       userId: accountUserId,
       creditLimit: data.type === "credit" ? data.creditLimit : null,
-      initialBalance: (data.type === "checking" || data.type === "savings" || data.type === "cash" || data.type === "other") ? (data.initialBalance ?? 0) : null,
+      initialBalance:
+        data.type === "checking" || data.type === "savings" || data.type === "cash" || data.type === "other"
+          ? (data.initialBalance ?? 0)
+          : data.type === "credit"
+            ? (data.initialBalance ?? 0)
+            : null,
       dueDayOfMonth: data.type === "credit" ? (data.dueDayOfMonth ?? null) : null,
       currencyCode: data.currencyCode || 'USD',
       householdId: householdId,
@@ -230,7 +235,7 @@ export class AccountsService {
     if (data.type !== undefined) {
       if (data.type === "credit") {
         updateData.creditLimit = data.creditLimit ?? null;
-        updateData.initialBalance = null;
+        updateData.initialBalance = data.initialBalance ?? 0;
         if (data.dueDayOfMonth !== undefined) {
           updateData.dueDayOfMonth = data.dueDayOfMonth;
         }
@@ -245,6 +250,8 @@ export class AccountsService {
     // Handle initialBalance based on type
     if (data.type !== undefined) {
       if (data.type === "checking" || data.type === "savings" || data.type === "cash" || data.type === "other") {
+        updateData.initialBalance = data.initialBalance ?? 0;
+      } else if (data.type === "credit") {
         updateData.initialBalance = data.initialBalance ?? 0;
       } else {
         updateData.initialBalance = null;

@@ -100,6 +100,8 @@ interface Account {
   name: string;
   type: string;
   isDefault?: boolean;
+  householdName?: string | null;
+  owners?: Array<{ id: string; name: string | null; avatarUrl: string | null }>;
 }
 
 // Account type i18n keys (used with tForms)
@@ -131,6 +133,21 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
   const tTx = useTranslations("transactions");
   const locale = useLocale();
   const getAccountTypeLabel = (type: string) => tForms((ACCOUNT_TYPE_KEYS[type.toLowerCase()] || "accountTypeOther") as "accountTypeChecking");
+
+  /** Builds account label with type and optional owner/household so duplicate names are distinguishable */
+  const getAccountDisplayLabel = (account: Account): string => {
+    const typeLabel = getAccountTypeLabel(account.type);
+    const base = `${account.name} (${typeLabel})`;
+    if (account.householdName?.trim()) {
+      return `${base} · ${account.householdName.trim()}`;
+    }
+    if (account.owners?.length) {
+      const names = account.owners.map((o) => o.name).filter(Boolean).join(", ");
+      if (names) return `${base} · ${names}`;
+    }
+    return base;
+  };
+
   // Set date after component mounts to avoid SSR/prerendering issues
   const [defaultDate, setDefaultDate] = useState<Date | null>(null);
 
@@ -1032,7 +1049,6 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                     const numValue = value ?? 0;
                     form.setValue("amount", numValue > 0 ? numValue : 0.01, { shouldValidate: true });
                   }}
-                  placeholder="$ 0.00"
                   size="medium"
                   required
                 />
@@ -1045,7 +1061,13 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
 
               <div className="space-y-1">
                 <label className="text-sm font-medium">
-                  {form.watch("type") === "transfer" ? tForms("fromAccountLabel") : tForms("accountLabel")}
+                  {form.watch("type") === "transfer"
+                    ? (() => {
+                        const selected = accounts.find((acc) => acc.id === form.watch("accountId"));
+                        const isToAccount = selected?.type === "credit";
+                        return isToAccount ? tForms("toAccountLabel") : tForms("fromAccountLabel");
+                      })()
+                    : tForms("accountLabel")}
                 </label>
                 <Select
                   value={form.watch("accountId") || ""}
@@ -1060,7 +1082,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                   <SelectContent>
                     {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name} ({getAccountTypeLabel(account.type)})
+                        {getAccountDisplayLabel(account)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1146,7 +1168,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                           .filter((account) => account.id !== form.watch("accountId") && account.type !== "credit")
                           .map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name} ({getAccountTypeLabel(account.type)})
+                              {getAccountDisplayLabel(account)}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -1184,7 +1206,7 @@ export function TransactionForm({ open, onOpenChange, transaction, plannedPaymen
                           .filter((account) => account.id !== form.watch("accountId"))
                           .map((account) => (
                             <SelectItem key={account.id} value={account.id}>
-                              {account.name} ({getAccountTypeLabel(account.type)})
+                              {getAccountDisplayLabel(account)}
                             </SelectItem>
                           ))}
                       </SelectContent>

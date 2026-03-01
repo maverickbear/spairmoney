@@ -11,7 +11,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Loader2, AlertCircle, HelpCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
-import { setTrustedBrowser } from "@/lib/utils/trusted-browser";
+import { registerTrustedDevice } from "@/lib/utils/trusted-browser";
 
 /**
  * Preloads user, profile, and billing data into global caches
@@ -599,9 +599,9 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
           localStorage.setItem("lastAuthMethod", "google");
         }
 
-        // Store trusted browser if user checked the option
-        if (trustBrowser && email) {
-          setTrustedBrowser(email);
+        // Register this device as trusted in Supabase if user checked the option
+        if (trustBrowser) {
+          await registerTrustedDevice();
         }
 
         // Wait for session to propagate
@@ -877,7 +877,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
               htmlFor="trust-browser"
               className="text-sm text-foreground cursor-pointer select-none"
             >
-              {t("dontAskAgainBrowser")}
+              {t("askAgainIn30Days")}
             </label>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -890,7 +890,7 @@ export function VerifyOtpForm({ email: propEmail }: VerifyOtpFormProps) {
                   <HelpCircle className="w-4 h-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" title={t("trustedBrowserTooltip")} className="max-w-[280px] whitespace-normal">
+              <TooltipContent side="right" title={t("trustedBrowser")}>
                 {t("trustedBrowserTooltip")}
               </TooltipContent>
             </Tooltip>

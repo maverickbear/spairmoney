@@ -453,7 +453,6 @@ export function BudgetForm({
             <DollarAmountInput
               value={form.watch("amount") || undefined}
               onChange={(value) => form.setValue("amount", value ?? 0, { shouldValidate: true })}
-              placeholder="$ 0.00"
               size="medium"
             />
             {form.formState.errors.amount && (
