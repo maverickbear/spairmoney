@@ -146,7 +146,6 @@ type SubcategoryUpdateData = {
 type SystemSettingsUpdateData = {
   updated_at: string;
   maintenance_mode?: boolean;
-  seo_settings?: Record<string, unknown>;
 };
 
 type PlanUpdateData = {
@@ -968,12 +967,52 @@ export class AdminRepository {
   }
 
   /**
-   * Get system settings
+   * Get SEO settings from dedicated table
    */
-  async getSystemSettings(): Promise<{ maintenanceMode: boolean; seoSettings?: SeoSettings }> {
+  async getSeoSettings(): Promise<SeoSettings | undefined> {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase
+      .from("system_seo_settings")
+      .select("payload")
+      .eq("id", "default")
+      .maybeSingle();
+
+    if (error) {
+      if (isAbortError(error)) return undefined;
+      logger.error("[AdminRepository] Error fetching SEO settings:", error);
+      throw new Error(`Failed to fetch SEO settings: ${error.message}`);
+    }
+    return data?.payload as SeoSettings | undefined;
+  }
+
+  /**
+   * Upsert SEO settings in dedicated table
+   */
+  async updateSeoSettings(payload: SeoSettings): Promise<SeoSettings> {
+    const supabase = createServiceRoleClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("system_seo_settings")
+      .upsert(
+        { id: "default", payload, updated_at: now },
+        { onConflict: "id" }
+      )
+      .select("payload")
+      .single();
+
+    if (error) {
+      logger.error("[AdminRepository] Error updating SEO settings:", error);
+      throw new Error(`Failed to update SEO settings: ${error.message}`);
+    }
+    return (data?.payload ?? payload) as SeoSettings;
+  }
+
+  /**
+   * Get system settings (maintenance mode only; SEO lives in system_seo_settings)
+   */
+  async getSystemSettings(): Promise<{ maintenanceMode: boolean }> {
     const supabase = createServiceRoleClient();
 
-    // Use system_settings table
     const { data: settings, error } = await supabase
       .from("system_config_settings")
       .select("*")
@@ -981,8 +1020,6 @@ export class AdminRepository {
       .single();
 
     if (error && error.code !== "PGRST116") {
-      // PGRST116 is "not found" - we'll return default if it doesn't exist
-      
       const errorMessage = error.message || "";
       if (isAbortError(error) ||
           errorMessage.includes("prerender") ||
@@ -991,52 +1028,40 @@ export class AdminRepository {
         return { maintenanceMode: false };
       }
       logger.error("[AdminRepository] Error fetching system settings:", error);
-      
-      // Check if the error is due to HTML response (misconfigured Supabase URL)
-      if (errorMessage.includes("<html>") || 
+      if (errorMessage.includes("<html>") ||
           errorMessage.includes("500 Internal Server Error") ||
           errorMessage.includes("cloudflare")) {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "not set";
         throw new Error(
           `Failed to fetch system settings: Supabase URL appears to be misconfigured. ` +
-          `Received HTML error page instead of JSON response. ` +
-          `Please verify NEXT_PUBLIC_SUPABASE_URL points to your Supabase project (should end with .supabase.co), ` +
-          `not your app domain. Current URL: ${supabaseUrl.substring(0, 50)}...`
+          `Please verify NEXT_PUBLIC_SUPABASE_URL. Current URL: ${supabaseUrl.substring(0, 50)}...`
         );
       }
-      
       throw new Error(`Failed to fetch system settings: ${error.message}`);
     }
 
-    // If no settings exist, return default
     if (!settings) {
       return { maintenanceMode: false };
     }
 
     return {
       maintenanceMode: settings.maintenance_mode || false,
-      seoSettings: settings.seo_settings || undefined,
     };
   }
 
   /**
-   * Update system settings
+   * Update system settings (maintenance mode only; SEO is updated via updateSeoSettings)
    */
-  async updateSystemSettings(data: { maintenanceMode?: boolean; seoSettings?: SeoSettings }): Promise<{ maintenanceMode: boolean; seoSettings?: SeoSettings }> {
+  async updateSystemSettings(data: { maintenanceMode?: boolean }): Promise<{ maintenanceMode: boolean }> {
     const supabase = createServiceRoleClient();
 
-    // Try to update existing settings
     const updateData: SystemSettingsUpdateData = {
       updated_at: new Date().toISOString(),
     };
     if (data.maintenanceMode !== undefined) {
       updateData.maintenance_mode = data.maintenanceMode;
     }
-    if (data.seoSettings !== undefined) {
-      updateData.seo_settings = data.seoSettings;
-    }
 
-    // Use system_settings table
     const { data: updatedSettings, error: updateError } = await supabase
       .from("system_config_settings")
       .update(updateData)
@@ -1044,17 +1069,13 @@ export class AdminRepository {
       .select()
       .single();
 
-    // If update failed because row doesn't exist, create it
     if (updateError && updateError.code === "PGRST116") {
-      const insertPayload: Record<string, unknown> = {
+      const insertPayload = {
         id: "default",
         maintenance_mode: data.maintenanceMode ?? false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      if (data.seoSettings !== undefined) {
-        insertPayload.seo_settings = data.seoSettings;
-      }
       const { data: newSettings, error: insertError } = await supabase
         .from("system_config_settings")
         .insert(insertPayload)
@@ -1065,11 +1086,7 @@ export class AdminRepository {
         logger.error("[AdminRepository] Error creating system settings:", insertError);
         throw new Error(`Failed to create system settings: ${insertError.message}`);
       }
-
-      return {
-        maintenanceMode: newSettings.maintenance_mode,
-        seoSettings: newSettings.seo_settings ?? undefined,
-      };
+      return { maintenanceMode: newSettings.maintenance_mode };
     }
 
     if (updateError) {
@@ -1079,7 +1096,6 @@ export class AdminRepository {
 
     return {
       maintenanceMode: updatedSettings?.maintenance_mode ?? false,
-      seoSettings: updatedSettings?.seo_settings ?? undefined,
     };
   }
 

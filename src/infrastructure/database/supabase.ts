@@ -618,10 +618,19 @@ export interface Database {
           maintenance_mode: boolean;
           created_at: string;
           updated_at: string;
-          seo_settings: Record<string, unknown> | null;
         };
         Insert: Omit<Database['public']['Tables']['system_config_settings']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['system_config_settings']['Insert']>;
+      };
+      system_seo_settings: {
+        Row: {
+          id: string;
+          payload: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['system_seo_settings']['Row'], 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['system_seo_settings']['Insert']>;
       };
       system_jobs_imports: {
         Row: {

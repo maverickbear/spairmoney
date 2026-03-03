@@ -424,9 +424,9 @@ export class AdminService {
   }
 
   /**
-   * Get system settings
+   * Get system settings (maintenance mode only)
    */
-  async getSystemSettings(): Promise<{ maintenanceMode: boolean; seoSettings?: SEOSettings }> {
+  async getSystemSettings(): Promise<{ maintenanceMode: boolean }> {
     return this.repository.getSystemSettings();
   }
 
@@ -434,21 +434,18 @@ export class AdminService {
    * Get public system settings (no authentication required)
    */
   async getPublicSystemSettings(): Promise<{ maintenanceMode: boolean }> {
-    const settings = await this.repository.getSystemSettings();
-    return {
-      maintenanceMode: settings.maintenanceMode || false,
-    };
+    return this.repository.getSystemSettings();
   }
 
   /**
    * Get public SEO settings (no authentication required)
    */
   async getPublicSeoSettings(): Promise<any> {
-    const settings = await this.repository.getSystemSettings();
-    if (!settings.seoSettings) {
+    const seoSettings = await this.repository.getSeoSettings();
+    if (!seoSettings) {
       return this.getDefaultSeoSettings();
     }
-    return settings.seoSettings;
+    return seoSettings;
   }
 
   /**
@@ -517,9 +514,9 @@ export class AdminService {
   }
 
   /**
-   * Update system settings
+   * Update system settings (maintenance mode only)
    */
-  async updateSystemSettings(data: { maintenanceMode?: boolean; seoSettings?: SEOSettings }): Promise<{ maintenanceMode: boolean; seoSettings?: SEOSettings }> {
+  async updateSystemSettings(data: { maintenanceMode?: boolean }): Promise<{ maintenanceMode: boolean }> {
     return this.repository.updateSystemSettings(data);
   }
 
@@ -527,8 +524,8 @@ export class AdminService {
    * Get SEO settings
    */
   async getSEOSettings(): Promise<SEOSettings> {
-    const settings = await this.repository.getSystemSettings();
-    return settings.seoSettings || this.getDefaultSeoSettings();
+    const seoSettings = await this.repository.getSeoSettings();
+    return seoSettings ?? this.getDefaultSeoSettings();
   }
 
   /**
@@ -538,14 +535,7 @@ export class AdminService {
     if (!seoSettings.title || !seoSettings.description) {
       throw new AppError("Title and description are required", 400);
     }
-
-    const currentSettings = await this.repository.getSystemSettings();
-    const updatedSettings = await this.repository.updateSystemSettings({
-      ...currentSettings,
-      seoSettings,
-    });
-
-    return updatedSettings.seoSettings || seoSettings;
+    return this.repository.updateSeoSettings(seoSettings);
   }
 
   /**

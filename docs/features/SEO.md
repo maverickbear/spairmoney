@@ -14,7 +14,7 @@ This document describes the SEO setup for the Spair Money landing and blog, what
 
 ### Titles and meta descriptions
 
-- **Landing:** Title and description come from Admin → SEO Settings (Supabase). Fallback `defaultSEOSettings` in `app/[locale]/(landing)/page.tsx` is used when DB is unavailable. Descriptions are unique and keyword-aware.
+- **Landing:** Title and description come from Admin → SEO Settings, stored in the `system_seo_settings` table (Supabase). Fallback `defaultSEOSettings` in `app/[locale]/(landing)/page.tsx` is used when DB is unavailable. Descriptions are unique and keyword-aware.
 - **Blog index:** Title/description from i18n `metadata.blogTitle` and `metadata.blogDescription`. Canonical and OG/Twitter are set.
 - **Blog post:** Unique title (`Post title | Spair Money Blog`), description from post, canonical and OG/Twitter (including article dates and optional OG image). Keywords from post when present.
 

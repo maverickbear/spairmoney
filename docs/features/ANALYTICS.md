@@ -1,6 +1,6 @@
 # Analytics (Landing Page)
 
-Landing page tracking uses **Google Analytics 4 (GA4)**. The Measurement ID is configured in **Admin → SEO Settings** (`googleTagId`), stored in Supabase `system_config_settings.seo_settings`, and loaded by the client via `GET /api/seo-settings/public`. The tag is injected in the root layout ([components/common/google-tag.tsx](../../components/common/google-tag.tsx)) and runs on all pages; filter in GA4 by page path to analyze landing-only traffic.
+Landing page tracking uses **Google Analytics 4 (GA4)**. The Measurement ID is configured in **Admin → SEO Settings** (`googleTagId`), stored in the `system_seo_settings` table (Supabase), and loaded by the client via `GET /api/seo-settings/public`. The tag is injected in the root layout ([components/common/google-tag.tsx](../../components/common/google-tag.tsx)) and runs on all pages; filter in GA4 by page path to analyze landing-only traffic.
 
 ## Traffic sources (“de onde vêm”)
 

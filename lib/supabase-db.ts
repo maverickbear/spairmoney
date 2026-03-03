@@ -521,7 +521,6 @@ export interface Database {
       maintenanceMode: boolean;
       createdAt: string;
       updatedAt: string;
-      seoSettings: Record<string, unknown> | null;
     };
     errorCodes: {
       code: string;
