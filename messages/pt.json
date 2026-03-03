@@ -342,6 +342,20 @@
       "nextTestimonial": "Próximo depoimento",
       "goToTestimonial": "Ir ao depoimento {index}"
     },
+    "trust": {
+      "headline": "As pessoas não precisam de mais apps de orçamento.",
+      "subline": "Elas precisam de clareza.",
+      "testimonial0Quote": "Achava que me virava bem com dinheiro até o Spair me mostrar R$ 300 em assinaturas.",
+      "testimonial0Name": "— Usuário",
+      "testimonial1Quote": "Finalmente entendi por que minhas economias não cresciam.",
+      "testimonial1Name": "— Usuário",
+      "testimonial2Quote": "Finalmente, um lugar onde vejo tudo. Chega de planilhas. Orçamentos e o Spair Score realmente me ajudam a me manter no rumo.",
+      "testimonial2Name": "James W.",
+      "testimonial3Quote": "Simples e claro. Minhas finanças finalmente fazem sentido. O painel é exatamente o que eu precisava.",
+      "testimonial3Name": "Sarah L.",
+      "testimonial4Quote": "Controlar gastos era um sacrifício. Agora leva segundos. As sugestões de categoria são certeiras.",
+      "testimonial4Name": "Emily C."
+    },
     "featuresThreeColumn": {
       "item1Title": "O Spair categoriza seus gastos.",
       "item1Description": "Categorias automáticas e tendências semanais ou mensais mostram para onde vai seu dinheiro.",
@@ -1775,7 +1789,7 @@
         "q10": "Como o app sabe qual categoria usar?",
         "a10": "O app aprende com como você categorizou no passado. Sugere a categoria mais provável ao adicionar ou importar. Quanto mais usar, melhor fica.",
         "q11": "Como removo uma conta?",
-        "a11": "Você pode excluir uma conta na seção Contas. As transações ficam até você excluí-las.",
+        "a11": "Vá em Contas no app, encontre a conta que deseja remover e toque no ícone de lixeira dessa conta. Confirme a exclusão. Se a conta tiver transações, você pode optar por transferi-las para outra conta antes de excluir. Você pode adicionar a mesma conta de novo depois, se quiser.",
         "q12": "Como adiciono ou removo membros do lar?",
         "a12": "No plano {planName}, vá na seção Membros nas configurações. Convide por e-mail; eles recebem o convite e podem entrar. Você pode ver e gerenciar todos."
       },

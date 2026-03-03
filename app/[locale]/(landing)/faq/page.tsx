@@ -217,7 +217,7 @@ export default function FAQPage() {
                       </h3>
                       <div className="mt-2">
                         {typeof faq.answer === "string" ? (
-                          <p className="text-sm leading-relaxed text-muted-foreground">
+                          <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
                             {faq.answer}
                           </p>
                         ) : (

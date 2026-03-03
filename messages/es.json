@@ -260,6 +260,20 @@
       "nextTestimonial": "Siguiente testimonio",
       "goToTestimonial": "Ir al testimonio {index}"
     },
+    "trust": {
+      "headline": "La gente no necesita más apps de presupuesto.",
+      "subline": "Necesitan claridad.",
+      "testimonial0Quote": "Creía que me manejaba bien con el dinero hasta que Spair me mostró $300 en suscripciones.",
+      "testimonial0Name": "— Usuario",
+      "testimonial1Quote": "Por fin entiendo por qué mis ahorros no crecían.",
+      "testimonial1Name": "— Usuario",
+      "testimonial2Quote": "Por fin, un lugar donde veo todo. Sin más hojas de cálculo. Los presupuestos y el Spair Score me ayudan a mantenerme en el camino.",
+      "testimonial2Name": "James W.",
+      "testimonial3Quote": "Simple y claro. Mis finanzas por fin tienen sentido. El panel es exactamente lo que necesitaba.",
+      "testimonial3Name": "Sarah L.",
+      "testimonial4Quote": "Controlar gastos era una tarea. Ahora toma segundos. Las sugerencias de categoría son acertadas.",
+      "testimonial4Name": "Emily C."
+    },
     "featuresThreeColumn": {
       "item1Title": "Spair categoriza tus gastos.",
       "item1Description": "Categorías automáticas y tendencias semanales o mensuales muestran a dónde va realmente tu dinero.",
@@ -1637,7 +1651,7 @@
         "q10": "¿Cómo sabe la app qué categoría usar?",
         "a10": "La app aprende de cómo has categorizado antes. Sugiere la categoría más probable al añadir o importar. Cuanto más la uses, más mejora.",
         "q11": "¿Cómo elimino una cuenta?",
-        "a11": "Puedes eliminar una cuenta desde la sección Cuentas. Las transacciones siguen hasta que las borres.",
+        "a11": "Ve a Cuentas en la app, localiza la cuenta que quieres eliminar y pulsa el icono de papelera en esa cuenta. Confirma la eliminación. Si la cuenta tiene transacciones, puedes optar por transferirlas a otra cuenta antes de eliminarla. Puedes volver a añadir la misma cuenta más tarde si quieres.",
         "q12": "¿Cómo añado o quito miembros del hogar?",
         "a12": "En el plan {planName}, ve a la sección Miembros en la configuración. Invitas por correo; ellos reciben la invitación y pueden unirse. Tú puedes ver y gestionar a todos."
       },

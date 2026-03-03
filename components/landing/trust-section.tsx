@@ -4,39 +4,43 @@ import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { useInView } from "@/hooks/use-in-view";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 
-const TESTIMONIALS = [
-  { stars: 5, quote: "I thought I was good with money until Spair showed me $300 in subscriptions.", name: "— User" },
-  { stars: 5, quote: "I finally understand why my savings weren't growing.", name: "— User" },
-  { stars: 5, quote: "Finally, one place where I see everything. No more spreadsheets. Budgets and the Spair Score actually help me stay on track.", name: "James W." },
-  { stars: 5, quote: "Simple and clear. My finances finally make sense. The dashboard is exactly what I needed.", name: "Sarah L." },
-  { stars: 5, quote: "Tracking expenses used to be a chore. Now it takes seconds. Category suggestions are spot on.", name: "Emily C." },
-];
-
+const TESTIMONIAL_KEYS = [0, 1, 2, 3, 4] as const;
 const AUTO_ADVANCE_MS = 5000;
 
 export function TrustSection() {
+  const t = useTranslations("landing.trust");
   const tAria = useTranslations("landing.aria");
   const { ref, inView } = useInView();
   const [index, setIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
+  const testimonials = useMemo(
+    () =>
+      TESTIMONIAL_KEYS.map((i) => ({
+        stars: 5,
+        quote: t(`testimonial${i}Quote`),
+        name: t(`testimonial${i}Name`),
+      })),
+    [t]
+  );
+
   const goTo = useCallback((i: number) => {
     setIndex((prev) => {
-      const next = i < 0 ? TESTIMONIALS.length - 1 : i >= TESTIMONIALS.length ? 0 : i;
+      const next = i < 0 ? testimonials.length - 1 : i >= testimonials.length ? 0 : i;
       return next;
     });
-  }, []);
+  }, [testimonials.length]);
 
   useEffect(() => {
     if (!inView || isPaused) return;
-    const t = setInterval(() => goTo(index + 1), AUTO_ADVANCE_MS);
-    return () => clearInterval(t);
+    const id = setInterval(() => goTo(index + 1), AUTO_ADVANCE_MS);
+    return () => clearInterval(id);
   }, [inView, isPaused, index, goTo]);
 
-  const t = TESTIMONIALS[index];
+  const current = testimonials[index];
 
   return (
     <section ref={ref} className={cn("py-16 md:py-24 bg-muted/40 text-foreground transition-all duration-700", inView ? "opacity-100" : "opacity-0")}>
@@ -46,8 +50,8 @@ export function TrustSection() {
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">People don&apos;t need more budgeting apps.</h2>
-          <p className="text-muted-foreground text-center mb-6">They need clarity.</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">{t("headline")}</h2>
+          <p className="text-muted-foreground text-center mb-6">{t("subline")}</p>
           <div className="relative flex items-center gap-2">
             <button
               type="button"
@@ -63,16 +67,16 @@ export function TrustSection() {
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                       key={star}
-                      className={cn("h-5 w-5", star <= t.stars ? "fill-foreground text-foreground" : "text-muted-foreground/40")}
+                      className={cn("h-5 w-5", star <= current.stars ? "fill-foreground text-foreground" : "text-muted-foreground/40")}
                     />
                   ))}
                 </div>
                 <p className="text-foreground text-sm md:text-base leading-relaxed max-w-xl mx-auto">
-                  &ldquo;{t.quote}&rdquo;
+                  &ldquo;{current.quote}&rdquo;
                 </p>
-                <p className="mt-4 font-semibold text-foreground">{t.name}</p>
+                <p className="mt-4 font-semibold text-foreground">{current.name}</p>
                 <div className="flex flex-wrap justify-center gap-2 sm:gap-1.5 mt-6">
-                  {TESTIMONIALS.map((_, i) => (
+                  {testimonials.map((_, i) => (
                     <button
                       key={i}
                       type="button"
