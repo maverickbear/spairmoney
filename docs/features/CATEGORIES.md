@@ -58,12 +58,17 @@ Custom categories and their subcategories are used in transactions the same way 
 
 ## Infrastructure
 
-- `src/infrastructure/database/repositories/categories.repository.ts`: CRUD for `categories` and `subcategories` (snake_case). List methods filter by `is_system = true` or `household_id = current user’s active household`. Tables have `household_id` (nullable, FK to `households`); no `user_id` column. RLS restricts access by household membership; API GET `/api/v2/categories/[id]` also enforces access.
+- `src/infrastructure/database/repositories/categories.repository.ts`: CRUD for `categories` and `subcategories` (snake_case). List methods filter by `is_system = true` or `household_id = current user’s active household`. Tables have `household_id` (nullable, FK to `households`). **Household members:** Any user who is an active member of a household (including members invited by the owner) has the same access as the owner to that household’s custom categories: they see them in lists, can create, edit, and delete. The member’s active household is set when they accept the invite (`acceptInvitation` sets `system_user_active_households`). RLS must allow access by household membership: run `scripts/categories-household-rls.sql` so that SELECT/INSERT/UPDATE/DELETE on `categories` and `subcategories` are allowed when the row’s `household_id` is one of the households where the current user is an active member (or when `is_system = true` for read/update/delete). API GET `/api/v2/categories/[id]` also enforces access in application logic.
 
 ## Dependencies
 
 - Used by: Transactions, Budgets, Reports, Dashboard (spending breakdown). Onboarding may reference default categories.
 
+## Household members
+
+- **Householder (owner)** and **household members** (users invited to the same household) share the same custom categories. When a member accepts an invite, their active household is set to that household (`system_user_active_households`), so they see the same categories as the owner and can create, edit, and delete custom categories for that household.
+- **Database:** Ensure RLS on `categories` and `subcategories` allows any active household member to read/write rows for that household. Run `scripts/categories-household-rls.sql` in the Supabase SQL Editor if policies are missing or only allowed the owner.
+
 ## Subscription / Access
 
-- Authenticated users. Creating and editing **custom** categories and subcategories requires a paid plan (`guardWriteAccess`). System categories are read-only for name/type; adding subcategories to system categories also requires a paid plan.
+- Authenticated users. Creating and editing **custom** categories and subcategories requires a paid plan (`guardWriteAccess`). System categories are read-only for name/type; adding subcategories to system categories also requires a paid plan. Household members use the household’s subscription for `canUserWrite`.

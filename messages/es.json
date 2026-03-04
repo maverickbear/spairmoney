@@ -543,6 +543,33 @@
   "pages": {
     "insights": "Insights y Acciones del Spair Score"
   },
+  "insights": {
+    "description": "Insights personalizados y pasos accionables para mejorar tu salud financiera",
+    "panoramaFallback": "Aquí está tu resumen financiero de este mes.",
+    "income": "Ingresos",
+    "expenses": "Gastos",
+    "savingsRate": "Tasa de ahorro",
+    "debtLoad": "Carga de deuda",
+    "emergencyFund": "Fondo de emergencia",
+    "monthsOfExpenses": "meses de gastos",
+    "spendingActions": "Gastos",
+    "debtActions": "Deudas",
+    "securityActions": "Seguridad",
+    "habits": "Hábitos",
+    "action": "Qué puedes hacer",
+    "loading": "Cargando insights…",
+    "errorLoading": "No se pudieron cargar los insights. Mostrando tus números y puntuación.",
+    "noData": "Añade transacciones de este mes para ver insights personalizados.",
+    "greatJob": "¡Buen trabajo!",
+    "greatJobDescription": "Tu Spair Score se ve bien. ¡Sigue así!",
+    "currentSpairScore": "Spair Score actual",
+    "spendingDiscipline": "Disciplina de gastos",
+    "debtExposure": "Exposición a la deuda",
+    "items": "{count, plural, one {# elemento} other {# elementos}}",
+    "highImpact": "Alto impacto",
+    "mediumImpact": "Impacto medio",
+    "lowImpact": "Bajo impacto"
+  },
   "dashboard": {
     "dashboardTitle": "Finanzas de {name} en un vistazo",
     "namePossessive": " – ",

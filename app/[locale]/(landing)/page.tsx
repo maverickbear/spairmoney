@@ -51,9 +51,10 @@ const defaultSEOSettings = {
     image: "/og-image.png",
     creator: "@spairmoney",
   },
+  fbAppId: "1596526524924732",
 };
 
-/** Fetches SEO from Supabase (system_config_settings.seo_settings). Used by generateMetadata and StructuredData. */
+/** Fetches SEO from system_seo_settings table (Supabase). Used by generateMetadata and StructuredData. */
 async function getSEOSettings() {
   try {
     const { makeAdminService } = await import("@/src/application/admin/admin.factory");
@@ -103,6 +104,7 @@ export async function generateMetadata() {
       description: settings.openGraph.description,
       images: [{ url: ogImageUrl, width: settings.openGraph.imageWidth, height: settings.openGraph.imageHeight, alt: settings.openGraph.imageAlt }],
     },
+    ...(settings.fbAppId ? { other: { "fb:app_id": settings.fbAppId } } : {}),
     twitter: {
       card: settings.twitter.card as "summary" | "summary_large_image",
       title: settings.twitter.title,

@@ -1707,6 +1707,16 @@ export default function TransactionsPage() {
               </div>
             )}
           </div>
+          {/* Date range filter - visible outside drawer for quick access */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+            <DateRangePicker
+              value={dateRange}
+              dateRange={customDateRange}
+              onValueChange={handleDateRangeChange}
+              className="flex-wrap"
+            />
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
           {selectedTransactionIds.size > 0 && (
             <>
@@ -1818,13 +1828,13 @@ export default function TransactionsPage() {
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="medium" 
-                className="text-xs md:text-sm"
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-label={tTx("manualData")}
               >
-                <Download className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
-                <span className="hidden md:inline">{tTx("manualData")}</span>
+                <Download className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -2519,19 +2529,6 @@ export default function TransactionsPage() {
 
           <ScrollArea className="flex-1">
             <div className="space-y-6 px-6 py-4">
-            {/* Date Range */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <label className="text-sm font-medium">{tTx("dateRangeLabel")}</label>
-              </div>
-              <DateRangePicker
-                value={dateRange}
-                dateRange={customDateRange}
-                onValueChange={handleDateRangeChange}
-              />
-            </div>
-
             {/* Account */}
             <div className="space-y-2.5">
               <div className="flex items-center gap-2">

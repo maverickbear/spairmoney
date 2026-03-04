@@ -967,7 +967,7 @@ export class AdminRepository {
   }
 
   /**
-   * Get SEO settings from dedicated table
+   * Get SEO settings. Single source of truth: system_seo_settings table only.
    */
   async getSeoSettings(): Promise<SeoSettings | undefined> {
     const supabase = createServiceRoleClient();
@@ -986,7 +986,7 @@ export class AdminRepository {
   }
 
   /**
-   * Upsert SEO settings in dedicated table
+   * Upsert SEO settings in system_seo_settings table (single source of truth).
    */
   async updateSeoSettings(payload: SeoSettings): Promise<SeoSettings> {
     const supabase = createServiceRoleClient();

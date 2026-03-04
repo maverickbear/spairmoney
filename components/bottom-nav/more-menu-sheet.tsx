@@ -62,8 +62,9 @@ function buildNavCategories(t: (key: string) => string): NavCategory[] {
     {
       title: t("sections.overview"),
       items: [
-        { href: "/reports", label: t("items.reports"), icon: FileText },
+        { href: "/dashboard", label: t("items.dashboard"), icon: LayoutDashboard },
         { href: "/insights", label: t("items.insights"), icon: Lightbulb },
+        { href: "/reports", label: t("items.reports"), icon: FileText },
       ],
     },
     {

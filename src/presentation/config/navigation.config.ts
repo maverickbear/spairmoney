@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  Lightbulb,
   Receipt,
   Target,
   FolderTree,
@@ -54,6 +55,7 @@ export const baseNavSections: NavSection[] = [
     titleKey: "sections.overview",
     items: [
       { href: "/dashboard", label: "Dashboard", labelKey: "items.dashboard", icon: LayoutDashboard },
+      { href: "/insights", label: "Insights", labelKey: "items.insights", icon: Lightbulb },
       { href: "/reports", label: "Reports", labelKey: "items.reports", icon: FileText },
     ],
   },
@@ -129,6 +131,7 @@ export const kbarCommandGroups: KBarCommandGroup[] = [
     title: "Overview",
     commands: [
       { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+      { id: "insights", label: "Insights", icon: Lightbulb, href: "/insights" },
       { id: "reports", label: "Reports", icon: FileText, href: "/reports" },
     ],
   },

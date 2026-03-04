@@ -438,7 +438,8 @@ export class AdminService {
   }
 
   /**
-   * Get public SEO settings (no authentication required)
+   * Get public SEO settings (no authentication required).
+   * Always fetches from system_seo_settings table; uses defaults only when the table has no row.
    */
   async getPublicSeoSettings(): Promise<any> {
     const seoSettings = await this.repository.getSeoSettings();
@@ -449,7 +450,8 @@ export class AdminService {
   }
 
   /**
-   * Get default SEO settings
+   * Default SEO values used only when system_seo_settings has no row (e.g. first deploy).
+   * Not used when the table has data; table is the single source of truth.
    */
   private getDefaultSeoSettings() {
     return {
@@ -489,6 +491,7 @@ export class AdminService {
         image: "/og-image.png",
         creator: "@spairmoney",
       },
+      fbAppId: "1596526524924732",
       organization: {
         name: "Spair Money",
         logo: "/icon-512x512.png",
@@ -521,7 +524,7 @@ export class AdminService {
   }
 
   /**
-   * Get SEO settings
+   * Get SEO settings. Always reads from system_seo_settings table; defaults only when table is empty.
    */
   async getSEOSettings(): Promise<SEOSettings> {
     const seoSettings = await this.repository.getSeoSettings();

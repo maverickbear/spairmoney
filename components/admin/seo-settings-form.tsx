@@ -25,6 +25,8 @@ interface SEOSettings {
     imageHeight: number;
     imageAlt: string;
   };
+  /** Optional. Facebook App ID for fb:app_id meta tag (fixes Facebook sharing warnings). */
+  fbAppId?: string;
   twitter: {
     card: string;
     title: string;
@@ -543,6 +545,19 @@ export function SEOSettingsForm() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fb-app-id">Facebook App ID (fb:app_id)</Label>
+                <Input
+                  id="fb-app-id"
+                  value={settings.fbAppId ?? ""}
+                  onChange={(e) => updateField(["fbAppId"], e.target.value)}
+                  placeholder="e.g. 123456789012345"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. From Facebook for Developers → Your App → App ID. Fixes &quot;Missing Properties: fb:app_id&quot; when sharing.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="og-title">OG Title</Label>
                 <Input

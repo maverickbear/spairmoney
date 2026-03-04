@@ -1,6 +1,7 @@
 import { calculateFinancialHealth } from "@/src/application/shared/financial-health";
 import { getCurrentUserId } from "@/src/application/shared/feature-guard";
 import { makeUserSubscriptionsService } from "@/src/application/user-subscriptions/user-subscriptions.factory";
+import { format } from "date-fns/format";
 import { startOfMonth } from "date-fns/startOfMonth";
 import { endOfMonth } from "date-fns/endOfMonth";
 import { subMonths } from "date-fns/subMonths";
@@ -218,29 +219,23 @@ async function loadDashboardDataInternal(
     return await debtsService.getDebts(accessToken, refreshToken);
   }
 
-  // Fetch essential data for initial render
-  // This allows the page to render quickly while secondary data loads in background
+  // Fetch essential data for initial render.
+  // Use forEffectiveMonth (same as Dashboard API) so Spair Score and Insights use the same "current month" definition.
+  const selectedMonthKey = format(selectedMonth, "yyyy-MM");
   const [
     selectedMonthTransactionsResult,
     accounts,
     budgets,
     upcomingTransactions,
   ] = await Promise.all([
-    transactionsService.getTransactions({ startDate: selectedMonth, endDate: selectedMonthEnd }, accessToken, refreshToken).catch((error) => {
+    transactionsService.getTransactions({ forEffectiveMonth: selectedMonthKey }, accessToken, refreshToken).catch((error) => {
       logger.error("Error fetching selected month transactions:", error);
       return { transactions: [], total: 0 };
     }).then((result) => {
-      // Debug: Log transactions being fetched
       const transactions = Array.isArray(result) ? result : (result?.transactions || []);
-      logger.debug("[DEBUG DataLoader] Fetched transactions:", {
+      logger.debug("[DEBUG DataLoader] Fetched transactions (forEffectiveMonth):", {
         count: transactions.length,
         expenseCount: transactions.filter(t => t.type === "expense").length,
-        expenseTransactions: transactions.filter(t => t.type === "expense").map(t => ({
-          id: t.id,
-          amount: t.amount,
-          date: t.date,
-          description: t.description?.substring(0, 30),
-        })),
       });
       return result;
     }),
